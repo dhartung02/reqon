@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#0e1217" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Pipeline · mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1217; --panel:#161d26; --panel-2:#1b232e; --line:#28333f; --line-2:#33414f;
+    --text:#e9eef4; --text-2:#b2bdc9; --dim:#7c8794;
+    --gold:#edc05a; --teal:#3fd3b4; --green:#9ed35f; --coral:#ef8268; --blue:#86a6dd; --violet:#a78bdb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.45;
+       min-height:100vh;-webkit-font-smoothing:antialiased;padding-bottom:30px}
+
+  /* sticky control bar */
+  .bar{position:sticky;top:0;z-index:20;background:rgba(14,18,23,.93);backdrop-filter:blur(10px);
+       border-bottom:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0)) 12px;
+       padding-top:calc(10px + env(safe-area-inset-top,0))}
+  .brandline{display:flex;align-items:center;gap:8px;color:var(--gold);font-family:"Spline Sans Mono",monospace;
+       font-size:.6rem;letter-spacing:.26em;text-transform:uppercase;margin-bottom:8px}
+  .brandline .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold)}
+  .brandline .right{margin-left:auto;color:var(--dim);letter-spacing:.1em}
+  .brandline a{color:var(--dim);text-decoration:none;border:1px solid var(--line-2);border-radius:7px;padding:3px 7px}
+  h1{font-family:"Fraunces",serif;font-weight:900;font-size:1.45rem;line-height:1;letter-spacing:-.01em;margin-bottom:9px}
+  h1 em{font-style:italic;color:var(--gold)}
+  input#q{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:11px;
+       padding:11px 13px;font-family:inherit;font-size:16px;outline:none}
+  input#q:focus{border-color:var(--gold)}
+  input#q::placeholder{color:var(--dim)}
+
+  .chips{display:flex;gap:7px;overflow-x:auto;padding:9px 0 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;font-family:"Spline Sans Mono",monospace;font-size:.72rem;font-weight:600;padding:8px 13px;
+       border-radius:999px;border:1px solid var(--line-2);color:var(--text-2);background:var(--panel);white-space:nowrap;cursor:pointer}
+  .chip.on{color:#15110a;background:var(--gold);border-color:var(--gold)}
+  .chip.on.tB{background:var(--blue);border-color:var(--blue);color:#0e1217}
+  .chip.on.tC{background:#2a3540;border-color:var(--line-2);color:var(--text)}
+  .selectrow{display:flex;gap:7px;margin-top:8px}
+  select{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;
+       padding:9px 10px;font-family:inherit;font-size:.84rem;outline:none}
+  select:focus{border-color:var(--gold)}
+
+  .kpi{display:flex;gap:8px;padding:11px 12px 0;overflow-x:auto;scrollbar-width:none}
+  .kpi::-webkit-scrollbar{display:none}
+  .kpi .k{flex:1;min-width:96px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+  .kpi .kn{font-family:"Fraunces",serif;font-weight:900;font-size:1.35rem;line-height:1}
+  .kpi .kn.coral{color:var(--coral)}.kpi .kn.gold{color:var(--gold)}.kpi .kn.teal{color:var(--teal)}
+  .kpi .kl{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:3px}
+  .countline{font-family:"Spline Sans Mono",monospace;font-size:.64rem;letter-spacing:.08em;color:var(--dim);
+       text-transform:uppercase;padding:11px 14px 4px}
+
+  .list{padding:4px 12px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:9px;
+       border-left:4px solid var(--line-2);border-right:4px solid transparent;cursor:pointer;transition:background .12s}
+  .card:active{background:var(--panel-2)}
+  .card.tierA{border-left-color:var(--gold)}
+  .card.tierB{border-left-color:var(--blue)}
+  .card.tierC{border-left-color:var(--line-2)}
+  .card.st-applied{border-right-color:var(--green);background:rgba(110,211,95,.06)}
+  .card.st-active{border-right-color:var(--teal);background:rgba(63,211,180,.09)}
+  .card.st-offer{border-right-color:var(--teal);background:rgba(63,211,180,.16)}
+  .card.st-rejected{border-right-color:var(--coral);opacity:.62}
+  .card.st-archived{opacity:.45}
+
+  .ctop{display:flex;justify-content:space-between;align-items:flex-start;gap:11px}
+  .co{font-family:"Spline Sans Mono",monospace;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+  .role{font-size:.96rem;font-weight:600;line-height:1.25}
+  .tag{font-family:"Spline Sans Mono",monospace;font-size:.6rem;font-weight:700;padding:3px 7px;border-radius:5px;flex:none}
+  .tag.A{background:var(--gold);color:#15110a}.tag.B{background:var(--blue);color:#0e1217}.tag.C{background:#2a3540;color:var(--text-2)}
+
+  .ev{display:flex;flex-direction:column;align-items:center;min-width:46px}
+  .ev .n{font-family:"Fraunces",serif;font-weight:900;font-size:1.3rem;line-height:1;color:var(--gold)}
+  .ev .l{font-family:"Spline Sans Mono",monospace;font-size:.5rem;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+
+  .pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .pill{font-family:"Spline Sans Mono",monospace;font-size:.6rem;padding:3px 8px;border-radius:999px;
+       border:1px solid var(--line-2);color:var(--text-2);white-space:nowrap}
+  .pill.remote{color:#0e1217;background:var(--teal);border-color:var(--teal);font-weight:700}
+  .pill.flex{color:#0e1217;background:var(--gold);border-color:var(--gold);font-weight:700}
+  .pill.onsite{color:#0e1217;background:var(--coral);border-color:var(--coral);font-weight:700}
+  .pill.sal{color:var(--text);border-color:#3a4a44;background:#13201c}
+  .pill.verified{color:var(--teal);border-color:#2f5650;background:#10302b66}
+  .pill.boardonly{color:var(--gold);border-color:#5a4a26;background:#2c2412aa}
+  .pill.unverified{color:var(--coral);border-color:#54322b;background:#2f1a1666}
+  .pill.sector{color:var(--blue);border-color:#324563;background:#16202e}
+  .pill.source{color:var(--violet);border-color:#3b3160;background:#1b1730}
+  .pill.status{color:var(--text-2)}
+  .pill.status.applied{color:var(--green);border-color:#3a5a2a;background:#16240f}
+  .pill.status.active{color:var(--teal);border-color:#2f5650;background:#10302b66}
+  .pill.status.offer{color:#0e1217;background:var(--teal);font-weight:700}
+  .pill.status.rejected{color:var(--coral);border-color:#54322b;background:#2f1a1666}
+
+  .scores{display:flex;gap:14px;margin-top:10px}
+  .sc{display:flex;align-items:baseline;gap:4px}
+  .sc b{font-family:"Fraunces",serif;font-weight:900;font-size:1rem}
+  .sc span{font-family:"Spline Sans Mono",monospace;font-size:.56rem;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}
+
+  .detail{display:none;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line-2)}
+  .card.open .detail{display:block}
+  .card .caret{color:var(--dim);font-size:.7rem;margin-top:6px;transition:transform .15s}
+  .card.open .caret{transform:rotate(180deg)}
+  .drow{display:flex;gap:8px;margin-bottom:7px;font-size:.82rem}
+  .drow .k{font-family:"Spline Sans Mono",monospace;font-size:.58rem;letter-spacing:.06em;text-transform:uppercase;
+       color:var(--dim);min-width:74px;flex:none;padding-top:2px}
+  .drow .v{color:var(--text-2)}
+  .notes{color:var(--text-2);font-size:.84rem;line-height:1.5;margin:4px 0 12px}
+  .applybtn{display:block;text-align:center;background:var(--gold);color:#15110a;text-decoration:none;font-weight:700;
+       border-radius:11px;padding:13px;font-size:.92rem}
+  .applybtn.dim{background:transparent;color:var(--text-2);border:1px solid var(--line-2)}
+
+  /* quick-add */
+  .addbtn{flex:none;background:var(--panel);border:1px solid var(--line-2);color:var(--text-2);border-radius:10px;
+       padding:9px 13px;font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer}
+  .addbtn.primary{background:var(--gold);color:#15110a;border-color:var(--gold);flex:1}
+  .addbtn.ghost{flex:none}
+  .addform{display:none;margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px;gap:8px;flex-direction:column}
+  .addform.open{display:flex}
+  .addform input{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line-2);color:var(--text);
+       border-radius:9px;padding:11px;font-size:16px;outline:none}
+  .addform input:focus{border-color:var(--gold)}
+  .addform .arow{display:flex;gap:8px}
+  .addform .arow input{flex:1}
+  .amsg{font-size:.78rem;min-height:0}
+  .amsg.ok{color:var(--green)}.amsg.err{color:var(--coral)}
+  .ahint{color:var(--dim);font-size:.7rem;line-height:1.4}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#1b232e;border:1px solid var(--line-2);
+       color:var(--text);padding:11px 18px;border-radius:11px;font-size:.85rem;opacity:0;pointer-events:none;transition:.22s;z-index:40;box-shadow:0 12px 30px -10px #000}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.ok{border-color:#3a5a2a}.toast.err{border-color:#54322b}
+  .loading,.empty{text-align:center;color:var(--text-2);padding:70px 18px;font-family:"Spline Sans Mono",monospace;letter-spacing:.08em}
+  footer{color:var(--dim);font-size:.7rem;line-height:1.55;padding:22px 16px 8px;border-top:1px solid var(--line);margin-top:14px}
+
+  /* expand/collapse-all controls (in the count line) */
+  .allctl{display:inline-flex;gap:7px;margin-left:auto}
+  .allctl button{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:8px;
+       padding:5px 10px;font-family:"Spline Sans Mono",monospace;font-size:.62rem;letter-spacing:.04em;cursor:pointer}
+  .allctl button:active{color:var(--text);border-color:var(--gold)}
+  #countline{display:flex;align-items:center}
+
+  /* tier accordion */
+  .tier-sec{margin:0 12px 10px;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--panel)}
+  .tier-sec.tierA{border-left:3px solid var(--gold)} .tier-sec.tierB{border-left:3px solid var(--blue)} .tier-sec.tierC{border-left:3px solid var(--line-2)}
+  .tier-head{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer;user-select:none;background:var(--panel-2)}
+  .tier-head .caret{color:var(--dim);font-size:.72rem;transition:transform .15s;width:12px;flex:none}
+  .tier-sec.collapsed .caret{transform:rotate(-90deg)}
+  .tier-head .tdot{width:10px;height:10px;border-radius:3px;flex:none}
+  .tdot.A{background:var(--gold)}.tdot.B{background:var(--blue)}.tdot.C{background:#3a4550}
+  .tier-head .tname{font-family:"Fraunces",serif;font-weight:900;font-size:1.1rem}
+  .tier-head .tcount{font-family:"Spline Sans Mono",monospace;font-size:.72rem;color:var(--text-2)}
+  .tier-head .tcount .of{color:var(--dim)}
+  .tier-head::after{content:"";flex:1}
+  .tier-body{padding:8px 9px 9px}
+  .tier-sec.collapsed .tier-body{display:none}
+  .tier-empty{color:var(--dim);font-size:.78rem;font-style:italic;padding:7px 5px}
+
+  /* compact rows */
+  .crow{display:grid;grid-template-columns:22px 40px 1fr auto 14px;align-items:center;gap:9px;background:var(--panel);
+       border:1px solid var(--line);border-left:3px solid var(--line-2);border-right:3px solid transparent;
+       border-radius:10px;padding:9px 11px;margin-bottom:6px}
+  .crow.tierA{border-left-color:var(--gold)}.crow.tierB{border-left-color:var(--blue)}.crow.tierC{border-left-color:var(--line-2)}
+  .crow.sel{background:#1c2733;border-color:var(--gold)}
+  .crow.st-applied{border-right-color:var(--green)}.crow.st-active{border-right-color:var(--teal)}.crow.st-offer{border-right-color:var(--teal)}
+  .crow.st-rejected{border-right-color:var(--coral);opacity:.62}.crow.st-archived{opacity:.45}
+  .crow-chk{width:19px;height:19px;accent-color:var(--gold)}
+  .crow-ev{font-family:"Fraunces",serif;font-weight:900;font-size:1.05rem;color:var(--gold);text-align:center;line-height:1}
+  .crow-main{min-width:0}
+  .crow-co{font-family:"Spline Sans Mono",monospace;font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow-role{font-size:.86rem;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow-caret{color:var(--dim);font-size:.66rem;transition:transform .15s;text-align:center}
+  .crow.open .crow-caret{transform:rotate(180deg)}
+  .tabadge{font-family:"Spline Sans Mono",monospace;font-size:.54rem;font-weight:700;padding:3px 7px;border-radius:999px;border:1px solid var(--line-2);color:var(--text-2);white-space:nowrap}
+  .tabadge.none{color:var(--dim)}
+  .tabadge.applied{color:var(--green);border-color:#3a5a2a;background:#16240f}
+  .tabadge.active{color:var(--teal);border-color:#2f5650;background:#10302b66}
+  .tabadge.offer{color:#0e1217;background:var(--teal);border-color:var(--teal)}
+  .tabadge.rejected{color:var(--coral);border-color:#54322b;background:#2f1a1666}
+  .fullcard{margin:0 2px 9px 6px}
+  .fullcard .card{cursor:default}
+
+  /* selection toolbar (bottom, thumb-friendly) */
+  .selbar{position:fixed;left:0;right:0;bottom:0;z-index:45;display:none;flex-direction:column;gap:7px;
+       background:rgba(20,26,33,.97);backdrop-filter:blur(10px);border-top:1px solid var(--gold);
+       padding:10px 14px calc(10px + env(safe-area-inset-bottom,0))}
+  .selbar.show{display:flex}
+  body.selopen{padding-bottom:150px}
+  .selbar .selrow{display:flex;gap:8px;align-items:center}
+  .selbar .selcount{font-family:"Spline Sans Mono",monospace;font-weight:700;color:var(--gold);font-size:.78rem;white-space:nowrap}
+  .selbar .sb-open{flex:1;background:var(--gold);color:#15110a;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:.9rem;font-family:inherit}
+  .selbar .sb-ghost{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:10px;padding:12px 13px;font-size:.82rem;font-family:inherit}
+  .selbar .sb-apply{flex:1;background:var(--green);color:#0e1217;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:.88rem;font-family:inherit}
+  .selbar .selhint{color:var(--dim);font-size:.66rem;line-height:1.4}
+  .selbar .selhint em{color:var(--text-2);font-style:italic}
+  .selbar .selstatus{color:var(--text-2);font-size:.72rem;min-height:0}
+  .selbar .selstatus.warn{color:var(--coral)}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brandline"><span class="dot"></span> Job Pipeline · mobile
+      <span class="right" id="updated">…</span>
+      <a href="/logout" title="Sign out" style="margin-left:8px">exit</a>
+    </div>
+    <h1>Pipeline <em>on the go</em></h1>
+    <input id="q" type="text" inputmode="search" placeholder="Search company, role, notes…" />
+    <div class="chips" id="lifecycleTabs"></div>
+    <div class="chips" id="laneBar"></div>
+    <div class="chips" id="tierChips">
+      <div class="chip on" data-tier="">All</div>
+      <div class="chip" data-tier="A">Tier A</div>
+      <div class="chip" data-tier="B">Tier B</div>
+      <div class="chip" data-tier="C">Tier C</div>
+    </div>
+    <div class="selectrow">
+      <select id="sector"><option value="">All sectors</option></select>
+      <select id="sourceSel"><option value="">All sources</option></select>
+      <select id="sort">
+        <option value="tier">Sort: Tier → EV</option>
+        <option value="ev">Sort: Expected value</option>
+        <option value="fit">Sort: Fit</option>
+        <option value="prob">Sort: Interview odds</option>
+        <option value="company">Sort: Company A–Z</option>
+      </select>
+      <button id="addToggle" class="addbtn" type="button">＋ Add</button>
+      <button id="scoutBtn" class="addbtn ghost" type="button" title="Run scout: validate + refresh, then find new">⟳ Scout</button>
+    </div>
+
+    <div id="addForm" class="addform">
+      <input id="a_link" type="url" inputmode="url" placeholder="Paste job link (LinkedIn, careers page…)" autocomplete="off">
+      <div class="arow">
+        <input id="a_company" type="text" placeholder="Company">
+        <input id="a_role" type="text" placeholder="Role / title">
+      </div>
+      <input id="a_location" type="text" placeholder="Location (optional)">
+      <div class="arow">
+        <button id="a_submit" class="addbtn primary" type="button">Add lead</button>
+        <button id="a_cancel" class="addbtn ghost" type="button">Cancel</button>
+      </div>
+      <div id="a_msg" class="amsg"></div>
+      <div class="ahint">Saved as an unscored lead (Tier C, unverified) — score it later on the desktop board. Link or a company+role is enough.</div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <div class="kpi" id="kpi"></div>
+  <div class="countline" id="countline"><span id="countText"></span>
+    <span class="allctl"><button id="expandAll" type="button">Expand all</button><button id="collapseAll" type="button">Collapse all</button></span>
+  </div>
+  <div class="list" id="list"><div class="loading">▚ loading…</div></div>
+
+  <div class="selbar" id="selbar">
+    <div class="selrow">
+      <span class="selcount"><span id="selCount">0</span> selected</span>
+      <button class="sb-ghost" id="selectAllBtn" type="button">All visible</button>
+      <button class="sb-ghost" id="clearSelBtn" type="button">Clear</button>
+    </div>
+    <div class="selrow">
+      <button class="sb-open" id="openTabsBtn" type="button">Open <span id="openN">0</span> in tabs ↗</button>
+      <button class="sb-apply" id="markAppliedBtn" type="button">✓ Applied today</button>
+    </div>
+    <div class="selhint">Opening several tabs needs pop-ups <em>allowed for this site</em> — if only one opens, allow pop-ups and tap again. A LinkedIn <em>search</em> link opens to a search, not the exact posting.</div>
+    <div class="selstatus" id="selStatus"></div>
+  </div>
+
+  <footer>
+    Read-only mobile view of your CRM. <b style="color:var(--text-2)">EV</b> = fit × interview-odds ÷ 10.
+    Left edge = tier, right edge = status. Scores &amp; salaries are estimates — verify on each board.
+    Edit on the desktop board.
+  </footer>
+
+<script>
+const REMOTE={remote:'Remote',flex:'Flex',onsite:'On-site'};
+const CONF={verified:'Verified',boardonly:'Board-only',unverified:'Unverified'};
+let DATA=[], state={tier:'',sector:'',sort:'tier',q:'',source:'',tab:'open',applyNext:true,lane:'all'};
+// ---- hygiene lanes (Phase 3; read-only on mobile, synced from /api/settings) ----
+const HYGIENE_DEFAULT={followupDays:7,followupStatuses:["Applied","Recruiter Screen","Hiring Manager","Panel"],needsVerifyIncludeBoardonly:false,closedHandling:"suggest"};
+let HYGIENE={...HYGIENE_DEFAULT};
+function _daysSince(d){ // local date-only delta ("YYYY-MM-DD" = LOCAL midnight; same-day = 0)
+  if(!d)return null;const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));let then;
+  if(m){then=new Date(+m[1],+m[2]-1,+m[3]);}else{const t=Date.parse(d);if(isNaN(t))return null;then=new Date(t);}
+  then.setHours(0,0,0,0);const today=new Date();today.setHours(0,0,0,0);return Math.max(0,Math.round((today-then)/864e5));}
+function needsVerify(x){return x.status==="Not Applied"&&(x.conf==="unverified"||x.reqCheck==="lead"||(HYGIENE.needsVerifyIncludeBoardonly&&x.conf==="boardonly"));}
+function followUpDue(x){if(!(HYGIENE.followupStatuses||[]).includes(x.status))return false;const d=_daysSince(x.lastcontact||x.applied);return d!=null&&d>=(HYGIENE.followupDays||7);}
+function closedReq(x){return (x.reqCheck||"")==="closed";}
+const LANE_DEFS=[
+  {key:"verify",label:"⚠ Verify",pred:needsVerify},
+  {key:"followup",label:"⏰ Follow-up",pred:followUpDue},
+  {key:"closed",label:"✖ Closed",pred:closedReq},
+];
+// apply-mode (Phase 4; read-only on mobile)
+const APPLY_MODE_MAP_DEFAULT={greenhouse:"fillable",ashby:"fillable",lever:"fillable",workable:"fillable",smartrecruiters:"fillable",recruitee:"fillable",personio:"fillable",teamtailor:"fillable",workday:"gated",bamboohr:"gated",icims:"gated",taleo:"gated",successfactors:"gated",phenom:"gated",jobvite:"gated",linkedin:"manual",other:"manual",manual:"manual","quick-add":"manual","":"manual"};
+let APPLY_MODE_MAP={...APPLY_MODE_MAP_DEFAULT};
+function applyModeOf(x){return x.applyMode||APPLY_MODE_MAP[rowSource(x)]||APPLY_MODE_MAP_DEFAULT[rowSource(x)]||"manual";}
+// ---- lifecycle tabs (Phase 2; mirrors desktop, synced from /api/settings) ----
+const TAB_DEFS=[{key:"open",label:"Open"},{key:"applied",label:"Applied"},{key:"interviewing",label:"Interviewing"},{key:"closed",label:"Closed"}];
+const TAB_MAP_DEFAULT={open:["Not Applied"],applied:["Applied"],interviewing:["Recruiter Screen","Hiring Manager","Panel","Offer"],closed:["Rejected","Archived"]};
+let TAB_MAP={...TAB_MAP_DEFAULT};
+function statusesForTab(k){return new Set((TAB_MAP[k]&&TAB_MAP[k].length?TAB_MAP[k]:TAB_MAP_DEFAULT[k])||[]);}
+function tabKeyForStatus(s){for(const d of TAB_DEFS){if(statusesForTab(d.key).has(s))return d.key;}return "open";}
+function isApplyNext(x){return ["A","B"].includes(x.tier)&&x.conf==="verified"&&!["closed","lead","unknown"].includes(x.reqCheck||"")&&x.status==="Not Applied";}
+function inferSource(link){const u=(link||'').toLowerCase();if(!u)return'';
+  if(u.includes('greenhouse.io'))return'greenhouse';if(u.includes('ashbyhq.com'))return'ashby';
+  if(u.includes('lever.co'))return'lever';if(u.includes('workable.com'))return'workable';
+  if(u.includes('smartrecruiters.com'))return'smartrecruiters';if(u.includes('recruitee.com'))return'recruitee';
+  if(u.includes('personio.'))return'personio';if(u.includes('teamtailor.com'))return'teamtailor';
+  if(u.includes('myworkdayjobs.com')||u.includes('myworkdaysite.com'))return'workday';
+  if(u.includes('bamboohr.com'))return'bamboohr';if(u.includes('icims.com'))return'icims';
+  if(u.includes('taleo.net'))return'taleo';if(u.includes('successfactors'))return'successfactors';
+  if(u.includes('linkedin.com'))return'linkedin';return'other';}
+const rowSource=x=>((x.source&&String(x.source).trim())||inferSource(x.link)||'—');
+const tierOpen={A:true,B:false,C:false};   // accordion — Tier A open by default
+const expanded=new Set();                  // compact rows expanded into full cards (by company|role key)
+const selected=new Set();                  // checkbox selection (by key)
+let visibleKeys=[];                        // keys currently shown post-filter (for "all visible")
+const key=x=>(x.company||'')+'|'+(x.role||'');
+const isLinkedInSearch=u=>/linkedin\.com\/jobs\/search/i.test(u||'');
+const ev=x=>Math.round(((+x.fit||0)*(+x.prob||0))/10*10)/10;
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function statusClass(s){s=(s||'').toLowerCase();
+  if(s==='offer')return'offer'; if(['recruiter screen','hiring manager','panel'].includes(s))return'active';
+  if(s==='applied')return'applied'; if(s==='rejected')return'rejected'; if(s==='archived')return'archived'; return'';}
+
+async function load(){
+  try{
+    const r=await fetch('/api/reqs',{credentials:'same-origin'});
+    if(r.status===401){location.href='/login?next=/m';return;}
+    DATA=await r.json();
+  }catch(e){document.getElementById('list').innerHTML='<div class="empty">Could not reach the server.</div>';return;}
+  try{const s=await (await fetch('/api/settings',{credentials:'same-origin',cache:'no-store'})).json(); if(s&&s.tabStatusMap)TAB_MAP={...TAB_MAP_DEFAULT,...s.tabStatusMap}; if(s&&s.hygiene)HYGIENE={...HYGIENE_DEFAULT,...s.hygiene}; if(s&&s.applyModeMap)APPLY_MODE_MAP={...APPLY_MODE_MAP_DEFAULT,...s.applyModeMap};}catch(e){}
+  // sector options (rebuild each load so re-loads don't duplicate)
+  const secs=[...new Set(DATA.map(x=>x.sector).filter(Boolean))].sort();
+  const sel=document.getElementById('sector');
+  sel.innerHTML='<option value="">All sectors</option>';
+  secs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+  // source options
+  const srcs=[...new Set(DATA.map(rowSource))].filter(s=>s&&s!=='—').sort();
+  const ssel=document.getElementById('sourceSel');
+  ssel.innerHTML='<option value="">All sources</option>';
+  srcs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;ssel.appendChild(o);});
+  document.getElementById('updated').textContent=DATA.length+' reqs';
+  kpi();
+  render();
+}
+
+function kpi(){
+  const lc=s=>(s||'').toLowerCase();
+  const applied=DATA.filter(x=>{const s=lc(x.status);return s && s!=='not applied' && s!=='identified' && s!=='archived' && s!=='withdrawn';}).length;
+  const rejected=DATA.filter(x=>lc(x.status)==='rejected').length;
+  const rate=applied?Math.round(rejected/applied*1000)/10:0;
+  document.getElementById('kpi').innerHTML=
+    `<div class="k"><div class="kn gold">${applied}</div><div class="kl">Applied</div></div>`+
+    `<div class="k"><div class="kn coral">${rejected}</div><div class="kl">Rejected</div></div>`+
+    `<div class="k"><div class="kn">${rate}%</div><div class="kl">Reject rate</div></div>`;
+}
+function daysSince(d){ // local date-only delta ("YYYY-MM-DD" = LOCAL midnight; same-day = 0)
+  if(!d)return null;const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));let then;
+  if(m){then=new Date(+m[1],+m[2]-1,+m[3]);}else{const t=Date.parse(d);if(isNaN(t))return null;then=new Date(t);}
+  then.setHours(0,0,0,0);const today=new Date();today.setHours(0,0,0,0);return Math.max(0,Math.round((today-then)/864e5));}
+
+// all filters EXCEPT lifecycle tab + apply-next (used for tab counts too)
+function baseFiltered(){
+  let rows=DATA.slice();
+  if(state.tier)rows=rows.filter(x=>x.tier===state.tier);
+  if(state.sector)rows=rows.filter(x=>x.sector===state.sector);
+  if(state.source)rows=rows.filter(x=>rowSource(x)===state.source);
+  if(state.q){const q=state.q.toLowerCase();
+    rows=rows.filter(x=>[x.company,x.role,x.notes,x.sector,x.recruiter,x.location].some(v=>(v||'').toLowerCase().includes(q)));}
+  return rows;
+}
+function filtered(){
+  let rows;
+  if(state.lane!=="all"){
+    const def=LANE_DEFS.find(d=>d.key===state.lane);
+    rows=baseFiltered().filter(def?def.pred:()=>true);
+  }else{
+    rows=baseFiltered().filter(x=>tabKeyForStatus(x.status)===state.tab);
+    if(state.tab==="open"&&state.applyNext)rows=rows.filter(isApplyNext);
+  }
+  const T={A:0,B:1,C:2};
+  rows.sort((a,b)=>{
+    switch(state.sort){
+      case'ev':return ev(b)-ev(a);
+      case'fit':return(+b.fit||0)-(+a.fit||0);
+      case'prob':return(+b.prob||0)-(+a.prob||0);
+      case'company':return(a.company||'').localeCompare(b.company||'');
+      default:{const t=(T[a.tier]??9)-(T[b.tier]??9);return t!==0?t:ev(b)-ev(a);}
+    }
+  });
+  return rows;
+}
+
+// Full traditional card — lazy-rendered inline (detail always shown) when a compact row is expanded.
+function fullCard(x){
+  const t=x.tier||'C', sc=statusClass(x.status), rm=x.remote||'';
+  const conf=x.conf||'', cf=CONF[conf]||conf;
+  const sal=x.salary?`<span class="pill sal">${esc(x.salary)}</span>`:'';
+  const link=x.link?`<a class="applybtn" href="${esc(x.link)}" target="_blank" rel="noopener">Open posting ↗</a>`
+                    :`<span class="applybtn dim">No link</span>`;
+  const stPill=(x.status&&x.status!=='Not Applied')?`<span class="pill status ${sc}">${esc(x.status)}</span>`:'';
+  return `<div class="fullcard"><div class="card open tier${t} ${sc?'st-'+sc:''}">
+    <div class="ctop">
+      <div style="min-width:0">
+        <div class="co">${esc(x.company)}</div>
+        <div class="role">${esc(x.role)}</div>
+      </div>
+      <div style="display:flex;gap:9px;align-items:flex-start;flex:none">
+        <div class="ev"><div class="n">${ev(x).toFixed(1)}</div><div class="l">EV</div></div>
+        <span class="tag ${t}">${t}</span>
+      </div>
+    </div>
+    <div class="pills">
+      ${rm?`<span class="pill ${rm}">${REMOTE[rm]||rm}</span>`:''}
+      <span class="pill sector">${esc(x.sector||'—')}</span>
+      ${conf?`<span class="pill ${conf}">${cf}</span>`:''}
+      <span class="pill source">⌖ ${esc(rowSource(x))}</span>
+      <span class="pill">⚙ ${esc(applyModeOf(x))}</span>
+      ${sal}${stPill}
+    </div>
+    <div class="scores">
+      <div class="sc"><b>${(+x.fit||0).toFixed(1)}</b><span>Fit</span></div>
+      <div class="sc"><b>${(+x.prob||0).toFixed(1)}</b><span>Int. odds</span></div>
+    </div>
+    <div class="detail">
+      ${x.location?`<div class="drow"><div class="k">Location</div><div class="v">${esc(x.location)}</div></div>`:''}
+      <div class="drow"><div class="k">Status</div><div class="v">${esc(x.status||'Not Applied')}${(()=>{const ad=x.date_applied||x.applied;const ds=daysSince(ad);return ad?` · applied ${esc(ad)}${ds!=null?` (${ds}d ago)`:''}`:'';})()}</div></div>
+      ${x.rejection?`<div class="drow"><div class="k">Rejection</div><div class="v">${[x.rejection.date,x.rejection.stage,x.rejection.source].filter(Boolean).map(esc).join(' · ')||'logged'}${x.rejection.reason?(' — '+esc(x.rejection.reason)):''}</div></div>`:''}
+      ${x.recruiter?`<div class="drow"><div class="k">Recruiter</div><div class="v">${esc(x.recruiter)}</div></div>`:''}
+      ${x.next?`<div class="drow"><div class="k">Next</div><div class="v">${esc(x.next)}</div></div>`:''}
+      ${x.notes?`<div class="notes">${esc(x.notes)}</div>`:''}
+      ${link}
+    </div>
+  </div></div>`;
+}
+
+// Compact row — EV · company · role · status badge, with checkbox + expand caret.
+function compactRow(x){
+  const k=key(x), t=x.tier||'C', sc=statusClass(x.status);
+  const badge=(x.status&&x.status!=='Not Applied')?`<span class="tabadge ${sc}">${esc(x.status)}</span>`:'<span class="tabadge none">Not applied</span>';
+  return `<div class="crow tier${t} ${sc?'st-'+sc:''} ${selected.has(k)?'sel':''} ${expanded.has(k)?'open':''}" data-k="${esc(k)}">
+    <input type="checkbox" class="crow-chk" data-selk="${esc(k)}" ${selected.has(k)?'checked':''} aria-label="Select for open-in-tabs">
+    <span class="crow-ev">${ev(x).toFixed(1)}</span>
+    <div class="crow-main"><div class="crow-co">${esc(x.company)} · ${esc(rowSource(x))}</div><div class="crow-role">${esc(x.role)}</div></div>
+    ${badge}
+    <span class="crow-caret">▾</span>
+  </div>`;
+}
+
+function render(){
+  const rows=filtered();   // filtered + globally sorted; bucketing preserves per-tier order
+  const el=document.getElementById('list');
+
+  // lifecycle tab bar (counts over the base set, i.e. before the tab/apply-next filter)
+  const base=baseFiltered();
+  const tabCounts={}; TAB_DEFS.forEach(d=>tabCounts[d.key]=0);
+  base.forEach(x=>tabCounts[tabKeyForStatus(x.status)]++);
+  let tabsHtml=TAB_DEFS.map(d=>`<div class="chip ${d.key===state.tab&&state.lane==='all'?'on':''}" data-tab="${d.key}">${d.label} ${tabCounts[d.key]}</div>`).join('');
+  if(state.tab==='open'&&state.lane==='all')tabsHtml+=`<div class="chip ${state.applyNext?'on':''}" data-applynext="1">Apply-next</div>`;
+  document.getElementById('lifecycleTabs').innerHTML=tabsHtml;
+  // hygiene lane chips (counts over base)
+  let laneHtml=`<div class="chip ${state.lane==='all'?'on':''}" data-lane="all">All</div>`+
+    LANE_DEFS.map(d=>`<div class="chip ${state.lane===d.key?'on':''}" data-lane="${d.key}">${d.label} ${base.filter(d.pred).length}</div>`).join('');
+  document.getElementById('laneBar').innerHTML=laneHtml;
+
+  document.getElementById('countText').textContent=rows.length+' of '+DATA.length+' shown';
+  visibleKeys=rows.map(key);
+  // prune selection of rows no longer visible so counts stay honest
+  const visSet=new Set(visibleKeys);
+  [...selected].forEach(k=>{if(!visSet.has(k))selected.delete(k);});
+
+  let html='';
+  if(state.lane==='all'&&state.tab==='open'){
+    const tiers={A:[],B:[],C:[]};
+    rows.forEach(x=>{(tiers[x.tier]||tiers.C).push(x);});
+    const tabBase=base.filter(x=>tabKeyForStatus(x.status)==='open');
+    const totals={A:0,B:0,C:0}; tabBase.forEach(x=>{totals[x.tier]=(totals[x.tier]||0)+1;});
+    const filterActive=!!(state.q||state.tier||state.sector||state.source||state.applyNext);
+    ['A','B','C'].forEach(t=>{
+      const items=tiers[t];
+      const isC=filterActive?items.length===0:!tierOpen[t];
+      const ofN=items.length!==totals[t]?`<span class="of"> of ${totals[t]}</span>`:'';
+      html+=`<div class="tier-sec tier${t} ${isC?'collapsed':''}">
+        <div class="tier-head" data-tier="${t}">
+          <span class="caret">▼</span>
+          <span class="tdot ${t}"></span>
+          <span class="tname">Tier ${t}</span>
+          <span class="tcount">(${items.length}${ofN})</span>
+        </div>
+        <div class="tier-body">`;
+      if(!items.length) html+=`<div class="tier-empty">No matching Tier ${t} requisitions.</div>`;
+      else items.forEach(x=>{ html+=compactRow(x); if(expanded.has(key(x))) html+=fullCard(x); });
+      html+=`</div></div>`;
+    });
+    el.innerHTML = rows.length ? html : '<div class="empty">No matches.</div>';
+  } else {
+    rows.forEach(x=>{ html+=compactRow(x); if(expanded.has(key(x))) html+=fullCard(x); });
+    el.innerHTML = rows.length ? `<div style="padding:2px 12px 10px">${html}</div>` : '<div class="empty">Nothing in this tab.</div>';
+  }
+  renderSelbar();
+}
+
+function renderSelbar(){
+  const n=selected.size;
+  document.getElementById('selCount').textContent=n;
+  document.getElementById('openN').textContent=n;
+  document.getElementById('selbar').classList.toggle('show',n>0);
+  document.body.classList.toggle('selopen',n>0);
+}
+
+// ---- list interactions (event delegation) ----
+document.getElementById('list').addEventListener('click',e=>{
+  if(e.target.closest('a'))return;
+  if(e.target.closest('.crow-chk'))return;       // checkbox handled on 'change'
+  const head=e.target.closest('.tier-head');
+  if(head){tierOpen[head.dataset.tier]=!tierOpen[head.dataset.tier];render();return;}
+  const row=e.target.closest('.crow');
+  if(row){const k=row.dataset.k; if(expanded.has(k))expanded.delete(k);else expanded.add(k); render();}
+});
+document.getElementById('list').addEventListener('change',e=>{
+  const chk=e.target.closest('.crow-chk'); if(!chk)return;
+  const k=chk.dataset.selk;
+  if(chk.checked)selected.add(k);else selected.delete(k);
+  const row=chk.closest('.crow'); if(row)row.classList.toggle('sel',chk.checked);
+  document.getElementById('selStatus').textContent='';
+  renderSelbar();
+});
+
+// ---- selection toolbar ----
+document.getElementById('selectAllBtn').addEventListener('click',()=>{visibleKeys.forEach(k=>selected.add(k));document.getElementById('selStatus').textContent='';render();});
+document.getElementById('clearSelBtn').addEventListener('click',()=>{selected.clear();document.getElementById('selStatus').textContent='';render();});
+// Bulk mark Applied — auto-captures today's date; persists per-row via the audit-logged PATCH endpoint.
+const PROMOTABLE=new Set(['','Not Applied','Identified']);
+document.getElementById('markAppliedBtn').addEventListener('click',async()=>{
+  const st=document.getElementById('selStatus');
+  const keys=[...selected];
+  if(!keys.length){st.textContent='Nothing selected.';st.classList.remove('warn');return;}
+  const sel=keys.map(k=>DATA.find(r=>key(r)===k)).filter(Boolean);
+  const eligible=sel.filter(x=>PROMOTABLE.has(x.status||''));
+  const skipped=keys.length-eligible.length;
+  if(!eligible.length){st.textContent=`Nothing to change — all ${keys.length} are already Applied or beyond.`;st.classList.add('warn');return;}
+  const today=new Date().toISOString().slice(0,10);
+  if(!confirm(`Mark ${eligible.length} as Applied today (${today})?`+(skipped?`\n\n${skipped} already Applied/beyond will be skipped.`:'')))return;
+  st.textContent='Saving…';st.classList.remove('warn');
+  let ok=0,fail=0;
+  for(const x of eligible){
+    const fields={status:'Applied',lastcontact:today,reqCheck:'open-applied'};
+    if(!x.applied)fields.applied=today;
+    if(!x.next)fields.next='Await recruiter response';
+    try{
+      const r=await fetch('/api/reqs/'+encodeURIComponent(key(x)),{method:'PATCH',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({fields,run:'mobile-bulk-apply',note:'bulk mark applied from /m'})});
+      if(r.status===401){location.href='/login?next=/m';return;}
+      const j=await r.json();
+      if(j&&j.ok){ok++;Object.assign(x,fields);}else fail++;
+    }catch(e){fail++;}
+  }
+  st.textContent=`Marked ${ok} as Applied (${today}).`+(fail?` ${fail} failed.`:'')+(skipped?` ${skipped} skipped (already applied/beyond).`:'');
+  st.classList.toggle('warn',fail>0);
+  kpi();render();
+});
+document.getElementById('openTabsBtn').addEventListener('click',()=>{
+  const st=document.getElementById('selStatus');
+  const keys=[...selected]; if(!keys.length){st.textContent='Nothing selected.';return;}
+  let opened=0,blocked=0,search=0,nolink=0;
+  keys.forEach(k=>{const x=DATA.find(r=>key(r)===k); if(!x)return;
+    if(!x.link){nolink++;return;}
+    if(isLinkedInSearch(x.link))search++;
+    const w=window.open(x.link,'_blank','noopener'); if(w)opened++;else blocked++;});
+  let msg=`Opened ${opened} tab${opened===1?'':'s'}.`;
+  if(blocked>0)msg+=` ${blocked} blocked — allow pop-ups and tap again.`;
+  if(search>0)msg+=` ${search} open to a LinkedIn search, not the exact posting.`;
+  if(nolink>0)msg+=` ${nolink} had no link.`;
+  st.textContent=msg; st.classList.toggle('warn',blocked>0);
+});
+
+// ---- expand / collapse all ----
+document.getElementById('expandAll').addEventListener('click',()=>{tierOpen.A=tierOpen.B=tierOpen.C=true;render();});
+document.getElementById('collapseAll').addEventListener('click',()=>{tierOpen.A=tierOpen.B=tierOpen.C=false;render();});
+
+document.getElementById('lifecycleTabs').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  if(c.dataset.applynext){state.applyNext=!state.applyNext;render();return;}
+  if(c.dataset.tab){state.tab=c.dataset.tab;render();}
+});
+document.getElementById('laneBar').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c||!c.dataset.lane)return;
+  state.lane=c.dataset.lane;render();
+});
+document.getElementById('q').addEventListener('input',e=>{state.q=e.target.value;render();});
+document.getElementById('sector').addEventListener('change',e=>{state.sector=e.target.value;render();});
+document.getElementById('sourceSel').addEventListener('change',e=>{state.source=e.target.value;render();});
+document.getElementById('sort').addEventListener('change',e=>{state.sort=e.target.value;render();});
+document.getElementById('tierChips').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  state.tier=c.dataset.tier;
+  document.querySelectorAll('#tierChips .chip').forEach(x=>{x.classList.remove('on','tB','tC');});
+  c.classList.add('on'); if(state.tier==='B')c.classList.add('tB'); if(state.tier==='C')c.classList.add('tC');
+  render();
+});
+
+// ---- quick-add ----
+const form=document.getElementById('addForm');
+function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(kind||'');
+  setTimeout(()=>{t.className='toast '+(kind||'');},2600);}
+document.getElementById('addToggle').addEventListener('click',()=>{
+  form.classList.toggle('open'); if(form.classList.contains('open'))document.getElementById('a_link').focus();});
+document.getElementById('a_cancel').addEventListener('click',()=>{form.classList.remove('open');});
+document.getElementById('a_submit').addEventListener('click',async()=>{
+  const link=document.getElementById('a_link').value.trim();
+  const company=document.getElementById('a_company').value.trim();
+  const role=document.getElementById('a_role').value.trim();
+  const location=document.getElementById('a_location').value.trim();
+  const msg=document.getElementById('a_msg');
+  if(!link && !company && !role){msg.className='amsg err';msg.textContent='Add a link, or a company + role.';return;}
+  msg.className='amsg';msg.textContent='Saving…';
+  try{
+    const r=await fetch('/api/reqs/quickadd',{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({link,company,role,location,source:'mobile quick-add'})});
+    if(r.status===401){location.href='/login?next=/m';return;}
+    const j=await r.json();
+    if(!j.ok){msg.className='amsg err';msg.textContent=j.error||'Failed.';return;}
+    if(j.duplicate){msg.className='amsg err';msg.textContent='Already tracked: '+j.company+' — '+j.role;return;}
+    ['a_link','a_company','a_role','a_location'].forEach(id=>document.getElementById(id).value='');
+    msg.className='amsg ok';msg.textContent='Added '+j.company+' — '+j.role;
+    toast('Added: '+j.company+' — '+j.role,'ok');
+    form.classList.remove('open');
+    await load();
+  }catch(e){msg.className='amsg err';msg.textContent='Network error.';}
+});
+
+// ---- Run Scout (trigger + poll) ----
+const mScout=document.getElementById('scoutBtn');
+let mPoll=null;
+function mPollStart(){
+  clearInterval(mPoll); mScout.disabled=true;
+  mPoll=setInterval(async()=>{
+    let j; try{j=await(await fetch('/api/scout/status',{cache:'no-store'})).json();}catch(e){return;}
+    const last=j.last||{};
+    if(j.running){
+      document.getElementById('updated').textContent=(last.phase==='validating'&&last.total)?`scout ${last.processed||0}/${last.total}`:'scout running…';
+    }else{
+      clearInterval(mPoll);mPoll=null;mScout.disabled=false;
+      if(last.state==='error'){toast('Scout error','err');document.getElementById('updated').textContent=DATA.length+' reqs';}
+      else{const v=last.validate,f=last.find;let m='Scout done';if(v)m+=` · ${v.open} open, ${v.closed} closed`;if(f)m+=` · ${f.added!=null?f.added:'?'} new`;toast(m,'ok');await load();}
+    }
+  },3000);
+}
+if(mScout)mScout.addEventListener('click',async()=>{
+  toast('Scout starting…');
+  try{
+    const r=await fetch('/api/scout/run',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'both'})});
+    if(r.status===401){location.href='/login?next=/m';return;}
+    const j=await r.json().catch(()=>({}));
+    if(r.status===409){toast('A scout run is already running');mPollStart();return;}
+    if(!j.ok){toast('Could not start: '+(j.error||''),'err');return;}
+    mPollStart();
+  }catch(e){toast('Network error','err');}
+});
+
+load();
+</script>
+</body>
+</html>

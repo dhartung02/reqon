@@ -1,0 +1,24 @@
+{
+  "generatedFrom": "(upload your resume in Settings → Candidate profile)",
+  "generatedAt": "",
+  "applicant": {
+    "name": "Your Name",
+    "email": "you@example.com",
+    "phone": "",
+    "linkedin": "https://linkedin.com/in/your-handle",
+    "location": "City, ST"
+  },
+  "seniority": ["principal", "director", "senior", "lead", "staff"],
+  "roleTerms": ["Principal Product Manager", "Director of Product", "Staff Product Manager"],
+  "industries": [],
+  "sectors": ["Data Infra", "AI Platform", "CDP / Customer Data"],
+  "keywords": [
+    { "kw": "data platform", "weight": 3 },
+    { "kw": "ai platform", "weight": 3 },
+    { "kw": "cdp", "weight": 2 }
+  ],
+  "narratives": [
+    { "id": "sample", "title": "Sample narrative", "body": "A reusable, fact-grounded story blurb the AI assistant can draw from. Replace with your own.", "tags": ["impact"] }
+  ],
+  "remoteOnly": true
+}

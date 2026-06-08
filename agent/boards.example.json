@@ -1,0 +1,19 @@
+{
+  "_comment": "Sample scout config. Add your own target companies via Settings → Add company by careers URL (only public ATS boards are pollable: greenhouse/ashby/lever/workable/smartrecruiters/recruitee/personio/teamtailor/workday). Your real boards.json is gitignored; this seeds a fresh clone and is safe to edit.",
+  "remoteOnly": true,
+  "minDelaySeconds": 0.4,
+  "disabledSources": [],
+  "minTierToMerge": "B",
+  "analyticsWindowDays": 0,
+  "hygiene": {
+    "followupDays": 7,
+    "followupStatuses": ["Applied", "Recruiter Screen", "Hiring Manager", "Panel"],
+    "needsVerifyIncludeBoardonly": false,
+    "closedHandling": "suggest"
+  },
+  "companies": [
+    { "name": "Example Greenhouse Co", "ats": "greenhouse", "slug": "example" },
+    { "name": "Example Ashby Co", "ats": "ashby", "slug": "example" },
+    { "name": "Example Lever Co", "ats": "lever", "slug": "example" }
+  ]
+}

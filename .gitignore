@@ -1,0 +1,59 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Python caches
+__pycache__/
+*.pyc
+agent/**/__pycache__/
+
+# Scout runtime state
+agent/scout-status.json
+
+# Append-only runtime ledgers (personal edit/enrichment history)
+agent/change-log.jsonl
+agent/enrichment-log.jsonl
+
+# Live data store + generated artifacts (snapshotted separately; *.example.json ships instead)
+data.json
+data.json.tmp
+backups/
+logs/
+node_modules/
+
+# Personal data — never committed; generic *.example versions ship for fresh clones
+seed.json
+agent/profile.json
+agent/found-log.md
+agent/boards.json
+agent/watchlist.json
+
+# Owner-only working docs + scratch files (kept local, not published)
+CLAUDE.md
+AGENTS.md
+PRODUCT-POSITIONING.md
+agent/scout-process.md
+agent/_candidates.json
+agent/_merge_build.py
+agent/_new_roles.json
+agent/_rescout.json
+
+# Runtime state / generated artifacts
+agent/assist-usage.json
+agent/assist-log.jsonl
+agent/digest-state.json
+agent/digest-latest.html
+agent/digest-latest.txt
+agent/source-health.json
+__pycache__/
+tests/__pycache__/
+
+# macOS cruft
+.DS_Store
+
+# Owner-specific working docs (personal infra / strategy notes)
+MOBILE-SETUP.md
+
+# Local Claude Code tooling config
+.claude/

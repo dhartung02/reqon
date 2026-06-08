@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Job Pipeline CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1217; --panel:#161d26; --panel-2:#1b232e; --line:#28333f; --line-2:#33414f;
+    --text:#e9eef4; --text-2:#b2bdc9; --dim:#7c8794;
+    --gold:#edc05a; --teal:#3fd3b4; --green:#9ed35f; --coral:#ef8268; --blue:#86a6dd; --violet:#a78bdb;
+    --t9:#3fd3b4; --t7:#9ed35f; --t5:#edc05a; --t3:#ef8268;
+    --shadow:0 16px 44px -18px rgba(0,0,0,.65);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:radial-gradient(1100px 600px at 92% -10%, #16252455, transparent 62%), var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.5;min-height:100vh;padding:clamp(14px,3vw,38px);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1340px;margin:0 auto}
+  header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:22px}
+  .brandline{display:flex;align-items:center;gap:11px;color:var(--gold);font-family:"Spline Sans Mono",monospace;font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;margin-bottom:11px}
+  .brandline .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px var(--gold)}
+  h1{font-family:"Fraunces",serif;font-weight:900;font-size:clamp(2rem,5vw,3.2rem);line-height:1;letter-spacing:-.015em}
+  h1 em{font-style:italic;color:var(--gold)}
+  .sub{color:var(--text-2);max-width:70ch;margin-top:11px;font-size:.92rem}
+  .updated{font-family:"Spline Sans Mono",monospace;font-size:.72rem;color:var(--dim);text-align:right;white-space:nowrap}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:11px;margin-bottom:20px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+  .stat .k{font-family:"Spline Sans Mono",monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .stat .v{font-family:"Fraunces",serif;font-weight:900;font-size:1.8rem;margin-top:5px;line-height:1}
+  .stat .v small{font-size:.85rem;color:var(--text-2);font-family:"Spline Sans",sans-serif;font-weight:500}
+  .stat .v.gold{color:var(--gold)} .stat .v.teal{color:var(--teal)} .stat .v.violet{color:var(--violet)} .stat .v.coral{color:var(--coral)}
+
+  .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px}
+  .controls input[type=text], .controls select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.88rem;outline:none}
+  .controls input[type=text]{min-width:170px;flex:1}
+  .controls input::placeholder{color:var(--dim)}
+  .controls select:focus,.controls input:focus{border-color:var(--gold)}
+  .toggle{display:inline-flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;user-select:none;font-size:.84rem;color:var(--text-2)}
+  .toggle input{accent-color:var(--teal);width:15px;height:15px}
+  .btn{background:var(--gold);color:#15110a;border:none;border-radius:10px;padding:9px 15px;font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit;transition:transform .12s,filter .12s}
+  .btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;color:var(--text-2);border:1px solid var(--line-2)}
+  .btn.ghost:hover{color:var(--text);border-color:var(--gold)}
+  .btn.apply{background:var(--green);color:#0e1217}
+  .spacer{flex:1}
+
+  /* Run Scout menu + status */
+  .scoutctl{position:relative;display:inline-block}
+  .scoutmenu{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:40;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:6px;min-width:248px;box-shadow:var(--shadow)}
+  .scoutmenu.open{display:block}
+  .scoutmenu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:9px 11px;border-radius:7px;font-family:inherit;font-size:.84rem;cursor:pointer}
+  .scoutmenu button:hover{background:var(--panel-2);color:var(--gold)}
+  .scoutmenu-foot{border-top:1px solid var(--line);margin-top:5px;padding:8px 11px 3px;font-family:"Spline Sans Mono",monospace;font-size:.58rem;letter-spacing:.03em;color:var(--dim);line-height:1.4}
+  .scoutstatus{font-family:"Spline Sans Mono",monospace;font-size:.73rem;color:var(--text-2);display:inline-flex;align-items:center;gap:7px;max-width:42ch}
+  .scoutstatus .spin{width:12px;height:12px;border:2px solid var(--line-2);border-top-color:var(--gold);border-radius:50%;display:inline-block;animation:scoutspin .8s linear infinite;flex:none}
+  @keyframes scoutspin{to{transform:rotate(360deg)}}
+  .scoutbtn-busy{opacity:.55;pointer-events:none}
+  .scoutmenu-lbl{font-family:"Spline Sans Mono",monospace;font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:7px 11px 3px}
+  .scoutmenu-hint{color:var(--teal);text-transform:none;letter-spacing:0}
+  .scoutmenu-sep{border-top:1px solid var(--line);margin:5px 0}
+  .scoutsources{max-height:140px;overflow:auto;padding:2px 9px 4px}
+  .scoutsources label{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--text-2);padding:3px 2px;cursor:pointer}
+  .scoutsources input{width:14px;height:14px;accent-color:var(--teal)}
+  .scoutsources .agg{color:var(--violet)}
+  /* source pill on rows */
+  .pill.source{color:var(--violet);border-color:#3b3160;background:#1b1730}
+  .crow-src{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.04em;color:var(--violet);text-transform:lowercase;white-space:nowrap}
+  /* settings panel */
+  .setsources{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;max-height:210px;overflow:auto}
+  .setsources label{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0}
+  .setsources input{width:15px;height:15px;accent-color:var(--teal)}
+  .setsources .kind{font-family:"Spline Sans Mono",monospace;font-size:.56rem;color:var(--dim);margin-left:auto}
+  .setsources .kind.needkey{color:var(--coral)}
+  .setsources .kind.ok{color:var(--teal)}
+  .setmuted{color:var(--dim);font-size:.72rem;font-weight:400;letter-spacing:0;text-transform:none}
+  .ahintrow{display:flex;align-items:center;gap:9px;margin-top:6px}
+  .setmsg{font-size:.8rem;min-height:1.1em;margin-top:6px}
+  .setmsg.ok{color:var(--green)} .setmsg.err{color:var(--coral)}
+  /* data-safety: snapshot list */
+  .bklist{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:230px;overflow:auto;padding:4px}
+  .bkrow{display:flex;align-items:center;gap:9px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:.76rem}
+  .bkrow:last-child{border-bottom:0}
+  .bkkind{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--line-2);color:var(--dim);flex:none}
+  .bkkind.auto{color:var(--blue)} .bkkind.manual{color:var(--green)} .bkkind.phase{color:var(--gold)}
+  .bkname{font-family:"Spline Sans Mono",monospace;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
+  .bkmeta{color:var(--dim);white-space:nowrap;flex:none}
+  .bkacts{display:flex;gap:6px;flex:none}
+  .bkacts a.mini{text-decoration:none}
+
+  /* selection toolbar (multi-select + open-in-tabs) */
+  .selbar{position:sticky;top:0;z-index:30;display:none;align-items:center;flex-wrap:wrap;gap:11px;
+    background:#1b232e;border:1px solid var(--gold);border-radius:12px;padding:10px 14px;margin:6px 2px 16px;box-shadow:var(--shadow)}
+  .selbar.show{display:flex}
+  .selbar .selcount{font-weight:700;color:var(--gold);font-family:"Spline Sans Mono",monospace;font-size:.82rem;letter-spacing:.04em}
+  .selbar .selhint{color:var(--dim);font-size:.72rem;max-width:52ch;line-height:1.4}
+  .selbar .selhint em{color:var(--text-2);font-style:italic}
+  .selbar .selstatus{font-size:.76rem;color:var(--text-2);flex-basis:100%}
+  .selbar .selstatus.warn{color:var(--coral)}
+
+  /* lifecycle tabs */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 2px 14px}
+  .tabs .tab{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);color:var(--text-2);border-radius:11px;padding:9px 15px;cursor:pointer;font-weight:700;font-size:.86rem;font-family:inherit;transition:border-color .12s,color .12s,background .12s}
+  .tabs .tab:hover{border-color:var(--line-2);color:var(--text)}
+  .tabs .tab.active{background:var(--panel-2);border-color:var(--gold);color:var(--text)}
+  .tabs .tab .tcnt{font-family:"Spline Sans Mono",monospace;font-size:.72rem;color:var(--dim);background:var(--bg);border-radius:20px;padding:1px 8px}
+  .tabs .tab.active .tcnt{color:var(--gold)}
+  .flatlist{display:flex;flex-direction:column;gap:0}
+  .flat-empty{color:var(--dim);padding:26px 12px;text-align:center}
+  /* hygiene lanes */
+  .lanes{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:0 2px 14px}
+  .lanes .llbl{font-family:"Spline Sans Mono",monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-right:2px}
+  .lanes .lane{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);color:var(--text-2);border-radius:9px;padding:6px 12px;cursor:pointer;font-weight:600;font-size:.8rem;font-family:inherit}
+  .lanes .lane:hover{border-color:var(--line-2);color:var(--text)}
+  .lanes .lane.active{border-color:var(--teal);color:var(--text);background:var(--panel-2)}
+  .lanes .lane .lcnt{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--dim);background:var(--bg);border-radius:20px;padding:1px 7px}
+  .lanes .lane.active .lcnt{color:var(--teal)}
+  .lane-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:11px 14px;margin:0 2px 12px}
+  .lane-head .lh-title{font-weight:700}
+  .lane-head .lh-desc{color:var(--dim);font-size:.78rem;flex:1 1 260px}
+  .crow-reason{font-size:.7rem;color:var(--coral);font-family:"Spline Sans Mono",monospace;white-space:nowrap}
+  /* apply-mode badge */
+  .am{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:5px;border:1px solid var(--line-2);color:var(--dim);white-space:nowrap;flex:none}
+  .am.fillable{color:var(--green);border-color:#2d5a3a}
+  .am.simplify{color:var(--violet);border-color:#3b3160}
+  .am.gated{color:var(--gold);border-color:#5a4a1e}
+  .am.manual{color:var(--text-2)}
+  .ammap{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;max-height:220px;overflow:auto}
+  .ammap .amrow{display:flex;align-items:center;gap:8px;font-size:.8rem}
+  .ammap .amrow span{flex:1;color:var(--text-2)}
+  .ammap .amrow select{flex:none;width:auto;padding:5px 8px;font-size:.78rem}
+  /* candidate profile + narratives */
+  .narr{border:1px solid var(--line-2);border-radius:9px;padding:9px 10px;margin-bottom:8px;background:var(--bg)}
+  .narr input,.narr textarea{margin-bottom:6px}
+  .narr .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
+  .profkw{display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:120px;overflow:auto}
+  .profkw .kw{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:2px 8px}
+  .profkw .kw b{color:var(--gold)}
+  /* analytics */
+  .an-wrap{display:flex;flex-direction:column;gap:14px}
+  .an-bartop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--dim);font-size:.8rem}
+  .an-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+  .an-kpi{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+  .an-kpi .k{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+  .an-kpi .v{font-family:"Fraunces",serif;font-weight:900;font-size:1.5rem;margin-top:3px}
+  .an-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+  .an-card h3{margin:0 0 10px;font-size:.95rem}
+  .an-funnel{display:flex;flex-direction:column;gap:7px}
+  .an-frow{display:flex;align-items:center;gap:10px;font-size:.82rem}
+  .an-frow .lbl{width:140px;flex:none;color:var(--text-2)}
+  .an-frow .bar{height:18px;background:var(--gold);border-radius:5px;min-width:2px}
+  .an-frow .num{font-family:"Spline Sans Mono",monospace;color:var(--text);white-space:nowrap}
+  .an-table{width:100%;border-collapse:collapse;font-size:.8rem}
+  .an-table th,.an-table td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}
+  .an-table th:first-child,.an-table td:first-child{text-align:left}
+  .an-table th{color:var(--dim);font-weight:600;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em}
+  .an-note{color:var(--dim);font-size:.74rem;line-height:1.5}
+  .an-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.an-grid2{grid-template-columns:1fr}}
+  /* tier accordion */
+  .tier-sec{margin-bottom:11px;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--panel)}
+  .tier-sec.tierA{border-left:3px solid var(--gold)}
+  .tier-sec.tierB{border-left:3px solid var(--blue)}
+  .tier-sec.tierC{border-left:3px solid var(--line-2)}
+  .tier-head{display:flex;align-items:center;gap:11px;padding:13px 16px;cursor:pointer;user-select:none;background:var(--panel-2)}
+  .tier-head:hover{background:#1f2935}
+  .tier-head .caret{color:var(--dim);font-size:.8rem;transition:transform .15s;width:14px;flex:none}
+  .tier-sec.collapsed .caret{transform:rotate(-90deg)}
+  .tier-head .tname{font-family:"Fraunces",serif;font-weight:900;font-size:1.3rem;letter-spacing:-.01em}
+  .tier-head .tdot{width:11px;height:11px;border-radius:3px;flex:none}
+  .tdot.A{background:var(--gold)} .tdot.B{background:var(--blue)} .tdot.C{background:#3a4550}
+  .tier-head .tcount{font-family:"Spline Sans Mono",monospace;font-size:.8rem;color:var(--text-2)}
+  .tier-head .tcount .of{color:var(--dim)}
+  .tier-head::after{content:"";flex:1}
+  .tier-head .tsum{font-family:"Spline Sans Mono",monospace;font-size:.64rem;color:var(--dim)}
+  .tier-body{padding:9px 11px 11px}
+  .tier-sec.collapsed .tier-body{display:none}
+  .tier-empty{color:var(--dim);font-size:.82rem;font-style:italic;padding:8px 6px}
+
+  /* compact rows + status badges */
+  .crow{display:grid;grid-template-columns:20px 46px minmax(110px,180px) 1fr auto 16px;align-items:center;gap:11px;
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line-2);border-right:3px solid transparent;
+    border-radius:10px;padding:9px 13px;cursor:pointer;transition:background .12s,border-color .12s;margin-bottom:5px}
+  .crow:hover{background:var(--panel-2);border-color:var(--line-2)}
+  .crow.tierA{border-left-color:var(--gold)} .crow.tierB{border-left-color:var(--blue)} .crow.tierC{border-left-color:var(--line-2)}
+  .crow.sel{background:#1c2733;border-color:var(--gold)}
+  .crow.st-applied{border-right-color:var(--green)}
+  .crow.st-active{border-right-color:var(--teal)}
+  .crow.st-offer{border-right-color:var(--teal)}
+  .crow.st-rejected{border-right-color:var(--coral);opacity:.62}
+  .crow.st-archived{opacity:.45}
+  .crow-chk{width:16px;height:16px;accent-color:var(--gold);cursor:pointer}
+  .crow-ev{font-family:"Fraunces",serif;font-weight:900;font-size:1.16rem;color:var(--gold);text-align:center;line-height:1}
+  .crow-co{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow-role{color:var(--text-2);font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow-caret{color:var(--dim);font-size:.7rem;transition:transform .15s;text-align:center}
+  .crow.open .crow-caret{transform:rotate(180deg)}
+  .crow.open{border-color:var(--line-2);background:var(--panel-2)}
+  .tabadge{font-family:"Spline Sans Mono",monospace;font-size:.58rem;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;white-space:nowrap;border:1px solid var(--line-2);color:var(--text-2)}
+  .tabadge.none{color:var(--dim)}
+  .tabadge.applied{color:var(--green);border-color:#3a5a2a;background:#16240f}
+  .tabadge.active{color:var(--teal);border-color:#2f5650;background:#10302b66}
+  .tabadge.offer{color:#0e1217;background:var(--teal);border-color:var(--teal)}
+  .tabadge.rejected{color:var(--coral);border-color:#54322b;background:#2f1a1666}
+  .tabadge.archived{color:var(--dim)}
+  .req.flash{animation:flashfade 1.6s ease-out}
+  @keyframes flashfade{0%{box-shadow:0 0 0 2px var(--gold);background:rgba(237,192,90,.14)}100%{box-shadow:none}}
+  @media (max-width:680px){
+    .crow{grid-template-columns:20px 40px 1fr auto 16px;}
+    .crow-role{display:none}
+  }
+
+  .req{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;margin-bottom:9px;transition:border-color .15s,background .15s;border-left:3px solid var(--line-2);border-right:3px solid transparent}
+  .req:hover{border-color:var(--line-2);background:var(--panel-2)}
+  .req.tierA{border-left-color:var(--gold)}
+  .req.tierB{border-left-color:var(--blue)}
+  .req.tierC{border-left-color:var(--line-2)}
+  /* status wash — glanceable "addressed vs outstanding" while scrolling (left edge = tier, right edge = status) */
+  .req.st-applied{background:rgba(110,211,95,.07);border-right-color:var(--green)}
+  .req.st-active{background:rgba(63,211,180,.10);border-right-color:var(--teal)}
+  .req.st-offer{background:rgba(63,211,180,.18);border-right-color:var(--teal)}
+  .req.st-rejected{background:rgba(239,130,104,.05);border-right-color:var(--coral);opacity:.6}
+  .req.st-archived{opacity:.42}
+  .req.st-applied:hover{background:rgba(110,211,95,.12)}
+  .req.st-active:hover,.req.st-offer:hover{background:rgba(63,211,180,.15)}
+  .doneflag{font-family:"Spline Sans Mono",monospace;font-size:.58rem;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .doneflag.applied{color:var(--green);border:1px solid #3a5a2a;background:#16240f}
+  .doneflag.active{color:var(--teal);border:1px solid #2f5650;background:#10302b66}
+  .doneflag.offer{color:#0e1217;background:var(--teal);font-weight:700}
+  .doneflag.rejected{color:var(--coral);border:1px solid #54322b;background:#2f1a1666}
+  .reqtop{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+  .rtitle{font-size:.98rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .rtitle .tierTag{font-family:"Spline Sans Mono",monospace;font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:5px}
+  .tierTag.A{background:var(--gold);color:#15110a} .tierTag.B{background:var(--blue);color:#0e1217} .tierTag.C{background:#2a3540;color:var(--text-2)}
+  .meta{color:var(--text-2);font-size:.79rem;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:7px}
+  .pill{font-family:"Spline Sans Mono",monospace;font-size:.63rem;letter-spacing:.02em;padding:3px 8px;border-radius:999px;border:1px solid var(--line-2);white-space:nowrap;color:var(--text-2)}
+  .pill.remote{color:#0e1217;background:var(--teal);border-color:var(--teal);font-weight:700}
+  .pill.onsite{color:#0e1217;background:var(--coral);border-color:var(--coral);font-weight:700}
+  .pill.flex{color:#0e1217;background:var(--gold);border-color:var(--gold);font-weight:700}
+  .pill.sal{color:var(--text);border-color:#3a4a44;background:#13201c}
+  .pill.verified{color:var(--teal);border-color:#2f5650;background:#10302b66}
+  .pill.boardonly{color:var(--gold);border-color:#5a4a26;background:#2c2412aa}
+  .pill.unverified{color:var(--coral);border-color:#54322b;background:#2f1a1666}
+
+  .scoresrow{display:flex;gap:16px;align-items:center;justify-content:flex-end}
+  .twoscore{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:54px}
+  .twoscore .n{font-family:"Fraunces",serif;font-weight:900;font-size:1.5rem;line-height:1}
+  .twoscore .l{font-family:"Spline Sans Mono",monospace;font-size:.54rem;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+
+  .crm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line-2)}
+  .cell{display:flex;flex-direction:column;gap:3px}
+  .cell label{font-family:"Spline Sans Mono",monospace;font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .cell input,.cell select{background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:7px;padding:6px 8px;font-family:inherit;font-size:.8rem;outline:none}
+  .cell input:focus,.cell select:focus{border-color:var(--gold)}
+  .cell.full{grid-column:1/-1}
+  .status-sel{font-weight:700}
+  .rowacts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+  .mini{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:8px;padding:5px 11px;font-size:.73rem;cursor:pointer;font-family:inherit}
+  .mini:hover{color:var(--text);border-color:var(--gold)}
+  .mini.link{color:var(--gold);border-color:#5c4d28}
+  .mini.danger:hover{color:var(--coral);border-color:var(--coral)}
+  a.applylink{text-decoration:none}
+
+  .statusdot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .overlay{position:fixed;inset:0;background:#06080bdb;backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:center;padding:24px;z-index:50;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line-2);border-radius:18px;padding:24px;max-width:680px;width:100%;box-shadow:var(--shadow);margin:auto}
+  .modal h2{font-family:"Fraunces",serif;font-weight:900;font-size:1.45rem;margin-bottom:4px}
+  .modal p.hint{color:var(--dim);font-size:.82rem;margin-bottom:16px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-family:"Spline Sans Mono",monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);margin-bottom:5px}
+  .field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:.86rem;outline:none}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gold)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:9px}
+  .scoregrid .field{margin-bottom:0}
+  .modalacts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .loading{text-align:center;color:var(--text-2);padding:60px 0;font-family:"Spline Sans Mono",monospace;letter-spacing:.1em}
+  footer{margin-top:28px;border-top:1px solid var(--line);padding-top:18px;color:var(--dim);font-size:.77rem;line-height:1.6}
+  footer b{color:var(--text-2)}
+
+  @media (max-width:880px){
+    .reqtop{grid-template-columns:1fr;gap:11px}
+    .scoresrow{justify-content:flex-start}
+    .grid2,.grid3{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brandline"><span class="dot"></span> Job Pipeline · CRM · v6 · server-backed</div>
+      <h1>Requisition <em>pipeline</em></h1>
+      <p class="sub" id="boardSub">Live-requisition CRM — grouped by company, sorted by fit. Each req carries fit + interview probability, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action). Edits save server-side — persistent.</p>
+    </div>
+    <div class="updated" id="updated">loading…</div>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <div class="tabs" id="lifecycleTabs"></div>
+  <div class="lanes" id="laneBar"></div>
+
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search company, role, recruiter, notes…" />
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option>
+      <option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option>
+    </select>
+    <select id="tierFilter"><option value="">All tiers</option><option value="A">Tier A</option><option value="B">Tier B</option><option value="C">Tier C</option></select>
+    <select id="sourceFilter"><option value="">All sources</option></select>
+    <select id="applyModeFilter"><option value="">All apply modes</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
+    <select id="sort">
+      <option value="expected" selected>Sort: Expected value (fit×prob)</option>
+      <option value="fit">Sort: Fit</option>
+      <option value="prob">Sort: Interview probability</option>
+      <option value="company">Sort: Company A–Z</option>
+      <option value="followup">Sort: Follow-up date</option>
+    </select>
+    <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply-next only</label>
+    <label class="toggle"><input type="checkbox" id="remoteOnly"> Remote only</label>
+    <label class="toggle"><input type="checkbox" id="activeOnly"> Active only</label>
+    <label class="toggle"><input type="checkbox" id="notAppliedOnly"> Not applied only</label>
+    <div class="spacer"></div>
+    <div class="scoutctl">
+      <button class="btn ghost" id="scoutBtn">⟳ Run Scout ▾</button>
+      <div class="scoutmenu" id="scoutMenu">
+        <div class="scoutmenu-lbl">Run mode</div>
+        <button data-mode="find">Find new matches</button>
+        <button data-mode="validate">Validate + refresh existing</button>
+        <button data-mode="both">Run all (validate, then find)</button>
+        <div class="scoutmenu-lbl">Scope to sources <span id="scoutScopeHint" class="scoutmenu-hint">(all)</span></div>
+        <div class="scoutsources" id="scoutSources"></div>
+        <div class="scoutmenu-sep"></div>
+        <button data-mode="source-backfill">↻ Backfill source from links</button>
+        <button id="openSettingsFromMenu">⚙ Settings…</button>
+        <div class="scoutmenu-foot" id="scoutAi">enrichment: …</div>
+      </div>
+    </div>
+    <span class="scoutstatus" id="scoutStatus"></span>
+    <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
+    <button class="btn" id="addBtn">+ Add requisition</button>
+    <button class="btn ghost" id="expandAllBtn">Expand all</button>
+    <button class="btn ghost" id="collapseAllBtn">Collapse all</button>
+    <button class="btn ghost" id="exportXlsxBtn">Export Excel</button>
+    <button class="btn ghost" id="exportBtn">Export CSV</button>
+    <button class="btn ghost" id="reloadBtn">Reload</button>
+  </div>
+
+  <div class="selbar" id="selbar">
+    <span class="selcount"><span id="selCount">0</span> selected</span>
+    <button class="btn" id="openTabsBtn">Open <span id="openN">0</span> in tabs ↗</button>
+    <button class="btn apply" id="markAppliedBtn">✓ Mark Applied (today)</button>
+    <button class="btn ghost" id="selectAllBtn">Select all visible</button>
+    <button class="btn ghost" id="clearSelBtn">Clear</button>
+    <span class="selhint">Opening several tabs needs pop-ups <em>allowed for this site</em> — if only one opens, allow pop-ups and retry. Rows whose link is a LinkedIn <em>search</em> open to a search, not the exact posting.</span>
+    <span class="selstatus" id="selStatus"></span>
+  </div>
+
+  <div id="board"><div class="loading">▚ loading from server…</div></div>
+
+  <footer>
+    <b>Link confidence.</b> <span style="color:var(--teal)">Verified</span> = I confirmed a live req this session. <span style="color:var(--gold)">Board-only</span> = link goes to the company's careers board (filter for the title); individual req URLs rotate/expire. <span style="color:var(--coral)">Unverified</span> = sourced from your uploaded doc, not yet confirmed — check before relying on it.<br>
+    <b>Fit</b> = domain/résumé match (your earlier 7-axis model, condensed). <b>Interview probability</b> = my estimate of landing a screen given seniority, remote competition, and how directly your background maps — deliberately separate from fit, since some perfect-fit roles are hard to land. <b>Expected value</b> = fit × probability, your best apply-effort allocator. <b>Tier A</b> refined by expected value, not raw fit. All scores are estimates, salary ranges indicative — verify on each board.<br>
+    <b>Status colors.</b> Cards you've <span style="color:var(--green)">applied</span> to are tinted green; <span style="color:var(--teal)">in-interview</span> stages teal (brightest at offer); <span style="color:var(--coral)">rejected</span> dimmed red; archived faded. Left edge = tier, right edge = status. Untinted = not yet addressed.
+  </footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add requisition</h2>
+    <p class="hint">A requisition = one specific role at a company. Group is by company name.</p>
+    <div class="grid2">
+      <div class="field"><label>Company</label><input id="f_company" type="text"></div>
+      <div class="field"><label>Sector</label><input id="f_sector" type="text" placeholder="CDP / Data Infra / Martech / AI / Enterprise SaaS"></div>
+    </div>
+    <div class="field"><label>Role / requisition title</label><input id="f_role" type="text"></div>
+    <div class="grid3">
+      <div class="field"><label>Salary</label><input id="f_salary" type="text" placeholder="$200K–280K"></div>
+      <div class="field"><label>Location</label><input id="f_location" type="text"></div>
+      <div class="field"><label>Remote</label><select id="f_remote"><option value="remote">Remote</option><option value="flex">Flex/Hybrid</option><option value="onsite">On-site</option></select></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Fit (0–10)</label><input id="f_fit" type="number" min="0" max="10" step="0.1"></div>
+      <div class="field"><label>Interview prob (0–10)</label><input id="f_prob" type="number" min="0" max="10" step="0.1"></div>
+      <div class="field"><label>Tier</label><select id="f_tier"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Link</label><input id="f_link" type="text" placeholder="https://…"></div>
+      <div class="field"><label>Link confidence</label><select id="f_conf"><option value="verified">Verified</option><option value="boardonly">Board-only</option><option value="unverified">Unverified</option></select></div>
+    </div>
+    <div class="field"><label>Why it fits / commentary</label><textarea id="f_notes" rows="2"></textarea></div>
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <div class="grid3">
+      <div class="field"><label>Status</label><select id="f_status"><option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option><option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option></select></div>
+      <div class="field"><label>Applied date</label><input id="f_applied" type="date"></div>
+      <div class="field"><label>Interview date</label><input id="f_interview" type="date"></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Recruiter</label><input id="f_recruiter" type="text"></div>
+      <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
+      <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Cover letter?</label><select id="f_cover"><option>No</option><option>Yes</option></select></div>
+      <div class="field"><label>Follow-up date</label><input id="f_followup" type="date"></div>
+      <div class="field"><label>Last contact</label><input id="f_lastcontact" type="date"></div>
+    </div>
+    <div class="field"><label>Next action</label><input id="f_next" type="text" placeholder="e.g. Ask Karolina for a referral"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="cancelBtn">Cancel</button>
+      <button class="btn" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="assistOverlay">
+  <div class="modal">
+    <h2>AI application assistant</h2>
+    <p class="hint" id="assistCtx">—</p>
+    <div class="grid2">
+      <div class="field"><label>Draft type</label><select id="assistKind"><option value="cover">Cover note</option><option value="screening">Screening question</option></select></div>
+      <div class="field"><label>Model</label><input id="assistModelEcho" type="text" disabled></div>
+    </div>
+    <div class="field" id="assistQWrap" style="display:none"><label>Screening question</label><textarea id="assistQ" rows="2" placeholder="Paste the question to answer…"></textarea></div>
+    <div class="field"><label>Job context (optional — pasted JD; defaults to the row's notes)</label><textarea id="assistJd" rows="3" placeholder="Paste the job description for a more grounded draft…"></textarea></div>
+    <div class="ahintrow"><button class="btn" id="assistGenBtn" type="button">Generate draft</button> <span id="assistUsage" class="setmuted"></span></div>
+    <div class="field" style="margin-top:10px"><label>Draft (edit before you use it — nothing is submitted)</label><textarea id="assistOut" rows="11" placeholder="Your draft appears here…"></textarea></div>
+    <div id="assistMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="assistClose">Close</button>
+      <button class="btn" id="assistCopy">Copy draft</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2>Scout settings</h2>
+    <p class="hint">Enable/disable sources, tune search keywords &amp; titles, and configure the OpenAI key used for AI rescoring. Saves to the server (boards.json / watchlist.json / .env) and takes effect on the next run — no restart needed.</p>
+
+    <div class="field"><label>Sources</label>
+      <div id="setSources" class="setsources"><div class="setmuted">loading…</div></div>
+    </div>
+    <div class="field"><label>Add company by careers URL</label>
+      <div class="ahintrow"><input id="discoverUrl" type="text" placeholder="Paste a Greenhouse / Ashby / Lever / Workable … job or board URL" style="flex:1"> <button class="mini" id="discoverBtn" type="button">Detect</button></div>
+      <div id="discoverResult" class="setmuted" style="margin-top:6px"></div>
+    </div>
+    <div class="field"><label>Source health <button class="mini" id="refreshHealthBtn" type="button" style="float:right">↻ refresh</button></label>
+      <div id="sourceHealth" class="bklist" style="max-height:180px"><div class="setmuted" style="padding:8px">Run the scout to populate.</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="field"><label>Min fit to add (0–10)</label><input id="setMinFit" type="number" min="0" max="10" step="0.1"></div>
+      <div class="field"><label>Min tier to add</label><select id="setMinTier"><option value="A">A only</option><option value="B">A &amp; B</option><option value="C">A, B &amp; C (all)</option></select></div>
+    </div>
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setRemoteOnly" type="checkbox" style="width:auto"> Remote-only (drop on-site)</label></div>
+    <div class="field"><label>Title bands (one per line)</label><textarea id="setTitles" rows="4"></textarea></div>
+    <div class="field"><label>Domain keywords (one per line)</label><textarea id="setKeywords" rows="5"></textarea></div>
+    <div class="grid2">
+      <div class="field"><label>Skip employment types (one per line)</label><textarea id="setSkipTypes" rows="4" placeholder="contract&#10;intern&#10;associate"></textarea></div>
+      <div class="field"><label>Blockers / negative keywords (one per line)</label><textarea id="setNegKw" rows="4" placeholder="crypto&#10;on-call&#10;clearance required"></textarea></div>
+    </div>
+    <p class="hint" style="margin:-4px 0 10px">Employment types match the role title and are dropped. Blockers demote a match (−2 fit each) so heavy hits fall below your min-fit / min-tier; light hits just rank lower.</p>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 6px">Lifecycle tabs</h2>
+    <div class="grid2">
+      <div class="field"><label>Open</label><input id="setTabOpen" type="text" placeholder="Not Applied"></div>
+      <div class="field"><label>Applied</label><input id="setTabApplied" type="text" placeholder="Applied"></div>
+      <div class="field"><label>Interviewing</label><input id="setTabInterviewing" type="text" placeholder="Recruiter Screen, Hiring Manager, Panel, Offer"></div>
+      <div class="field"><label>Rejected + Archived</label><input id="setTabClosed" type="text" placeholder="Rejected, Archived"></div>
+    </div>
+    <p class="hint" style="margin:-6px 0 12px">Comma-separated statuses routed to each board tab. Valid: Not Applied, Applied, Recruiter Screen, Hiring Manager, Panel, Offer, Rejected, Archived. Any unlisted status falls into Open.</p>
+    <div class="field"><label>Analytics window (days; 0 = all time)</label><input id="setAnalyticsWindow" type="number" min="0" max="3650" step="1"></div>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 6px">Hygiene lanes</h2>
+    <div class="grid2">
+      <div class="field"><label>Follow-up due after (days)</label><input id="setFollowupDays" type="number" min="0" max="365" step="1"></div>
+      <div class="field"><label>Closed-req handling</label><select id="setClosedHandling"><option value="suggest">Suggest (passive)</option><option value="auto">Prompt to archive</option></select></div>
+    </div>
+    <div class="field"><label>Follow-up applies to statuses (comma-separated)</label><input id="setFollowupStatuses" type="text" placeholder="Applied, Recruiter Screen, Hiring Manager, Panel"></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setNeedsVerifyBoardonly" type="checkbox" style="width:auto"> Needs-verify lane also includes board-only links</label></div>
+    <p class="hint" style="margin:-4px 0 12px">Lanes are non-destructive: closed reqs are surfaced for review and archived only on confirm (a snapshot is taken first) — never auto-deleted. The needs-verify lane always includes unverified links and leads.</p>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 6px">Apply mode</h2>
+    <div class="field"><label>Source → default apply mode</label>
+      <div id="applyModeMapBox" class="ammap"><div class="setmuted">loading…</div></div>
+    </div>
+    <div class="ahintrow"><button class="mini" id="backfillApplyModeBtn" type="button">↻ Backfill apply-mode now</button> <span class="setmuted">Stamps inferred apply-mode onto rows missing it (snapshots first).</span></div>
+    <p class="hint" style="margin:8px 0 12px">fillable = Claude-in-Chrome can fill the form · gated = login-walled (open + Simplify/manual) · simplify = use Simplify Copilot · manual = by hand. Each card has a per-row override.</p>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 4px">Candidate profile</h2>
+    <p class="hint" id="profMeta" style="margin:0 0 10px">Drives scoring &amp; pre-fill. Re-parse your resume to refresh keywords.</p>
+    <div class="field"><label>Resume (.docx / .txt / .md / .pdf)</label>
+      <input id="resumeFile" type="file" accept=".docx,.txt,.md,.pdf">
+      <div class="ahintrow"><button class="mini" id="uploadResumeBtn" type="button">⬆ Upload &amp; re-parse</button> <span class="setmuted">Re-extracts keywords + applicant info; your narratives &amp; manual prefs are kept.</span></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Name</label><input id="profName" type="text"></div>
+      <div class="field"><label>Email</label><input id="profEmail" type="text"></div>
+      <div class="field"><label>Phone</label><input id="profPhone" type="text"></div>
+      <div class="field"><label>LinkedIn</label><input id="profLinkedin" type="text"></div>
+    </div>
+    <div class="field"><label>Location</label><input id="profLocation" type="text"></div>
+    <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text"></div>
+    <div class="field"><label>Role / title terms (comma-separated)</label><input id="profRoleTerms" type="text"></div>
+    <div class="grid2">
+      <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
+      <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
+    </div>
+    <div class="field"><label>Resume keywords (weighted — read-only; refresh via re-parse)</label><div id="profKeywords" class="profkw"></div></div>
+    <div class="field"><label>Narrative library (reusable story blurbs for cover notes / screening answers)</label>
+      <div id="narrativeBox"></div>
+      <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
+    </div>
+    <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <div class="grid2">
+      <div class="field"><label>AI calls per run (cap)</label><input id="setAiMax" type="number" min="0" max="500" step="1"></div>
+      <div class="field"><label>Re-enrich after (days)</label><input id="setAiTtl" type="number" min="0" max="365" step="1"></div>
+    </div>
+    <p class="hint" style="margin:-6px 0 12px">Cost control: each run makes at most this many AI calls, and a role isn't re-scored by AI again until its posting changes or this many days pass. ~0.5–1k tokens per call on <span id="setBudgetModel">gpt-5.4-mini</span>.</p>
+    <div class="grid2">
+      <div class="field"><label>JD chars sent to AI</label><input id="setJdChars" type="number" min="500" max="20000" step="100"></div>
+      <div class="field"><label>Max tokens per scoring call</label><input id="setMaxTokens" type="number" min="64" max="4000" step="10"></div>
+    </div>
+    <div class="field"><label>Scout delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
+    <div class="field"><label>OpenAI model</label><input id="setModel" type="text" placeholder="gpt-5.4-mini"></div>
+    <div class="field"><label>OpenAI API key <span id="setKeyState" class="setmuted"></span></label>
+      <input id="setKey" type="password" placeholder="leave blank to keep current" autocomplete="off">
+      <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Stored server-side in .env (never sent to the browser).</span></div>
+    </div>
+    <div class="field"><label>Aggregator keys (optional)</label>
+      <div class="grid2">
+        <input id="setTheirstack" type="password" placeholder="THEIRSTACK_API_KEY (blank=keep)" autocomplete="off">
+        <input id="setApify" type="password" placeholder="APIFY_TOKEN (blank=keep)" autocomplete="off">
+      </div>
+      <div class="ahintrow"><button class="mini danger" id="clearTheirstackBtn" type="button">Clear TheirStack</button> <button class="mini danger" id="clearApifyBtn" type="button">Clear Apify</button></div>
+    </div>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 6px">AI application assistant</h2>
+    <div class="grid2">
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setAssistEnabled" type="checkbox" style="width:auto"> Enable AI draft assistant</label></div>
+      <div class="field"><label>Assistant model (blank = scoring model)</label><input id="setAssistModel" type="text" placeholder="gpt-5.4-mini"></div>
+      <div class="field"><label>Daily call cap</label><input id="setAssistDaily" type="number" min="0" max="1000" step="1"></div>
+      <div class="field"><label>Max tokens per draft</label><input id="setAssistMaxTokens" type="number" min="64" max="4000" step="10"></div>
+    </div>
+    <p class="hint" id="assistUsageHint" style="margin:-4px 0 12px">Per-req "✍ AI draft" composes a cover note or screening answer from your profile + narratives + JD. Output is editable and never auto-submitted.</p>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 6px">Morning digest</h2>
+    <div class="grid2">
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestEnabled" type="checkbox" style="width:auto"> Enable scheduled digest</label></div>
+      <div class="field"><label>Time (HH:MM, server local)</label><input id="setDigestTime" type="text" placeholder="07:00"></div>
+      <div class="field"><label>Channel</label><select id="setDigestChannel"><option value="file">File only</option><option value="slack">Slack webhook</option><option value="email">Email (SMTP)</option></select></div>
+      <div class="field"><label>Look-back window (days)</label><input id="setDigestDays" type="number" min="1" max="60" step="1"></div>
+    </div>
+    <div class="field"><label>Slack incoming webhook URL <span id="webhookState" class="setmuted"></span></label><input id="setDigestWebhook" type="text" placeholder="https://hooks.slack.com/… (blank = keep)" autocomplete="off">
+      <div class="ahintrow"><button class="mini danger" id="clearWebhookBtn" type="button">Clear webhook</button></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Email to</label><input id="setDigestTo" type="text" placeholder="you@example.com"></div>
+      <div class="field"><label>Email from</label><input id="setDigestFrom" type="text" placeholder="defaults to SMTP user"></div>
+      <div class="field"><label>SMTP host</label><input id="setSmtpHost" type="text" placeholder="smtp.gmail.com"></div>
+      <div class="field"><label>SMTP port</label><input id="setSmtpPort" type="text" placeholder="587"></div>
+      <div class="field"><label>SMTP user</label><input id="setSmtpUser" type="text"></div>
+      <div class="field"><label>SMTP password <span id="smtpState" class="setmuted"></span></label><input id="setSmtpPass" type="password" placeholder="blank = keep" autocomplete="off">
+        <div class="ahintrow"><button class="mini danger" id="clearSmtpPassBtn" type="button">Clear password</button></div>
+      </div>
+    </div>
+    <div class="ahintrow"><button class="mini" id="sendDigestBtn" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
+    <p class="hint" style="margin:8px 0 12px">The always-on server composes from your data and delivers at the set time. A file fallback is always written to <code>agent/digest-latest.html</code>. MCP connectors aren't reachable from the server — use a Slack webhook or SMTP. Save settings before sending a test.</p>
+
+    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
+    <h2 style="font-size:1rem;margin:0 0 6px">Data safety</h2>
+    <div class="grid2">
+      <div class="field"><label>Backup retention (auto-snapshots to keep)</label><input id="setRetention" type="number" min="1" max="1000" step="1"></div>
+      <div class="field"><label>Shrink guard (refuse save dropping &gt; X% of rows)</label><input id="setGuardPct" type="number" min="0" max="100" step="1"></div>
+    </div>
+    <p class="hint" style="margin:-6px 0 12px">Every board save snapshots the previous data first; only the newest <span id="setRetentionEcho">50</span> auto-snapshots are kept (manual &amp; phase snapshots are never auto-deleted). A save that would drop more than the guard % of rows — or an empty save over a non-empty store — is refused as likely corruption. Set the guard to 0 to allow any size drop.</p>
+    <div class="field"><label>Snapshots</label>
+      <div class="ahintrow" style="margin-bottom:8px">
+        <button class="mini" id="snapNowBtn" type="button">📸 Snapshot now</button>
+        <button class="mini" id="refreshBackupsBtn" type="button">↻ Refresh list</button>
+        <span class="setmuted">Restore snapshots your current data first, then replaces it.</span>
+      </div>
+      <div id="backupList" class="bklist"><div class="setmuted" style="padding:8px">loading…</div></div>
+    </div>
+
+    <div id="setMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="settingsCancel">Close</button>
+      <button class="btn" id="settingsSave">Save settings</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API="/api/reqs";
+const STATUS_ORDER=["Not Applied","Applied","Recruiter Screen","Hiring Manager","Panel","Offer","Rejected","Archived"];
+const STATUS_COLOR={"Not Applied":"#5a6470","Applied":"var(--blue)","Recruiter Screen":"var(--violet)","Hiring Manager":"var(--gold)","Panel":"var(--gold)","Offer":"var(--teal)","Rejected":"var(--coral)","Archived":"#3a4550"};
+const ACTIVE=new Set(["Applied","Recruiter Screen","Hiring Manager","Panel","Offer"]);
+
+let rows=[];
+// ---- lifecycle tabs (Phase 2) ----
+const TAB_DEFS=[
+  {key:"open",label:"Open"},
+  {key:"applied",label:"Applied"},
+  {key:"interviewing",label:"Interviewing"},
+  {key:"closed",label:"Rejected + Archived"},
+  {key:"analytics",label:"📊 Analytics"},
+];
+const TAB_MAP_DEFAULT={open:["Not Applied"],applied:["Applied"],interviewing:["Recruiter Screen","Hiring Manager","Panel","Offer"],closed:["Rejected","Archived"]};
+let ANALYTICS_WINDOW=0;   // days; 0 = all-time (from settings)
+let TAB_MAP={...TAB_MAP_DEFAULT};
+let activeTab="open", applyNextOnly=true;
+// ---- hygiene lanes (Phase 3) ----
+const HYGIENE_DEFAULT={followupDays:7,followupStatuses:["Applied","Recruiter Screen","Hiring Manager","Panel"],needsVerifyIncludeBoardonly:false,closedHandling:"suggest"};
+let HYGIENE={...HYGIENE_DEFAULT};
+let activeLane="all";
+function daysSince(d){ // local date-only delta; "YYYY-MM-DD" parsed as LOCAL midnight (same-day = 0)
+  if(!d)return null;
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));
+  let then;
+  if(m){then=new Date(+m[1],+m[2]-1,+m[3]);}
+  else{const t=Date.parse(d);if(isNaN(t))return null;then=new Date(t);}
+  then.setHours(0,0,0,0);
+  const today=new Date();today.setHours(0,0,0,0);
+  return Math.max(0,Math.round((today-then)/864e5));
+}
+function needsVerify(x){return x.status==="Not Applied"&&(x.conf==="unverified"||x.reqCheck==="lead"||(HYGIENE.needsVerifyIncludeBoardonly&&x.conf==="boardonly"));}
+function followUpDue(x){if(!(HYGIENE.followupStatuses||[]).includes(x.status))return false;const d=daysSince(x.lastcontact||x.applied);return d!=null&&d>=(HYGIENE.followupDays||7);}
+function closedReq(x){return (x.reqCheck||"")==="closed";}
+const LANE_DEFS=[
+  {key:"verify",label:"⚠ Needs verify",pred:needsVerify,desc:"Not-applied leads with an unverified link — confirm the live posting before applying.",reason:x=>x.reqCheck==="lead"?"lead":x.conf},
+  {key:"followup",label:"⏰ Follow-up due",pred:followUpDue,desc:"Active applications with no contact past your follow-up threshold — nudge or log an update.",reason:x=>{const d=daysSince(x.lastcontact||x.applied);return d!=null?d+"d quiet":"stale";}},
+  {key:"closed",label:"✖ Closed reqs",pred:closedReq,desc:"Postings detected closed. Archive them (snapshots first) — never auto-deleted.",reason:x=>"req closed"},
+];
+function laneDef(k){return LANE_DEFS.find(d=>d.key===k);}
+// ---- apply-mode (Phase 4) ----
+const APPLY_MODES=["fillable","gated","manual","simplify"];
+const APPLY_MODE_MAP_DEFAULT={greenhouse:"fillable",ashby:"fillable",lever:"fillable",workable:"fillable",smartrecruiters:"fillable",recruitee:"fillable",personio:"fillable",teamtailor:"fillable",workday:"gated",bamboohr:"gated",icims:"gated",taleo:"gated",successfactors:"gated",phenom:"gated",jobvite:"gated",linkedin:"manual",other:"manual",manual:"manual","quick-add":"manual","":"manual"};
+let APPLY_MODE_MAP={...APPLY_MODE_MAP_DEFAULT};
+function applyModeOf(x){return x.applyMode||APPLY_MODE_MAP[rowSource(x)]||APPLY_MODE_MAP_DEFAULT[rowSource(x)]||"manual";}
+function applyModeBadge(x){const m=applyModeOf(x);return `<span class="am ${m}" title="Apply mode: ${m}">${m}</span>`;}
+function applyApplyModeMap(m){if(m&&typeof m==="object")APPLY_MODE_MAP={...APPLY_MODE_MAP_DEFAULT,...m};if(rows.length)render();}
+function statusesForTab(k){return new Set((TAB_MAP[k]&&TAB_MAP[k].length?TAB_MAP[k]:TAB_MAP_DEFAULT[k])||[]);}
+function tabKeyForStatus(status){for(const d of TAB_DEFS){if(statusesForTab(d.key).has(status))return d.key;}return "open";} // unmapped -> Open so nothing disappears
+// apply-next queue: tier A/B · verified · req still open · not yet applied
+function isApplyNext(x){return ["A","B"].includes(x.tier)&&x.conf==="verified"&&!["closed","lead","unknown"].includes(x.reqCheck||"")&&x.status==="Not Applied";}
+const tierOpen={A:true,B:false,C:false};   // accordion state — Tier A open by default
+const expanded=new Set();                  // compact rows expanded into full cards (by row index)
+const selected=new Set();                  // checkbox selection (by row index)
+let visibleIdx=[];                         // row indices currently shown post-filter (for "select all visible")
+const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function expected(x){return +(((+x.fit||0)*(+x.prob||0))/10).toFixed(1);}
+function fitColor(v){if(v>=8.5)return"var(--t9)";if(v>=7)return"var(--t7)";if(v>=5)return"var(--t5)";return"var(--t3)";}
+function probColor(v){if(v>=7)return"var(--t9)";if(v>=6)return"var(--t7)";if(v>=4.5)return"var(--t5)";return"var(--t3)";}
+// Infer a row's source from its link when not explicitly stamped (mirrors scout_run.parse_ats).
+function inferSource(link){
+  const u=(link||"").toLowerCase(); if(!u)return"";
+  if(u.includes("greenhouse.io"))return"greenhouse";
+  if(u.includes("ashbyhq.com"))return"ashby";
+  if(u.includes("lever.co"))return"lever";
+  if(u.includes("workable.com"))return"workable";
+  if(u.includes("smartrecruiters.com"))return"smartrecruiters";
+  if(u.includes("recruitee.com"))return"recruitee";
+  if(u.includes("personio."))return"personio";
+  if(u.includes("teamtailor.com"))return"teamtailor";
+  if(u.includes("myworkdayjobs.com")||u.includes("myworkdaysite.com"))return"workday";
+  if(u.includes("bamboohr.com"))return"bamboohr";
+  if(u.includes("icims.com"))return"icims";
+  if(u.includes("taleo.net"))return"taleo";
+  if(u.includes("successfactors"))return"successfactors";
+  if(u.includes("linkedin.com"))return"linkedin";
+  return"other";
+}
+const rowSource=x=>((x.source&&String(x.source).trim())||inferSource(x.link)||"—");
+function populateSourceFilter(){
+  const sel=F("sourceFilter"); const cur=sel.value;
+  const seen=[...new Set(rows.map(rowSource))].filter(s=>s&&s!=="—").sort();
+  const want='<option value="">All sources</option>'+seen.map(s=>`<option value="${s}">${s}</option>`).join("");
+  if(sel.dataset.sig!==want){sel.innerHTML=want;sel.dataset.sig=want;if(seen.includes(cur))sel.value=cur;}
+}
+
+// ---------- server-backed persistence ----------
+const updEl=()=>document.getElementById("updated");
+let saveTimer=null, saving=false, dirty=false;
+function setSave(state){
+  const el=updEl();
+  if(state==="saving"){el.textContent="Saving…";el.style.color="var(--gold)";}
+  else if(state==="saved"){const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});el.textContent="✓ Saved "+t+" · "+rows.length+" reqs";el.style.color="var(--dim)";}
+  else if(state==="error"){el.textContent="⚠ Save failed — retrying…";el.style.color="var(--coral)";}
+}
+async function doPut(force){
+  saving=true; setSave("saving");
+  try{
+    const res=await fetch(API+(force?"?allowShrink=1":""),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(rows)});
+    if(res.status===409){   // corruption guard tripped — do NOT blind-retry; let the user decide
+      saving=false;
+      let info={}; try{info=await res.json();}catch(e){}
+      if(confirm("⚠ "+(info.error||"Save refused by the safety guard.")+"\n\nForce this save anyway?\n(Cancel keeps your edits unsaved — use Reload to pull the server's copy.)")){
+        return doPut(true);
+      }
+      setSave("error"); updEl().textContent="⚠ Save refused — guard tripped. Force or Reload.";
+      return;
+    }
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    saving=false;
+    if(dirty){dirty=false;return doPut();}   // coalesce edits that arrived mid-request
+    setSave("saved");
+  }catch(e){
+    saving=false; setSave("error");
+    clearTimeout(saveTimer); saveTimer=setTimeout(doPut, 2500);   // auto-retry
+  }
+}
+function persist(){   // debounced — for rapid inline edits
+  if(saving){dirty=true;return;}
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(doPut, 500);
+}
+function persistNow(){   // immediate — for add/edit/delete
+  clearTimeout(saveTimer);
+  if(saving){dirty=true;return;}
+  doPut();
+}
+
+async function load(){
+  try{
+    const res=await fetch(API,{cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    rows=Array.isArray(data)?data:[];
+    setSave("saved");
+  }catch(e){
+    document.getElementById("board").innerHTML='<div class="loading">⚠ Could not reach the server ('+e.message+'). Is it running? Try: <b>npm start</b> in ~/job-pipeline-crm</div>';
+    updEl().textContent="⚠ offline"; updEl().style.color="var(--coral)";
+    return;
+  }
+  render();
+}
+
+const SCLS={"Applied":"st-applied","Recruiter Screen":"st-active","Hiring Manager":"st-active","Panel":"st-active","Offer":"st-offer","Rejected":"st-rejected","Archived":"st-archived"};
+const BADGECLS={"Applied":"applied","Recruiter Screen":"active","Hiring Manager":"active","Panel":"active","Offer":"offer","Rejected":"rejected","Archived":"archived"};
+const isLinkedInSearch=u=>/linkedin\.com\/jobs\/search/i.test(u||"");
+
+// Full traditional requisition card — lazy-rendered inline when a compact row is expanded.
+function reqCardHTML(x,i){
+  const rc=x.remote==="remote"?"remote":(x.remote==="onsite"?"onsite":"flex");
+  const rt=x.remote==="remote"?"Remote":(x.remote==="onsite"?"On-site":"Flex/Hybrid");
+  const confTxt=x.conf==="verified"?"✓ Verified":(x.conf==="unverified"?"⚠ Unverified":"◷ Board-only");
+  const scls=SCLS[x.status]||"";
+  const flag = x.status==="Applied"?'<span class="doneflag applied">✓ Applied</span>'
+    : (["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)?`<span class="doneflag active">✓ ${x.status}</span>`
+    : (x.status==="Offer"?'<span class="doneflag offer">★ Offer</span>'
+    : (x.status==="Rejected"?'<span class="doneflag rejected">✕ Rejected</span>':"")));
+  return `
+  <div class="req tier${x.tier} ${scls}" id="req-${i}" style="margin-left:8px">
+    <div class="reqtop">
+      <div>
+        <div class="rtitle"><span class="tierTag ${x.tier}">TIER ${x.tier}</span> ${esc(x.role)} ${flag}</div>
+        <div class="meta">
+          <span class="pill ${rc}">${rt}</span>
+          ${x.location?`<span class="pill">${esc(x.location)}</span>`:""}
+          ${x.salary?`<span class="pill sal">${esc(x.salary)}</span>`:""}
+          <span class="pill ${x.conf}">${confTxt}</span>
+          <span class="pill source">⌖ ${esc(rowSource(x))}</span>
+          ${applyModeBadge(x)}
+        </div>
+        ${x.notes?`<div class="meta" style="font-style:italic;color:var(--text-2);margin-top:8px;display:block;line-height:1.5;border-left:2px solid var(--line-2);padding-left:10px">${esc(x.notes)}</div>`:""}
+      </div>
+      <div class="scoresrow">
+        <div class="twoscore"><span class="n" style="color:${fitColor(x.fit)}">${(+x.fit).toFixed(1)}</span><span class="l">Fit</span></div>
+        <div class="twoscore"><span class="n" style="color:${probColor(x.prob)}">${(+x.prob).toFixed(1)}</span><span class="l">Interview</span></div>
+        <div class="twoscore"><span class="n" style="color:var(--gold)">${expected(x)}</span><span class="l">Exp. val</span></div>
+      </div>
+    </div>
+    <div class="crm">
+      <div class="cell"><label>Status</label>
+        <select class="status-sel" style="color:${STATUS_COLOR[x.status]||'var(--text)'}" onchange="upd(${i},'status',this.value)">
+          ${STATUS_ORDER.map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join("")}
+        </select></div>
+      <div class="cell"><label>Applied date</label><input type="date" value="${x.applied||''}" onchange="upd(${i},'applied',this.value)"></div>
+      <div class="cell"><label>Interview date</label><input type="date" value="${x.interview||''}" onchange="upd(${i},'interview',this.value)"></div>
+      <div class="cell"><label>Follow-up</label><input type="date" value="${x.followup||''}" onchange="upd(${i},'followup',this.value)"></div>
+      <div class="cell"><label>Recruiter</label><input type="text" value="${(x.recruiter||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'recruiter',this.value)"></div>
+      <div class="cell"><label>Referral</label><select onchange="upd(${i},'referral',this.value)"><option ${x.referral==='No'?'selected':''}>No</option><option ${x.referral==='Yes'?'selected':''}>Yes</option></select></div>
+      <div class="cell"><label>Resume ver.</label><select onchange="upd(${i},'resume',this.value)">${["—","PM","Director","Principal","Platform","AI"].map(o=>`<option ${o===x.resume?'selected':''}>${o}</option>`).join("")}</select></div>
+      <div class="cell"><label>Cover letter</label><select onchange="upd(${i},'cover',this.value)"><option ${x.cover==='No'?'selected':''}>No</option><option ${x.cover==='Yes'?'selected':''}>Yes</option></select></div>
+      <div class="cell"><label>Last contact</label><input type="date" value="${x.lastcontact||''}" onchange="upd(${i},'lastcontact',this.value)"></div>
+      <div class="cell"><label>Apply mode</label><select onchange="upd(${i},'applyMode',this.value)">${APPLY_MODES.map(o=>`<option ${o===applyModeOf(x)?'selected':''}>${o}</option>`).join("")}</select></div>
+      <div class="cell full"><label>Next action</label><input type="text" value="${(x.next||'').replace(/"/g,'&quot;')}" placeholder="e.g. tailor Principal resume, ask for referral" onchange="upd(${i},'next',this.value)"></div>
+    </div>
+    <div class="rowacts">
+      ${x.link?`<a class="applylink" href="${x.link}" target="_blank" rel="noopener"><span class="mini link">Open ↗</span></a>`:""}
+      <button class="mini" onclick="editRow(${i})">Edit details</button>
+      <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
+      <button class="mini danger" onclick="delRow(${i})">Delete</button>
+    </div>
+  </div>`;
+}
+
+// Compact row — EV · company · role · status badge, with a checkbox + expand caret.
+function compactRowHTML(x, reason, showArchive){
+  const i=x._i;
+  const scls=SCLS[x.status]||"";
+  const badge=(x.status&&x.status!=="Not Applied")?`<span class="tabadge ${BADGECLS[x.status]||''}">${esc(x.status)}</span>`:'<span class="tabadge none">Not applied</span>';
+  const sel=selected.has(i)?"sel":"";
+  const open=expanded.has(i)?"open":"";
+  const reasonHtml=reason?`<span class="crow-reason">${esc(reason)}</span>`:'';
+  const archiveHtml=showArchive?`<button class="mini danger" onclick="event.stopPropagation();archiveRow(${i})" title="Set status to Archived (snapshots first)">Archive</button>`:'';
+  return `<div class="crow tier${x.tier} ${scls} ${sel} ${open}" data-i="${i}" onclick="toggleCard(${i})">
+    <input type="checkbox" class="crow-chk" ${selected.has(i)?"checked":""} onclick="event.stopPropagation();toggleSel(${i},this.checked)" title="Select for Open-in-tabs">
+    <span class="crow-ev">${x._ev.toFixed(1)}</span>
+    <span class="crow-co">${esc(x.company)}</span>
+    <span class="crow-role">${esc(x.role||'')} <span class="crow-src">· ${esc(rowSource(x))}</span></span>
+    ${applyModeBadge(x)}
+    ${reasonHtml}
+    ${badge}
+    ${archiveHtml}
+    <span class="crow-caret">▾</span>
+  </div>`;
+}
+
+function render(){
+  const qy=document.getElementById("search").value.trim().toLowerCase();
+  const sf=document.getElementById("statusFilter").value;
+  const tf=document.getElementById("tierFilter").value;
+  const srcf=document.getElementById("sourceFilter").value;
+  const sortKey=document.getElementById("sort").value;
+  const remoteOnly=document.getElementById("remoteOnly").checked;
+  const activeOnly=document.getElementById("activeOnly").checked;
+  const notAppliedOnly=document.getElementById("notAppliedOnly").checked;
+  populateSourceFilter();
+
+  applyNextOnly=F("applyNextOnly").checked;
+
+  // base = all rows after the GLOBAL filters (everything EXCEPT the lifecycle tab + apply-next)
+  let base=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)}));
+  if(qy)base=base.filter(x=>(x.company+" "+x.role+" "+(x.notes||"")+" "+(x.recruiter||"")+" "+(x.next||"")+" "+(x.sector||"")).toLowerCase().includes(qy));
+  if(sf)base=base.filter(x=>x.status===sf);
+  if(tf)base=base.filter(x=>x.tier===tf);
+  if(srcf)base=base.filter(x=>rowSource(x)===srcf);
+  const amf=F("applyModeFilter").value;
+  if(amf)base=base.filter(x=>applyModeOf(x)===amf);
+  if(remoteOnly)base=base.filter(x=>x.remote==="remote"||x.remote==="flex");
+  if(activeOnly)base=base.filter(x=>ACTIVE.has(x.status));
+  if(notAppliedOnly)base=base.filter(x=>x.status==="Not Applied");
+
+  // lifecycle tab counts (over the globally-filtered base) + tab bar
+  const tabCounts={}; TAB_DEFS.forEach(d=>tabCounts[d.key]=0);
+  base.forEach(x=>{tabCounts[tabKeyForStatus(x.status)]++;});
+  tabCounts.analytics=base.length;   // analytics isn't a status bucket
+  F("lifecycleTabs").innerHTML=TAB_DEFS.map(d=>`<div class="tab ${d.key===activeTab?'active':''}" onclick="setTab('${d.key}')"><span>${d.label}</span><span class="tcnt">${tabCounts[d.key]}</span></div>`).join("");
+  // hygiene lane bar (counts over the global-filtered base); a lane overrides the tab view
+  const analytics=activeTab==="analytics";
+  const laneActive=!analytics&&activeLane!=="all";
+  F("laneBar").style.display=analytics?"none":"";
+  F("laneBar").innerHTML=`<span class="llbl">Lanes</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
+    LANE_DEFS.map(d=>`<div class="lane ${activeLane===d.key?'active':''}" onclick="setLane('${d.key}')"><span>${d.label}</span><span class="lcnt">${base.filter(d.pred).length}</span></div>`).join("");
+  F("applyNextWrap").style.display=(activeTab==="open"&&!laneActive&&!analytics)?"":"none";
+
+  // rows for the active tab; Open defaults to the apply-next queue. A hygiene lane (across the
+  // whole filtered base) takes precedence over the lifecycle tab.
+  const tabBase=base.filter(x=>tabKeyForStatus(x.status)===activeTab);
+  let list=laneActive?base.filter(laneDef(activeLane).pred):((activeTab==="open"&&applyNextOnly)?tabBase.filter(isApplyNext):tabBase);
+
+  // stats (always full-set, unaffected by filters)
+  const total=rows.length;
+  const applied=rows.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
+  const active=rows.filter(x=>ACTIVE.has(x.status)).length;
+  const interviews=rows.filter(x=>["Recruiter Screen","Hiring Manager","Panel","Offer"].includes(x.status)).length;
+  const tierA=rows.filter(x=>x.tier==="A").length;
+  const rejected=rows.filter(x=>x.status==="Rejected").length;
+  const rejRate=applied?Math.round(rejected/applied*1000)/10:0;
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><div class="k">Requisitions</div><div class="v">${total}</div></div>
+    <div class="stat"><div class="k">Applied</div><div class="v gold">${applied}</div></div>
+    <div class="stat"><div class="k">Active pipeline</div><div class="v teal">${active}</div></div>
+    <div class="stat"><div class="k">In interviews</div><div class="v violet">${interviews}</div></div>
+    <div class="stat"><div class="k">Rejected</div><div class="v coral">${rejected} <small>${rejRate}%</small></div></div>
+    <div class="stat"><div class="k">Tier A</div><div class="v">${tierA}</div></div>`;
+
+  const cmp=(a,b)=>{
+    if(sortKey==="company")return (a.company||"").localeCompare(b.company||"");
+    if(sortKey==="prob")return (+b.prob||0)-(+a.prob||0);
+    if(sortKey==="fit")return (+b.fit||0)-(+a.fit||0);
+    if(sortKey==="followup"){const da=a.followup?Date.parse(a.followup):8.64e15,db=b.followup?Date.parse(b.followup):8.64e15;return da-db;}
+    return b._ev-a._ev;   // "expected" + default
+  };
+
+  visibleIdx = list.map(x=>x._i);   // for "select all visible"
+  // prune selection of rows no longer visible (e.g., filtered out) so counts stay honest
+  const visSet=new Set(visibleIdx);
+  [...selected].forEach(i=>{if(!visSet.has(i))selected.delete(i);});
+
+  const board=document.getElementById("board");
+  let html="";
+  if(analytics){
+    // conversion & source-ROI analytics — computed client-side from the (non-status-filtered) base
+    board.innerHTML=renderAnalytics({qy,srcf,tf,amf,remoteOnly});
+    renderSelbar();
+    return;
+  }
+  if(laneActive){
+    // hygiene lane view — flat EV-sorted list with a reason badge; closed lane adds archive actions
+    const def=laneDef(activeLane);
+    const items=[...list].sort(cmp);
+    const showArchive=activeLane==="closed";
+    html+=`<div class="lane-head"><span class="lh-title">${def.label}</span><span class="lh-desc">${def.desc}</span>`;
+    if(showArchive&&items.length)html+=`<button class="btn ghost" onclick="archiveAllClosed()">Archive all ${items.length} (snapshot first)</button>`;
+    html+=`</div><div class="flatlist">`;
+    if(!items.length)html+=`<div class="flat-empty">Nothing in this lane. 🎉</div>`;
+    else items.forEach(x=>{ html+=compactRowHTML(x,def.reason(x),showArchive); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
+    html+=`</div>`;
+  } else if(activeTab==="open"){
+    // Open tab keeps the tier accordion; "of N" is relative to all Open rows pre-apply-next
+    const tiers={A:[],B:[],C:[]};
+    list.forEach(x=>{(tiers[x.tier]||tiers.C).push(x);});
+    const totals={A:0,B:0,C:0}; tabBase.forEach(x=>{totals[x.tier]=(totals[x.tier]||0)+1;});
+    ["A","B","C"].forEach(t=>tiers[t].sort(cmp));
+    const filterActive=!!(qy||sf||tf||srcf||remoteOnly||activeOnly||notAppliedOnly||applyNextOnly);
+    ["A","B","C"].forEach(t=>{
+      const items=tiers[t];
+      const isC = filterActive ? items.length===0 : !tierOpen[t];
+      const ofN = items.length!==totals[t] ? `<span class="of"> of ${totals[t]}</span>` : "";
+      html+=`<div class="tier-sec tier${t} ${isC?'collapsed':''}">
+        <div class="tier-head" onclick="toggleTier('${t}')">
+          <span class="caret">▼</span>
+          <span class="tdot ${t}"></span>
+          <span class="tname">Tier ${t}</span>
+          <span class="tcount">(${items.length}${ofN})</span>
+          <span class="tsum">${t==='A'?'apply now':(t==='B'?'strong':'monitor')}</span>
+        </div>
+        <div class="tier-body">`;
+      if(!items.length) html+=`<div class="tier-empty">No matching Tier ${t} requisitions.</div>`;
+      else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
+      html+=`</div></div>`;
+    });
+  } else {
+    // Applied / Interviewing / Rejected+Archived -> flat EV-sorted list
+    const items=[...list].sort(cmp);
+    html+='<div class="flatlist">';
+    if(!items.length) html+=`<div class="flat-empty">Nothing in ${TAB_DEFS.find(d=>d.key===activeTab).label}.</div>`;
+    else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
+    html+='</div>';
+  }
+  board.innerHTML=html;
+  renderSelbar();
+}
+window.setTab=function(k){activeTab=k;render();};
+window.setLane=function(k){activeLane=k;render();};
+// ---------- analytics (Phase 8) ----------
+const STAGE_RANK={"Not Applied":0,"Applied":1,"Recruiter Screen":2,"Hiring Manager":3,"Panel":4,"Offer":5};
+const ACTIVE_STAGES=["Applied","Recruiter Screen","Hiring Manager","Panel","Offer"];
+function anMetrics(rs){
+  const m={total:rs.length,applied:0,recruiter:0,hm:0,panel:0,offer:0,rejected:0,archived:0,notApplied:0};
+  let ttrSum=0,ttrN=0;
+  rs.forEach(x=>{
+    const s=x.status||"Not Applied";
+    if(s==="Not Applied")m.notApplied++; if(s==="Archived")m.archived++; if(s==="Rejected")m.rejected++;
+    if(ACTIVE_STAGES.includes(s)||s==="Rejected"||!!x.applied)m.applied++;
+    const r=STAGE_RANK[s];
+    if(r>=2)m.recruiter++; if(r>=3)m.hm++; if(r>=4)m.panel++; if(r>=5)m.offer++;
+    if(x.applied&&x.lastcontact){const d=(Date.parse(x.lastcontact)-Date.parse(x.applied))/864e5; if(!isNaN(d)&&d>=0){ttrSum+=d;ttrN++;}}
+  });
+  const pct=(a,b)=>b?Math.round(a/b*1000)/10:0;
+  m.responseRate=pct(m.recruiter,m.applied); m.offerRate=pct(m.offer,m.applied); m.rejectRate=pct(m.rejected,m.applied);
+  m.ttr=ttrN?Math.round(ttrSum/ttrN*10)/10:null; m.ttrN=ttrN;
+  return m;
+}
+function anBreakdown(rs,keyFn,label){
+  const g={}; rs.forEach(x=>{const k=keyFn(x)||"—";(g[k]=g[k]||[]).push(x);});
+  const out=Object.keys(g).map(k=>{const mm=anMetrics(g[k]);return {k,n:mm.total,applied:mm.applied,resp:mm.recruiter,offer:mm.offer,rr:mm.responseRate};}).sort((a,b)=>b.n-a.n);
+  return `<div class="an-card"><h3>${label}</h3><table class="an-table"><tr><th>${label}</th><th>Roles</th><th>Applied</th><th>Responses</th><th>Offers</th><th>Resp&nbsp;%</th></tr>`+
+    out.map(r=>`<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${r.applied}</td><td>${r.resp}</td><td>${r.offer}</td><td>${r.rr}%</td></tr>`).join("")+`</table></div>`;
+}
+function renderAnalytics(f){
+  let rs=rows.slice();
+  if(f.qy)rs=rs.filter(x=>(x.company+" "+x.role+" "+(x.notes||"")+" "+(x.sector||"")).toLowerCase().includes(f.qy));
+  if(f.srcf)rs=rs.filter(x=>rowSource(x)===f.srcf);
+  if(f.tf)rs=rs.filter(x=>x.tier===f.tf);
+  if(f.amf)rs=rs.filter(x=>applyModeOf(x)===f.amf);
+  if(f.remoteOnly)rs=rs.filter(x=>x.remote==="remote"||x.remote==="flex");
+  if(ANALYTICS_WINDOW>0)rs=rs.filter(x=>{const d=daysSince(x.applied||x.added);return d!=null&&d<=ANALYTICS_WINDOW;});
+  const m=anMetrics(rs);
+  const win=ANALYTICS_WINDOW>0?`last ${ANALYTICS_WINDOW} days (by applied/added date)`:"all time";
+  const kpi=(k,v)=>`<div class="an-kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const kpis=`<div class="an-kpis">`+
+    kpi("Roles",m.total)+kpi("Applied",m.applied)+kpi("Responses",m.recruiter)+
+    kpi("Response rate",m.responseRate+"%")+kpi("Offers",m.offer)+kpi("Reject rate",m.rejectRate+"%")+
+    kpi("Avg days→contact",m.ttr!=null?m.ttr+`<span style="font-size:.6rem;color:var(--dim)"> (n=${m.ttrN})</span>`:"—")+`</div>`;
+  const fb=Math.max(m.applied,1);
+  const stage=(lbl,n)=>`<div class="an-frow"><span class="lbl">${lbl}</span><span class="bar" style="width:${Math.round(n/fb*100)}%"></span><span class="num">${n} · ${Math.round(n/fb*1000)/10}%</span></div>`;
+  const funnel=`<div class="an-card"><h3>Conversion funnel</h3><div class="an-funnel">`+
+    stage("Applied",m.applied)+stage("Recruiter screen",m.recruiter)+stage("Hiring manager",m.hm)+
+    stage("Panel",m.panel)+stage("Offer",m.offer)+`</div>`+
+    `<p class="an-note" style="margin-top:10px">Rejected: ${m.rejected} · Not applied: ${m.notApplied} · Archived: ${m.archived}. Window: ${win}. ` +
+    `Stages use each row's <em>current</em> status — rejected-after-interview rows count as Applied but not in later stages, so interview stages are a floor.</p></div>`;
+  const breakdowns=`<div class="an-grid2">`+
+    anBreakdown(rs,x=>rowSource(x),"Source / ATS")+anBreakdown(rs,x=>x.sector,"Sector")+
+    anBreakdown(rs,x=>"Tier "+(x.tier||"?"),"Tier")+anBreakdown(rs,x=>applyModeOf(x),"Apply mode")+`</div>`;
+  return `<div class="an-wrap"><div class="an-bartop"><b style="color:var(--text)">Conversion &amp; source-ROI</b> · ${win} · adjust the window in ⚙ Settings; search/tier/source/apply-mode filters above still apply.</div>${kpis}${funnel}${breakdowns}</div>`;
+}
+function applyHygiene(h){ if(h&&typeof h==="object")HYGIENE={...HYGIENE_DEFAULT,...h}; if(rows.length)render(); }
+async function archiveRow(i){
+  const r=rows[i]; if(!r)return;
+  if(!confirm(`Archive "${r.company} — ${r.role}"?\n\nYour data is snapshotted first; this sets status to Archived (not deleted).`))return;
+  await fetch("/api/backup",{method:"POST"}).catch(()=>{});
+  rows[i].status="Archived"; persistNow(); render();
+}
+async function archiveAllClosed(){
+  // only the closed rows CURRENTLY SHOWN (respects search/source/tier/apply-mode filters),
+  // matching the "Archive all N" button count — never the whole store.
+  const targets=visibleIdx.map(i=>({x:rows[i],i})).filter(o=>o.x&&closedReq(o.x)&&o.x.status!=="Archived");
+  if(!targets.length){alert("No closed reqs in the current view to archive.");return;}
+  if(!confirm(`Archive ${targets.length} closed req(s) shown in this view?\n\nYour data is snapshotted first; statuses set to Archived (not deleted).`))return;
+  await fetch("/api/backup",{method:"POST"}).catch(()=>{});
+  targets.forEach(o=>{rows[o.i].status="Archived";});
+  persistNow(); render();
+}
+window.archiveRow=archiveRow; window.archiveAllClosed=archiveAllClosed;
+
+window.toggleTier=function(t){tierOpen[t]=!tierOpen[t];render();};
+window.toggleCard=function(i){if(expanded.has(i))expanded.delete(i);else expanded.add(i);render();};
+
+// ---------- selection + open-in-tabs ----------
+function renderSelbar(){
+  const n=selected.size;
+  document.getElementById("selCount").textContent=n;
+  document.getElementById("openN").textContent=n;
+  document.getElementById("selbar").classList.toggle("show",n>0);
+}
+window.toggleSel=function(i,checked){
+  if(checked)selected.add(i);else selected.delete(i);
+  const row=document.querySelector('.crow[data-i="'+i+'"]');
+  if(row)row.classList.toggle("sel",checked);
+  document.getElementById("selStatus").textContent="";
+  renderSelbar();
+};
+window.selectAllVisible=function(){
+  visibleIdx.forEach(i=>selected.add(i));
+  document.getElementById("selStatus").textContent="";
+  render();
+};
+window.clearSel=function(){
+  selected.clear();
+  document.getElementById("selStatus").textContent="";
+  render();
+};
+window.openSelectedTabs=function(){
+  const ids=[...selected];
+  const st=document.getElementById("selStatus");
+  if(!ids.length){st.textContent="Nothing selected.";return;}
+  let opened=0,blocked=0,search=0,nolink=0;
+  ids.forEach(i=>{
+    const x=rows[i]; if(!x)return;
+    if(!x.link){nolink++;return;}
+    if(isLinkedInSearch(x.link))search++;
+    const w=window.open(x.link,"_blank","noopener");
+    if(w)opened++; else blocked++;
+  });
+  let msg=`Opened ${opened} tab${opened===1?"":"s"}.`;
+  if(blocked>0)msg+=` ${blocked} blocked — allow pop-ups for this site and click again.`;
+  if(search>0)msg+=` ${search} open to a LinkedIn search, not the exact posting.`;
+  if(nolink>0)msg+=` ${nolink} had no link.`;
+  st.textContent=msg;
+  st.classList.toggle("warn",blocked>0);
+};
+// Bulk mark Applied — auto-captures today's date. Only promotes rows not already applied/beyond;
+// non-destructive on existing applied dates and next-action text. Persists via the normal PUT save.
+const PROMOTABLE=new Set(["","Not Applied","Identified"]);
+window.markSelectedApplied=function(){
+  const st=document.getElementById("selStatus");
+  const ids=[...selected];
+  if(!ids.length){st.textContent="Nothing selected.";st.classList.remove("warn");return;}
+  const eligible=ids.filter(i=>rows[i]&&PROMOTABLE.has(rows[i].status||""));
+  const skipped=ids.length-eligible.length;
+  if(!eligible.length){st.textContent=`Nothing to change — all ${ids.length} selected are already Applied or beyond.`;st.classList.add("warn");return;}
+  const today=new Date().toISOString().slice(0,10);
+  if(!confirm(`Mark ${eligible.length} role${eligible.length>1?"s":""} as Applied today (${today})?`+(skipped?`\n\n${skipped} already Applied/beyond will be skipped.`:""))) return;
+  eligible.forEach(i=>{const x=rows[i];
+    x.status="Applied";
+    if(!x.applied)x.applied=today;
+    x.lastcontact=today;
+    if(!x.next)x.next="Await recruiter response";
+    x.reqCheck="open-applied";
+  });
+  persistNow();
+  render();
+  st.textContent=`Marked ${eligible.length} as Applied (${today}).`+(skipped?` ${skipped} skipped (already applied/beyond).`:"");
+  st.classList.remove("warn");
+};
+
+window.upd=function(i,field,val){rows[i][field]=val;persist();if(field==='status')render();};
+
+let editingIndex=-1;
+const F=id=>document.getElementById(id);
+function openModal(t){F("modalTitle").textContent=t;F("overlay").classList.add("open");}
+function closeModal(){F("overlay").classList.remove("open");editingIndex=-1;}
+const TEXT=["company","sector","role","salary","location","link","notes","recruiter","next","applied","interview","followup","lastcontact"];
+const SEL=["remote","tier","conf","status","referral","resume","cover"];
+function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("f_prob").value="";F("f_remote").value="remote";F("f_tier").value="A";F("f_conf").value="unverified";F("f_status").value="Not Applied";F("f_referral").value="No";F("f_resume").value="—";F("f_cover").value="No";}
+function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
+function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);return o;}
+window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit requisition");};
+window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?")){rows.splice(i,1);persistNow();render();}};
+F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition");};
+F("cancelBtn").onclick=closeModal;
+F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
+F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0)rows[editingIndex]={...rows[editingIndex],...o};else rows.unshift(o);persistNow();render();closeModal();};
+["search","statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("input",render));
+["statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("change",render));
+F("remoteOnly").onchange=render;F("activeOnly").onchange=render;F("notAppliedOnly").onchange=render;F("applyNextOnly").onchange=render;
+
+// Accordion expand/collapse-all + selection toolbar wiring
+F("expandAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=true;render();};
+F("collapseAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=false;render();};
+F("openTabsBtn").onclick=openSelectedTabs;
+F("markAppliedBtn").onclick=markSelectedApplied;
+F("selectAllBtn").onclick=selectAllVisible;
+F("clearSelBtn").onclick=clearSel;
+
+// ---------- Run Scout (deterministic core + optional OpenAI enrichment) ----------
+let scoutPoll=null;
+function setScoutStatus(html,spinning){const el=F("scoutStatus");el.innerHTML=(spinning?'<span class="spin"></span>':'')+html;}
+function scoutBusy(on){F("scoutBtn").classList.toggle("scoutbtn-busy",on);}
+function scoutSummary(last){
+  if(!last)return "done.";
+  const v=last.validate,f=last.find,sb=last.sourceBackfill,parts=[];
+  if(v){let ai=v.rescored?`, AI-rescored ${v.rescored} (${v.aiCalls||0} calls${v.aiTokens?`, ${v.aiTokens} tok`:''}${v.aiSkippedFresh?`, ${v.aiSkippedFresh} fresh-skipped`:''}${v.aiSkippedCap?`, ${v.aiSkippedCap} over-cap`:''})`:(v.aiSkippedFresh?`, AI ${v.aiSkippedFresh} fresh-skipped`:'');parts.push(`validated ${v.checked} (open ${v.open}, closed ${v.closed}, unknown ${v.unknown}; refreshed ${v.refreshed}${ai})`);}
+  if(f)parts.push(`found ${f.added!=null?f.added:'?'} new`);
+  if(sb)parts.push(`stamped source on ${sb.stamped} of ${sb.checked}`);
+  const scope=(last.sources&&last.sources!=="all")?` [${Array.isArray(last.sources)?last.sources.join(","):last.sources}]`:"";
+  return (parts.join(" · ")||"done.")+scope;
+}
+function startScoutPoll(){
+  clearInterval(scoutPoll);
+  scoutPoll=setInterval(async()=>{
+    let j; try{j=await(await fetch("/api/scout/status",{cache:"no-store"})).json();}catch(e){return;}
+    const last=j.last||{};
+    if(j.running){
+      scoutBusy(true);
+      let p="scout running…";
+      if(last.phase==="validating"&&last.total)p=`validating ${last.processed||0}/${last.total}…`;
+      else if(last.phase==="source-backfill"&&last.total)p=`stamping sources ${last.processed||0}/${last.total}…`;
+      else if(last.phase==="finding")p="finding new roles…";
+      else if(last.phase)p=last.phase+"…";
+      setScoutStatus(p,true);
+    }else{
+      clearInterval(scoutPoll);scoutPoll=null;scoutBusy(false);
+      if(last.state==="error")setScoutStatus("⚠ scout error: "+(last.error||"see server log"),false);
+      else{setScoutStatus("✓ "+scoutSummary(last),false);load();}   // refresh board with new/updated rows
+    }
+  },2500);
+}
+async function refreshScoutAi(){
+  try{
+    const j=await(await fetch("/api/scout/status",{cache:"no-store"})).json();
+    F("scoutAi").textContent=j.llmEnabled?("AI rescoring ON · "+(j.llmModel||"")):"AI rescoring off — set OPENAI_API_KEY to enable";
+    if(j.running){scoutBusy(true);startScoutPoll();}
+  }catch(e){F("scoutAi").textContent="server status unavailable";}
+}
+async function triggerScout(mode){
+  F("scoutMenu").classList.remove("open");scoutBusy(true);setScoutStatus("starting…",true);
+  const sources=(typeof selectedScoutSources==="function")?selectedScoutSources():[];
+  try{
+    const r=await fetch("/api/scout/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,sources})});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===409){setScoutStatus("a run is already in progress…",true);startScoutPoll();return;}
+    if(!r.ok||!j.ok){scoutBusy(false);setScoutStatus("⚠ "+(j.error||"could not start scout"),false);return;}
+    startScoutPoll();
+  }catch(e){scoutBusy(false);setScoutStatus("⚠ network error starting scout",false);}
+}
+F("scoutBtn").onclick=(e)=>{e.stopPropagation();F("scoutMenu").classList.toggle("open");};
+document.addEventListener("click",(e)=>{if(!e.target.closest(".scoutctl"))F("scoutMenu").classList.remove("open");});
+F("scoutMenu").querySelectorAll("button[data-mode]").forEach(b=>b.onclick=()=>triggerScout(b.dataset.mode));
+
+// ---------- source scope (in Run Scout menu) + Settings panel ----------
+function buildScoutSources(j){
+  const box=F("scoutSources"); if(!j||!j.sources){box.innerHTML="";return;}
+  box.innerHTML=j.sources.filter(s=>s.enabled).map(s=>
+    `<label class="${s.kind==='aggregator'?'agg':''}"><input type="checkbox" data-runsrc="${s.name}"> ${s.label}</label>`).join("");
+  box.querySelectorAll("input").forEach(c=>c.onchange=updateScoutScopeHint);
+  updateScoutScopeHint();
+  F("scoutAi").textContent=j.llm&&j.llm.keySet?("AI rescoring ON · "+(j.llm.model||"")):"AI rescoring off — set OPENAI_API_KEY in Settings";
+}
+window.selectedScoutSources=function(){return [...F("scoutSources").querySelectorAll("input[data-runsrc]:checked")].map(c=>c.dataset.runsrc);};
+function updateScoutScopeHint(){const n=selectedScoutSources().length;F("scoutScopeHint").textContent=n?`(${n} selected)`:"(all)";}
+
+const SET=id=>document.getElementById(id);
+function fillSettings(j){
+  SET("setSources").innerHTML=j.sources.map(s=>{
+    const k=s.needsKey?`<span class="kind ${s.configured?'ok':'needkey'}">${s.kind}${s.configured?'':' · key needed'}</span>`
+                       :`<span class="kind">${s.kind}${s.note?(' · '+s.note):''}</span>`;
+    return `<label><input type="checkbox" data-src="${s.name}" ${s.enabled?'checked':''}> ${s.label} ${k}</label>`;
+  }).join("");
+  SET("setMinFit").value=j.minFit;
+  SET("setMinTier").value=["A","B","C"].includes(j.minTierToMerge)?j.minTierToMerge:"B";
+  SET("setRemoteOnly").checked=!!j.remoteOnly;
+  SET("setTitles").value=(j.titles||[]).join("\n");
+  SET("setKeywords").value=(j.keywords||[]).join("\n");
+  SET("setSkipTypes").value=(j.skipEmploymentTypes||[]).join("\n");
+  SET("setNegKw").value=(j.negativeKeywords||[]).join("\n");
+  SET("setModel").value=j.llm.model||"";
+  SET("setKeyState").textContent=j.llm.keySet?`(set ••••${j.llm.keyLast4})`:"(not set)";
+  SET("setKey").value="";
+  const bud=j.budget||{}; SET("setAiMax").value=bud.maxPerRun!=null?bud.maxPerRun:40; SET("setAiTtl").value=bud.ttlDays!=null?bud.ttlDays:14;
+  SET("setBudgetModel").textContent=j.llm.model||"gpt-5.4-mini";
+  SET("setJdChars").value=bud.jdChars!=null?bud.jdChars:3500; SET("setMaxTokens").value=bud.maxTokens!=null?bud.maxTokens:400;
+  SET("setMinDelay").value=j.minDelaySeconds!=null?j.minDelaySeconds:0.4;
+  const as=j.assist||{};
+  SET("setAssistEnabled").checked=as.enabled!==false;
+  SET("setAssistModel").value=as.model||"";
+  SET("setAssistDaily").value=as.dailyCalls!=null?as.dailyCalls:25;
+  SET("setAssistMaxTokens").value=as.maxTokens!=null?as.maxTokens:700;
+  SET("assistUsageHint").textContent=`Used today: ${as.callsToday||0} call(s), ${as.tokensToday||0} tokens. Per-req "✍ AI draft" grounds in your profile + narratives; output is editable and never auto-submitted.`;
+  const dg=j.digest||{};
+  SET("setDigestEnabled").checked=!!dg.enabled;
+  SET("setDigestTime").value=dg.time||"07:00";
+  SET("setDigestChannel").value=dg.channel||"file";
+  SET("setDigestDays").value=dg.days!=null?dg.days:1;
+  SET("setDigestWebhook").value=""; SET("webhookState").textContent=dg.webhookSet?"(set)":"(not set)";
+  SET("setDigestTo").value=dg.to||""; SET("setDigestFrom").value=dg.from||"";
+  SET("setSmtpHost").value=dg.smtpHost||""; SET("setSmtpPort").value=dg.smtpPort||""; SET("setSmtpUser").value=dg.smtpUser||"";
+  SET("setSmtpPass").value=""; SET("smtpState").textContent=dg.smtpSet?"(set)":"(not set)";
+  SET("digestStatus").textContent=dg.lastSent?`Last sent ${new Date(dg.lastSent).toLocaleString()} via ${dg.lastChannel||"?"}`+(dg.lastCounts?` (${dg.lastCounts.newFinds} new / ${dg.lastCounts.followUps} follow / ${dg.lastCounts.closed} closed)`:""):"Never sent.";
+  const bk=j.backup||{}; const ret=bk.retention!=null?bk.retention:50;
+  SET("setRetention").value=ret; SET("setGuardPct").value=bk.guardPct!=null?bk.guardPct:20; SET("setRetentionEcho").textContent=ret;
+  const tm=j.tabStatusMap||{};
+  SET("setTabOpen").value=(tm.open||TAB_MAP_DEFAULT.open).join(", ");
+  SET("setTabApplied").value=(tm.applied||TAB_MAP_DEFAULT.applied).join(", ");
+  SET("setTabInterviewing").value=(tm.interviewing||TAB_MAP_DEFAULT.interviewing).join(", ");
+  SET("setTabClosed").value=(tm.closed||TAB_MAP_DEFAULT.closed).join(", ");
+  SET("setAnalyticsWindow").value=j.analyticsWindowDays!=null?j.analyticsWindowDays:0;
+  ANALYTICS_WINDOW=+j.analyticsWindowDays||0;
+  applyTabMap(tm);   // sync the live board tabs + re-render
+  const hg=j.hygiene||{};
+  SET("setFollowupDays").value=hg.followupDays!=null?hg.followupDays:HYGIENE_DEFAULT.followupDays;
+  SET("setFollowupStatuses").value=(hg.followupStatuses||HYGIENE_DEFAULT.followupStatuses).join(", ");
+  SET("setNeedsVerifyBoardonly").checked=hg.needsVerifyIncludeBoardonly===true;
+  SET("setClosedHandling").value=["suggest","auto"].includes(hg.closedHandling)?hg.closedHandling:"suggest";
+  applyHygiene(hg);
+  const amm=j.applyModeMap||{}; const modes=j.applyModes||APPLY_MODES;
+  SET("applyModeMapBox").innerHTML=Object.keys(amm).filter(k=>k!=="").sort().map(src=>
+    `<div class="amrow"><span>${src}</span><select data-amsrc="${src}">${modes.map(o=>`<option ${o===amm[src]?'selected':''}>${o}</option>`).join("")}</select></div>`).join("");
+  applyApplyModeMap(amm);
+}
+function applyTabMap(tm){
+  if(tm&&typeof tm==="object"){TAB_MAP={...TAB_MAP_DEFAULT,...tm};}
+  if(rows.length)render();
+}
+async function fetchSettings(){return (await fetch("/api/settings",{cache:"no-store"})).json();}
+function openSettings(){
+  F("scoutMenu").classList.remove("open");
+  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();})
+    .catch(()=>{SET("setMsg").className="setmsg err";SET("setMsg").textContent="Could not load settings.";SET("settingsOverlay").classList.add("open");});
+}
+
+// ---------- data-safety: snapshot list / restore / snapshot-now ----------
+function fmtBytes(n){ if(n<1024)return n+" B"; if(n<1048576)return (n/1024).toFixed(1)+" KB"; return (n/1048576).toFixed(1)+" MB"; }
+function fmtTime(ms){ try{return new Date(ms).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}catch(e){return "";} }
+async function loadBackups(){
+  const box=SET("backupList"); box.innerHTML='<div class="setmuted" style="padding:8px">loading…</div>';
+  try{
+    const j=await (await fetch("/api/backups",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    if(!j.backups.length){box.innerHTML='<div class="setmuted" style="padding:8px">No snapshots yet.</div>';return;}
+    box.innerHTML=j.backups.slice(0,60).map(b=>{
+      const rows=b.rows==null?"?":b.rows;
+      return `<div class="bkrow"><span class="bkkind ${b.kind}">${b.kind}</span>`+
+        `<span class="bkname" title="${b.name}">${b.name}</span>`+
+        `<span class="bkmeta">${rows} rows · ${fmtBytes(b.size)} · ${fmtTime(b.mtime)}</span>`+
+        `<span class="bkacts"><a class="mini" href="/api/backups/${encodeURIComponent(b.name)}" download>Download</a>`+
+        `<button class="mini danger" data-restore="${b.name}" data-rows="${rows}" type="button">Restore</button></span></div>`;
+    }).join("");
+    box.querySelectorAll("button[data-restore]").forEach(btn=>btn.onclick=()=>restoreBackup(btn.dataset.restore,btn.dataset.rows));
+  }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">Could not load snapshots: '+e.message+'</div>';}
+}
+async function restoreBackup(name,rowsLabel){
+  if(!confirm("Restore "+name+" ("+rowsLabel+" rows)?\n\nYour current data is snapshotted first, then replaced. The board will reload."))return;
+  SET("setMsg").className="setmsg";SET("setMsg").textContent="Restoring…";
+  try{
+    const j=await (await fetch("/api/restore",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:name})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("setMsg").className="setmsg ok";SET("setMsg").textContent="Restored "+j.restored+" rows from "+j.from+". Reloading board…";
+    if(typeof load==="function"){document.getElementById("board").innerHTML='<div class="loading">▚ reloading…</div>';load();}
+    loadBackups();
+  }catch(e){SET("setMsg").className="setmsg err";SET("setMsg").textContent="Restore failed: "+e.message;}
+}
+SET("snapNowBtn").onclick=async()=>{
+  SET("setMsg").className="setmsg";SET("setMsg").textContent="Snapshotting…";
+  try{const j=await (await fetch("/api/backup",{method:"POST"})).json();if(!j.ok)throw new Error(j.error||"failed");
+    SET("setMsg").className="setmsg ok";SET("setMsg").textContent="Snapshot saved: "+j.file;loadBackups();
+  }catch(e){SET("setMsg").className="setmsg err";SET("setMsg").textContent="Snapshot failed: "+e.message;}
+};
+SET("refreshBackupsBtn").onclick=loadBackups;
+
+// ---------- source health + discovery (Phase 9) ----------
+async function loadSourceHealth(){
+  const box=SET("sourceHealth");
+  try{
+    const j=await (await fetch("/api/source-health",{cache:"no-store"})).json();
+    const src=(j.health&&j.health.sources)||{}; const keys=Object.keys(src);
+    if(!keys.length){box.innerHTML='<div class="setmuted" style="padding:8px">No runs yet — run the scout to populate.</div>';return;}
+    box.innerHTML='<div class="bkrow" style="font-weight:700"><span class="bkkind">src</span><span class="bkname">last run</span><span class="bkmeta">co·posts·match·err</span></div>'+
+      keys.sort().map(k=>{const h=src[k]||{};const err=h.errors?` · <span style="color:var(--coral)">${h.errors}e</span>`:"";
+        return `<div class="bkrow"><span class="bkkind">${esc(k)}</span><span class="bkname">${h.lastRun?new Date(h.lastRun).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}${h.dry?" ·dry":""}</span><span class="bkmeta">${h.companies||0}·${h.postings||0}·${h.matches||0}${err}</span></div>`;}).join("");
+  }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">Could not load: '+esc(e.message)+'</div>';}
+}
+SET("refreshHealthBtn").onclick=loadSourceHealth;
+SET("discoverBtn").onclick=async()=>{
+  const url=SET("discoverUrl").value.trim(); if(!url)return;
+  SET("discoverResult").innerHTML="Detecting…";
+  try{
+    const j=await (await fetch("/api/sources/discover",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})})).json();
+    if(!j.detected){SET("discoverResult").innerHTML=`<span class="setmsg err">${esc(j.note||j.error||"Could not detect a pollable ATS.")}</span>`;return;}
+    SET("discoverResult").innerHTML=`Detected <b>${esc(j.ats)}</b> · slug <code>${esc(j.slug)}</code> `+
+      `<input id="discoverName" type="text" placeholder="Company name" value="${esc(j.slug)}" style="width:150px;display:inline-block;margin:4px 6px 0">`+
+      `<button class="mini" id="addCompanyBtn" type="button">Add to scout</button>`;
+    SET("addCompanyBtn").onclick=async()=>{
+      try{const r=await (await fetch("/api/sources/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ats:j.ats,slug:j.slug,name:SET("discoverName").value.trim()})})).json();
+        if(!r.ok)throw new Error(r.error||"failed");
+        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)):("Added "+esc(r.name)+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs next scout.")}</span>`;
+      }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Add failed: ${esc(e.message)}</span>`;}
+    };
+  }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Failed: ${esc(e.message)}</span>`;}
+};
+async function saveSettings(){
+  const body={
+    disabledSources:[...SET("setSources").querySelectorAll("input[data-src]")].filter(c=>!c.checked).map(c=>c.dataset.src),
+    remoteOnly:SET("setRemoteOnly").checked,
+    minFit:parseFloat(SET("setMinFit").value)||0,
+    minTierToMerge:SET("setMinTier").value,
+    titles:SET("setTitles").value.split("\n").map(s=>s.trim()).filter(Boolean),
+    keywords:SET("setKeywords").value.split("\n").map(s=>s.trim()).filter(Boolean),
+    skipEmploymentTypes:SET("setSkipTypes").value.split("\n").map(s=>s.trim()).filter(Boolean),
+    negativeKeywords:SET("setNegKw").value.split("\n").map(s=>s.trim()).filter(Boolean),
+    analyticsWindowDays:parseInt(SET("setAnalyticsWindow").value,10),
+    tabStatusMap:{
+      open:SET("setTabOpen").value.split(",").map(s=>s.trim()).filter(Boolean),
+      applied:SET("setTabApplied").value.split(",").map(s=>s.trim()).filter(Boolean),
+      interviewing:SET("setTabInterviewing").value.split(",").map(s=>s.trim()).filter(Boolean),
+      closed:SET("setTabClosed").value.split(",").map(s=>s.trim()).filter(Boolean)
+    },
+    hygiene:{
+      followupDays:parseInt(SET("setFollowupDays").value,10),
+      followupStatuses:SET("setFollowupStatuses").value.split(",").map(s=>s.trim()).filter(Boolean),
+      needsVerifyIncludeBoardonly:SET("setNeedsVerifyBoardonly").checked,
+      closedHandling:SET("setClosedHandling").value
+    },
+    applyModeMap:(()=>{const o={};SET("applyModeMapBox").querySelectorAll("select[data-amsrc]").forEach(s=>{o[s.dataset.amsrc]=s.value;});return o;})(),
+    openaiModel:SET("setModel").value.trim()||"gpt-5.4-mini",
+    aiMaxPerRun:parseInt(SET("setAiMax").value,10),
+    aiTtlDays:parseInt(SET("setAiTtl").value,10),
+    openaiJdChars:parseInt(SET("setJdChars").value,10),
+    openaiMaxTokens:parseInt(SET("setMaxTokens").value,10),
+    minDelaySeconds:parseFloat(SET("setMinDelay").value),
+    assistEnabled:SET("setAssistEnabled").checked,
+    assistModel:SET("setAssistModel").value.trim(),
+    assistDailyCalls:parseInt(SET("setAssistDaily").value,10),
+    assistMaxTokens:parseInt(SET("setAssistMaxTokens").value,10),
+    digestEnabled:SET("setDigestEnabled").checked,
+    digestTime:SET("setDigestTime").value.trim(),
+    digestChannel:SET("setDigestChannel").value,
+    digestDays:parseInt(SET("setDigestDays").value,10),
+    digestTo:SET("setDigestTo").value.trim(),
+    digestFrom:SET("setDigestFrom").value.trim(),
+    smtpHost:SET("setSmtpHost").value.trim(),
+    smtpPort:SET("setSmtpPort").value.trim(),
+    smtpUser:SET("setSmtpUser").value.trim(),
+    backupRetention:parseInt(SET("setRetention").value,10),
+    putGuardPct:parseInt(SET("setGuardPct").value,10)
+  };
+  const key=SET("setKey").value.trim(); if(key)body.openaiKey=key;
+  const ts=SET("setTheirstack").value.trim(), ap=SET("setApify").value.trim();
+  if(ts||ap){body.envKeys={}; if(ts)body.envKeys.THEIRSTACK_API_KEY=ts; if(ap)body.envKeys.APIFY_TOKEN=ap;}
+  const wh=SET("setDigestWebhook").value.trim(); if(wh)body.digestSlackWebhook=wh;
+  const sp=SET("setSmtpPass").value; if(sp)body.smtpPass=sp;
+  SET("setMsg").className="setmsg";SET("setMsg").textContent="Saving…";
+  try{
+    const j=await (await fetch("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    fillSettings(j);buildScoutSources(j);
+    SET("setMsg").className="setmsg ok";SET("setMsg").textContent="Saved. Takes effect next run.";
+  }catch(e){SET("setMsg").className="setmsg err";SET("setMsg").textContent="Save failed: "+e.message;}
+}
+SET("clearKeyBtn").onclick=()=>clearSecret("OPENAI_API_KEY","OpenAI key");
+async function clearSecret(key,label){
+  if(!confirm("Clear stored "+label+"?"))return;
+  try{const j=await (await fetch("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({clearSecrets:[key]})})).json();
+    fillSettings(j);buildScoutSources(j);
+    SET("setMsg").className="setmsg ok";SET("setMsg").textContent=label+" cleared.";
+  }catch(e){SET("setMsg").className="setmsg err";SET("setMsg").textContent="Clear failed: "+e.message;}
+}
+SET("clearWebhookBtn").onclick=()=>clearSecret("DIGEST_SLACK_WEBHOOK","Slack webhook");
+SET("clearSmtpPassBtn").onclick=()=>clearSecret("SMTP_PASS","SMTP password");
+SET("clearTheirstackBtn").onclick=()=>clearSecret("THEIRSTACK_API_KEY","TheirStack key");
+SET("clearApifyBtn").onclick=()=>clearSecret("APIFY_TOKEN","Apify token");
+SET("settingsBtn").onclick=openSettings;
+SET("openSettingsFromMenu").onclick=openSettings;
+SET("settingsCancel").onclick=()=>SET("settingsOverlay").classList.remove("open");
+SET("settingsSave").onclick=saveSettings;
+SET("settingsOverlay").onclick=e=>{if(e.target.id==="settingsOverlay")SET("settingsOverlay").classList.remove("open");};
+// populate the Run-Scout source checklist + AI footer on load
+fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
+
+// ---------- candidate profile + narrative library (Phase 5) ----------
+let PROFILE_NARRATIVES=[];
+const csvList=v=>String(v||"").split(",").map(s=>s.trim()).filter(Boolean);
+async function loadProfile(){ try{const j=await (await fetch("/api/profile",{cache:"no-store"})).json(); if(j.ok){fillProfile(j.profile); brandFromProfile(j.profile);} }catch(e){} }
+// personalize the title from the profile (no hardcoded name in markup)
+function brandFromProfile(p){ const n=(p&&p.applicant&&p.applicant.name||"").trim(); if(n)document.title="Job Pipeline CRM — "+n; }
+loadProfile();   // sets the title at startup; re-runs when Settings opens
+function fillProfile(p){
+  p=p||{}; const a=p.applicant||{};
+  SET("profName").value=a.name||""; SET("profEmail").value=a.email||""; SET("profPhone").value=a.phone||"";
+  SET("profLinkedin").value=a.linkedin||""; SET("profLocation").value=a.location||"";
+  SET("profSeniority").value=(p.seniority||[]).join(", ");
+  SET("profRoleTerms").value=(p.roleTerms||[]).join(", ");
+  SET("profIndustries").value=(p.industries||[]).join(", ");
+  SET("profSectors").value=(p.sectors||[]).join(", ");
+  SET("profKeywords").innerHTML=(p.keywords||[]).slice(0,60).map(k=>`<span class="kw">${esc(k.kw)} <b>${k.weight}</b></span>`).join("")||'<span class="setmuted">No keywords yet — upload a resume.</span>';
+  SET("profMeta").textContent=p.generatedFrom?`From ${p.generatedFrom} (${p.generatedAt||"?"}) · ${(p.keywords||[]).length} keywords`:"No resume parsed yet.";
+  PROFILE_NARRATIVES=(p.narratives||[]).map(n=>({id:n.id,title:n.title||"",body:n.body||"",tags:(n.tags||[]).join(", ")}));
+  renderNarratives();
+}
+function renderNarratives(){
+  SET("narrativeBox").innerHTML=PROFILE_NARRATIVES.map((n,i)=>
+    `<div class="narr" data-i="${i}"><button class="narr-rm" type="button" onclick="removeNarrative(${i})">remove</button>`+
+    `<input class="narr-title" type="text" placeholder="Title (e.g. Product Catalog 0→1)" value="${(n.title||'').replace(/"/g,'&quot;')}">`+
+    `<textarea class="narr-body" rows="3" placeholder="The reusable blurb…">${esc(n.body||'')}</textarea>`+
+    `<input class="narr-tags" type="text" placeholder="tags: comma-separated (e.g. impact, CDP)" value="${(n.tags||'').replace(/"/g,'&quot;')}"></div>`
+  ).join("")||'<div class="setmuted">No narratives yet.</div>';
+}
+function syncNarrativesFromDOM(){
+  const out=[]; SET("narrativeBox").querySelectorAll(".narr").forEach((el,i)=>{
+    out.push({id:(PROFILE_NARRATIVES[i]||{}).id, title:el.querySelector(".narr-title").value, body:el.querySelector(".narr-body").value, tags:el.querySelector(".narr-tags").value});
+  });
+  PROFILE_NARRATIVES=out;
+}
+window.removeNarrative=function(i){syncNarrativesFromDOM();PROFILE_NARRATIVES.splice(i,1);renderNarratives();};
+SET("addNarrativeBtn").onclick=()=>{syncNarrativesFromDOM();PROFILE_NARRATIVES.push({title:"",body:"",tags:""});renderNarratives();};
+async function saveProfile(){
+  syncNarrativesFromDOM();
+  const body={
+    applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim()},
+    seniority:csvList(SET("profSeniority").value), roleTerms:csvList(SET("profRoleTerms").value),
+    industries:csvList(SET("profIndustries").value), sectors:csvList(SET("profSectors").value),
+    narratives:PROFILE_NARRATIVES.map(n=>({id:n.id,title:n.title,body:n.body,tags:csvList(n.tags)}))
+  };
+  SET("profMsg").className="setmsg";SET("profMsg").textContent="Saving…";
+  try{const j=await (await fetch("/api/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||"failed"); fillProfile(j.profile);
+    SET("profMsg").className="setmsg ok";SET("profMsg").textContent="Profile saved.";
+  }catch(e){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Save failed: "+e.message;}
+}
+SET("saveProfileBtn").onclick=saveProfile;
+SET("uploadResumeBtn").onclick=async()=>{
+  const f=SET("resumeFile").files[0];
+  if(!f){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Choose a resume file first.";return;}
+  SET("profMsg").className="setmsg";SET("profMsg").textContent="Uploading & parsing…";
+  try{
+    const dataBase64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(",").pop());r.onerror=reject;r.readAsDataURL(f);});
+    const j=await (await fetch("/api/profile/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f.name,dataBase64})})).json();
+    if(!j.ok)throw new Error(j.error||"failed"); fillProfile(j.profile);
+    SET("profMsg").className="setmsg ok";SET("profMsg").textContent="Parsed "+f.name+" — keywords refreshed.";
+  }catch(e){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Upload failed: "+e.message;}
+};
+
+// ---------- AI application assistant (Phase 6) ----------
+let assistRow=null;
+window.openAssist=function(i){
+  const x=rows[i]; if(!x)return; assistRow=x;
+  F("assistCtx").textContent=(x.company||"")+" — "+(x.role||"");
+  F("assistOut").value=""; F("assistMsg").textContent=""; F("assistMsg").className="setmsg";
+  F("assistQ").value=""; F("assistJd").value=""; F("assistKind").value="cover"; F("assistQWrap").style.display="none";
+  fetchSettings().then(j=>{const as=j.assist||{};F("assistModelEcho").value=as.model||"";
+    F("assistUsage").textContent=`Today: ${as.callsToday||0}/${as.dailyCalls||0} calls · ${as.tokensToday||0} tokens`;
+    if(as.enabled===false){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Assistant is disabled in Settings.";}
+  }).catch(()=>{});
+  F("assistOverlay").classList.add("open");
+};
+F("assistKind").onchange=()=>{F("assistQWrap").style.display=F("assistKind").value==="screening"?"":"none";};
+F("assistGenBtn").onclick=async()=>{
+  if(!assistRow)return;
+  const kind=F("assistKind").value;
+  if(kind==="screening"&&!F("assistQ").value.trim()){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Enter the screening question.";return;}
+  F("assistMsg").className="setmsg";F("assistMsg").textContent="Generating…";F("assistGenBtn").disabled=true;
+  try{
+    const body={key:(assistRow.company+"|"+assistRow.role).toLowerCase().trim(),kind,question:F("assistQ").value,jd:F("assistJd").value};
+    const j=await (await fetch("/api/assist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    F("assistOut").value=j.draft||"";
+    F("assistMsg").className="setmsg ok";F("assistMsg").textContent=`Draft ready (${j.tokens} tokens). Edit before use — nothing was submitted.`;
+    if(j.usage)F("assistUsage").textContent=`Today: ${j.usage.calls}/${j.usage.cap||0} calls · ${j.usage.tokens} tokens`;
+  }catch(e){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Failed: "+e.message;}
+  finally{F("assistGenBtn").disabled=false;}
+};
+F("assistCopy").onclick=()=>{const t=F("assistOut").value;if(!t)return;try{navigator.clipboard.writeText(t);}catch(e){}F("assistMsg").className="setmsg ok";F("assistMsg").textContent="Copied.";};
+F("assistClose").onclick=()=>F("assistOverlay").classList.remove("open");
+F("assistOverlay").onclick=e=>{if(e.target.id==="assistOverlay")F("assistOverlay").classList.remove("open");};
+
+// ---------- morning digest test send (Phase 7) ----------
+SET("sendDigestBtn").onclick=async()=>{
+  SET("digestStatus").textContent="Sending…";
+  try{const j=await (await fetch("/api/digest/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({channel:SET("setDigestChannel").value})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("digestStatus").textContent=`Sent via ${j.delivered} — ${j.counts.newFinds} new / ${j.counts.followUps} follow-ups / ${j.counts.closed} closed.`;
+  }catch(e){SET("digestStatus").textContent="Failed: "+e.message;}
+};
+SET("backfillApplyModeBtn").onclick=async()=>{
+  SET("setMsg").className="setmsg";SET("setMsg").textContent="Backfilling apply-mode…";
+  try{const j=await (await fetch("/api/applymode/backfill",{method:"POST"})).json();if(!j.ok)throw new Error(j.error||"failed");
+    SET("setMsg").className="setmsg ok";SET("setMsg").textContent=`Stamped ${j.stamped} row(s) (of ${j.total}).`;
+    if(typeof load==="function")load();
+  }catch(e){SET("setMsg").className="setmsg err";SET("setMsg").textContent="Backfill failed: "+e.message;}
+};
+
+// Reload = re-fetch the authoritative state from the server (discards nothing — edits are already saved).
+F("reloadBtn").onclick=()=>{document.getElementById("board").innerHTML='<div class="loading">▚ reloading…</div>';load();};
+
+// Excel export — server regenerates the formatted workbook on demand.
+F("exportXlsxBtn").onclick=()=>{window.location="/api/export.xlsx";};
+
+// CSV export — client-side, instant.
+F("exportBtn").onclick=()=>{
+  const cols=["company","sector","role","salary","location","remote","fit","prob","expectedVal","tier","conf","status","applied","interview","recruiter","referral","resume","cover","followup","lastcontact","next","added","link","notes"];
+  const lines=[cols.join(",")];
+  rows.forEach(x=>{const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-crm.csv";a.click();
+};
+
+load();
+refreshScoutAi();
+</script>
+</body>
+</html>

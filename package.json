@@ -1,0 +1,18 @@
+{
+  "name": "job-pipeline-crm",
+  "version": "1.0.0",
+  "description": "Self-hosted, config-driven job-search requisition CRM with a deterministic multi-ATS scout and optional AI assist. Server-backed JSON persistence.",
+  "license": "MIT",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2"
+  }
+}

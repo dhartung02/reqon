@@ -1,0 +1,38 @@
+{
+  "_comment": "Sample search terms for the scout — edit in Settings. Your real watchlist.json is gitignored; this seeds a fresh clone.",
+  "searchTerms": {
+    "titles": [
+      "Principal Product Manager",
+      "Director, Product Management",
+      "Senior Director Product Management",
+      "Group Product Manager",
+      "Staff Product Manager",
+      "Head of Product"
+    ],
+    "keywords": [
+      "data platform",
+      "data products",
+      "pipelines",
+      "Snowflake",
+      "data lake",
+      "AI platform",
+      "agentic",
+      "LLM",
+      "MCP",
+      "generative AI",
+      "CDP",
+      "customer data platform",
+      "martech",
+      "audience",
+      "identity resolution",
+      "usage billing",
+      "monetization",
+      "pricing",
+      "API platform",
+      "developer platform"
+    ],
+    "minFitToAdd": 6,
+    "negativeKeywords": []
+  },
+  "companies": []
+}

@@ -86,6 +86,10 @@ def extract_applicant(text):
               "IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV",
               "NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN",
               "TX","UT","VT","VA","WA","WV","WI","WY","DC"}
+    # Location is ONLY ever set from a strict "City, ST" shape backed by a real US
+    # state code — never from a bare keyword. This guards a core identity field from
+    # resume keyword bleed (an earlier version wrote a domain term like "Generative AI"
+    # into location). If nothing matches, leave it blank for manual entry — never guess.
     for m in re.finditer(r"\b([A-Z][a-z]+(?: [A-Z][a-z]+)?),\s*([A-Z]{2})\b", text):
         if m.group(2) in states:           # only accept a real US state abbreviation
             a["location"] = m.group(0)

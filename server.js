@@ -212,6 +212,13 @@ app.use(express.urlencoded({ extended: false }));
 const APP_TOKEN = process.env.APP_TOKEN || '';
 const COOKIE = 'crm_auth';
 const TOKEN_HASH = APP_TOKEN ? crypto.createHash('sha256').update(APP_TOKEN).digest('hex') : '';
+// Scoped, least-privilege token for automated ingestion (e.g. a ChatGPT Action). It authorizes
+// ONLY append-only writes (POST /api/reqs/merge + /api/reqs/quickadd) — never reads, the profile
+// (PII), settings, restore, or a full PUT. Leak blast radius = appending rows, nothing destructive.
+// Read live from process.env so a Regenerate (which rewrites .env + process.env) takes effect
+// immediately, no restart. Returns the sha256 hash to compare against, or '' when unset.
+const ingestHash = () => process.env.INGEST_TOKEN ? crypto.createHash('sha256').update(process.env.INGEST_TOKEN).digest('hex') : '';
+const INGEST_PATHS = new Set(['/reqs/merge', '/reqs/quickadd']); // relative to the /api mount
 
 const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex');
 function safeEq(a, b) {
@@ -318,8 +325,15 @@ app.use('/api', (req, res, next) => {
 });
 
 // Every /api request requires auth when APP_TOKEN is set — write endpoints are never open remotely.
+// The scoped INGEST_TOKEN is accepted ONLY for append-only ingest routes (merge/quickadd), so an
+// automated ingester (ChatGPT Action) can add roles but can't read PII, change settings, or wipe data.
 app.use('/api', (req, res, next) => {
   if (authed(req)) return next();
+  const ih = ingestHash();
+  if (ih && req.method === 'POST' && INGEST_PATHS.has(req.path)) {
+    const h = req.headers['x-crm-token'] || req.headers['x-ingest-token'] || req.query.token;
+    if (h && safeEq(sha(h), ih)) return next();
+  }
   res.status(401).json({ ok: false, error: 'auth required' });
 });
 
@@ -370,9 +384,12 @@ app.put('/api/reqs', (req, res) => {
 });
 
 // Append-only merge by company+role. NEVER overwrites existing tracking edits.
+// Accepts either a bare JSON array (local tooling) or an object { roles: [...] } /
+// { requisitions: [...] } — GPT Actions require an object request body, not a top-level array.
 app.post('/api/reqs/merge', (req, res) => {
-  const incoming = req.body;
-  if (!Array.isArray(incoming)) return res.status(400).json({ ok: false, error: 'Expected a JSON array of requisitions.' });
+  const b = req.body;
+  const incoming = Array.isArray(b) ? b : (b && (Array.isArray(b.roles) ? b.roles : (Array.isArray(b.requisitions) ? b.requisitions : null)));
+  if (!Array.isArray(incoming)) return res.status(400).json({ ok: false, error: 'Expected a JSON array, or an object { "roles": [...] }.' });
   const rows = readStore();
   const boards = readJsonSafe(BOARDS_FILE, {});
   const existing = new Set(rows.map(reqKey));
@@ -477,6 +494,8 @@ app.post('/api/reqs/quickadd', (req, res) => {
   try {
     writeStore(rows);
     res.json({ ok: true, added: 1, company, role, tier: row.tier, total: rows.length });
+    // fire-and-forget: enrich from the live posting (real company/role/location + AI score)
+    if (row.link && b.enrich !== false) backgroundEnrich(reqKey(row));
   } catch (e) {
     console.error('[POST /api/reqs/quickadd]', e.message);
     res.status(500).json({ ok: false, error: e.message });
@@ -844,6 +863,166 @@ app.patch('/api/reqs/:key', (req, res) => {
   res.json({ ok: true, key, changes, tier: after.tier, conf: after.conf, needsEnrichment: after.needsEnrichment === true, logged: true });
 });
 
+// ---------- lead enrichment worker (fetch posting → JSON-LD/OG → real fields) ----------
+const PROFILE_JSON = path.join(ROOT, 'agent', 'profile.json');
+async function fetchHtml(url) {
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const r = await fetch(url, { redirect: 'follow', signal: ctrl.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', 'Accept': 'text/html' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.text();
+  } finally { clearTimeout(timer); }
+}
+function stripTags(s) {
+  return String(s || '').replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+}
+function metaContent(html, prop) {
+  const re = new RegExp('<meta[^>]+(?:property|name)=["\']' + prop.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '["\'][^>]*>', 'i');
+  const m = html.match(re); if (!m) return '';
+  const c = m[0].match(/content=["']([^"']*)["']/i); return c ? c[1].trim() : '';
+}
+function parseJsonLdJobs(html) {
+  const out = []; const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi; let m;
+  while ((m = re.exec(html))) {
+    let d; try { d = JSON.parse(m[1].trim()); } catch (e) { continue; }
+    const arr = Array.isArray(d) ? d : (d && Array.isArray(d['@graph']) ? d['@graph'] : [d]);
+    for (const o of arr) {
+      const t = o && o['@type'];
+      if (t === 'JobPosting' || (Array.isArray(t) && t.includes('JobPosting'))) out.push(o);
+    }
+  }
+  return out;
+}
+function extractJobMeta(html) {
+  const res = { company: '', role: '', location: '', remote: '', jd: '', employmentType: '' };
+  const jobs = parseJsonLdJobs(html);
+  if (jobs.length) {
+    const j = jobs[0];
+    res.role = stripTags(j.title || '');
+    const org = j.hiringOrganization;
+    res.company = stripTags((org && (org.name || (typeof org === 'string' ? org : ''))) || '');
+    const addr = a => { const ad = a && a.address; if (!ad) return ''; return [ad.addressLocality, ad.addressRegion].filter(v => v && !/^n\/?a$/i.test(String(v).trim())).join(', '); };
+    const jl = j.jobLocation; let loc = '';
+    if (Array.isArray(jl)) loc = jl.map(addr).filter(Boolean).join(' / '); else if (jl) loc = addr(jl);
+    res.jd = stripTags(j.description || '').slice(0, 4000);
+    const remote = j.jobLocationType === 'TELECOMMUTE' || /\bremote\b/i.test(loc) || /\bremote\b/i.test(res.jd.slice(0, 400));
+    if (remote) { res.remote = 'remote'; res.location = loc || 'Remote'; }
+    else if (loc) { res.location = loc; res.remote = 'onsite'; }
+    res.employmentType = (Array.isArray(j.employmentType) ? j.employmentType.join(',') : j.employmentType) || '';
+  }
+  if (!res.role || !res.company) {
+    const og = metaContent(html, 'og:title');
+    if (og) {
+      const t = og.replace(/\s*\|\s*[^|]*$/, '').trim();   // strip "| Simplify" etc.
+      const mm = t.match(/^(.*\S)\s*@\s*(\S.*)$/) || t.match(/^(.*\S)\s+at\s+(\S.*)$/i) || t.match(/^(.*\S)\s+[–—-]\s+(\S.*)$/);
+      if (mm) { res.role = res.role || mm[1].trim(); res.company = res.company || mm[2].trim(); }
+      else res.role = res.role || t;
+    }
+  }
+  if (!res.jd) { const ogd = metaContent(html, 'og:description'); if (ogd) res.jd = ogd.slice(0, 2000); }
+  return res;
+}
+function guessSector(text) {
+  const t = (text || '').toLowerCase();
+  if (/\b(cdp|customer data platform)\b/.test(t)) return 'CDP / Customer Data';
+  if (/\b(genai|gen ai|llm|agentic|\bml\b|machine learning|ai platform|\bai\/ml\b|model)\b/.test(t)) return 'AI Platform';
+  if (/\b(identity|iam|sso|scim|authn|authz|access management)\b/.test(t)) return 'Identity / Data';
+  if (/\b(martech|marketing|audience|segment|engagement|campaign|crm)\b/.test(t)) return 'Martech / Engagement';
+  if (/\b(data platform|data product|pipeline|snowflake|data lake|etl|warehouse|data infra|databricks)\b/.test(t)) return 'Data Infra';
+  return 'Enterprise SaaS';
+}
+async function scoreLead(company, role, jd) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  try {
+    const prof = readJsonSafe(PROFILE_JSON, {});
+    const kws = (prof.keywords || []).slice(0, 30).map(k => k.kw).join(', ');
+    const system = 'You score job fit for a Principal/Director-level Product Manager who is remote-only (US). Priority domains (fit 8-10): data platform, AI/LLM/agentic platform, CDP, martech/identity, API/developer platform, IAM/SSO. Secondary (~7): usage-billing, catalog/commerce, enterprise SaaS. Penalize on-site heavily. Return ONLY compact JSON: {"fit":<0-10>,"prob":<0-10>,"sector":"<CDP / Customer Data|Martech / Engagement|Data Infra|Identity / Data|Enterprise SaaS|AI Platform>"}.';
+    const user = 'Candidate keywords: ' + kws + '\n\nCompany: ' + company + '\nRole: ' + role + '\nJD:\n' + String(jd || '').slice(0, 3000);
+    const { content } = await openaiChat({ model: assistModel(), system, user, maxTokens: 120 });
+    const m = content && content.match(/\{[\s\S]*\}/); if (!m) return null;
+    const j = JSON.parse(m[0]);
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? null : Math.max(0, Math.min(10, n)); };
+    return { fit: num(j.fit), prob: num(j.prob), sector: j.sector };
+  } catch (e) { return null; }
+}
+// Fetch a row's posting and compute the enriched field set (no store I/O). Returns
+// {fields, scored} or null when there's no link / no extractable metadata. Shared by the
+// manual /api/enrich/run route AND quickadd's background auto-enrich.
+async function computeEnrichFields(row, opts) {
+  opts = opts || {};
+  const url = row.link || row.url || '';
+  if (!url) return null;
+  const html = await fetchHtml(url);
+  const meta = extractJobMeta(html);
+  if (!meta.company && !meta.role) return null;
+  const fields = {};
+  if (meta.company) fields.company = meta.company;
+  if (meta.role) fields.role = meta.role;
+  if (meta.location) fields.location = meta.location;
+  if (meta.remote) fields.remote = meta.remote;
+  if (meta.jd) fields.notes = meta.jd.slice(0, 1200) + ' [enriched ' + new Date().toISOString().slice(0, 10) + ']';
+  let sector = guessSector((meta.role || '') + ' ' + (meta.jd || ''));
+  let scored = null;
+  if (opts.score !== false) scored = await scoreLead(meta.company || row.company, meta.role || row.role, meta.jd);
+  if (scored) { if (scored.fit != null) fields.fit = scored.fit; if (scored.prob != null) fields.prob = scored.prob; if (scored.sector) sector = scored.sector; }
+  fields.sector = sector;
+  fields.conf = 'boardonly';
+  fields.needsEnrichment = false;
+  if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob);
+  return { fields, scored };
+}
+// Fire-and-forget enrichment of one row by key — used by quickadd so a capture becomes a full,
+// scored row on its own. Re-reads the store after the (slow) fetch so a concurrent save isn't lost.
+// Never throws; logs to the enrichment audit log.
+async function backgroundEnrich(key) {
+  try {
+    let rows = readStore();
+    let idx = rows.findIndex(r => reqKey(r) === key);
+    if (idx < 0) return;
+    const ce = await computeEnrichFields(rows[idx], { score: true });
+    if (!ce) return;
+    rows = readStore();                                   // re-read post-fetch
+    idx = rows.findIndex(r => reqKey(r) === key);
+    if (idx < 0) return;
+    const before = Object.assign({}, rows[idx]);
+    Object.assign(rows[idx], ce.fields);
+    const changes = {};
+    for (const k of Object.keys(ce.fields)) if (JSON.stringify(before[k]) !== JSON.stringify(ce.fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: ce.fields[k] };
+    writeStore(rows);
+    logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich', result: 'pass', changes, sourceUrl: rows[idx].link || null, note: 'auto-enrich on capture' + (ce.scored ? ' + AI score' : '') });
+  } catch (e) { console.error('[auto-enrich]', e.message); }
+}
+// POST /api/enrich/run  body: {key?: "company|role"} single, or {all:true}/none => all needsEnrichment leads.
+// Full-auth only. Fetches each posting, extracts real fields, optionally AI-scores, audits, snapshots first.
+app.post('/api/enrich/run', async (req, res) => {
+  const body = req.body || {};
+  const wantKey = body.key ? String(body.key).toLowerCase().trim() : null;
+  const doScore = body.score !== false;
+  const rows = readStore();
+  const targets = rows.map((r, i) => ({ r, i })).filter(o => wantKey ? reqKey(o.r) === wantKey : o.r.needsEnrichment === true);
+  if (!targets.length) return res.json({ ok: true, enriched: 0, failed: 0, results: [], note: 'No matching leads to enrich.' });
+  let snapped = false; const results = [];
+  for (const { r, i } of targets) {
+    try {
+      const ce = await computeEnrichFields(r, { score: doScore });
+      if (!ce) { results.push({ key: reqKey(r), ok: false, note: 'no link or no metadata (JS-only page?)' }); continue; }
+      if (!snapped) { snapshotData('auto'); snapped = true; }
+      const before = Object.assign({}, rows[i]);
+      Object.assign(rows[i], ce.fields);
+      const changes = {};
+      for (const k of Object.keys(ce.fields)) if (JSON.stringify(before[k]) !== JSON.stringify(ce.fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: ce.fields[k] };
+      logEnrichment({ ts: new Date().toISOString(), run: 'enrich-worker', key: reqKey(before), action: 'enrich', result: 'pass', changes, sourceUrl: r.link || null, note: 'JSON-LD/OG enrichment' + (ce.scored ? ' + AI score' : '') });
+      results.push({ key: reqKey(rows[i]), ok: true, company: rows[i].company, role: rows[i].role, scored: !!ce.scored });
+    } catch (e) { results.push({ key: reqKey(r), ok: false, note: e.message }); }
+  }
+  try { writeStore(rows); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  const enriched = results.filter(x => x.ok).length;
+  res.json({ ok: true, enriched, failed: results.length - enriched, results });
+});
+
 // ---------- scout trigger (deterministic core; optional OpenAI enrichment) ----------
 // POST /api/scout/run {mode:'find'|'validate'|'both'}  -> spawns agent/scout_run.py detached,
 //   returns immediately. GET /api/scout/status -> live progress from agent/scout-status.json.
@@ -1058,6 +1237,11 @@ function settingsPayload() {
     hygiene: hygieneSettings(boards),
     applyModes: APPLY_MODES,
     applyModeMap: applyModeMapMerged(boards),
+    auth: {
+      appTokenSet: !!process.env.APP_TOKEN,
+      ingestTokenSet: !!process.env.INGEST_TOKEN,
+      ingestTokenLast4: last4(process.env.INGEST_TOKEN || '')
+    },
     llm: {
       keySet: !!process.env.OPENAI_API_KEY,
       keyLast4: last4(process.env.OPENAI_API_KEY || ''),
@@ -1238,6 +1422,15 @@ app.post('/api/sources/add', (req, res) => {
   boards.companies.push({ name, ats, slug });
   writeJsonPretty(BOARDS_FILE, boards);
   res.json({ ok: true, added: 1, name, ats, slug, total: boards.companies.length });
+});
+
+// Regenerate the scoped ingest token. Full-auth only (the /api gate already blocks the ingest
+// token from reaching anything but merge/quickadd). Writes .env + live process.env, returns the
+// new value ONCE so it can be copied into the ChatGPT Action.
+app.post('/api/ingest-token/regenerate', (req, res) => {
+  const token = crypto.randomBytes(24).toString('base64url');
+  setEnvVars({ INGEST_TOKEN: token });
+  res.json({ ok: true, token });
 });
 
 // Timestamped, keep-forever snapshot of the current store ("Snapshot now").

@@ -9,30 +9,56 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0e1217; --panel:#161d26; --panel-2:#1b232e; --line:#28333f; --line-2:#33414f;
-    --text:#e9eef4; --text-2:#b2bdc9; --dim:#7c8794;
-    --gold:#edc05a; --teal:#3fd3b4; --green:#9ed35f; --coral:#ef8268; --blue:#86a6dd; --violet:#a78bdb;
-    --t9:#3fd3b4; --t7:#9ed35f; --t5:#edc05a; --t3:#ef8268;
-    --shadow:0 16px 44px -18px rgba(0,0,0,.65);
+    --bg:#0d1117; --panel:#151b23; --panel-2:#1b222b; --line:#262d37; --line-2:#333c47;
+    --text:#e8eef5; --text-2:#aab6c2; --dim:#8a96a3;
+    /* Functional color roles (#19) — meaning, not decoration:
+       accent=primary action/active · positive=applied/fillable · info=verified/source
+       warning=gated/needs-attention · danger=rejected/error · ai=scoring/AI · muted=manual/inactive */
+    --accent:#e3b95a; --positive:#69c57e; --active:#39c2b0; --info:#79a6e0; --warning:#e0a23c; --danger:#e8755f; --ai:#a78bdb; --muted:#6f7b88;
+    /* legacy aliases kept so existing rules resolve; remapped onto the role tokens */
+    --gold:var(--accent); --teal:var(--active); --green:var(--positive); --coral:var(--danger); --blue:var(--info); --violet:var(--ai);
+    /* score bands — desaturated, functional: strong→ok→possible→low */
+    --t9:#5bbf8e; --t7:#8fbf6a; --t5:#d2a64a; --t3:#d97b63;
+    --shadow:0 12px 32px -16px rgba(0,0,0,.55);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
-  body{background:radial-gradient(1100px 600px at 92% -10%, #16252455, transparent 62%), var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.5;min-height:100vh;padding:clamp(14px,3vw,38px);-webkit-font-smoothing:antialiased}
+  body{background:var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.5;min-height:100vh;padding:clamp(14px,2.4vw,30px);-webkit-font-smoothing:antialiased}
   .wrap{max-width:1340px;margin:0 auto}
   header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:22px}
   .brandline{display:flex;align-items:center;gap:11px;color:var(--gold);font-family:"Spline Sans Mono",monospace;font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;margin-bottom:11px}
-  .brandline .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px var(--gold)}
+  .brandline .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
   h1{font-family:"Fraunces",serif;font-weight:900;font-size:clamp(2rem,5vw,3.2rem);line-height:1;letter-spacing:-.015em}
   h1 em{font-style:italic;color:var(--gold)}
   .sub{color:var(--text-2);max-width:70ch;margin-top:11px;font-size:.92rem}
   .updated{font-family:"Spline Sans Mono",monospace;font-size:.72rem;color:var(--dim);text-align:right;white-space:nowrap}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:11px;margin-bottom:20px}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
-  .stat .k{font-family:"Spline Sans Mono",monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-  .stat .v{font-family:"Fraunces",serif;font-weight:900;font-size:1.8rem;margin-top:5px;line-height:1}
-  .stat .v small{font-size:.85rem;color:var(--text-2);font-family:"Spline Sans",sans-serif;font-weight:500}
-  .stat .v.gold{color:var(--gold)} .stat .v.teal{color:var(--teal)} .stat .v.violet{color:var(--violet)} .stat .v.coral{color:var(--coral)}
+  /* slim app bar (#2) */
+  .appbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:18px}
+  .appbar-l{display:flex;align-items:center;gap:10px;position:relative}
+  .appbar h1{font-family:"Fraunces",serif;font-weight:900;font-size:1.45rem;line-height:1;letter-spacing:-.01em}
+  .brand-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
+  .appbar-r{display:flex;align-items:center;gap:12px}
+  .infobtn{width:21px;height:21px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--dim);font-size:.78rem;font-style:italic;font-family:Georgia,"Times New Roman",serif;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .infobtn:hover{color:var(--text);border-color:var(--accent)}
+  .about-pop{display:none;position:absolute;top:calc(100% + 10px);left:0;z-index:45;width:min(460px,86vw);background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:15px 17px;box-shadow:var(--shadow);color:var(--text-2);font-size:.85rem;line-height:1.55}
+  .about-pop.open{display:block}
+  .about-pop b{color:var(--text)}
+  .about-pop p{margin:0 0 8px}.about-pop p:last-child{margin:0}
+
+  /* KPI pills (#3) — compact operating metrics; secondary health is plainer/muted */
+  .kpibar{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin-bottom:18px}
+  .kpi{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:78px}
+  .kpi .kpi-k{font-size:.66rem;letter-spacing:.03em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+  .kpi .kpi-v{font-weight:700;font-size:1.18rem;line-height:1.15;letter-spacing:-.01em}
+  .kpi .kpi-v small{font-size:.72rem;color:var(--text-2);font-weight:500;margin-left:3px}
+  .kpi.accent .kpi-v{color:var(--accent)} .kpi.positive .kpi-v{color:var(--positive)}
+  .kpi.active .kpi-v{color:var(--active)} .kpi.warning .kpi-v{color:var(--warning)} .kpi.danger .kpi-v{color:var(--danger)}
+  .kpi-div{align-self:stretch;width:1px;background:var(--line);margin:4px 5px;flex:none}
+  .kpi.sec{background:transparent;border-color:transparent;padding:8px 8px}
+  .kpi.sec .kpi-v{font-weight:600;font-size:1rem;color:var(--text-2)}
+  .kpi.sec .kpi-k{font-size:.62rem}
+  @media (max-width:680px){.kpi-div{display:none}}
 
   .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px}
   .controls input[type=text], .controls select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.88rem;outline:none}
@@ -47,6 +73,28 @@
   .btn.ghost:hover{color:var(--text);border-color:var(--gold)}
   .btn.apply{background:var(--green);color:#0e1217}
   .spacer{flex:1}
+
+  /* reorganized toolbar (#4) — primary controls visible, filters + admin behind popovers */
+  .toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:14px}
+  .toolbar input[type=text],.toolbar select,.pop input[type=text],.pop select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.88rem;outline:none}
+  .toolbar input[type=text]{min-width:200px;flex:1}
+  .toolbar input::placeholder{color:var(--dim)}
+  .toolbar select:focus,.toolbar input:focus,.pop select:focus,.pop input:focus{border-color:var(--accent)}
+  .popwrap{position:relative;display:inline-block}
+  .fcount{display:none;margin-left:6px;background:var(--accent);color:#15110a;border-radius:20px;padding:0 7px;font-size:.7rem;font-weight:700;font-family:"Spline Sans Mono",monospace}
+  .fcount.on{display:inline-block}
+  .pop{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:42;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:11px;box-shadow:var(--shadow);min-width:230px}
+  .pop.open{display:block}
+  .pop.right{left:auto;right:0}
+  .pop.filterspop{display:none;width:min(460px,92vw)}
+  .pop.filterspop.open{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .pop.filterspop select{width:100%}
+  .pop.filterspop .toggle{width:100%;justify-content:flex-start}
+  .pop.menu{padding:6px;min-width:200px}
+  .pop.menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:9px 11px;border-radius:7px;font-family:inherit;font-size:.85rem;cursor:pointer}
+  .pop.menu button:hover{background:var(--panel-2);color:var(--accent)}
+  .pop-sep{border-top:1px solid var(--line);margin:5px 4px}
+  .overflowbtn{font-size:1.1rem;line-height:.6;padding:7px 13px}
 
   /* Run Scout menu + status */
   .scoutctl{position:relative;display:inline-block}
@@ -122,8 +170,34 @@
   .lane-head .lh-title{font-weight:700}
   .lane-head .lh-desc{color:var(--dim);font-size:.78rem;flex:1 1 260px}
   .crow-reason{font-size:.7rem;color:var(--coral);font-family:"Spline Sans Mono",monospace;white-space:nowrap}
+  /* Today / command center (#10,#11) */
+  .today-wrap{display:flex;flex-direction:column;gap:14px}
+  .today-head{font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
+  .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(252px,1fr));gap:11px}
+  .today-card{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);transition:border-color .12s,background .12s}
+  .today-card:hover:not(.empty){border-color:var(--line-2);background:var(--panel-2)}
+  .today-card.empty{opacity:.5;cursor:default}
+  .today-card .tc-n{font-weight:700;font-size:1.75rem;line-height:1;min-width:40px;letter-spacing:-.02em;color:var(--text)}
+  .today-card.accent .tc-n{color:var(--accent)} .today-card.warning .tc-n{color:var(--warning)}
+  .today-card.danger .tc-n{color:var(--danger)} .today-card.active .tc-n{color:var(--active)} .today-card.muted .tc-n{color:var(--dim)}
+  .today-card .tc-t{font-weight:600;font-size:.95rem;display:block}
+  .today-card .tc-d{color:var(--dim);font-size:.79rem;margin-top:3px;display:block;line-height:1.35}
+  .today-banner{background:rgba(105,197,126,.1);border:1px solid #2d5a3a;border-radius:10px;padding:11px 15px;color:var(--positive);font-weight:600;font-size:.9rem}
+  .today-foot{color:var(--dim);font-size:.8rem}
+  /* last scout run strip + all-clear */
+  .scoutrun{display:flex;align-items:center;gap:13px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 16px}
+  .scoutrun .sr-lbl{font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+  .scoutrun .sr-when{font-weight:600;color:var(--text);font-size:.88rem}
+  .scoutrun .sr-stat{color:var(--text-2);font-family:"Spline Sans Mono",monospace;font-size:.76rem}
+  .scoutrun .sr-stat b{color:var(--text);font-weight:700}
+  .scoutrun .sr-stat.sr-err b,.scoutrun .sr-stat.sr-err{color:var(--danger)}
+  .scoutrun .sr-run{margin-left:auto;padding:6px 12px;font-size:.8rem}
+  .today-clear{background:rgba(105,197,126,.08);border:1px solid #2d5a3a;border-radius:12px;padding:16px 18px;color:var(--positive);font-weight:600}
+  .recent-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:11px 14px;margin:0 2px 12px}
+  .recent-head .rh-title{font-weight:700}
+  .recent-head .rh-desc{color:var(--dim);font-size:.78rem;flex:1 1 220px}
   /* apply-mode badge */
-  .am{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:5px;border:1px solid var(--line-2);color:var(--dim);white-space:nowrap;flex:none}
+  .am{font-family:"Spline Sans Mono",monospace;font-size:.62rem;letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:5px;border:1px solid var(--line-2);color:var(--dim);white-space:nowrap;flex:none}
   .am.fillable{color:var(--green);border-color:#2d5a3a}
   .am.simplify{color:var(--violet);border-color:#3b3160}
   .am.gated{color:var(--gold);border-color:#5a4a1e}
@@ -145,13 +219,26 @@
   .an-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
   .an-kpi{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
   .an-kpi .k{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
-  .an-kpi .v{font-family:"Fraunces",serif;font-weight:900;font-size:1.5rem;margin-top:3px}
+  .an-kpi .v{font-weight:700;font-size:1.45rem;margin-top:3px;letter-spacing:-.01em}
   .an-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
   .an-card h3{margin:0 0 10px;font-size:.95rem}
   .an-funnel{display:flex;flex-direction:column;gap:7px}
   .an-frow{display:flex;align-items:center;gap:10px;font-size:.82rem}
   .an-frow .lbl{width:140px;flex:none;color:var(--text-2)}
-  .an-frow .bar{height:18px;background:var(--gold);border-radius:5px;min-width:2px}
+  .an-frow .bar{height:18px;background:var(--accent);border-radius:5px;min-width:2px}
+  .an-frow .bar.zero{background:var(--line-2)}
+  .an-frow .bar.rej{background:var(--danger)} .an-frow .bar.ok{background:var(--positive)}
+  .an-frow .bar.act{background:var(--active)} .an-frow .bar.neu{background:var(--muted)}
+  .an-table td.rejcell{color:var(--danger)}
+  /* analytics insights (#12) */
+  .an-insights{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+  .an-insights h3{margin:0 0 8px;font-size:.95rem}
+  .an-ins{display:flex;gap:10px;align-items:flex-start;padding:7px 0;font-size:.85rem;color:var(--text-2);border-bottom:1px solid var(--line);line-height:1.45}
+  .an-ins:last-child{border-bottom:0}
+  .an-ins .idot{width:7px;height:7px;border-radius:50%;margin-top:6px;flex:none;background:var(--info)}
+  .an-ins.warn .idot{background:var(--warning)} .an-ins.good .idot{background:var(--positive)} .an-ins.bad .idot{background:var(--danger)}
+  .an-ins b{color:var(--text)}
+  .an-empty{color:var(--dim);font-size:.85rem;line-height:1.55}
   .an-frow .num{font-family:"Spline Sans Mono",monospace;color:var(--text);white-space:nowrap}
   .an-table{width:100%;border-collapse:collapse;font-size:.8rem}
   .an-table th,.an-table td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}
@@ -160,57 +247,54 @@
   .an-note{color:var(--dim);font-size:.74rem;line-height:1.5}
   .an-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:720px){.an-grid2{grid-template-columns:1fr}}
-  /* tier accordion */
-  .tier-sec{margin-bottom:11px;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--panel)}
-  .tier-sec.tierA{border-left:3px solid var(--gold)}
-  .tier-sec.tierB{border-left:3px solid var(--blue)}
-  .tier-sec.tierC{border-left:3px solid var(--line-2)}
-  .tier-head{display:flex;align-items:center;gap:11px;padding:13px 16px;cursor:pointer;user-select:none;background:var(--panel-2)}
-  .tier-head:hover{background:#1f2935}
-  .tier-head .caret{color:var(--dim);font-size:.8rem;transition:transform .15s;width:14px;flex:none}
+  /* tier sections (#7) — subtle header + divider, no heavy block or thick rail */
+  .tier-sec{margin-bottom:18px}
+  .tier-head{display:flex;align-items:center;gap:9px;padding:6px 2px 8px;cursor:pointer;user-select:none;border-bottom:1px solid var(--line);margin-bottom:9px}
+  .tier-head:hover .tname{color:var(--text)}
+  .tier-head .caret{color:var(--dim);font-size:.72rem;transition:transform .15s;width:12px;flex:none}
   .tier-sec.collapsed .caret{transform:rotate(-90deg)}
-  .tier-head .tname{font-family:"Fraunces",serif;font-weight:900;font-size:1.3rem;letter-spacing:-.01em}
-  .tier-head .tdot{width:11px;height:11px;border-radius:3px;flex:none}
-  .tdot.A{background:var(--gold)} .tdot.B{background:var(--blue)} .tdot.C{background:#3a4550}
-  .tier-head .tcount{font-family:"Spline Sans Mono",monospace;font-size:.8rem;color:var(--text-2)}
-  .tier-head .tcount .of{color:var(--dim)}
-  .tier-head::after{content:"";flex:1}
-  .tier-head .tsum{font-family:"Spline Sans Mono",monospace;font-size:.64rem;color:var(--dim)}
-  .tier-body{padding:9px 11px 11px}
+  .tier-head .tname{font-weight:700;font-size:.92rem;letter-spacing:.01em;color:var(--text-2)}
+  .tier-head .tdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .tdot.A{background:var(--accent)} .tdot.B{background:var(--info)} .tdot.C{background:var(--muted)}
+  .tier-head .tcount{font-size:.82rem;color:var(--dim)}
+  .tier-head .tcount .of{color:var(--dim);opacity:.7}
+  .tier-head .tsum{font-size:.74rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .tier-head .tsel{margin-left:auto;background:transparent;border:1px solid var(--line-2);color:var(--dim);border-radius:6px;padding:3px 10px;font-size:.72rem;font-family:inherit;cursor:pointer}
+  .tier-head .tsel:hover{color:var(--text);border-color:var(--accent)}
   .tier-sec.collapsed .tier-body{display:none}
-  .tier-empty{color:var(--dim);font-size:.82rem;font-style:italic;padding:8px 6px}
+  .tier-empty{color:var(--dim);font-size:.84rem;padding:6px 4px 12px}
 
-  /* compact rows + status badges */
-  .crow{display:grid;grid-template-columns:20px 46px minmax(110px,180px) 1fr auto 16px;align-items:center;gap:11px;
-    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line-2);border-right:3px solid transparent;
-    border-radius:10px;padding:9px 13px;cursor:pointer;transition:background .12s,border-color .12s;margin-bottom:5px}
+  /* compact rows (#5,#8) — company/role lead, score de-emphasized, metadata clustered, larger status */
+  .crow{display:grid;grid-template-columns:18px 38px minmax(0,1fr) auto 14px;align-items:center;gap:12px;
+    background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--line-2);
+    border-radius:9px;padding:9px 13px;cursor:pointer;transition:background .12s,border-color .12s;margin-bottom:5px}
   .crow:hover{background:var(--panel-2);border-color:var(--line-2)}
-  .crow.tierA{border-left-color:var(--gold)} .crow.tierB{border-left-color:var(--blue)} .crow.tierC{border-left-color:var(--line-2)}
-  .crow.sel{background:#1c2733;border-color:var(--gold)}
-  .crow.st-applied{border-right-color:var(--green)}
-  .crow.st-active{border-right-color:var(--teal)}
-  .crow.st-offer{border-right-color:var(--teal)}
-  .crow.st-rejected{border-right-color:var(--coral);opacity:.62}
-  .crow.st-archived{opacity:.45}
-  .crow-chk{width:16px;height:16px;accent-color:var(--gold);cursor:pointer}
-  .crow-ev{font-family:"Fraunces",serif;font-weight:900;font-size:1.16rem;color:var(--gold);text-align:center;line-height:1}
-  .crow-co{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .crow-role{color:var(--text-2);font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow.tierA{border-left-color:var(--accent)} .crow.tierB{border-left-color:var(--info)} .crow.tierC{border-left-color:var(--line-2)}
+  .crow.sel{background:#1c2733;border-color:var(--accent)}
+  .crow.st-rejected{opacity:.6} .crow.st-archived{opacity:.45}
+  .crow-chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .crow-ev{font-family:"Spline Sans Mono",monospace;font-weight:700;font-size:1rem;text-align:center;line-height:1;color:var(--text-2)}
+  .crow-main{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .crow-co{font-weight:700;color:var(--text);white-space:nowrap;flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis}
+  .crow-role{color:var(--text-2);font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .crow-tail{display:flex;align-items:center;gap:9px;justify-content:flex-end;white-space:nowrap}
+  .crow-src{font-family:"Spline Sans Mono",monospace;font-size:.66rem;letter-spacing:.02em;color:var(--ai);text-transform:lowercase;white-space:nowrap}
   .crow-caret{color:var(--dim);font-size:.7rem;transition:transform .15s;text-align:center}
   .crow.open .crow-caret{transform:rotate(180deg)}
   .crow.open{border-color:var(--line-2);background:var(--panel-2)}
-  .tabadge{font-family:"Spline Sans Mono",monospace;font-size:.58rem;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px;white-space:nowrap;border:1px solid var(--line-2);color:var(--text-2)}
-  .tabadge.none{color:var(--dim)}
-  .tabadge.applied{color:var(--green);border-color:#3a5a2a;background:#16240f}
-  .tabadge.active{color:var(--teal);border-color:#2f5650;background:#10302b66}
-  .tabadge.offer{color:#0e1217;background:var(--teal);border-color:var(--teal)}
-  .tabadge.rejected{color:var(--coral);border-color:#54322b;background:#2f1a1666}
-  .tabadge.archived{color:var(--dim)}
+  /* status pill — bigger, clearer, functional color (#8,#19) */
+  .stpill{font-size:.72rem;font-weight:600;letter-spacing:.01em;padding:4px 11px;border-radius:7px;white-space:nowrap;border:1px solid var(--line-2);color:var(--text-2);min-width:78px;text-align:center}
+  .stpill.none{color:var(--dim)}
+  .stpill.applied{color:var(--positive);border-color:#345a32;background:rgba(105,197,126,.1)}
+  .stpill.active{color:var(--active);border-color:#2f5650;background:rgba(57,194,176,.1)}
+  .stpill.offer{color:#0e1217;background:var(--active);border-color:var(--active);font-weight:700}
+  .stpill.rejected{color:var(--danger);border-color:#54322b;background:rgba(232,117,95,.1)}
+  .stpill.archived{color:var(--dim)}
   .req.flash{animation:flashfade 1.6s ease-out}
-  @keyframes flashfade{0%{box-shadow:0 0 0 2px var(--gold);background:rgba(237,192,90,.14)}100%{box-shadow:none}}
+  @keyframes flashfade{0%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:none}}
   @media (max-width:680px){
-    .crow{grid-template-columns:20px 40px 1fr auto 16px;}
-    .crow-role{display:none}
+    .crow{grid-template-columns:18px 34px minmax(0,1fr) auto 14px;gap:9px}
+    .crow-src{display:none}
   }
 
   .req{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;margin-bottom:9px;transition:border-color .15s,background .15s;border-left:3px solid var(--line-2);border-right:3px solid transparent}
@@ -245,14 +329,26 @@
   .pill.boardonly{color:var(--gold);border-color:#5a4a26;background:#2c2412aa}
   .pill.unverified{color:var(--coral);border-color:#54322b;background:#2f1a1666}
 
+  /* score band tag + fit rationale (#6) */
+  .bandtag{font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:6px;white-space:nowrap}
+  .bandtag.b-exc{color:#0e1217;background:var(--positive)}
+  .bandtag.b-strong{color:var(--positive);border:1px solid #345a32}
+  .bandtag.b-possible{color:var(--warning);border:1px solid #5a4a26}
+  .bandtag.b-low{color:var(--dim);border:1px solid var(--line-2)}
+  .fitrat{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line-2)}
+  .fitrat .fr{display:flex;flex-direction:column;gap:2px;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:6px 10px;min-width:104px}
+  .fitrat .fr .frl{font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .fitrat .fr .frv{font-size:.81rem;color:var(--text-2)}
+  .fitrat .fr.ok .frv{color:var(--positive)} .fitrat .fr.warn .frv{color:var(--warning)}
+  .fitrat .fr.bad .frv{color:var(--danger)} .fitrat .fr.dim .frv{color:var(--dim)}
   .scoresrow{display:flex;gap:16px;align-items:center;justify-content:flex-end}
   .twoscore{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:54px}
-  .twoscore .n{font-family:"Fraunces",serif;font-weight:900;font-size:1.5rem;line-height:1}
-  .twoscore .l{font-family:"Spline Sans Mono",monospace;font-size:.54rem;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+  .twoscore .n{font-weight:700;font-size:1.4rem;line-height:1;letter-spacing:-.01em}
+  .twoscore .l{font-size:.62rem;letter-spacing:.06em;color:var(--dim);text-transform:uppercase}
 
   .crm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line-2)}
   .cell{display:flex;flex-direction:column;gap:3px}
-  .cell label{font-family:"Spline Sans Mono",monospace;font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .cell label{font-size:.68rem;letter-spacing:.03em;text-transform:uppercase;color:var(--dim)}
   .cell input,.cell select{background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:7px;padding:6px 8px;font-family:inherit;font-size:.8rem;outline:none}
   .cell input:focus,.cell select:focus{border-color:var(--gold)}
   .cell.full{grid-column:1/-1}
@@ -268,10 +364,10 @@
   .overlay{position:fixed;inset:0;background:#06080bdb;backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:center;padding:24px;z-index:50;overflow:auto}
   .overlay.open{display:flex}
   .modal{background:var(--panel);border:1px solid var(--line-2);border-radius:18px;padding:24px;max-width:680px;width:100%;box-shadow:var(--shadow);margin:auto}
-  .modal h2{font-family:"Fraunces",serif;font-weight:900;font-size:1.45rem;margin-bottom:4px}
+  .modal h2{font-weight:700;font-size:1.25rem;letter-spacing:-.01em;margin-bottom:4px}
   .modal p.hint{color:var(--dim);font-size:.82rem;margin-bottom:16px}
   .field{margin-bottom:12px}
-  .field label{display:block;font-family:"Spline Sans Mono",monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);margin-bottom:5px}
+  .field label{display:block;font-size:.7rem;letter-spacing:.03em;text-transform:uppercase;color:var(--text-2);margin-bottom:5px}
   .field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:.86rem;outline:none}
   .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gold)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -279,6 +375,40 @@
   .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:9px}
   .scoregrid .field{margin-bottom:0}
   .modalacts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  /* settings drawer (#13,#14,#16) */
+  .settings-modal{max-width:940px;width:100%;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
+  .settings-head{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid var(--line);flex:none}
+  .settings-head h2{margin:0}
+  .settings-body{display:flex;min-height:0;flex:1}
+  .settings-nav{flex:none;width:202px;border-right:1px solid var(--line);padding:12px 10px;overflow:auto;display:flex;flex-direction:column;gap:2px;background:var(--bg)}
+  .settings-nav button{text-align:left;background:transparent;border:0;color:var(--text-2);padding:9px 12px;border-radius:8px;font-family:inherit;font-size:.86rem;cursor:pointer}
+  .settings-nav button:hover{background:var(--panel-2);color:var(--text)}
+  .settings-nav button.active{background:var(--panel-2);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+  .settings-content{flex:1;min-width:0;overflow:auto;padding:20px 22px}
+  .sset[hidden]{display:none}
+  .sset .ssh{font-size:1.05rem;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+  .sset .ssd{color:var(--dim);font-size:.82rem;margin:0 0 15px;line-height:1.5}
+  .settings-foot{display:flex;align-items:center;gap:12px;justify-content:flex-end;padding:13px 22px;border-top:1px solid var(--line);flex:none}
+  .settings-foot #setMsg{margin-right:auto}
+  .iconbtn{background:transparent;border:0;color:var(--dim);font-size:1.3rem;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px}
+  .iconbtn:hover{color:var(--text);background:var(--panel-2)}
+  .connstat{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+  .connrow{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;font-size:.85rem}
+  .connrow .cdot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .connrow.on .cdot{background:var(--positive)}
+  .connrow .cname{font-weight:600}
+  .connrow .cval{color:var(--dim);margin-left:auto;font-family:"Spline Sans Mono",monospace;font-size:.76rem}
+  .connrow.on .cval{color:var(--positive)}
+  .safetynote{background:rgba(121,166,224,.08);border:1px solid #2f4360;border-radius:9px;padding:11px 14px;color:var(--text-2);font-size:.82rem;margin-bottom:16px;line-height:1.5}
+  .tokrow{display:flex;align-items:center;gap:11px;padding:9px 13px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;font-size:.85rem;margin-bottom:6px}
+  .tokrow .tokname{font-weight:600;min-width:160px}
+  .tokrow .tokstate{font-family:"Spline Sans Mono",monospace;font-size:.76rem;color:var(--dim)}
+  .tokrow .tokstate.on{color:var(--positive)}
+  .tokrow .tokhint{margin-left:auto;color:var(--dim);font-size:.76rem}
+  .tokrow .mini{margin-left:auto}
+  .toknew{margin-top:8px;padding:10px 13px;border:1px solid #345a32;background:rgba(105,197,126,.08);border-radius:9px;font-size:.82rem;color:var(--text-2);line-height:1.5}
+  .toknew code{font-family:"Spline Sans Mono",monospace;color:var(--positive);word-break:break-all;font-size:.86rem}
+  @media(max-width:720px){.settings-body{flex-direction:column}.settings-nav{width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--line)}}
   .loading{text-align:center;color:var(--text-2);padding:60px 0;font-family:"Spline Sans Mono",monospace;letter-spacing:.1em}
   footer{margin-top:28px;border-top:1px solid var(--line);padding-top:18px;color:var(--dim);font-size:.77rem;line-height:1.6}
   footer b{color:var(--text-2)}
@@ -292,30 +422,30 @@
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
-    <div>
-      <div class="brandline"><span class="dot"></span> Job Pipeline · CRM · v6 · server-backed</div>
-      <h1>Requisition <em>pipeline</em></h1>
-      <p class="sub" id="boardSub">Live-requisition CRM — grouped by company, sorted by fit. Each req carries fit + interview probability, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action). Edits save server-side — persistent.</p>
+  <header class="appbar">
+    <div class="appbar-l">
+      <span class="brand-dot"></span>
+      <h1>Requisition pipeline</h1>
+      <button class="infobtn" id="aboutBtn" title="About this board" aria-label="About this board">i</button>
+      <div class="about-pop" id="aboutPop">
+        <p><b>Self-hosted job-search CRM.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
+        <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Tier</b> is set by expected value.</p>
+        <p>Every edit saves server-side and persists. Use <b>Run Scout</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs action.</p>
+      </div>
     </div>
-    <div class="updated" id="updated">loading…</div>
+    <div class="appbar-r">
+      <span class="updated" id="updated">loading…</span>
+      <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
+    </div>
   </header>
 
-  <section class="stats" id="stats"></section>
+  <section class="kpibar" id="stats"></section>
 
   <div class="tabs" id="lifecycleTabs"></div>
   <div class="lanes" id="laneBar"></div>
 
-  <div class="controls">
+  <div class="toolbar">
     <input type="text" id="search" placeholder="Search company, role, recruiter, notes…" />
-    <select id="statusFilter">
-      <option value="">All statuses</option>
-      <option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option>
-      <option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option>
-    </select>
-    <select id="tierFilter"><option value="">All tiers</option><option value="A">Tier A</option><option value="B">Tier B</option><option value="C">Tier C</option></select>
-    <select id="sourceFilter"><option value="">All sources</option></select>
-    <select id="applyModeFilter"><option value="">All apply modes</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
     <select id="sort">
       <option value="expected" selected>Sort: Expected value (fit×prob)</option>
       <option value="fit">Sort: Fit</option>
@@ -323,11 +453,25 @@
       <option value="company">Sort: Company A–Z</option>
       <option value="followup">Sort: Follow-up date</option>
     </select>
-    <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply-next only</label>
-    <label class="toggle"><input type="checkbox" id="remoteOnly"> Remote only</label>
-    <label class="toggle"><input type="checkbox" id="activeOnly"> Active only</label>
-    <label class="toggle"><input type="checkbox" id="notAppliedOnly"> Not applied only</label>
+    <div class="popwrap">
+      <button class="btn ghost" id="filtersBtn" type="button">⚲ Filters<span class="fcount" id="filtersCount"></span> ▾</button>
+      <div class="pop filterspop" id="filtersPop">
+        <select id="statusFilter">
+          <option value="">All statuses</option>
+          <option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option>
+          <option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option>
+        </select>
+        <select id="tierFilter"><option value="">All tiers</option><option value="A">Tier A</option><option value="B">Tier B</option><option value="C">Tier C</option></select>
+        <select id="sourceFilter"><option value="">All sources</option></select>
+        <select id="applyModeFilter"><option value="">All apply modes</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
+        <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply-next only</label>
+        <label class="toggle"><input type="checkbox" id="remoteOnly"> Remote only</label>
+        <label class="toggle"><input type="checkbox" id="activeOnly"> Active only</label>
+        <label class="toggle"><input type="checkbox" id="notAppliedOnly"> Not applied only</label>
+      </div>
+    </div>
     <div class="spacer"></div>
+    <span class="scoutstatus" id="scoutStatus"></span>
     <div class="scoutctl">
       <button class="btn ghost" id="scoutBtn">⟳ Run Scout ▾</button>
       <div class="scoutmenu" id="scoutMenu">
@@ -343,23 +487,33 @@
         <div class="scoutmenu-foot" id="scoutAi">enrichment: …</div>
       </div>
     </div>
-    <span class="scoutstatus" id="scoutStatus"></span>
-    <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
-    <button class="btn" id="addBtn">+ Add requisition</button>
-    <button class="btn ghost" id="expandAllBtn">Expand all</button>
-    <button class="btn ghost" id="collapseAllBtn">Collapse all</button>
-    <button class="btn ghost" id="exportXlsxBtn">Export Excel</button>
-    <button class="btn ghost" id="exportBtn">Export CSV</button>
-    <button class="btn ghost" id="reloadBtn">Reload</button>
+    <button class="btn" id="addBtn">+ Add</button>
+    <div class="popwrap">
+      <button class="btn ghost overflowbtn" id="overflowBtn" type="button" title="More actions" aria-label="More actions">⋯</button>
+      <div class="pop menu right" id="overflowPop">
+        <button id="expandAllBtn">Expand all tiers</button>
+        <button id="collapseAllBtn">Collapse all tiers</button>
+        <div class="pop-sep"></div>
+        <button id="importBtn">Import roles (JSON)…</button>
+        <button id="enrichAllBtn">Enrich all leads…</button>
+        <div class="pop-sep"></div>
+        <button id="exportXlsxBtn">Export Excel</button>
+        <button id="exportBtn">Export CSV</button>
+        <div class="pop-sep"></div>
+        <button id="reloadBtn">Reload from server</button>
+      </div>
+    </div>
   </div>
 
   <div class="selbar" id="selbar">
     <span class="selcount"><span id="selCount">0</span> selected</span>
     <button class="btn" id="openTabsBtn">Open <span id="openN">0</span> in tabs ↗</button>
     <button class="btn apply" id="markAppliedBtn">✓ Mark Applied (today)</button>
+    <button class="btn ghost" id="archiveSelBtn">Archive</button>
+    <button class="btn ghost" id="exportSelBtn">Export</button>
     <button class="btn ghost" id="selectAllBtn">Select all visible</button>
     <button class="btn ghost" id="clearSelBtn">Clear</button>
-    <span class="selhint">Opening several tabs needs pop-ups <em>allowed for this site</em> — if only one opens, allow pop-ups and retry. Rows whose link is a LinkedIn <em>search</em> open to a search, not the exact posting.</span>
+    <span class="selhint"><em>⌘/Ctrl-click</em> a row to toggle it · <em>Shift-click</em> for a range · <em>Select all</em> in a tier header. Opening several tabs needs pop-ups allowed for this site — if only one opens, allow pop-ups and retry.</span>
     <span class="selstatus" id="selStatus"></span>
   </div>
 
@@ -367,8 +521,8 @@
 
   <footer>
     <b>Link confidence.</b> <span style="color:var(--teal)">Verified</span> = I confirmed a live req this session. <span style="color:var(--gold)">Board-only</span> = link goes to the company's careers board (filter for the title); individual req URLs rotate/expire. <span style="color:var(--coral)">Unverified</span> = sourced from your uploaded doc, not yet confirmed — check before relying on it.<br>
-    <b>Fit</b> = domain/résumé match (your earlier 7-axis model, condensed). <b>Interview probability</b> = my estimate of landing a screen given seniority, remote competition, and how directly your background maps — deliberately separate from fit, since some perfect-fit roles are hard to land. <b>Expected value</b> = fit × probability, your best apply-effort allocator. <b>Tier A</b> refined by expected value, not raw fit. All scores are estimates, salary ranges indicative — verify on each board.<br>
-    <b>Status colors.</b> Cards you've <span style="color:var(--green)">applied</span> to are tinted green; <span style="color:var(--teal)">in-interview</span> stages teal (brightest at offer); <span style="color:var(--coral)">rejected</span> dimmed red; archived faded. Left edge = tier, right edge = status. Untinted = not yet addressed.
+    <b>Fit</b> = domain/résumé match (your earlier 7-axis model, condensed). <b>Interview probability</b> = my estimate of landing a screen given seniority, remote competition, and how directly your background maps — deliberately separate from fit, since some perfect-fit roles are hard to land. <b>Expected value</b> = fit × probability, your best apply-effort allocator. <b>Tier A</b> refined by expected value, not raw fit. <b>Bands</b> (shown when a row is expanded): 8.0+ <span style="color:var(--green)">Excellent</span> · 6.5–7.9 <span style="color:var(--green)">Strong</span> · 5.0–6.4 <span style="color:var(--gold)">Possible</span> · &lt;5.0 <span style="color:var(--dim)">Low priority</span> — Tier A maps to Excellent/Strong, B to Possible, C below. All scores are estimates, salary ranges indicative — verify on each board.<br>
+    <b>Status.</b> Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks the tier (A gold · B blue · C grey).
   </footer>
 </div>
 
@@ -420,6 +574,19 @@
   </div>
 </div>
 
+<div class="overlay" id="importOverlay">
+  <div class="modal" style="max-width:640px">
+    <h2>Import roles (JSON)</h2>
+    <p class="hint">Paste a JSON array of roles (or <code>{"roles":[…]}</code>) — e.g. ChatGPT's output. Append-only merge: dedupes by <b>company+role</b>, never overwrites your tracking edits. Runs locally — no token or HTTPS needed.</p>
+    <div class="field"><label>JSON</label><textarea id="importJson" rows="12" placeholder='[ {"company":"Acme","role":"Principal Product Manager, Data Platform","sector":"Data Infra","remote":"remote","fit":8.5,"prob":7,"tier":"A","conf":"unverified","link":"https://…","notes":"why it fits"} ]'></textarea></div>
+    <div id="importMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="importCancel">Close</button>
+      <button class="btn" id="importRun">Import &amp; merge</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="assistOverlay">
   <div class="modal">
     <h2>AI application assistant</h2>
@@ -441,166 +608,210 @@
 </div>
 
 <div class="overlay" id="settingsOverlay">
-  <div class="modal">
-    <h2>Scout settings</h2>
-    <p class="hint">Enable/disable sources, tune search keywords &amp; titles, and configure the OpenAI key used for AI rescoring. Saves to the server (boards.json / watchlist.json / .env) and takes effect on the next run — no restart needed.</p>
+  <div class="modal settings-modal">
+    <div class="settings-head">
+      <h2>Settings</h2>
+      <button class="iconbtn" id="settingsCancelTop" type="button" title="Close" aria-label="Close">×</button>
+    </div>
+    <div class="settings-body">
+      <nav class="settings-nav" id="settingsNav">
+        <button data-sect="sources" class="active">Sources</button>
+        <button data-sect="matching">Matching &amp; scoring</button>
+        <button data-sect="profile">Candidate profile</button>
+        <button data-sect="workflow">Workflow</button>
+        <button data-sect="ai">AI assistant</button>
+        <button data-sect="digest">Digest &amp; notifications</button>
+        <button data-sect="data">Data safety</button>
+        <button data-sect="advanced">Advanced</button>
+      </nav>
+      <div class="settings-content" id="settingsContent">
 
-    <div class="field"><label>Sources</label>
-      <div id="setSources" class="setsources"><div class="setmuted">loading…</div></div>
-    </div>
-    <div class="field"><label>Add company by careers URL</label>
-      <div class="ahintrow"><input id="discoverUrl" type="text" placeholder="Paste a Greenhouse / Ashby / Lever / Workable … job or board URL" style="flex:1"> <button class="mini" id="discoverBtn" type="button">Detect</button></div>
-      <div id="discoverResult" class="setmuted" style="margin-top:6px"></div>
-    </div>
-    <div class="field"><label>Source health <button class="mini" id="refreshHealthBtn" type="button" style="float:right">↻ refresh</button></label>
-      <div id="sourceHealth" class="bklist" style="max-height:180px"><div class="setmuted" style="padding:8px">Run the scout to populate.</div></div>
-    </div>
+        <section class="sset" data-sect="sources">
+          <div class="ssh">Sources</div>
+          <p class="ssd">Enable or disable the board APIs the scout polls, add companies by careers URL, and check each source's last run. Saves to boards.json / watchlist.json — takes effect on the next run, no restart.</p>
+          <div class="field"><label>Enabled sources</label>
+            <div id="setSources" class="setsources"><div class="setmuted">loading…</div></div>
+          </div>
+          <div class="field"><label>Add company by careers URL</label>
+            <div class="ahintrow"><input id="discoverUrl" type="text" placeholder="Paste a Greenhouse / Ashby / Lever / Workable … job or board URL" style="flex:1"> <button class="mini" id="discoverBtn" type="button">Detect</button></div>
+            <div id="discoverResult" class="setmuted" style="margin-top:6px"></div>
+          </div>
+          <div class="field"><label>Source health <button class="mini" id="refreshHealthBtn" type="button" style="float:right">↻ refresh</button></label>
+            <div id="sourceHealth" class="bklist" style="max-height:220px"><div class="setmuted" style="padding:8px">Run the scout to populate.</div></div>
+          </div>
+        </section>
 
-    <div class="grid2">
-      <div class="field"><label>Min fit to add (0–10)</label><input id="setMinFit" type="number" min="0" max="10" step="0.1"></div>
-      <div class="field"><label>Min tier to add</label><select id="setMinTier"><option value="A">A only</option><option value="B">A &amp; B</option><option value="C">A, B &amp; C (all)</option></select></div>
-    </div>
-    <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setRemoteOnly" type="checkbox" style="width:auto"> Remote-only (drop on-site)</label></div>
-    <div class="field"><label>Title bands (one per line)</label><textarea id="setTitles" rows="4"></textarea></div>
-    <div class="field"><label>Domain keywords (one per line)</label><textarea id="setKeywords" rows="5"></textarea></div>
-    <div class="grid2">
-      <div class="field"><label>Skip employment types (one per line)</label><textarea id="setSkipTypes" rows="4" placeholder="contract&#10;intern&#10;associate"></textarea></div>
-      <div class="field"><label>Blockers / negative keywords (one per line)</label><textarea id="setNegKw" rows="4" placeholder="crypto&#10;on-call&#10;clearance required"></textarea></div>
-    </div>
-    <p class="hint" style="margin:-4px 0 10px">Employment types match the role title and are dropped. Blockers demote a match (−2 fit each) so heavy hits fall below your min-fit / min-tier; light hits just rank lower.</p>
+        <section class="sset" data-sect="matching" hidden>
+          <div class="ssh">Matching &amp; scoring</div>
+          <p class="ssd">Thresholds and keyword lists that decide which roles the scout adds and how it ranks them.</p>
+          <div class="grid2">
+            <div class="field"><label>Min fit to add (0–10)</label><input id="setMinFit" type="number" min="0" max="10" step="0.1"></div>
+            <div class="field"><label>Min tier to add</label><select id="setMinTier"><option value="A">A only</option><option value="B">A &amp; B</option><option value="C">A, B &amp; C (all)</option></select></div>
+          </div>
+          <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setRemoteOnly" type="checkbox" style="width:auto"> Remote-only (drop on-site)</label></div>
+          <div class="field"><label>Title bands (one per line)</label><textarea id="setTitles" rows="4"></textarea></div>
+          <div class="field"><label>Domain keywords (one per line)</label><textarea id="setKeywords" rows="5"></textarea></div>
+          <div class="grid2">
+            <div class="field"><label>Skip employment types (one per line)</label><textarea id="setSkipTypes" rows="4" placeholder="contract&#10;intern&#10;associate"></textarea></div>
+            <div class="field"><label>Blockers / negative keywords (one per line)</label><textarea id="setNegKw" rows="4" placeholder="crypto&#10;on-call&#10;clearance required"></textarea></div>
+          </div>
+          <p class="hint" style="margin:-4px 0 4px">Employment types match the role title and are dropped. Blockers demote a match (−2 fit each) so heavy hits fall below your min-fit / min-tier; light hits just rank lower.</p>
+        </section>
 
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 6px">Lifecycle tabs</h2>
-    <div class="grid2">
-      <div class="field"><label>Open</label><input id="setTabOpen" type="text" placeholder="Not Applied"></div>
-      <div class="field"><label>Applied</label><input id="setTabApplied" type="text" placeholder="Applied"></div>
-      <div class="field"><label>Interviewing</label><input id="setTabInterviewing" type="text" placeholder="Recruiter Screen, Hiring Manager, Panel, Offer"></div>
-      <div class="field"><label>Rejected + Archived</label><input id="setTabClosed" type="text" placeholder="Rejected, Archived"></div>
-    </div>
-    <p class="hint" style="margin:-6px 0 12px">Comma-separated statuses routed to each board tab. Valid: Not Applied, Applied, Recruiter Screen, Hiring Manager, Panel, Offer, Rejected, Archived. Any unlisted status falls into Open.</p>
-    <div class="field"><label>Analytics window (days; 0 = all time)</label><input id="setAnalyticsWindow" type="number" min="0" max="3650" step="1"></div>
+        <section class="sset" data-sect="profile" hidden>
+          <div class="ssh">Candidate profile</div>
+          <p class="ssd" id="profMeta">Drives scoring &amp; pre-fill. Re-parse your resume to refresh keywords.</p>
+          <div class="field"><label>Resume (.docx / .txt / .md / .pdf)</label>
+            <input id="resumeFile" type="file" accept=".docx,.txt,.md,.pdf">
+            <div class="ahintrow"><button class="mini" id="uploadResumeBtn" type="button">⬆ Upload &amp; re-parse</button> <span class="setmuted">Re-extracts keywords + applicant info; your narratives &amp; manual prefs are kept.</span></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Name</label><input id="profName" type="text"></div>
+            <div class="field"><label>Email</label><input id="profEmail" type="text"></div>
+            <div class="field"><label>Phone</label><input id="profPhone" type="text"></div>
+            <div class="field"><label>LinkedIn</label><input id="profLinkedin" type="text"></div>
+          </div>
+          <div class="field"><label>Location</label><input id="profLocation" type="text"></div>
+          <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text"></div>
+          <div class="field"><label>Role / title terms (comma-separated)</label><input id="profRoleTerms" type="text"></div>
+          <div class="grid2">
+            <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
+            <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
+          </div>
+          <div class="field"><label>Resume keywords (weighted — read-only; refresh via re-parse)</label><div id="profKeywords" class="profkw"></div></div>
+          <div class="field"><label>Narrative library (reusable story blurbs for cover notes / screening answers)</label>
+            <div id="narrativeBox"></div>
+            <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
+          </div>
+          <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
+        </section>
 
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 6px">Hygiene lanes</h2>
-    <div class="grid2">
-      <div class="field"><label>Follow-up due after (days)</label><input id="setFollowupDays" type="number" min="0" max="365" step="1"></div>
-      <div class="field"><label>Closed-req handling</label><select id="setClosedHandling"><option value="suggest">Suggest (passive)</option><option value="auto">Prompt to archive</option></select></div>
-    </div>
-    <div class="field"><label>Follow-up applies to statuses (comma-separated)</label><input id="setFollowupStatuses" type="text" placeholder="Applied, Recruiter Screen, Hiring Manager, Panel"></div>
-    <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setNeedsVerifyBoardonly" type="checkbox" style="width:auto"> Needs-verify lane also includes board-only links</label></div>
-    <p class="hint" style="margin:-4px 0 12px">Lanes are non-destructive: closed reqs are surfaced for review and archived only on confirm (a snapshot is taken first) — never auto-deleted. The needs-verify lane always includes unverified links and leads.</p>
+        <section class="sset" data-sect="workflow" hidden>
+          <div class="ssh">Workflow</div>
+          <p class="ssd">How statuses route to board tabs, when hygiene lanes flag work, the analytics window, and per-source apply modes.</p>
+          <div style="font-weight:600;font-size:.9rem;margin:2px 0 8px">Lifecycle tabs</div>
+          <div class="grid2">
+            <div class="field"><label>Open</label><input id="setTabOpen" type="text" placeholder="Not Applied"></div>
+            <div class="field"><label>Applied</label><input id="setTabApplied" type="text" placeholder="Applied"></div>
+            <div class="field"><label>Interviewing</label><input id="setTabInterviewing" type="text" placeholder="Recruiter Screen, Hiring Manager, Panel, Offer"></div>
+            <div class="field"><label>Rejected + Archived</label><input id="setTabClosed" type="text" placeholder="Rejected, Archived"></div>
+          </div>
+          <p class="hint" style="margin:-6px 0 12px">Comma-separated statuses routed to each board tab. Any unlisted status falls into Open.</p>
+          <div class="field"><label>Analytics window (days; 0 = all time)</label><input id="setAnalyticsWindow" type="number" min="0" max="3650" step="1"></div>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Hygiene lanes</div>
+          <div class="grid2">
+            <div class="field"><label>Follow-up due after (days)</label><input id="setFollowupDays" type="number" min="0" max="365" step="1"></div>
+            <div class="field"><label>Closed-req handling</label><select id="setClosedHandling"><option value="suggest">Suggest (passive)</option><option value="auto">Prompt to archive</option></select></div>
+          </div>
+          <div class="field"><label>Follow-up applies to statuses (comma-separated)</label><input id="setFollowupStatuses" type="text" placeholder="Applied, Recruiter Screen, Hiring Manager, Panel"></div>
+          <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setNeedsVerifyBoardonly" type="checkbox" style="width:auto"> Needs-verify lane also includes board-only links</label></div>
+          <p class="hint" style="margin:-4px 0 12px">Lanes are non-destructive: closed reqs are surfaced for review and archived only on confirm (snapshot taken first) — never auto-deleted.</p>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Apply mode</div>
+          <div class="field"><label>Source → default apply mode</label>
+            <div id="applyModeMapBox" class="ammap"><div class="setmuted">loading…</div></div>
+          </div>
+          <div class="ahintrow"><button class="mini" id="backfillApplyModeBtn" type="button">↻ Backfill apply-mode now</button> <span class="setmuted">Stamps inferred apply-mode onto rows missing it (snapshots first).</span></div>
+          <p class="hint" style="margin:8px 0 0">fillable = Claude-in-Chrome can fill the form · gated = login-walled · simplify = Simplify Copilot · manual = by hand. Each card has a per-row override.</p>
+        </section>
 
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 6px">Apply mode</h2>
-    <div class="field"><label>Source → default apply mode</label>
-      <div id="applyModeMapBox" class="ammap"><div class="setmuted">loading…</div></div>
-    </div>
-    <div class="ahintrow"><button class="mini" id="backfillApplyModeBtn" type="button">↻ Backfill apply-mode now</button> <span class="setmuted">Stamps inferred apply-mode onto rows missing it (snapshots first).</span></div>
-    <p class="hint" style="margin:8px 0 12px">fillable = Claude-in-Chrome can fill the form · gated = login-walled (open + Simplify/manual) · simplify = use Simplify Copilot · manual = by hand. Each card has a per-row override.</p>
+        <section class="sset" data-sect="ai" hidden>
+          <div class="ssh">AI assistant</div>
+          <p class="ssd">The OpenAI model and budget for scout rescoring, plus the per-req draft assistant. API keys live under Advanced.</p>
+          <div class="field"><label>OpenAI model</label><input id="setModel" type="text" placeholder="gpt-5.4-mini"></div>
+          <div class="grid2">
+            <div class="field"><label>AI calls per run (cap)</label><input id="setAiMax" type="number" min="0" max="500" step="1"></div>
+            <div class="field"><label>Re-enrich after (days)</label><input id="setAiTtl" type="number" min="0" max="365" step="1"></div>
+          </div>
+          <p class="hint" style="margin:-6px 0 12px">Cost control: each run makes at most this many AI calls, and a role isn't re-scored until its posting changes or this many days pass. ~0.5–1k tokens per call on <span id="setBudgetModel">gpt-5.4-mini</span>.</p>
+          <div class="grid2">
+            <div class="field"><label>JD chars sent to AI</label><input id="setJdChars" type="number" min="500" max="20000" step="100"></div>
+            <div class="field"><label>Max tokens per scoring call</label><input id="setMaxTokens" type="number" min="64" max="4000" step="10"></div>
+          </div>
+          <div class="field"><label>Scout delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Application draft assistant</div>
+          <div class="grid2">
+            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setAssistEnabled" type="checkbox" style="width:auto"> Enable AI draft assistant</label></div>
+            <div class="field"><label>Assistant model (blank = scoring model)</label><input id="setAssistModel" type="text" placeholder="gpt-5.4-mini"></div>
+            <div class="field"><label>Daily call cap</label><input id="setAssistDaily" type="number" min="0" max="1000" step="1"></div>
+            <div class="field"><label>Max tokens per draft</label><input id="setAssistMaxTokens" type="number" min="64" max="4000" step="10"></div>
+          </div>
+          <p class="hint" id="assistUsageHint" style="margin:-4px 0 0">Per-req "✍ AI draft" composes a cover note or screening answer from your profile + narratives + JD. Output is editable and never auto-submitted.</p>
+        </section>
 
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 4px">Candidate profile</h2>
-    <p class="hint" id="profMeta" style="margin:0 0 10px">Drives scoring &amp; pre-fill. Re-parse your resume to refresh keywords.</p>
-    <div class="field"><label>Resume (.docx / .txt / .md / .pdf)</label>
-      <input id="resumeFile" type="file" accept=".docx,.txt,.md,.pdf">
-      <div class="ahintrow"><button class="mini" id="uploadResumeBtn" type="button">⬆ Upload &amp; re-parse</button> <span class="setmuted">Re-extracts keywords + applicant info; your narratives &amp; manual prefs are kept.</span></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Name</label><input id="profName" type="text"></div>
-      <div class="field"><label>Email</label><input id="profEmail" type="text"></div>
-      <div class="field"><label>Phone</label><input id="profPhone" type="text"></div>
-      <div class="field"><label>LinkedIn</label><input id="profLinkedin" type="text"></div>
-    </div>
-    <div class="field"><label>Location</label><input id="profLocation" type="text"></div>
-    <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text"></div>
-    <div class="field"><label>Role / title terms (comma-separated)</label><input id="profRoleTerms" type="text"></div>
-    <div class="grid2">
-      <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
-      <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
-    </div>
-    <div class="field"><label>Resume keywords (weighted — read-only; refresh via re-parse)</label><div id="profKeywords" class="profkw"></div></div>
-    <div class="field"><label>Narrative library (reusable story blurbs for cover notes / screening answers)</label>
-      <div id="narrativeBox"></div>
-      <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
-    </div>
-    <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
+        <section class="sset" data-sect="digest" hidden>
+          <div class="ssh">Digest &amp; notifications</div>
+          <p class="ssd">The always-on server composes a morning digest from your data and delivers it at the set time via Slack webhook or SMTP. A file fallback is always written to <code>agent/digest-latest.html</code>.</p>
+          <div class="grid2">
+            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestEnabled" type="checkbox" style="width:auto"> Enable scheduled digest</label></div>
+            <div class="field"><label>Time (HH:MM, server local)</label><input id="setDigestTime" type="text" placeholder="07:00"></div>
+            <div class="field"><label>Channel</label><select id="setDigestChannel"><option value="file">File only</option><option value="slack">Slack webhook</option><option value="email">Email (SMTP)</option></select></div>
+            <div class="field"><label>Look-back window (days)</label><input id="setDigestDays" type="number" min="1" max="60" step="1"></div>
+          </div>
+          <div class="field"><label>Slack incoming webhook URL <span id="webhookState" class="setmuted"></span></label><input id="setDigestWebhook" type="text" placeholder="https://hooks.slack.com/… (blank = keep)" autocomplete="off">
+            <div class="ahintrow"><button class="mini danger" id="clearWebhookBtn" type="button">Clear webhook</button></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Email to</label><input id="setDigestTo" type="text" placeholder="you@example.com"></div>
+            <div class="field"><label>Email from</label><input id="setDigestFrom" type="text" placeholder="defaults to SMTP user"></div>
+            <div class="field"><label>SMTP host</label><input id="setSmtpHost" type="text" placeholder="smtp.gmail.com"></div>
+            <div class="field"><label>SMTP port</label><input id="setSmtpPort" type="text" placeholder="587"></div>
+            <div class="field"><label>SMTP user</label><input id="setSmtpUser" type="text"></div>
+            <div class="field"><label>SMTP password <span id="smtpState" class="setmuted"></span></label><input id="setSmtpPass" type="password" placeholder="blank = keep" autocomplete="off">
+              <div class="ahintrow"><button class="mini danger" id="clearSmtpPassBtn" type="button">Clear password</button></div>
+            </div>
+          </div>
+          <div class="ahintrow"><button class="mini" id="sendDigestBtn" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
+          <p class="hint" style="margin:8px 0 0">Save settings before sending a test.</p>
+        </section>
 
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <div class="grid2">
-      <div class="field"><label>AI calls per run (cap)</label><input id="setAiMax" type="number" min="0" max="500" step="1"></div>
-      <div class="field"><label>Re-enrich after (days)</label><input id="setAiTtl" type="number" min="0" max="365" step="1"></div>
-    </div>
-    <p class="hint" style="margin:-6px 0 12px">Cost control: each run makes at most this many AI calls, and a role isn't re-scored by AI again until its posting changes or this many days pass. ~0.5–1k tokens per call on <span id="setBudgetModel">gpt-5.4-mini</span>.</p>
-    <div class="grid2">
-      <div class="field"><label>JD chars sent to AI</label><input id="setJdChars" type="number" min="500" max="20000" step="100"></div>
-      <div class="field"><label>Max tokens per scoring call</label><input id="setMaxTokens" type="number" min="64" max="4000" step="10"></div>
-    </div>
-    <div class="field"><label>Scout delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
-    <div class="field"><label>OpenAI model</label><input id="setModel" type="text" placeholder="gpt-5.4-mini"></div>
-    <div class="field"><label>OpenAI API key <span id="setKeyState" class="setmuted"></span></label>
-      <input id="setKey" type="password" placeholder="leave blank to keep current" autocomplete="off">
-      <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Stored server-side in .env (never sent to the browser).</span></div>
-    </div>
-    <div class="field"><label>Aggregator keys (optional)</label>
-      <div class="grid2">
-        <input id="setTheirstack" type="password" placeholder="THEIRSTACK_API_KEY (blank=keep)" autocomplete="off">
-        <input id="setApify" type="password" placeholder="APIFY_TOKEN (blank=keep)" autocomplete="off">
+        <section class="sset" data-sect="data" hidden>
+          <div class="ssh">Data safety</div>
+          <p class="ssd">Every board save snapshots the previous data first; corruption-shaped saves are refused. Snapshots are never auto-deleted beyond the retention cap (manual &amp; phase snapshots are always kept).</p>
+          <div class="grid2">
+            <div class="field"><label>Backup retention (auto-snapshots to keep)</label><input id="setRetention" type="number" min="1" max="1000" step="1"></div>
+            <div class="field"><label>Shrink guard (refuse save dropping &gt; X% of rows)</label><input id="setGuardPct" type="number" min="0" max="100" step="1"></div>
+          </div>
+          <p class="hint" style="margin:-6px 0 12px">Only the newest <span id="setRetentionEcho">50</span> auto-snapshots are kept. A save that would drop more than the guard % of rows — or an empty save over a non-empty store — is refused as likely corruption. Set the guard to 0 to allow any size drop.</p>
+          <div class="field"><label>Snapshots</label>
+            <div class="ahintrow" style="margin-bottom:8px">
+              <button class="mini" id="snapNowBtn" type="button">📸 Snapshot now</button>
+              <button class="mini" id="refreshBackupsBtn" type="button">↻ Refresh list</button>
+              <span class="setmuted">Restore snapshots your current data first, then replaces it.</span>
+            </div>
+            <div id="backupList" class="bklist"><div class="setmuted" style="padding:8px">loading…</div></div>
+          </div>
+        </section>
+
+        <section class="sset" data-sect="advanced" hidden>
+          <div class="ssh">Advanced — integrations &amp; security</div>
+          <p class="ssd">API keys and tokens for AI rescoring and job aggregators.</p>
+          <div class="safetynote">🔒 Keys are stored server-side in <code>.env</code> and are <b>never sent back to the browser</b>. Fields show only whether a key is set; leave blank to keep the current value.</div>
+          <div class="field"><label>Connection status</label>
+            <div id="connStatus" class="connstat"><div class="setmuted">loading…</div></div>
+          </div>
+          <div class="field"><label>Access tokens (remote access)</label>
+            <div class="tokrow"><span class="tokname">App passphrase</span><span id="appTokState" class="tokstate">—</span><span class="tokhint">.env only · full access</span></div>
+            <div class="tokrow"><span class="tokname">ChatGPT ingest token</span><span id="ingestTokState" class="tokstate">—</span><button class="mini" id="regenIngestBtn" type="button">Regenerate</button></div>
+            <div id="ingestTokNew" class="toknew" style="display:none"></div>
+            <p class="hint" style="margin:8px 0 0">The <b>ingest token</b> is scoped to <code>POST /api/reqs/merge</code> + <code>/quickadd</code> only — safe to hand an automation (ChatGPT Action). The <b>app passphrase</b> grants full access and is managed in <code>.env</code> (not editable here by design). Send either as the <code>X-CRM-Token</code> header.</p>
+          </div>
+          <div class="field"><label>OpenAI API key <span id="setKeyState" class="setmuted"></span></label>
+            <input id="setKey" type="password" placeholder="leave blank to keep current" autocomplete="off">
+            <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Powers scout rescoring + the draft assistant.</span></div>
+          </div>
+          <div class="field"><label>Aggregator keys (optional)</label>
+            <div class="grid2">
+              <input id="setTheirstack" type="password" placeholder="THEIRSTACK_API_KEY (blank=keep)" autocomplete="off">
+              <input id="setApify" type="password" placeholder="APIFY_TOKEN (blank=keep)" autocomplete="off">
+            </div>
+            <div class="ahintrow"><button class="mini danger" id="clearTheirstackBtn" type="button">Clear TheirStack</button> <button class="mini danger" id="clearApifyBtn" type="button">Clear Apify</button></div>
+          </div>
+        </section>
+
       </div>
-      <div class="ahintrow"><button class="mini danger" id="clearTheirstackBtn" type="button">Clear TheirStack</button> <button class="mini danger" id="clearApifyBtn" type="button">Clear Apify</button></div>
     </div>
-
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 6px">AI application assistant</h2>
-    <div class="grid2">
-      <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setAssistEnabled" type="checkbox" style="width:auto"> Enable AI draft assistant</label></div>
-      <div class="field"><label>Assistant model (blank = scoring model)</label><input id="setAssistModel" type="text" placeholder="gpt-5.4-mini"></div>
-      <div class="field"><label>Daily call cap</label><input id="setAssistDaily" type="number" min="0" max="1000" step="1"></div>
-      <div class="field"><label>Max tokens per draft</label><input id="setAssistMaxTokens" type="number" min="64" max="4000" step="10"></div>
-    </div>
-    <p class="hint" id="assistUsageHint" style="margin:-4px 0 12px">Per-req "✍ AI draft" composes a cover note or screening answer from your profile + narratives + JD. Output is editable and never auto-submitted.</p>
-
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 6px">Morning digest</h2>
-    <div class="grid2">
-      <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestEnabled" type="checkbox" style="width:auto"> Enable scheduled digest</label></div>
-      <div class="field"><label>Time (HH:MM, server local)</label><input id="setDigestTime" type="text" placeholder="07:00"></div>
-      <div class="field"><label>Channel</label><select id="setDigestChannel"><option value="file">File only</option><option value="slack">Slack webhook</option><option value="email">Email (SMTP)</option></select></div>
-      <div class="field"><label>Look-back window (days)</label><input id="setDigestDays" type="number" min="1" max="60" step="1"></div>
-    </div>
-    <div class="field"><label>Slack incoming webhook URL <span id="webhookState" class="setmuted"></span></label><input id="setDigestWebhook" type="text" placeholder="https://hooks.slack.com/… (blank = keep)" autocomplete="off">
-      <div class="ahintrow"><button class="mini danger" id="clearWebhookBtn" type="button">Clear webhook</button></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Email to</label><input id="setDigestTo" type="text" placeholder="you@example.com"></div>
-      <div class="field"><label>Email from</label><input id="setDigestFrom" type="text" placeholder="defaults to SMTP user"></div>
-      <div class="field"><label>SMTP host</label><input id="setSmtpHost" type="text" placeholder="smtp.gmail.com"></div>
-      <div class="field"><label>SMTP port</label><input id="setSmtpPort" type="text" placeholder="587"></div>
-      <div class="field"><label>SMTP user</label><input id="setSmtpUser" type="text"></div>
-      <div class="field"><label>SMTP password <span id="smtpState" class="setmuted"></span></label><input id="setSmtpPass" type="password" placeholder="blank = keep" autocomplete="off">
-        <div class="ahintrow"><button class="mini danger" id="clearSmtpPassBtn" type="button">Clear password</button></div>
-      </div>
-    </div>
-    <div class="ahintrow"><button class="mini" id="sendDigestBtn" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
-    <p class="hint" style="margin:8px 0 12px">The always-on server composes from your data and delivers at the set time. A file fallback is always written to <code>agent/digest-latest.html</code>. MCP connectors aren't reachable from the server — use a Slack webhook or SMTP. Save settings before sending a test.</p>
-
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <h2 style="font-size:1rem;margin:0 0 6px">Data safety</h2>
-    <div class="grid2">
-      <div class="field"><label>Backup retention (auto-snapshots to keep)</label><input id="setRetention" type="number" min="1" max="1000" step="1"></div>
-      <div class="field"><label>Shrink guard (refuse save dropping &gt; X% of rows)</label><input id="setGuardPct" type="number" min="0" max="100" step="1"></div>
-    </div>
-    <p class="hint" style="margin:-6px 0 12px">Every board save snapshots the previous data first; only the newest <span id="setRetentionEcho">50</span> auto-snapshots are kept (manual &amp; phase snapshots are never auto-deleted). A save that would drop more than the guard % of rows — or an empty save over a non-empty store — is refused as likely corruption. Set the guard to 0 to allow any size drop.</p>
-    <div class="field"><label>Snapshots</label>
-      <div class="ahintrow" style="margin-bottom:8px">
-        <button class="mini" id="snapNowBtn" type="button">📸 Snapshot now</button>
-        <button class="mini" id="refreshBackupsBtn" type="button">↻ Refresh list</button>
-        <span class="setmuted">Restore snapshots your current data first, then replaces it.</span>
-      </div>
-      <div id="backupList" class="bklist"><div class="setmuted" style="padding:8px">loading…</div></div>
-    </div>
-
-    <div id="setMsg" class="setmsg"></div>
-    <div class="modalacts">
+    <div class="settings-foot">
+      <span id="setMsg" class="setmsg"></span>
       <button class="btn ghost" id="settingsCancel">Close</button>
       <button class="btn" id="settingsSave">Save settings</button>
     </div>
@@ -616,16 +827,19 @@ const ACTIVE=new Set(["Applied","Recruiter Screen","Hiring Manager","Panel","Off
 let rows=[];
 // ---- lifecycle tabs (Phase 2) ----
 const TAB_DEFS=[
+  {key:"today",label:"Today"},
   {key:"open",label:"Open"},
   {key:"applied",label:"Applied"},
   {key:"interviewing",label:"Interviewing"},
   {key:"closed",label:"Rejected + Archived"},
-  {key:"analytics",label:"📊 Analytics"},
+  {key:"analytics",label:"Analytics"},
 ];
 const TAB_MAP_DEFAULT={open:["Not Applied"],applied:["Applied"],interviewing:["Recruiter Screen","Hiring Manager","Panel","Offer"],closed:["Rejected","Archived"]};
 let ANALYTICS_WINDOW=0;   // days; 0 = all-time (from settings)
 let TAB_MAP={...TAB_MAP_DEFAULT};
-let activeTab="open", applyNextOnly=true;
+let activeTab="today", applyNextOnly=true;
+let scoutLast=null;                 // computed summary of the last scout run (for the Today strip)
+let recentOnly=false, recentCutoff="";  // "New since last run" transient filter
 // ---- hygiene lanes (Phase 3) ----
 const HYGIENE_DEFAULT={followupDays:7,followupStatuses:["Applied","Recruiter Screen","Hiring Manager","Panel"],needsVerifyIncludeBoardonly:false,closedHandling:"suggest"};
 let HYGIENE={...HYGIENE_DEFAULT};
@@ -667,6 +881,30 @@ let visibleIdx=[];                         // row indices currently shown post-f
 const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function expected(x){return +(((+x.fit||0)*(+x.prob||0))/10).toFixed(1);}
 function fitColor(v){if(v>=8.5)return"var(--t9)";if(v>=7)return"var(--t7)";if(v>=5)return"var(--t5)";return"var(--t3)";}
+// score bands (#6) — shared label/class for fit & expected value on a 0–10 scale
+function bandLabel(v){v=+v||0;if(v>=8)return"Excellent";if(v>=6.5)return"Strong";if(v>=5)return"Possible";return"Low priority";}
+function bandClass(v){v=+v||0;if(v>=8)return"b-exc";if(v>=6.5)return"b-strong";if(v>=5)return"b-possible";return"b-low";}
+// Heuristic fit rationale from the row's own fields — turns the score into decision support (#6).
+const SENIOR_RE=/\b(principal|staff|director|sr\.?|senior|lead|head of|group|vp|chief)\b/i;
+const DOMAIN_RE=/\b(data platform|data product|pipeline|snowflake|data lake|cdp|customer data|martech|audience|segment|identity|iam|sso|scim|developer platform|integration|catalog|billing|usage|monetization|pricing)\b/i;
+const AIPLAT_RE=/\b(\bai\b|genai|gen ai|llm|agentic|\bmcp\b|\bml\b|model|machine learning)\b/i;
+function fitRationale(x){
+  const blob=((x.role||"")+" "+(x.notes||"")+" "+(x.sector||"")).toLowerCase();
+  const titleOk=SENIOR_RE.test(x.role||"");
+  const rt=x.remote==="remote"?{v:"Remote ✓",t:"ok"}:(x.remote==="flex"?{v:"Flex / hybrid",t:"warn"}:{v:"On-site (penalty)",t:"bad"});
+  const risks=[];
+  if(/contract|contractor|temp\b/i.test(x.role||""))risks.push("contract");
+  if(x.remote==="onsite")risks.push("on-site");
+  if(x.conf==="unverified")risks.push("unverified link");
+  else if(x.conf==="boardonly")risks.push("board-only link");
+  return [
+    {l:"Title match",v:titleOk?"Senior band ✓":"Below target band",t:titleOk?"ok":"warn"},
+    {l:"Domain match",v:DOMAIN_RE.test(blob)?"On-target":"Adjacent",t:DOMAIN_RE.test(blob)?"ok":"warn"},
+    {l:"AI / platform",v:AIPLAT_RE.test(blob)?"Strong":"—",t:AIPLAT_RE.test(blob)?"ok":"dim"},
+    {l:"Location",v:rt.v,t:rt.t},
+    {l:"Risk",v:risks.length?risks.join(", "):"none flagged",t:risks.length?"bad":"ok"},
+  ];
+}
 function probColor(v){if(v>=7)return"var(--t9)";if(v>=6)return"var(--t7)";if(v>=4.5)return"var(--t5)";return"var(--t3)";}
 // Infer a row's source from its link when not explicitly stamped (mirrors scout_run.parse_ats).
 function inferSource(link){
@@ -770,7 +1008,7 @@ function reqCardHTML(x,i){
   <div class="req tier${x.tier} ${scls}" id="req-${i}" style="margin-left:8px">
     <div class="reqtop">
       <div>
-        <div class="rtitle"><span class="tierTag ${x.tier}">TIER ${x.tier}</span> ${esc(x.role)} ${flag}</div>
+        <div class="rtitle"><span class="tierTag ${x.tier}">TIER ${x.tier}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
         <div class="meta">
           <span class="pill ${rc}">${rt}</span>
           ${x.location?`<span class="pill">${esc(x.location)}</span>`:""}
@@ -784,9 +1022,10 @@ function reqCardHTML(x,i){
       <div class="scoresrow">
         <div class="twoscore"><span class="n" style="color:${fitColor(x.fit)}">${(+x.fit).toFixed(1)}</span><span class="l">Fit</span></div>
         <div class="twoscore"><span class="n" style="color:${probColor(x.prob)}">${(+x.prob).toFixed(1)}</span><span class="l">Interview</span></div>
-        <div class="twoscore"><span class="n" style="color:var(--gold)">${expected(x)}</span><span class="l">Exp. val</span></div>
+        <div class="twoscore"><span class="n" style="color:var(--accent)">${expected(x)}</span><span class="l">Exp. val</span></div>
       </div>
     </div>
+    <div class="fitrat">${fitRationale(x).map(r=>`<div class="fr ${r.t}"><span class="frl">${r.l}</span><span class="frv">${esc(r.v)}</span></div>`).join("")}</div>
     <div class="crm">
       <div class="cell"><label>Status</label>
         <select class="status-sel" style="color:${STATUS_COLOR[x.status]||'var(--text)'}" onchange="upd(${i},'status',this.value)">
@@ -806,6 +1045,7 @@ function reqCardHTML(x,i){
     <div class="rowacts">
       ${x.link?`<a class="applylink" href="${x.link}" target="_blank" rel="noopener"><span class="mini link">Open ↗</span></a>`:""}
       <button class="mini" onclick="editRow(${i})">Edit details</button>
+      ${x.link?`<button class="mini" onclick="enrichRow(${i})" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
       <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
@@ -816,20 +1056,16 @@ function reqCardHTML(x,i){
 function compactRowHTML(x, reason, showArchive){
   const i=x._i;
   const scls=SCLS[x.status]||"";
-  const badge=(x.status&&x.status!=="Not Applied")?`<span class="tabadge ${BADGECLS[x.status]||''}">${esc(x.status)}</span>`:'<span class="tabadge none">Not applied</span>';
+  const badge=(x.status&&x.status!=="Not Applied")?`<span class="stpill ${BADGECLS[x.status]||''}">${esc(x.status)}</span>`:'<span class="stpill none">Not applied</span>';
   const sel=selected.has(i)?"sel":"";
   const open=expanded.has(i)?"open":"";
   const reasonHtml=reason?`<span class="crow-reason">${esc(reason)}</span>`:'';
   const archiveHtml=showArchive?`<button class="mini danger" onclick="event.stopPropagation();archiveRow(${i})" title="Set status to Archived (snapshots first)">Archive</button>`:'';
-  return `<div class="crow tier${x.tier} ${scls} ${sel} ${open}" data-i="${i}" onclick="toggleCard(${i})">
+  return `<div class="crow tier${x.tier} ${scls} ${sel} ${open}" data-i="${i}" onclick="rowClick(event,${i})">
     <input type="checkbox" class="crow-chk" ${selected.has(i)?"checked":""} onclick="event.stopPropagation();toggleSel(${i},this.checked)" title="Select for Open-in-tabs">
-    <span class="crow-ev">${x._ev.toFixed(1)}</span>
-    <span class="crow-co">${esc(x.company)}</span>
-    <span class="crow-role">${esc(x.role||'')} <span class="crow-src">· ${esc(rowSource(x))}</span></span>
-    ${applyModeBadge(x)}
-    ${reasonHtml}
-    ${badge}
-    ${archiveHtml}
+    <span class="crow-ev" title="Expected value = fit × probability · ${bandLabel(x._ev)}">${x._ev.toFixed(1)}</span>
+    <span class="crow-main"><span class="crow-co">${esc(x.company)}</span><span class="crow-role">${esc(x.role||'')}</span></span>
+    <span class="crow-tail"><span class="crow-src">${esc(rowSource(x))}</span>${applyModeBadge(x)}${reasonHtml}${badge}${archiveHtml}</span>
     <span class="crow-caret">▾</span>
   </div>`;
 }
@@ -863,35 +1099,56 @@ function render(){
   const tabCounts={}; TAB_DEFS.forEach(d=>tabCounts[d.key]=0);
   base.forEach(x=>{tabCounts[tabKeyForStatus(x.status)]++;});
   tabCounts.analytics=base.length;   // analytics isn't a status bucket
+  tabCounts.today=base.filter(needsVerify).length+base.filter(followUpDue).length+base.filter(closedReq).length; // action items needing attention
   F("lifecycleTabs").innerHTML=TAB_DEFS.map(d=>`<div class="tab ${d.key===activeTab?'active':''}" onclick="setTab('${d.key}')"><span>${d.label}</span><span class="tcnt">${tabCounts[d.key]}</span></div>`).join("");
   // hygiene lane bar (counts over the global-filtered base); a lane overrides the tab view
   const analytics=activeTab==="analytics";
-  const laneActive=!analytics&&activeLane!=="all";
-  F("laneBar").style.display=analytics?"none":"";
+  const today=activeTab==="today";
+  const laneActive=!analytics&&!today&&activeLane!=="all";
+  const recentActive=!analytics&&!today&&!laneActive&&recentOnly;
+  F("laneBar").style.display=(analytics||today)?"none":"";
   F("laneBar").innerHTML=`<span class="llbl">Lanes</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
     LANE_DEFS.map(d=>`<div class="lane ${activeLane===d.key?'active':''}" onclick="setLane('${d.key}')"><span>${d.label}</span><span class="lcnt">${base.filter(d.pred).length}</span></div>`).join("");
   F("applyNextWrap").style.display=(activeTab==="open"&&!laneActive&&!analytics)?"":"none";
+  // active-filter count badge on the Filters button
+  const fc=(sf?1:0)+(tf?1:0)+(srcf?1:0)+(amf?1:0)+(remoteOnly?1:0)+(activeOnly?1:0)+(notAppliedOnly?1:0)+((activeTab==="open"&&applyNextOnly)?1:0);
+  const fcEl=F("filtersCount"); fcEl.textContent=fc; fcEl.classList.toggle("on",fc>0);
+  // context-aware primary action: Run Scout leads on discovery tabs, +Add elsewhere (#20)
+  const scoutPrimary=(activeTab==="open"||activeTab==="today")&&!analytics;
+  F("scoutBtn").classList.toggle("ghost",!scoutPrimary);
+  F("addBtn").classList.toggle("ghost",scoutPrimary);
 
   // rows for the active tab; Open defaults to the apply-next queue. A hygiene lane (across the
   // whole filtered base) takes precedence over the lifecycle tab.
   const tabBase=base.filter(x=>tabKeyForStatus(x.status)===activeTab);
-  let list=laneActive?base.filter(laneDef(activeLane).pred):((activeTab==="open"&&applyNextOnly)?tabBase.filter(isApplyNext):tabBase);
+  let list=laneActive?base.filter(laneDef(activeLane).pred)
+    :recentActive?base.filter(x=>x.status==="Not Applied"&&(x.added||"")>=recentCut())
+    :((activeTab==="open"&&applyNextOnly)?tabBase.filter(isApplyNext):tabBase);
 
-  // stats (always full-set, unaffected by filters)
+  // KPIs (always full-set, unaffected by filters) — split: primary operating · secondary health
   const total=rows.length;
+  const openCount=rows.filter(x=>tabKeyForStatus(x.status)==="open").length;
   const applied=rows.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
-  const active=rows.filter(x=>ACTIVE.has(x.status)).length;
-  const interviews=rows.filter(x=>["Recruiter Screen","Hiring Manager","Panel","Offer"].includes(x.status)).length;
+  const followups=rows.filter(followUpDue).length;
+  const inInterview=rows.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)).length;
+  const offers=rows.filter(x=>x.status==="Offer").length;
   const tierA=rows.filter(x=>x.tier==="A").length;
   const rejected=rows.filter(x=>x.status==="Rejected").length;
   const rejRate=applied?Math.round(rejected/applied*1000)/10:0;
-  document.getElementById("stats").innerHTML=`
-    <div class="stat"><div class="k">Requisitions</div><div class="v">${total}</div></div>
-    <div class="stat"><div class="k">Applied</div><div class="v gold">${applied}</div></div>
-    <div class="stat"><div class="k">Active pipeline</div><div class="v teal">${active}</div></div>
-    <div class="stat"><div class="k">In interviews</div><div class="v violet">${interviews}</div></div>
-    <div class="stat"><div class="k">Rejected</div><div class="v coral">${rejected} <small>${rejRate}%</small></div></div>
-    <div class="stat"><div class="k">Tier A</div><div class="v">${tierA}</div></div>`;
+  const am=anMetrics(rows);
+  const kpi=(k,v,cls="",extra="")=>`<div class="kpi ${cls}"><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
+  document.getElementById("stats").innerHTML=
+    kpi("Open",openCount,"accent")+
+    kpi("Applied",applied,"positive")+
+    kpi("Follow-up due",followups,followups?"warning":"")+
+    kpi("Interviews",inInterview,"active")+
+    kpi("Offers",offers,offers?"active":"")+
+    `<div class="kpi-div"></div>`+
+    kpi("Total roles",total,"sec")+
+    kpi("Rejected",rejected,"sec",`<small>${rejRate}%</small>`)+
+    kpi("Tier A",tierA,"sec")+
+    kpi("Response rate",am.responseRate+"%","sec")+
+    kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");
 
   const cmp=(a,b)=>{
     if(sortKey==="company")return (a.company||"").localeCompare(b.company||"");
@@ -908,6 +1165,11 @@ function render(){
 
   const board=document.getElementById("board");
   let html="";
+  if(today){
+    board.innerHTML=renderToday();
+    renderSelbar();
+    return;
+  }
   if(analytics){
     // conversion & source-ROI analytics — computed client-side from the (non-status-filtered) base
     board.innerHTML=renderAnalytics({qy,srcf,tf,amf,remoteOnly});
@@ -925,27 +1187,39 @@ function render(){
     if(!items.length)html+=`<div class="flat-empty">Nothing in this lane. 🎉</div>`;
     else items.forEach(x=>{ html+=compactRowHTML(x,def.reason(x),showArchive); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
     html+=`</div>`;
-  } else if(activeTab==="open"){
-    // Open tab keeps the tier accordion; "of N" is relative to all Open rows pre-apply-next
+  } else if(recentActive){
+    // "New since last run" — flat list of not-applied roles added on/after the cutoff
+    const items=[...list].sort(cmp);
+    const lbl=recentCutoff?`the last scout run (${recentCutoff})`:`the last 3 days`;
+    html+=`<div class="recent-head"><span class="rh-title">New since last run</span><span class="rh-desc">Not-applied roles added since ${lbl}.</span><button class="btn ghost" onclick="setTab('open')">Clear</button></div><div class="flatlist">`;
+    if(!items.length)html+=`<div class="flat-empty">Nothing new since the last run.</div>`;
+    else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
+    html+=`</div>`;
+  } else if(activeTab==="open"||activeTab==="applied"){
+    // Open + Applied keep the tier accordion so tier counts stay visible.
+    // Open: "of N" is relative to all Open rows pre-apply-next. Applied: list===tabBase.
     const tiers={A:[],B:[],C:[]};
     list.forEach(x=>{(tiers[x.tier]||tiers.C).push(x);});
     const totals={A:0,B:0,C:0}; tabBase.forEach(x=>{totals[x.tier]=(totals[x.tier]||0)+1;});
     ["A","B","C"].forEach(t=>tiers[t].sort(cmp));
     const filterActive=!!(qy||sf||tf||srcf||remoteOnly||activeOnly||notAppliedOnly||applyNextOnly);
+    const applied=activeTab==="applied";
     ["A","B","C"].forEach(t=>{
       const items=tiers[t];
       const isC = filterActive ? items.length===0 : !tierOpen[t];
       const ofN = items.length!==totals[t] ? `<span class="of"> of ${totals[t]}</span>` : "";
+      const tsum = applied ? `${items.length} applied` : (t==='A'?'apply now':(t==='B'?'strong':'monitor'));
       html+=`<div class="tier-sec tier${t} ${isC?'collapsed':''}">
         <div class="tier-head" onclick="toggleTier('${t}')">
           <span class="caret">▼</span>
           <span class="tdot ${t}"></span>
           <span class="tname">Tier ${t}</span>
           <span class="tcount">(${items.length}${ofN})</span>
-          <span class="tsum">${t==='A'?'apply now':(t==='B'?'strong':'monitor')}</span>
+          <span class="tsum">${tsum}</span>
+          ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible Tier ${t} row(s)">Select all</button>`:""}
         </div>
         <div class="tier-body">`;
-      if(!items.length) html+=`<div class="tier-empty">No matching Tier ${t} requisitions.</div>`;
+      if(!items.length) html+=`<div class="tier-empty">${applied?`No Tier ${t} applications yet.`:`No matching Tier ${t} requisitions.`}</div>`;
       else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
       html+=`</div></div>`;
     });
@@ -960,8 +1234,91 @@ function render(){
   board.innerHTML=html;
   renderSelbar();
 }
-window.setTab=function(k){activeTab=k;render();};
+window.setTab=function(k){activeTab=k;recentOnly=false;if(k==="today")loadScoutSummary();render();};
 window.setLane=function(k){activeLane=k;render();};
+// ---------- Today / command center ----------
+const dateNDaysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+function recentCut(){return recentCutoff||(scoutLast&&scoutLast.when?scoutLast.when.slice(0,10):dateNDaysAgo(3));}
+function fmtWhen(iso){try{const d=new Date(iso),diff=(Date.now()-d.getTime())/3600000;
+  if(diff>=0&&diff<24){const h=Math.floor(diff),m=Math.floor((diff-h)*60);return h>0?`${h}h ${m}m ago`:`${m}m ago`;}
+  return d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return String(iso);}}
+// Fetch + summarize the last scout run from /api/scout/status + /api/source-health (read-only).
+async function loadScoutSummary(){
+  try{
+    const st=await (await fetch("/api/scout/status",{cache:"no-store"})).json();
+    let postings=null,errors=0,matches=0;
+    try{const h=await (await fetch("/api/source-health",{cache:"no-store"})).json();
+      const srcs=(h.health&&h.health.sources)||{}; const keys=Object.keys(srcs);
+      if(keys.length){postings=0;keys.forEach(k=>{const s=srcs[k]||{};postings+=s.postings||0;errors+=s.errors||0;matches+=s.matches||0;});}
+    }catch(e){}
+    const last=st.last||{},find=last.find||{},val=last.validate||{};
+    scoutLast={running:!!st.running,when:last.finishedAt||last.startedAt||null,
+      added:find.added!=null?find.added:0,newMatches:find.newMatches!=null?find.newMatches:matches,
+      updated:val.refreshed||0,errors,postings,dry:!!last.dry};
+  }catch(e){}
+  if(activeTab==="today"&&rows.length)render();
+}
+function scoutRunStripHTML(){
+  const s=scoutLast;
+  if(s&&s.running)return `<div class="scoutrun"><span class="sr-lbl">Scout</span><span class="sr-when">running…</span></div>`;
+  if(!s||!s.when)return `<div class="scoutrun"><span class="sr-lbl">Last scout run</span><span class="sr-when">never</span><span class="sr-stat">Run Scout to pull fresh roles.</span><button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
+  return `<div class="scoutrun"><span class="sr-lbl">Last scout run</span><span class="sr-when">${fmtWhen(s.when)}</span>`+
+    `<span class="sr-stat">${s.postings!=null?`<b>${s.postings}</b> scanned · `:""}<b>${s.newMatches||0}</b> matches · <b>+${s.added||0}</b> added · <b>~${s.updated||0}</b> updated</span>`+
+    `<span class="sr-stat ${s.errors?'sr-err':''}"><b>${s.errors||0}</b> error${s.errors===1?'':'s'}</span>`+
+    `${s.dry?`<span class="sr-stat">· dry-run</span>`:""}`+
+    `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
+}
+function renderToday(){
+  const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)}));
+  const cut=recentCut(), anchored=!!(scoutLast&&scoutLast.when);
+  const newSince=all.filter(x=>x.status==="Not Applied"&&(x.added||"")>=cut);
+  const tierAOpen=all.filter(x=>x.tier==="A"&&x.status==="Not Applied");
+  const verify=all.filter(needsVerify);
+  const applyNext=all.filter(isApplyNext);
+  const followup=all.filter(followUpDue);
+  const closed=all.filter(closedReq);
+  const interview=all.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status));
+  const offers=all.filter(x=>x.status==="Offer");
+  const card=(n,title,desc,cls,action)=>{
+    const empty=n===0;
+    return `<button class="today-card ${cls} ${empty?'empty':''}" ${empty?'disabled':`onclick="${action}"`}>`+
+      `<span class="tc-n">${n}</span><span class="tc-meta"><span class="tc-t">${title}</span><span class="tc-d">${desc}</span></span></button>`;
+  };
+  const actionTotal=newSince.length+verify.length+applyNext.length+tierAOpen.length+followup.length+closed.length;
+  const queue=actionTotal===0
+    ? `<div class="today-clear">✓ You're all caught up — nothing needs action right now. Run Scout to pull fresh matches.</div>`
+    : `<div class="today-grid">
+        ${card(newSince.length,"New since last run",anchored?"Added since the last scout run, not yet applied":"Added in the last 3 days, not yet applied","accent","todoGo('review')")}
+        ${card(verify.length,"Needs verification","Unverified links — confirm the live posting first","warning","todoGo('verify')")}
+        ${card(applyNext.length,"Apply next","Tier A/B · verified · still open · not applied","accent","todoGo('applynext')")}
+        ${card(tierAOpen.length,"Tier A · not applied","Top-tier roles you haven't applied to yet","accent","todoGo('tierA')")}
+        ${card(followup.length,"Follow-up due","Active applications gone quiet past your threshold","danger","todoGo('followup')")}
+        ${card(closed.length,"Recently closed","Postings detected closed — review and archive","muted","todoGo('closed')")}
+      </div>`;
+  const pipeline=(interview.length||offers.length)
+    ? `<div class="today-grid">${card(interview.length,"In interviews","Active interview-stage conversations","active","setTab('interviewing')")}${offers.length?card(offers.length,"Offers","Open offers — see the Interviewing tab","active","setTab('interviewing')"):""}</div>`
+    : "";
+  return `<div class="today-wrap">
+    ${scoutRunStripHTML()}
+    <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
+    ${queue}
+    ${pipeline}
+    <div class="today-foot">${rows.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
+  </div>`;
+}
+window.todoGo=function(view){
+  activeLane="all"; recentOnly=false;
+  // clean slate so each Today card gives a predictable, isolated view
+  F("search").value=""; F("statusFilter").value=""; F("tierFilter").value=""; F("sourceFilter").value=""; F("applyModeFilter").value="";
+  F("remoteOnly").checked=false; F("activeOnly").checked=false; F("notAppliedOnly").checked=false; F("applyNextOnly").checked=false;
+  if(view==="applynext"){activeTab="open";F("applyNextOnly").checked=true;}
+  else if(view==="verify"){activeTab="open";activeLane="verify";}
+  else if(view==="followup"){activeTab="open";activeLane="followup";}
+  else if(view==="closed"){activeTab="open";activeLane="closed";}
+  else if(view==="tierA"){activeTab="open";F("tierFilter").value="A";F("statusFilter").value="Not Applied";}
+  else if(view==="review"){activeTab="open";recentOnly=true;recentCutoff=(scoutLast&&scoutLast.when)?scoutLast.when.slice(0,10):"";}
+  render();
+};
 // ---------- analytics (Phase 8) ----------
 const STAGE_RANK={"Not Applied":0,"Applied":1,"Recruiter Screen":2,"Hiring Manager":3,"Panel":4,"Offer":5};
 const ACTIVE_STAGES=["Applied","Recruiter Screen","Hiring Manager","Panel","Offer"];
@@ -983,9 +1340,46 @@ function anMetrics(rs){
 }
 function anBreakdown(rs,keyFn,label){
   const g={}; rs.forEach(x=>{const k=keyFn(x)||"—";(g[k]=g[k]||[]).push(x);});
-  const out=Object.keys(g).map(k=>{const mm=anMetrics(g[k]);return {k,n:mm.total,applied:mm.applied,resp:mm.recruiter,offer:mm.offer,rr:mm.responseRate};}).sort((a,b)=>b.n-a.n);
-  return `<div class="an-card"><h3>${label}</h3><table class="an-table"><tr><th>${label}</th><th>Roles</th><th>Applied</th><th>Responses</th><th>Offers</th><th>Resp&nbsp;%</th></tr>`+
-    out.map(r=>`<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${r.applied}</td><td>${r.resp}</td><td>${r.offer}</td><td>${r.rr}%</td></tr>`).join("")+`</table></div>`;
+  const out=Object.keys(g).map(k=>{const mm=anMetrics(g[k]);return {k,n:mm.total,applied:mm.applied,resp:mm.recruiter,rej:mm.rejected,offer:mm.offer,rr:mm.responseRate,rjr:mm.rejectRate};}).sort((a,b)=>b.n-a.n);
+  return `<div class="an-card"><h3>${label}</h3><table class="an-table"><tr><th>${label}</th><th>Roles</th><th>App</th><th>Resp</th><th>Rej</th><th>Off</th><th>Resp&nbsp;%</th><th>Rej&nbsp;%</th></tr>`+
+    out.map(r=>`<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${r.applied}</td><td>${r.resp}</td><td class="${r.rej?'rejcell':''}">${r.rej}</td><td>${r.offer}</td><td>${r.rr}%</td><td class="${r.rjr?'rejcell':''}">${r.rjr}%</td></tr>`).join("")+`</table></div>`;
+}
+// Auto-generated decision-support insights for the Analytics tab (#12).
+function buildInsights(rs,m){
+  const out=[];
+  const bySource={}; rs.forEach(x=>{const s=rowSource(x);(bySource[s]=bySource[s]||[]).push(x);});
+  const srcStats=Object.entries(bySource).map(([s,arr])=>({s,m:anMetrics(arr),n:arr.length,tierA:arr.filter(x=>x.tier==="A").length}));
+  if(m.recruiter>0){
+    const ranked=srcStats.filter(o=>o.m.applied>=3).sort((a,b)=>b.m.responseRate-a.m.responseRate);
+    if(ranked.length)out.push({tone:"good",html:`Best source by response rate: <b>${esc(ranked[0].s)}</b> at ${ranked[0].m.responseRate}% (${ranked[0].m.recruiter}/${ranked[0].m.applied} applications).`});
+    const dead=srcStats.filter(o=>o.m.applied>=5&&o.m.recruiter===0).sort((a,b)=>b.m.applied-a.m.applied);
+    if(dead.length)out.push({tone:"warn",html:`<b>${esc(dead[0].s)}</b> has produced 0 responses from ${dead[0].m.applied} applications — consider deprioritizing it.`});
+  }else if(m.applied>0){
+    out.push({tone:"warn",html:`No responses yet across <b>${m.applied}</b> applications. Once responses arrive, this view ranks sources by quality and response rate.`});
+  }else{
+    out.push({tone:"",html:`No applications logged yet in this window. Apply to a few roles (or mark some Applied) and source-ROI, funnel, and response-rate analytics will populate here.`});
+  }
+  // gated vs fillable mix among applications
+  const gatedApplied=rs.filter(x=>m&&applyModeOf(x)==="gated"&&x.status!=="Not Applied").length;
+  if(gatedApplied>0)out.push({tone:"",html:`${gatedApplied} of your applications went through <b>gated</b> (login-walled) ATSs — fillable sources are faster to apply through if quality is comparable.`});
+  // Tier A engagement
+  const tierA=rs.filter(x=>x.tier==="A");
+  const tierAApplied=tierA.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
+  const tierAResp=tierA.filter(x=>STAGE_RANK[x.status]>=2).length;
+  if(tierA.length)out.push({tone:tierAResp?"good":"",html:`Tier A: ${tierAApplied} of ${tierA.length} applied, ${tierAResp} response${tierAResp===1?"":"s"} so far.`});
+  // stale active applications
+  const stale=rs.filter(x=>["Applied","Recruiter Screen","Hiring Manager","Panel"].includes(x.status)&&(()=>{const d=daysSince(x.lastcontact||x.applied);return d!=null&&d>=14;})()).length;
+  if(stale>0)out.push({tone:"warn",html:`<b>${stale}</b> active application${stale===1?" is":"s are"} aging 14+ days without contact — consider a follow-up.`});
+  // rejection summary + top-rejecting source
+  if(m.rejected>0){
+    out.push({tone:"bad",html:`<b>${m.rejected}</b> rejection${m.rejected===1?'':'s'} so far — ${m.rejectRate}% of applications.`});
+    const rej=srcStats.filter(o=>o.m.rejected>=2).sort((a,b)=>b.m.rejectRate-a.m.rejectRate);
+    if(rej.length)out.push({tone:"bad",html:`Highest rejection rate: <b>${esc(rej[0].s)}</b> at ${rej[0].m.rejectRate}% (${rej[0].m.rejected}/${rej[0].m.applied}).`});
+  }
+  // verification debt
+  const verify=rs.filter(needsVerify).length;
+  if(verify>0)out.push({tone:"warn",html:`<b>${verify}</b> role${verify===1?"":"s"} still need link verification before applying.`});
+  return out;
 }
 function renderAnalytics(f){
   let rs=rows.slice();
@@ -1000,19 +1394,35 @@ function renderAnalytics(f){
   const kpi=(k,v)=>`<div class="an-kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   const kpis=`<div class="an-kpis">`+
     kpi("Roles",m.total)+kpi("Applied",m.applied)+kpi("Responses",m.recruiter)+
-    kpi("Response rate",m.responseRate+"%")+kpi("Offers",m.offer)+kpi("Reject rate",m.rejectRate+"%")+
+    kpi("Response rate",m.responseRate+"%")+kpi("Offers",m.offer)+kpi("Rejected",m.rejected)+kpi("Reject rate",m.rejectRate+"%")+
     kpi("Avg days→contact",m.ttr!=null?m.ttr+`<span style="font-size:.6rem;color:var(--dim)"> (n=${m.ttrN})</span>`:"—")+`</div>`;
   const fb=Math.max(m.applied,1);
-  const stage=(lbl,n)=>`<div class="an-frow"><span class="lbl">${lbl}</span><span class="bar" style="width:${Math.round(n/fb*100)}%"></span><span class="num">${n} · ${Math.round(n/fb*1000)/10}%</span></div>`;
+  const stage=(lbl,n)=>`<div class="an-frow"><span class="lbl">${lbl}</span><span class="bar ${n?'':'zero'}" style="width:${n?Math.max(Math.round(n/fb*100),2):2}%"></span><span class="num">${n} · ${Math.round(n/fb*1000)/10}%</span></div>`;
+  const ins=buildInsights(rs,m);
+  const insights=`<div class="an-insights"><h3>Insights</h3>`+
+    (ins.length?ins.map(i=>`<div class="an-ins ${i.tone}"><span class="idot"></span><span>${i.html}</span></div>`).join("")
+              :`<div class="an-empty">Not enough data yet for insights.</div>`)+`</div>`;
   const funnel=`<div class="an-card"><h3>Conversion funnel</h3><div class="an-funnel">`+
     stage("Applied",m.applied)+stage("Recruiter screen",m.recruiter)+stage("Hiring manager",m.hm)+
     stage("Panel",m.panel)+stage("Offer",m.offer)+`</div>`+
     `<p class="an-note" style="margin-top:10px">Rejected: ${m.rejected} · Not applied: ${m.notApplied} · Archived: ${m.archived}. Window: ${win}. ` +
     `Stages use each row's <em>current</em> status — rejected-after-interview rows count as Applied but not in later stages, so interview stages are a floor.</p></div>`;
+  // Application outcomes — mutually-exclusive current status of everything applied; surfaces rejection as a real slice
+  const oc={
+    awaiting: rs.filter(x=>x.status==="Applied").length,
+    interview: rs.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)).length,
+    offer: rs.filter(x=>x.status==="Offer").length,
+    rejected: rs.filter(x=>x.status==="Rejected").length
+  };
+  const ocTotal=Math.max(oc.awaiting+oc.interview+oc.offer+oc.rejected,1);
+  const obar=(lbl,n,cls)=>`<div class="an-frow"><span class="lbl">${lbl}</span><span class="bar ${n?cls:'zero'}" style="width:${n?Math.max(Math.round(n/ocTotal*100),2):2}%"></span><span class="num">${n} · ${Math.round(n/ocTotal*1000)/10}%</span></div>`;
+  const outcomes=`<div class="an-card"><h3>Application outcomes</h3><div class="an-funnel">`+
+    obar("Awaiting reply",oc.awaiting,"neu")+obar("In interview",oc.interview,"act")+obar("Offer",oc.offer,"ok")+obar("Rejected",oc.rejected,"rej")+`</div>`+
+    `<p class="an-note" style="margin-top:10px">Current status of your ${ocTotal} application${ocTotal===1?'':'s'} (mutually exclusive). Reject rate: <b style="color:var(--coral)">${m.rejectRate}%</b> of applied · response rate ${m.responseRate}%. Window: ${win}.</p></div>`;
   const breakdowns=`<div class="an-grid2">`+
     anBreakdown(rs,x=>rowSource(x),"Source / ATS")+anBreakdown(rs,x=>x.sector,"Sector")+
     anBreakdown(rs,x=>"Tier "+(x.tier||"?"),"Tier")+anBreakdown(rs,x=>applyModeOf(x),"Apply mode")+`</div>`;
-  return `<div class="an-wrap"><div class="an-bartop"><b style="color:var(--text)">Conversion &amp; source-ROI</b> · ${win} · adjust the window in ⚙ Settings; search/tier/source/apply-mode filters above still apply.</div>${kpis}${funnel}${breakdowns}</div>`;
+  return `<div class="an-wrap"><div class="an-bartop"><b style="color:var(--text)">Conversion &amp; source-ROI</b> · ${win} · adjust the window in ⚙ Settings; search/tier/source/apply-mode filters above still apply.</div>${insights}${kpis}<div class="an-grid2">${funnel}${outcomes}</div>${breakdowns}</div>`;
 }
 function applyHygiene(h){ if(h&&typeof h==="object")HYGIENE={...HYGIENE_DEFAULT,...h}; if(rows.length)render(); }
 async function archiveRow(i){
@@ -1036,6 +1446,35 @@ window.archiveRow=archiveRow; window.archiveAllClosed=archiveAllClosed;
 window.toggleTier=function(t){tierOpen[t]=!tierOpen[t];render();};
 window.toggleCard=function(i){if(expanded.has(i))expanded.delete(i);else expanded.add(i);render();};
 
+// Row click: plain = expand; ⌘/Ctrl = toggle-select; Shift = range-select (over the visible order).
+let lastSelAnchor=null;
+const tierOf=x=>(["A","B","C"].includes(x&&x.tier)?x.tier:"C");
+window.rowClick=function(e,i){
+  if(e.shiftKey){
+    e.preventDefault();
+    const order=visibleIdx, b=order.indexOf(i), a=order.indexOf(lastSelAnchor);
+    if(a>=0&&b>=0){const lo=Math.min(a,b),hi=Math.max(a,b);for(let k=lo;k<=hi;k++)selected.add(order[k]);}
+    else selected.add(i);
+    lastSelAnchor=i;
+    try{window.getSelection().removeAllRanges();}catch(_){}
+    document.getElementById("selStatus").textContent=""; render();
+    return;
+  }
+  if(e.metaKey||e.ctrlKey){
+    if(selected.has(i))selected.delete(i);else selected.add(i);
+    lastSelAnchor=i;
+    document.getElementById("selStatus").textContent=""; render();
+    return;
+  }
+  toggleCard(i);
+};
+// Select every currently-visible row in one tier (respects active filters/apply-next).
+window.selectTier=function(t){
+  visibleIdx.forEach(i=>{const x=rows[i];if(x&&tierOf(x)===t)selected.add(i);});
+  if(selected.size)lastSelAnchor=[...selected].pop();
+  document.getElementById("selStatus").textContent=""; render();
+};
+
 // ---------- selection + open-in-tabs ----------
 function renderSelbar(){
   const n=selected.size;
@@ -1045,6 +1484,7 @@ function renderSelbar(){
 }
 window.toggleSel=function(i,checked){
   if(checked)selected.add(i);else selected.delete(i);
+  lastSelAnchor=i;
   const row=document.querySelector('.crow[data-i="'+i+'"]');
   if(row)row.classList.toggle("sel",checked);
   document.getElementById("selStatus").textContent="";
@@ -1104,6 +1544,27 @@ window.markSelectedApplied=function(){
   st.classList.remove("warn");
 };
 
+// Bulk archive — snapshots first, sets selected rows to Archived (non-destructive).
+window.archiveSelected=async function(){
+  const st=document.getElementById("selStatus");
+  const ids=[...selected].filter(i=>rows[i]&&rows[i].status!=="Archived");
+  if(!ids.length){st.textContent="Nothing to archive (selection already archived or empty).";st.classList.add("warn");return;}
+  if(!confirm(`Archive ${ids.length} selected role${ids.length>1?"s":""}?\n\nYour data is snapshotted first; statuses set to Archived (not deleted).`))return;
+  await fetch("/api/backup",{method:"POST"}).catch(()=>{});
+  ids.forEach(i=>{rows[i].status="Archived";});
+  selected.clear(); persistNow(); render();
+  st.textContent=`Archived ${ids.length}.`; st.classList.remove("warn");
+};
+// Bulk export — CSV of just the selected rows.
+window.exportSelected=function(){
+  const ids=[...selected]; const st=document.getElementById("selStatus");
+  if(!ids.length){st.textContent="Nothing selected.";st.classList.add("warn");return;}
+  const cols=["company","sector","role","salary","location","remote","fit","prob","expectedVal","tier","conf","status","applied","interview","recruiter","referral","resume","cover","followup","lastcontact","next","added","link","notes"];
+  const lines=[cols.join(",")];
+  ids.forEach(i=>{const x=rows[i];if(!x)return;const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-selected.csv";a.click();
+  st.textContent=`Exported ${ids.length} row(s).`; st.classList.remove("warn");
+};
 window.upd=function(i,field,val){rows[i][field]=val;persist();if(field==='status')render();};
 
 let editingIndex=-1;
@@ -1130,6 +1591,8 @@ F("expandAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=true;render();};
 F("collapseAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=false;render();};
 F("openTabsBtn").onclick=openSelectedTabs;
 F("markAppliedBtn").onclick=markSelectedApplied;
+F("archiveSelBtn").onclick=archiveSelected;
+F("exportSelBtn").onclick=exportSelected;
 F("selectAllBtn").onclick=selectAllVisible;
 F("clearSelBtn").onclick=clearSel;
 
@@ -1163,6 +1626,7 @@ function startScoutPoll(){
       clearInterval(scoutPoll);scoutPoll=null;scoutBusy(false);
       if(last.state==="error")setScoutStatus("⚠ scout error: "+(last.error||"see server log"),false);
       else{setScoutStatus("✓ "+scoutSummary(last),false);load();}   // refresh board with new/updated rows
+      loadScoutSummary();   // refresh the Today "last scout run" strip
     }
   },2500);
 }
@@ -1257,6 +1721,25 @@ function fillSettings(j){
   SET("applyModeMapBox").innerHTML=Object.keys(amm).filter(k=>k!=="").sort().map(src=>
     `<div class="amrow"><span>${src}</span><select data-amsrc="${src}">${modes.map(o=>`<option ${o===amm[src]?'selected':''}>${o}</option>`).join("")}</select></div>`).join("");
   applyApplyModeMap(amm);
+  buildConnStatus(j);
+  const au=j.auth||{};
+  SET("appTokState").textContent=au.appTokenSet?"Set":"Not set — remote API is OPEN";
+  SET("appTokState").className="tokstate"+(au.appTokenSet?" on":"");
+  SET("ingestTokState").textContent=au.ingestTokenSet?("Set ••••"+(au.ingestTokenLast4||"")):"Not set";
+  SET("ingestTokState").className="tokstate"+(au.ingestTokenSet?" on":"");
+}
+// Advanced → connection status indicators (#16). Derives state from the settings payload.
+function buildConnStatus(j){
+  const box=SET("connStatus"); if(!box)return;
+  const srcCfg=(name)=>{const s=(j.sources||[]).find(x=>x.name===name);return s?!!s.configured:false;};
+  const rows=[
+    {name:"OpenAI",on:!!(j.llm&&j.llm.keySet),on_t:"Connected",off_t:"Not configured"},
+    {name:"SMTP (email)",on:!!(j.digest&&j.digest.smtpSet),on_t:"Connected",off_t:"Not configured"},
+    {name:"Slack webhook",on:!!(j.digest&&j.digest.webhookSet),on_t:"Connected",off_t:"Not configured"},
+    {name:"TheirStack",on:srcCfg("theirstack"),on_t:"Connected",off_t:"Not configured"},
+    {name:"Apify (Fantastic.jobs)",on:srcCfg("fantastic"),on_t:"Connected",off_t:"Not configured"},
+  ];
+  box.innerHTML=rows.map(r=>`<div class="connrow ${r.on?'on':''}"><span class="cdot"></span><span class="cname">${r.name}</span><span class="cval">${r.on?r.on_t:r.off_t}</span></div>`).join("");
 }
 function applyTabMap(tm){
   if(tm&&typeof tm==="object"){TAB_MAP={...TAB_MAP_DEFAULT,...tm};}
@@ -1412,7 +1895,25 @@ SET("clearApifyBtn").onclick=()=>clearSecret("APIFY_TOKEN","Apify token");
 SET("settingsBtn").onclick=openSettings;
 SET("openSettingsFromMenu").onclick=openSettings;
 SET("settingsCancel").onclick=()=>SET("settingsOverlay").classList.remove("open");
+SET("settingsCancelTop").onclick=()=>SET("settingsOverlay").classList.remove("open");
+SET("regenIngestBtn").onclick=async()=>{
+  if(!confirm("Regenerate the ChatGPT ingest token?\n\nThe current token stops working immediately — you'll need to paste the new value into your ChatGPT Action."))return;
+  const box=SET("ingestTokNew"); box.style.display="block"; box.textContent="Generating…";
+  try{
+    const j=await (await fetch("/api/ingest-token/regenerate",{method:"POST"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    box.innerHTML='New ingest token (copy now — shown once): <code>'+esc(j.token)+'</code>';
+    SET("ingestTokState").textContent="Set ••••"+j.token.slice(-4); SET("ingestTokState").className="tokstate on";
+  }catch(e){box.innerHTML='<span style="color:var(--coral)">Regenerate failed: '+esc(e.message)+'</span>';}
+};
 SET("settingsSave").onclick=saveSettings;
+// settings left-nav section switching
+SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()=>{
+  const k=b.dataset.sect;
+  SET("settingsNav").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll(".sset").forEach(s=>s.hidden=(s.dataset.sect!==k));
+  SET("settingsContent").scrollTop=0;
+});
 SET("settingsOverlay").onclick=e=>{if(e.target.id==="settingsOverlay")SET("settingsOverlay").classList.remove("open");};
 // populate the Run-Scout source checklist + AI footer on load
 fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
@@ -1529,6 +2030,60 @@ SET("backfillApplyModeBtn").onclick=async()=>{
   }catch(e){SET("setMsg").className="setmsg err";SET("setMsg").textContent="Backfill failed: "+e.message;}
 };
 
+// Import roles (JSON) — paste e.g. ChatGPT output; goes through the append-only merge path.
+F("importBtn").onclick=()=>{F("overflowPop").classList.remove("open");F("importJson").value="";F("importMsg").textContent="";F("importMsg").className="setmsg";F("importOverlay").classList.add("open");F("importJson").focus();};
+F("importCancel").onclick=()=>F("importOverlay").classList.remove("open");
+F("importOverlay").onclick=e=>{if(e.target.id==="importOverlay")F("importOverlay").classList.remove("open");};
+F("importRun").onclick=async()=>{
+  const msg=F("importMsg");
+  // forgiving paste: strip ```json … ``` fences and any prose before the first [ or {
+  let raw=F("importJson").value.trim();
+  if(!raw){msg.className="setmsg err";msg.textContent="Paste a JSON array (or {\"roles\":[…]}) first.";return;}
+  raw=raw.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+  const s=raw.search(/[\[{]/); if(s>0)raw=raw.slice(s);
+  let data; try{data=JSON.parse(raw);}catch(e){msg.className="setmsg err";msg.textContent="Invalid JSON: "+e.message;return;}
+  const arr=Array.isArray(data)?data
+    :(data&&Array.isArray(data.roles)?data.roles
+    :(data&&Array.isArray(data.requisitions)?data.requisitions
+    :(data&&(data.company||data.role)?[data]:null)));   // tolerate a single role object
+  if(!arr){msg.className="setmsg err";msg.textContent='Expected a JSON array, or an object like {"roles":[…]}.';return;}
+  msg.className="setmsg";msg.textContent=`Merging ${arr.length} role(s)…`;
+  try{
+    const r=await fetch("/api/reqs/merge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({roles:arr})});
+    const j=await r.json(); if(!j.ok)throw new Error(j.error||("HTTP "+r.status));
+    msg.className="setmsg ok";msg.textContent=`Added ${j.added}, skipped ${j.skipped} (already on board), total ${j.total}.`;
+    await load();
+  }catch(e){msg.className="setmsg err";msg.textContent="Import failed: "+e.message;}
+};
+
+// Enrich a single lead — fetch the posting → real company/role/location/sector (+AI score).
+window.enrichRow=async function(i){
+  const x=rows[i]; if(!x)return;
+  const key=(x.company+"|"+x.role).toLowerCase().trim();
+  setScoutStatus("enriching "+esc(x.company)+"…",true);
+  try{
+    const j=await (await fetch("/api/enrich/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    const r0=(j.results&&j.results[0])||{};
+    await load();
+    if(r0.ok)setScoutStatus("✓ enriched: "+esc(r0.company)+" — "+esc(r0.role)+(r0.scored?" (AI-scored)":""),false);
+    else setScoutStatus("⚠ could not enrich: "+esc(r0.note||"no metadata"),false);
+  }catch(e){setScoutStatus("⚠ enrich failed: "+esc(e.message),false);}
+};
+// Enrich every quick-add lead in the needsEnrichment queue.
+async function enrichAll(){
+  F("overflowPop").classList.remove("open");
+  if(!confirm("Enrich all quick-add leads?\n\nFetches each posting and fills company/role/location/sector (+AI score if enabled). Snapshots first; this can take a moment for many leads."))return;
+  setScoutStatus("enriching leads…",true);
+  try{
+    const j=await (await fetch("/api/enrich/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({all:true})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    await load();
+    setScoutStatus(`✓ enriched ${j.enriched} lead(s)${j.failed?`, ${j.failed} failed (JS-only pages)`:""}`,false);
+  }catch(e){setScoutStatus("⚠ enrich failed: "+esc(e.message),false);}
+}
+F("enrichAllBtn").onclick=enrichAll;
+
 // Reload = re-fetch the authoritative state from the server (discards nothing — edits are already saved).
 F("reloadBtn").onclick=()=>{document.getElementById("board").innerHTML='<div class="loading">▚ reloading…</div>';load();};
 
@@ -1543,8 +2098,20 @@ F("exportBtn").onclick=()=>{
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-crm.csv";a.click();
 };
 
+// About popover (app bar)
+F("aboutBtn").onclick=(e)=>{e.stopPropagation();F("aboutPop").classList.toggle("open");};
+document.addEventListener("click",(e)=>{if(!e.target.closest("#aboutBtn")&&!e.target.closest("#aboutPop"))F("aboutPop").classList.remove("open");});
+
+// Toolbar popovers (Filters + overflow menu) — one open at a time, close on outside click
+function togglePop(popId){const p=F(popId);const wasOpen=p.classList.contains("open");document.querySelectorAll(".pop.open").forEach(x=>x.classList.remove("open"));if(!wasOpen)p.classList.add("open");}
+F("filtersBtn").onclick=(e)=>{e.stopPropagation();togglePop("filtersPop");};
+F("overflowBtn").onclick=(e)=>{e.stopPropagation();togglePop("overflowPop");};
+F("overflowPop").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>F("overflowPop").classList.remove("open")));
+document.addEventListener("click",(e)=>{if(!e.target.closest(".popwrap"))document.querySelectorAll(".pop.open").forEach(x=>x.classList.remove("open"));});
+
 load();
 refreshScoutAi();
+loadScoutSummary();
 </script>
 </body>
 </html>

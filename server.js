@@ -95,6 +95,25 @@ function writeStore(rows) {
   fs.renameSync(tmp, DATA_FILE);
 }
 const reqKey = x => (String(x.company || '') + '|' + String(x.role || '')).toLowerCase().trim();
+// A stable posting id pulled from the link (greenhouse gh_jid / numeric job id, ashby uuid,
+// generic /jobs|listing/<id>, jobId/reqId params). Lets distinct same-title reqs at one company
+// coexist (different ids), while a re-capture of the SAME posting still dedupes.
+function postingId(u) {
+  if (!u) return '';
+  const s = String(u);
+  let m = s.match(/[?&]gh_jid=(\d+)/i) || s.match(/\/listing\/(\d+)/i) || s.match(/\/jobs?\/(\d{4,})/i) || s.match(/[?&](?:jobid|requisitionid|reqid)=([\w-]+)/i);
+  if (m) return m[1].toLowerCase();
+  m = s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);   // ashby/uuid
+  return m ? m[0].toLowerCase() : '';
+}
+// Same posting only if company+role match AND there aren't two provably-different posting ids.
+// Strictly more conservative than reqKey alone — it only SPLITS apart same-title rows that carry
+// different req ids (e.g. 3 "Staff Product Manager" at Dropbox); it never merges more than before.
+function sameReq(a, b) {
+  if (reqKey(a) !== reqKey(b)) return false;
+  const ia = postingId(a.link || a.url), ib = postingId(b.link || b.url);
+  return !(ia && ib && ia !== ib);
+}
 const expectedValue = x => +(((+x.fit || 0) * (+x.prob || 0)) / 10).toFixed(1);
 
 // Tier from fit/prob per agent/scoring-criteria.md (EV = fit*prob/10).
@@ -392,13 +411,12 @@ app.post('/api/reqs/merge', (req, res) => {
   if (!Array.isArray(incoming)) return res.status(400).json({ ok: false, error: 'Expected a JSON array, or an object { "roles": [...] }.' });
   const rows = readStore();
   const boards = readJsonSafe(BOARDS_FILE, {});
-  const existing = new Set(rows.map(reqKey));
   let added = 0, skippedPolicy = 0;
   const addedKeys = [], policyDrops = [];
   for (const x of incoming) {
     const k = reqKey(x);
     if (!k || k === '|') continue;
-    if (!existing.has(k)) {
+    if (!rows.some(r => sameReq(r, x))) {   // req-id aware: distinct same-title postings coexist
       // default any missing tracking fields so merged rows render cleanly
       const row = Object.assign({
         status: 'Not Applied', applied: '', interview: '', recruiter: '', referral: 'No',
@@ -410,7 +428,6 @@ app.post('/api/reqs/merge', (req, res) => {
       if (block) { skippedPolicy++; policyDrops.push({ key: k, reason: block }); continue; }
       if (!row.applyMode) row.applyMode = inferApplyMode(row, boards);   // Phase 4: stamp how to apply
       rows.push(row);
-      existing.add(k);
       added++;
       addedKeys.push(k);
     }
@@ -486,8 +503,7 @@ app.post('/api/reqs/quickadd', (req, res) => {
   };
   row.applyMode = inferApplyMode(row, readJsonSafe(BOARDS_FILE, {}));   // Phase 4
   const rows = readStore();
-  const k = reqKey(row);
-  if (rows.some(r => reqKey(r) === k)) {
+  if (rows.some(r => sameReq(r, row))) {   // req-id aware: same title at one company is only a dup when the posting id matches
     return res.json({ ok: true, added: 0, skipped: 1, duplicate: true, company, role, total: rows.length });
   }
   rows.push(row);
@@ -896,7 +912,7 @@ function parseJsonLdJobs(html) {
   }
   return out;
 }
-function extractJobMeta(html) {
+function extractJobMeta(html, url) {
   const res = { company: '', role: '', location: '', remote: '', jd: '', employmentType: '' };
   const jobs = parseJsonLdJobs(html);
   if (jobs.length) {
@@ -913,17 +929,37 @@ function extractJobMeta(html) {
     else if (loc) { res.location = loc; res.remote = 'onsite'; }
     res.employmentType = (Array.isArray(j.employmentType) ? j.employmentType.join(',') : j.employmentType) || '';
   }
-  if (!res.role || !res.company) {
-    const og = metaContent(html, 'og:title');
-    if (og) {
-      const t = og.replace(/\s*\|\s*[^|]*$/, '').trim();   // strip "| Simplify" etc.
-      const mm = t.match(/^(.*\S)\s*@\s*(\S.*)$/) || t.match(/^(.*\S)\s+at\s+(\S.*)$/i) || t.match(/^(.*\S)\s+[–—-]\s+(\S.*)$/);
-      if (mm) { res.role = res.role || mm[1].trim(); res.company = res.company || mm[2].trim(); }
-      else res.role = res.role || t;
-    }
+  const ogTitle = (metaContent(html, 'og:title') || '').replace(/\s*\|\s*[^|]*$/, '').trim();
+  const titleTag = stripTags(((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]) || '')
+    .replace(/\s*\|\s*[^|]*$/, '').replace(/^job application for\s+/i, '').trim();
+  // COMPANY — the ATS URL slug is authoritative (greenhouse/ashby/lever put the company in the path).
+  // Title fragments like "Staff Product Manager - Enterprise AI" are a TEAM, not the company, so we
+  // never split a "- X" / ", X" tail off as the company. Fallbacks: JSON-LD org, then "… at Company".
+  const urlCompany = companyFromUrl(url);
+  if (urlCompany) res.company = urlCompany;
+  if (!res.company) { const m = titleTag.match(/\s+at\s+(\S.+)$/i); if (m) res.company = m[1].trim(); }
+  // ROLE — keep the full title (og:title on ATS boards is the pure role and may contain "-"/","); only
+  // trim a trailing " at <company>" if present. Never truncate at a dash/comma.
+  if (!res.role) res.role = ogTitle || titleTag.replace(/\s+at\s+\S.+$/i, '').trim();
+  if (res.role && res.company) {
+    res.role = res.role.replace(new RegExp('\\s+at\\s+' + res.company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i'), '').trim();
   }
   if (!res.jd) { const ogd = metaContent(html, 'og:description'); if (ogd) res.jd = ogd.slice(0, 2000); }
+  if (!res.remote && /\bremote\b/i.test(res.jd.slice(0, 400))) res.remote = 'remote';   // detect remote when JSON-LD didn't
   return res;
+}
+// Company from an ATS URL slug — greenhouse/ashby/lever/workable put it in the path; the most
+// reliable source when page metadata lacks a company. Title-cases the slug (twilio -> Twilio).
+function companyFromUrl(url) {
+  try {
+    const u = new URL(url); const h = u.hostname.toLowerCase();
+    const seg = u.pathname.split('/').filter(Boolean);
+    let slug = '';
+    if (h.includes('greenhouse.io') || h.includes('ashbyhq.com') || h.includes('lever.co') || h.includes('workable.com')) slug = seg[0] || '';
+    else if (h.includes('myworkdayjobs.com')) slug = h.split('.')[0] || '';
+    if (!slug || /^(jobs?|careers?|apply|embed|en|en-us|o|p)$/i.test(slug)) return '';
+    return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+  } catch (e) { return ''; }
 }
 function guessSector(text) {
   const t = (text || '').toLowerCase();
@@ -956,7 +992,7 @@ async function computeEnrichFields(row, opts) {
   const url = row.link || row.url || '';
   if (!url) return null;
   const html = await fetchHtml(url);
-  const meta = extractJobMeta(html);
+  const meta = extractJobMeta(html, url);
   if (!meta.company && !meta.role) return null;
   const fields = {};
   if (meta.company) fields.company = meta.company;
@@ -974,6 +1010,24 @@ async function computeEnrichFields(row, opts) {
   if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob);
   return { fields, scored };
 }
+// Apply enriched fields to rows[idx], but if the corrected company+role now matches a DIFFERENT
+// existing row (e.g. a lead resolves to a role the scout already tracks), drop the lead instead of
+// duplicating — the existing (possibly edited/verified) row wins. Mutates `rows`.
+function applyEnrichedRow(rows, idx, fields) {
+  // probe with the post-enrichment company/role but the row's existing link (carries the req id)
+  const probe = { company: fields.company || rows[idx].company, role: fields.role || rows[idx].role, link: fields.link || rows[idx].link };
+  const dup = rows.findIndex((r, j) => j !== idx && sameReq(r, probe));
+  if (dup >= 0) {
+    const removed = rows[idx];
+    rows.splice(idx, 1);
+    return { action: 'merged', key: reqKey(removed), into: reqKey(probe), changes: {} };
+  }
+  const before = Object.assign({}, rows[idx]);
+  Object.assign(rows[idx], fields);
+  const changes = {};
+  for (const k of Object.keys(fields)) if (JSON.stringify(before[k]) !== JSON.stringify(fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: fields[k] };
+  return { action: 'updated', key: reqKey(rows[idx]), changes };
+}
 // Fire-and-forget enrichment of one row by key — used by quickadd so a capture becomes a full,
 // scored row on its own. Re-reads the store after the (slow) fetch so a concurrent save isn't lost.
 // Never throws; logs to the enrichment audit log.
@@ -987,12 +1041,11 @@ async function backgroundEnrich(key) {
     rows = readStore();                                   // re-read post-fetch
     idx = rows.findIndex(r => reqKey(r) === key);
     if (idx < 0) return;
-    const before = Object.assign({}, rows[idx]);
-    Object.assign(rows[idx], ce.fields);
-    const changes = {};
-    for (const k of Object.keys(ce.fields)) if (JSON.stringify(before[k]) !== JSON.stringify(ce.fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: ce.fields[k] };
+    const res = applyEnrichedRow(rows, idx, ce.fields);
     writeStore(rows);
-    logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich', result: 'pass', changes, sourceUrl: rows[idx].link || null, note: 'auto-enrich on capture' + (ce.scored ? ' + AI score' : '') });
+    logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich',
+      result: res.action === 'merged' ? 'merged' : 'pass', changes: res.changes,
+      note: res.action === 'merged' ? ('resolved to already-tracked ' + res.into + '; duplicate lead removed') : ('auto-enrich on capture' + (ce.scored ? ' + AI score' : '')) });
   } catch (e) { console.error('[auto-enrich]', e.message); }
 }
 // POST /api/enrich/run  body: {key?: "company|role"} single, or {all:true}/none => all needsEnrichment leads.
@@ -1005,17 +1058,19 @@ app.post('/api/enrich/run', async (req, res) => {
   const targets = rows.map((r, i) => ({ r, i })).filter(o => wantKey ? reqKey(o.r) === wantKey : o.r.needsEnrichment === true);
   if (!targets.length) return res.json({ ok: true, enriched: 0, failed: 0, results: [], note: 'No matching leads to enrich.' });
   let snapped = false; const results = [];
+  // descending index order so a dedupe splice never shifts an index we haven't processed yet
+  targets.sort((a, b) => b.i - a.i);
   for (const { r, i } of targets) {
     try {
       const ce = await computeEnrichFields(r, { score: doScore });
       if (!ce) { results.push({ key: reqKey(r), ok: false, note: 'no link or no metadata (JS-only page?)' }); continue; }
       if (!snapped) { snapshotData('auto'); snapped = true; }
-      const before = Object.assign({}, rows[i]);
-      Object.assign(rows[i], ce.fields);
-      const changes = {};
-      for (const k of Object.keys(ce.fields)) if (JSON.stringify(before[k]) !== JSON.stringify(ce.fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: ce.fields[k] };
-      logEnrichment({ ts: new Date().toISOString(), run: 'enrich-worker', key: reqKey(before), action: 'enrich', result: 'pass', changes, sourceUrl: r.link || null, note: 'JSON-LD/OG enrichment' + (ce.scored ? ' + AI score' : '') });
-      results.push({ key: reqKey(rows[i]), ok: true, company: rows[i].company, role: rows[i].role, scored: !!ce.scored });
+      const res = applyEnrichedRow(rows, i, ce.fields);
+      logEnrichment({ ts: new Date().toISOString(), run: 'enrich-worker', key: res.key, action: 'enrich',
+        result: res.action === 'merged' ? 'merged' : 'pass', changes: res.changes, sourceUrl: r.link || null,
+        note: res.action === 'merged' ? ('resolved to already-tracked ' + res.into + '; duplicate lead removed') : ('JSON-LD/OG enrichment' + (ce.scored ? ' + AI score' : '')) });
+      if (res.action === 'merged') results.push({ key: res.key, ok: true, merged: true, into: res.into });
+      else results.push({ key: res.key, ok: true, company: rows[i].company, role: rows[i].role, scored: !!ce.scored });
     } catch (e) { results.push({ key: reqKey(r), ok: false, note: e.message }); }
   }
   try { writeStore(rows); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }

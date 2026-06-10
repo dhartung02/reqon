@@ -87,7 +87,8 @@ Branch: `feat/sync-foundation`. Implements ROADMAP Phase 0 (FR-SRV-1…5).
 5. **Shared test vectors** — `tests/vectors/*.json`: fixtures for `postingId`, `sameReq`,
    tier derivation, EV, LWW outcomes, tombstone merge. `tests/run-vectors.js` asserts them
    (plain Node, `node tests/run-vectors.js` exits non-zero on failure). These same files
-   will be consumed by the Swift port in WP-2.
+   are consumed by the React Native app in WP-2 — which **imports `core/crm-core.js`
+   directly** (no re-port), so the vectors prove server == app == extension.
 
 **Verification / acceptance** — ROADMAP Phase 0 checklist, plus:
 ```bash
@@ -136,34 +137,45 @@ LinkedIn job page, simplify.jobs. DevTools audit: only configured-origin calls.
 
 ---
 
-## WP-2 — iOS app foundation  *(new Xcode project)*
+## WP-2 — iOS app foundation  *(React Native / Expo project)*
 
-Branch/repo: decide at kickoff — recommend a **separate repo** (`job-pipeline-ios`) to
-keep this repo's open-source surface clean; copy `tests/vectors/` in (or submodule).
-Implements ROADMAP Phase 2 (FR-APP-1…8). Requires: WP-0 merged; Apple Developer account;
-Mac with Xcode (Claude Code can scaffold the project, build/test via `xcodebuild`).
+**Stack decision (locked):** **React Native (Expo)**, chosen over Swift specifically so the
+app **imports `core/crm-core.js` verbatim** — the same module the server and extension use —
+instead of re-porting scoring/dedupe/sync into a second language. Native code is limited to
+a thin Swift Share-Extension target + the WKWebView (WP-4). The shared-core extraction
+(`core/crm-core.js` + `tests/run-core-vectors.js`) is the **M0 prerequisite** and is DONE.
+
+Branch/repo: decide at kickoff — recommend a **separate repo** (`job-pipeline-app`) to keep
+this repo's surface clean; vendor `core/` + `tests/vectors/` in (git submodule or a tiny
+`core` package). Implements ROADMAP Phase 2 (FR-APP-1…8). Requires: WP-0 merged; Apple
+Developer account; Mac with Xcode + Node (Expo prebuild / `eas build` or local `xcodebuild`).
 
 **Decisions to confirm at kickoff (ask the user):**
-- Separate repo vs `ios/` subdir · SwiftData vs GRDB/SQLite · min iOS version (17
-  suggested) · bundle id (needed for APNs) · app name.
+- Separate repo vs `app/` subdir · Expo managed+prebuild vs bare RN · local store
+  (expo-sqlite / op-sqlite / WatermelonDB) · how `core/` is vendored (submodule vs package)
+  · min iOS version (17 suggested) · bundle id (needed for APNs) · app name.
 
 **Milestones (each independently verifiable)**
-1. **M1 Core engine:** models (full schema + `id`/`updatedAt`/`deleted`), pure-logic port
-  (postingId/sameReq/EV/tier/lanes/Today counts), **vector tests green in Swift** (XCTest
-  reading the shared JSON vectors).
+0. **M0 Shared core (DONE):** `core/crm-core.js` (+ `.mjs` ESM shim) extracted; `server.js`
+   imports it; `tests/run-core-vectors.js` asserts the module directly; server, board, and
+   extension all consume the one source. ✅
+1. **M1 Core engine:** RN project scaffolds; local store (full schema + `id`/`updatedAt`/
+   `deleted`); imports `core/crm-core.js` for postingId/sameReq/EV/tier/reconcile; the
+   shared vectors run green inside the RN bundle (jest reading `tests/vectors/`).
 2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
    tracking edits; seeded sample store.
-3. **M3 Capture:** Share Extension → confirm sheet → save; on-device enrichment
-   (URLSession port of `computeEnrichFields`, incl. URL-slug company + JSON-LD/OG/title);
-   optional OpenAI scoring (Keychain key).
-4. **M4 Sync:** SyncEngine vs `/api/sync` (configurable URL+token; launch/foreground/
-   manual; LWW; offline queue; idRemap handling). ATS exception for the configured host
-   documented.
+3. **M3 Capture:** native Swift Share-Extension → confirm sheet → save (App Group → RN
+   store); on-device enrichment (`fetch` port of `computeEnrichFields`, incl. URL-slug
+   company + JSON-LD/OG/title); optional OpenAI scoring (expo-secure-store key).
+4. **M4 Sync:** SyncEngine vs `/api/sync` via the shared `reconcileSync` (configurable
+   URL+token; launch/foreground/manual; LWW; offline queue; idRemap handling). ATS
+   exception for the configured host documented.
 5. **M5 Local notifications + export:** follow-up-due / needs-verify notifs; CSV/JSON
    share-sheet export; local snapshots.
 
 **Acceptance** — ROADMAP Phase 2 checklist (airplane-mode suite, convergence test with a
-seeded divergent store against a dev server instance on :8788).
+seeded divergent store against a dev server instance on :8788; shared vectors green inside
+the RN bundle against the same `core/crm-core.js` the server runs).
 
 ---
 
@@ -197,9 +209,10 @@ when serverless. Keep v1 budget caps + audit logging. Acceptance per ROADMAP Pha
 
 ## WP-6 — On-device scout  *(app)*
 
-Implements ROADMAP Phase 6. Swift port of board polling vs `boards.json` config (synced
-or in-app edited); BGTaskScheduler + manual run; parity sample test vs Python scout on
-identical config; event-key notification dedupe with push. Acceptance per ROADMAP Phase 6.
+Implements ROADMAP Phase 6. JS/TS port of board polling vs `boards.json` config (synced or
+in-app edited), scoring via `core/crm-core.js`; expo background-fetch + manual run; parity
+sample test vs Python scout on identical config; event-key notification dedupe with push.
+Acceptance per ROADMAP Phase 6.
 
 ---
 

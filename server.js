@@ -113,36 +113,12 @@ function ensureRowIdentity(rows) {
 }
 const liveRows = rows => rows.filter(r => r && r.deleted !== true);
 
-const reqKey = x => (String(x.company || '') + '|' + String(x.role || '')).toLowerCase().trim();
-// A stable posting id pulled from the link (greenhouse gh_jid / numeric job id, ashby uuid,
-// generic /jobs|listing/<id>, jobId/reqId params). Lets distinct same-title reqs at one company
-// coexist (different ids), while a re-capture of the SAME posting still dedupes.
-function postingId(u) {
-  if (!u) return '';
-  const s = String(u);
-  let m = s.match(/[?&]gh_jid=(\d+)/i) || s.match(/\/listing\/(\d+)/i) || s.match(/\/jobs?\/(\d{4,})/i) || s.match(/[?&](?:jobid|requisitionid|reqid)=([\w-]+)/i);
-  if (m) return m[1].toLowerCase();
-  m = s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);   // ashby/uuid
-  return m ? m[0].toLowerCase() : '';
-}
-// Same posting only if company+role match AND there aren't two provably-different posting ids.
-// Strictly more conservative than reqKey alone — it only SPLITS apart same-title rows that carry
-// different req ids (e.g. 3 "Staff Product Manager" at Dropbox); it never merges more than before.
-function sameReq(a, b) {
-  if (reqKey(a) !== reqKey(b)) return false;
-  const ia = postingId(a.link || a.url), ib = postingId(b.link || b.url);
-  return !(ia && ib && ia !== ib);
-}
-const expectedValue = x => +(((+x.fit || 0) * (+x.prob || 0)) / 10).toFixed(1);
-
-// Tier from fit/prob per agent/scoring-criteria.md (EV = fit*prob/10).
-// A = apply-now (EV>=5.2 AND fit>=8 AND prob>=6.5); B = strong (EV>=4.0); C = monitor.
-function computeTier(fit, prob) {
-  const f = +fit || 0, p = +prob || 0, ev = +((f * p) / 10).toFixed(1);
-  if (ev >= 5.2 && f >= 8 && p >= 6.5) return 'A';
-  if (ev >= 4.0) return 'B';
-  return 'C';
-}
+// Pure identity/scoring/sync logic now lives in core/crm-core.js — the single source shared by
+// the server, the React Native app, and the Chrome extension (pinned by tests/vectors/).
+const core = require('./core/crm-core');
+const { reqKey, postingId, sameReq, expectedValue, computeTier } = core;
+// reconcileSync needs a uuid + clock; inject the server's so the change feed stamps real times.
+const reconcileSync = (serverRows, clientRows) => core.reconcileSync(serverRows, clientRows, { genId: () => crypto.randomUUID(), now: nowIso });
 
 // Merge-boundary policy (mirrors scout.py): enforce minTierToMerge + employment-type skips so
 // ANY caller of /api/reqs/merge (scout, merge-into-crm.js, direct) honors the A/B-only invariant.
@@ -921,34 +897,7 @@ app.patch('/api/reqs/:key', (req, res) => {
 });
 
 // ---------- sync (WP-0): device↔server reconcile ----------
-// Pure reconcile, exported for the shared test vectors. Per-row last-writer-wins by updatedAt;
-// unknown ids append (still subject to req-ID dedupe → idRemaps tells the client which of its
-// rows are actually an existing server row); tombstones propagate like any other edit.
-function reconcileSync(serverRows, clientRows) {
-  const out = serverRows.slice();
-  const byId = new Map(out.map((r, i) => [r.id, i]));
-  let applied = 0, conflicts = 0;
-  const idRemaps = [];
-  for (const c of (clientRows || [])) {
-    if (!c || typeof c !== 'object') continue;
-    if (!c.id) c.id = crypto.randomUUID();
-    c.updatedAt = c.updatedAt || nowIso();
-    const i = byId.has(c.id) ? byId.get(c.id) : -1;
-    if (i >= 0) {
-      const s = out[i];
-      if ((c.updatedAt || '') > (s.updatedAt || '')) { c.syncedAt = nowIso(); out[i] = c; applied++; }
-      else if ((c.updatedAt || '') < (s.updatedAt || '') && JSON.stringify(c) !== JSON.stringify(s)) conflicts++;   // server wins; counted for the log
-    } else {
-      // unknown id — dedupe by posting identity before appending (capture raced on two devices)
-      const dup = out.findIndex(r => sameReq(r, c));
-      if (dup >= 0) { idRemaps.push({ from: c.id, to: out[dup].id }); conflicts++; continue; }
-      c.syncedAt = nowIso();
-      out.push(c); applied++;
-    }
-  }
-  return { rows: out, applied, conflicts, idRemaps };
-}
-
+// Reconcile logic lives in core/crm-core.js (reconcileSync, wrapped above with server uuid/clock).
 app.post('/api/sync', (req, res) => {
   const b = req.body || {};
   const clientRows = Array.isArray(b.rows) ? b.rows : [];

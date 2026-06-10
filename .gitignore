@@ -57,3 +57,6 @@ MOBILE-SETUP.md
 
 # Local Claude Code tooling config
 .claude/
+
+# runtime push device registry (WP-0)
+agent/push-tokens.json

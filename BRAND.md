@@ -1,54 +1,78 @@
 # Reqon — Visual identity (locked)
 
-**Direction chosen: Concept A — Reticle Q ("Reconnaissance").** Strategic, sharp, confident — a
-tactical OS for career management, not a standard utility app. This is the canonical visual spec;
-the input brief is [BRAND-BRIEF.md](BRAND-BRIEF.md). Pronunciation stays **"REE-kon"**; tagline
-**"Recon for your career."**
+**Direction: Concept A — Reticle Q ("Reconnaissance").** Strategic, sharp, confident — a tactical
+OS for career management, not a standard utility app. This is the canonical visual spec; the input
+brief is [BRAND-BRIEF.md](BRAND-BRIEF.md). Pronunciation **"REE-kon"**; tagline **"Recon for your
+career."**
 
-> Implementation note: the **Emerald Command** palette below is the single source of truth for the
-> app's dark theme — encoded as tokens in [`app/src/theme.ts`](app/src/theme.ts). The board UI
-> (`public/index.html`) can be migrated to these values in a later pass.
+> Canonical assets + tokens live in [`brand/`](brand/): `tokens.json`, `tokens.css`, and the
+> Reticle Q SVGs. The app consumes the palette via [`app/src/theme.ts`](app/src/theme.ts); the
+> board UI (`public/index.html`) can migrate to these values in a later pass.
+> The SVGs in `brand/` are **code-built from the spec below** — faithful working masters the
+> designer can validate or replace with their own vector files.
 
 ---
 
-## 1. Master logo & glyph construction
+## 1. Wordmark
 
-The identity lives in the **Q** — the organic curve of the letter balanced with the mechanical
-precision of a reticle.
+Projects absolute control, executive judgment, high data density.
 
-- **Body:** a perfect geometric circle — a complete perimeter implying total situational awareness.
-- **Reticle tail:** a single precise diagonal dash cleaving the lower-right quadrant, extending
-  slightly into and out of the circle — a crosshair marker on a tactical scope.
-- **Wordmark:** Spline Sans (or a close geometric sans), **heavy weight (Bold / Extra Bold)**,
-  **ALL CAPS** — command, finality, precision (avoids the "friendly startup" lowercase vibe).
-- **Kerning:** wide letter-spacing for a premium, high-data-density feel.
+- **Typeface:** Spline Sans — or a high-precision geometric sans (Geist Sans, Inter).
+- **Weight:** Bold / Extra Bold for the primary letters (R, E, O, N).
+- **Case:** ALL CAPS, strictly (sheds the "friendly startup" / consumer-utility vibe).
+- **Tracking:** +15% to +20% (`0.15em`–`0.2em`) — letters breathe; premium-dashboard feel.
 
-## 2. Palette — "Emerald Command" (dark-mode only)
+## 2. The "Q" — custom-modified, not typed straight
 
-| Role | Name | Hex | Usage |
+- **Body:** perfect geometric circle; stroke weight and cap-height match R/E/O/N.
+- **Reticle tail:** a razor-sharp, uniform diagonal hashmark at **exactly 45°** (top-left →
+  bottom-right) cleaving the lower-right quadrant — a crosshair marker on a tactical scope.
+- **Clearance:** a hard, clean gap separates the tail from the body by **1.5× the stroke width** —
+  negative space that stops the letter "mudding up" at small sizes.
+
+### Glyph vector spec (100×100 grid)
+
+- **Outer perimeter:** perfect circle, center `(50,50)`, **diameter 80px**.
+- **Stroke width:** consistent **10px**.
+- **Tail:** **10px** thick, **25px** long, at **45°**, starting just inside the lower-right baseline
+  and projecting outward.
+- **Tactical breaks (optional, high-res only — e.g. iOS icon):** micro-gaps at the **12 / 3 / 6 / 9
+  o'clock** positions to mimic a targeting-scope reticle.
+
+## 3. Palette — "Emerald Command" (dark-mode only)
+
+| Token key | Name | Hex | Usage |
 |---|---|---|---|
-| Canvas | Obsidian Black | `#0B0C0E` | Core background |
-| Elements | Command Gray | `#16181C` | UI cards, board containers, inputs |
-| Primary accent | Tactical Emerald | `#00E5A3` | Highest scores (Tier A), live scouting indicators, the logo glyph |
-| Secondary accent | Radar Amber | `#FFB800` | Tier B scores / pending alerts only — **never the logo** |
-| Tier C / muted | Recon Muted | `#64748B` | Tier C roles, deactivated data points |
-| Type (high) | Clean White | `#E2E8F0` | Primary content text |
+| `canvas` | Obsidian Black | `#0B0C0E` | Core background |
+| `element` | Command Gray | `#16181C` | Cards, pipeline containers, inputs |
+| `emerald` | Tactical Emerald | `#00E5A3` | Tier A / live "signal acquired" / **the glyph** |
+| `amber` | Radar Amber | `#FFB800` | Tier B / pending sync action — **never the logo** |
+| `muted` | Recon Muted | `#64748B` | Tier C / background technical details |
+| `text-high` | Clean White | `#E2E8F0` | High-contrast crisp technical typography |
 
-## 3. Application & scalability
+Authoritative token files: [`brand/tokens.json`](brand/tokens.json), [`brand/tokens.css`](brand/tokens.css).
 
-| Placement | Mark | Implementation |
+## 4. Application & scalability
+
+| Surface | Asset variant | Scale / contrast rules |
 |---|---|---|
-| iOS app icon | Reticle Q glyph only | Obsidian Black bg, glyph in Tactical Emerald; optional subtle outer "signal bloom" glow to hint at AI |
-| Chrome ext. (16px) | Simplified glyph | Drop inner reticle lines — circle-and-tail geometry only, solid Tactical Emerald, high-contrast on any browser bg |
-| Mac/Windows menu bar | Simplified monochrome glyph | Pure white / system color; thicken geometry slightly at 16px for clarity |
-| Sync server favicon | Simplified monochrome glyph | White-on-dark for the self-hosted dashboard |
+| iOS app icon | Full Reticle Q (Emerald) | Centered on pure `#0B0C0E`; subtle crisp outer glow (`drop-shadow`) on the emerald lines for an "active radar" luminance |
+| Chrome ext. (16px) | Simplified Reticle Q | **Drop all micro-gaps / internal detail** — solid bold circle + pronounced tail; legible on any toolbar |
+| Mac/Windows menu bar | Monochrome native icon | Solid white / system color; **thicken stroke ~15%** to fight subpixel rendering in OS bars |
+| Sync server favicon | Simplified monochrome | Pure white glyph on a `#16181C` grid for visibility in crowded tabs |
 
-## 4. Brand-family hierarchy
+**Extension contrast fix (required).** Job boards swing between blinding-light and custom-dark
+themes; a bare emerald/transparent icon vanishes on dark toolbars. The Chrome `default_icon`
+bundle must house the emerald Reticle Q inside a solid rounded-rect **`#16181C`** container so the
+mark always sits in its own crisp perimeter. → [`brand/reqon-icon-extension.svg`](brand/reqon-icon-extension.svg).
 
-The primary wordmark is bold, geometric, all-caps; sub-brands complement that weight without
-competing. **Rule:** sub-brand names render in **Tactical Emerald** (the A-Tier status color) to
-signify operational status.
+## 5. Sub-brand family
 
-- **REQON** — primary brand: all caps, bold.
-- **REQON CLIP** · **REQON SCOUT** · **REQON SYNC** — same font, bold but slightly thinner than
-  the main brand.
+Strict suffix pattern; the secondary word is always a **lighter weight (Regular/Medium)** than
+**REQON** (Bold) so focus stays on the parent. The suffix color signals the product's role:
+
+| Lockup | Suffix color | Intent |
+|---|---|---|
+| **REQON CLIP** (Chrome extension) | Tactical Emerald | Lightweight, active capture plugin |
+| **REQON SYNC** (self-hosted backend) | Recon Muted | Quiet, background data-layer infrastructure |
+| **REQON SCOUT** (automated sweeper) | Radar Amber | Active processing — crawling/scanning for hits |

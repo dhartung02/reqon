@@ -137,7 +137,7 @@ LinkedIn job page, simplify.jobs. DevTools audit: only configured-origin calls.
 
 ---
 
-## WP-2 — iOS app foundation  *(React Native / Expo project)*
+## WP-2 — Reqon iOS app foundation  *(React Native / Expo · `app/` workspace)*
 
 **Stack decision (locked):** **React Native (Expo)**, chosen over Swift specifically so the
 app **imports `core/crm-core.js` verbatim** — the same module the server and extension use —
@@ -145,15 +145,23 @@ instead of re-porting scoring/dedupe/sync into a second language. Native code is
 a thin Swift Share-Extension target + the WKWebView (WP-4). The shared-core extraction
 (`core/crm-core.js` + `tests/run-core-vectors.js`) is the **M0 prerequisite** and is DONE.
 
-Branch/repo: decide at kickoff — recommend a **separate repo** (`job-pipeline-app`) to keep
-this repo's surface clean; vendor `core/` + `tests/vectors/` in (git submodule or a tiny
-`core` package). Implements ROADMAP Phase 2 (FR-APP-1…8). Requires: WP-0 merged; Apple
-Developer account; Mac with Xcode + Node (Expo prebuild / `eas build` or local `xcodebuild`).
+**Decisions (locked at kickoff, 2026-06-10):**
+- **Product name: Reqon** (coined: *recon* + *req*, reads "reckon"). Sub-brands: **Reqon**
+  (app) · **Reqon Sync** (server) · **Reqon Clip** (extension) · **Reqon Scout** (agent).
+  Full rebrand of README/UI/package names is its own task once the logo + palette land.
+- **Monorepo** — new `app/` workspace **in this repo** (npm workspaces). The app imports
+  `../../core/crm-core.js` directly: no submodule, no published package, zero drift.
+- **Expo** (managed + config-plugin prebuild — needed for the native Share Extension in M3).
+  Matches the user's prior RN app.
+- **Local store: expo-sqlite** — first-party, no extra native config, ample for single-user
+  scale; op-sqlite / WatermelonDB rejected as overkill.
+- **Min iOS: current** (Expo default floor; personal app, reach is a non-issue).
+  **Simulator-first** — Apple Developer account ($99/yr) deferred to WP-3 (APNs) and the
+  on-device Share-Extension test; M1/M2/M4 are all simulator-verifiable.
+- **Bundle id: `com.reqon.app`** (needed for APNs in WP-3).
 
-**Decisions to confirm at kickoff (ask the user):**
-- Separate repo vs `app/` subdir · Expo managed+prebuild vs bare RN · local store
-  (expo-sqlite / op-sqlite / WatermelonDB) · how `core/` is vendored (submodule vs package)
-  · min iOS version (17 suggested) · bundle id (needed for APNs) · app name.
+Implements ROADMAP Phase 2 (FR-APP-1…8). Requires: WP-0 merged (done); Mac with Xcode +
+Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
 
 **Milestones (each independently verifiable)**
 0. **M0 Shared core (DONE):** `core/crm-core.js` (+ `.mjs` ESM shim) extracted; `server.js`

@@ -162,10 +162,11 @@ possible surface. **Explicit non-goal: form autofill** (Simplify keeps that job)
 
 ---
 
-### Phase 2 — iOS app foundation (local-first engine + sync)
+### Phase 2 — Reqon iOS app foundation (local-first engine + sync)
 
-**Goal:** a standalone **React Native (Expo)** app that replaces the mobile web view and
-works with **no backend**.
+**Goal:** a standalone **React Native (Expo)** app — **Reqon** — that replaces the mobile
+web view and works with **no backend**. Lives in this repo as the `app/` workspace and
+imports `core/crm-core.js` directly.
 
 **Functional requirements**
 - **FR-APP-1** Local store (expo-sqlite / op-sqlite, optionally WatermelonDB) with full

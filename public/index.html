@@ -1163,11 +1163,11 @@ function render(){
     kpi("Open",openCount,"accent")+
     kpi("Applied",applied,"positive")+
     kpi("Follow-up due",followups,followups?"warning":"")+
+    kpi("Rejected",rejected,rejected?"danger":"",`<small>${rejRate}%</small>`)+
     kpi("Interviews",inInterview,"active")+
     kpi("Offers",offers,offers?"active":"")+
     `<div class="kpi-div"></div>`+
     kpi("Total roles",total,"sec")+
-    kpi("Rejected",rejected,"sec",`<small>${rejRate}%</small>`)+
     kpi("Tier A",tierA,"sec")+
     kpi("Response rate",am.responseRate+"%","sec")+
     kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");

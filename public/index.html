@@ -793,6 +793,10 @@
             </div>
             <div id="backupList" class="bklist"><div class="setmuted" style="padding:8px">loading…</div></div>
           </div>
+          <div class="field"><label>Deleted rows (tombstones)</label>
+            <div class="ahintrow"><button class="mini danger" id="purgeTombstonesBtn" type="button">Purge tombstones</button> <span id="tombstoneInfo" class="setmuted"></span></div>
+            <p class="hint" style="margin:6px 0 0">Deletes are soft (tombstones) so they sync to other devices. Purging permanently removes them (snapshots first).</p>
+          </div>
         </section>
 
         <section class="sset" data-sect="advanced" hidden>
@@ -1100,7 +1104,7 @@ function render(){
   applyNextOnly=F("applyNextOnly").checked;
 
   // base = all rows after the GLOBAL filters (everything EXCEPT the lifecycle tab + apply-next)
-  let base=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)}));
+  let base=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)})).filter(x=>x.deleted!==true);
   if(qy)base=base.filter(x=>(x.company+" "+x.role+" "+(x.notes||"")+" "+(x.recruiter||"")+" "+(x.next||"")+" "+(x.sector||"")).toLowerCase().includes(qy));
   if(sf)base=base.filter(x=>x.status===sf);
   if(tf)base=base.filter(x=>x.tier===tf);
@@ -1143,16 +1147,17 @@ function render(){
     :((activeTab==="open"&&applyNextOnly)?tabBase.filter(isApplyNext):tabBase);
 
   // KPIs (always full-set, unaffected by filters) — split: primary operating · secondary health
-  const total=rows.length;
-  const openCount=rows.filter(x=>tabKeyForStatus(x.status)==="open").length;
-  const applied=rows.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
-  const followups=rows.filter(followUpDue).length;
-  const inInterview=rows.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)).length;
-  const offers=rows.filter(x=>x.status==="Offer").length;
-  const tierA=rows.filter(x=>x.tier==="A").length;
-  const rejected=rows.filter(x=>x.status==="Rejected").length;
+  const live=rows.filter(x=>x.deleted!==true);
+  const total=live.length;
+  const openCount=live.filter(x=>tabKeyForStatus(x.status)==="open").length;
+  const applied=live.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
+  const followups=live.filter(followUpDue).length;
+  const inInterview=live.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)).length;
+  const offers=live.filter(x=>x.status==="Offer").length;
+  const tierA=live.filter(x=>x.tier==="A").length;
+  const rejected=live.filter(x=>x.status==="Rejected").length;
   const rejRate=applied?Math.round(rejected/applied*1000)/10:0;
-  const am=anMetrics(rows);
+  const am=anMetrics(live);
   const kpi=(k,v,cls="",extra="")=>`<div class="kpi ${cls}"><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
   document.getElementById("stats").innerHTML=
     kpi("Open",openCount,"accent")+
@@ -1309,7 +1314,7 @@ function scoutRunStripHTML(){
     `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
 }
 function renderToday(){
-  const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)}));
+  const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)})).filter(x=>x.deleted!==true);
   const cut=recentCut(), anchored=!!(scoutLast&&scoutLast.when);
   const newSince=all.filter(x=>x.status==="Not Applied"&&(x.added||"")>=cut);
   const tierAOpen=all.filter(x=>x.tier==="A"&&x.status==="Not Applied");
@@ -1343,7 +1348,7 @@ function renderToday(){
     <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
     ${queue}
     ${pipeline}
-    <div class="today-foot">${rows.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
+    <div class="today-foot">${all.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
   </div>`;
 }
 window.todoGo=function(view){
@@ -1422,7 +1427,7 @@ function buildInsights(rs,m){
   return out;
 }
 function renderAnalytics(f){
-  let rs=rows.slice();
+  let rs=rows.filter(x=>x.deleted!==true);
   if(f.qy)rs=rs.filter(x=>(x.company+" "+x.role+" "+(x.notes||"")+" "+(x.sector||"")).toLowerCase().includes(f.qy));
   if(f.srcf)rs=rs.filter(x=>rowSource(x)===f.srcf);
   if(f.tf)rs=rs.filter(x=>x.tier===f.tf);
@@ -1469,7 +1474,7 @@ async function archiveRow(i){
   const r=rows[i]; if(!r)return;
   if(!confirm(`Archive "${r.company} — ${r.role}"?\n\nYour data is snapshotted first; this sets status to Archived (not deleted).`))return;
   await fetch("/api/backup",{method:"POST"}).catch(()=>{});
-  rows[i].status="Archived"; persistNow(); render();
+  rows[i].status="Archived"; stampRow(i); persistNow(); render();
 }
 async function archiveAllClosed(){
   // only the closed rows CURRENTLY SHOWN (respects search/source/tier/apply-mode filters),
@@ -1478,7 +1483,7 @@ async function archiveAllClosed(){
   if(!targets.length){alert("No closed reqs in the current view to archive.");return;}
   if(!confirm(`Archive ${targets.length} closed req(s) shown in this view?\n\nYour data is snapshotted first; statuses set to Archived (not deleted).`))return;
   await fetch("/api/backup",{method:"POST"}).catch(()=>{});
-  targets.forEach(o=>{rows[o.i].status="Archived";});
+  targets.forEach(o=>{rows[o.i].status="Archived";stampRow(o.i);});
   persistNow(); render();
 }
 window.archiveRow=archiveRow; window.archiveAllClosed=archiveAllClosed;
@@ -1585,7 +1590,7 @@ window.markSelectedApplied=function(){
   const today=new Date().toISOString().slice(0,10);
   if(!confirm(`Mark ${eligible.length} role${eligible.length>1?"s":""} as Applied today (${today})?`+(skipped?`\n\n${skipped} already Applied/beyond will be skipped.`:""))) return;
   eligible.forEach(i=>{const x=rows[i];
-    x.status="Applied";
+    x.status="Applied";stampRow(i);
     if(!x.applied)x.applied=today;
     x.lastcontact=today;
     if(!x.next)x.next="Await recruiter response";
@@ -1604,7 +1609,7 @@ window.archiveSelected=async function(){
   if(!ids.length){st.textContent="Nothing to archive (selection already archived or empty).";st.classList.add("warn");return;}
   if(!confirm(`Archive ${ids.length} selected role${ids.length>1?"s":""}?\n\nYour data is snapshotted first; statuses set to Archived (not deleted).`))return;
   await fetch("/api/backup",{method:"POST"}).catch(()=>{});
-  ids.forEach(i=>{rows[i].status="Archived";});
+  ids.forEach(i=>{rows[i].status="Archived";stampRow(i);});
   selected.clear(); persistNow(); render();
   st.textContent=`Archived ${ids.length}.`; st.classList.remove("warn");
 };
@@ -1618,8 +1623,10 @@ window.exportSelected=function(){
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-selected.csv";a.click();
   st.textContent=`Exported ${ids.length} row(s).`; st.classList.remove("warn");
 };
+// WP-0: every client-side edit stamps updatedAt so per-row last-writer-wins has honest timestamps
+function stampRow(i){if(rows[i])rows[i].updatedAt=new Date().toISOString();}
 window.upd=function(i,field,val){
-  rows[i][field]=val;
+  rows[i][field]=val;stampRow(i);
   // moving to Applied auto-stamps today's applied date (only if not already set — never overwrites)
   if(field==='status'&&val==='Applied'&&!rows[i].applied){rows[i].applied=new Date().toISOString().slice(0,10);}
   persist();
@@ -1636,11 +1643,11 @@ function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("
 function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
 function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);return o;}
 window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit requisition");};
-window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?")){rows.splice(i,1);persistNow();render();}};
+window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?\n\nKept as a recoverable tombstone (purge in Settings → Data safety) so the delete syncs to other devices.")){rows[i].deleted=true;stampRow(i);persistNow();render();}};
 F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition");};
 F("cancelBtn").onclick=closeModal;
 F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
-F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0)rows[editingIndex]={...rows[editingIndex],...o};else rows.unshift(o);persistNow();render();closeModal();};
+F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0){rows[editingIndex]={...rows[editingIndex],...o};stampRow(editingIndex);}else rows.unshift(o);persistNow();render();closeModal();};
 ["search","statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("input",render));
 ["statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("change",render));
 F("remoteOnly").onchange=render;F("activeOnly").onchange=render;F("notAppliedOnly").onchange=render;F("applyNextOnly").onchange=render;F("groupBy").onchange=render;
@@ -1787,6 +1794,8 @@ function fillSettings(j){
   SET("appTokState").className="tokstate"+(au.appTokenSet?" on":"");
   SET("ingestTokState").textContent=au.ingestTokenSet?("Set ••••"+(au.ingestTokenLast4||"")):"Not set";
   SET("ingestTokState").className="tokstate"+(au.ingestTokenSet?" on":"");
+  const tomb=rows.filter(x=>x.deleted===true).length;
+  SET("tombstoneInfo").textContent=tomb?`${tomb} tombstone(s) pending purge.`:"No tombstones.";
 }
 // Advanced → connection status indicators (#16). Derives state from the settings payload.
 function buildConnStatus(j){
@@ -1798,6 +1807,7 @@ function buildConnStatus(j){
     {name:"Slack webhook",on:!!(j.digest&&j.digest.webhookSet),on_t:"Connected",off_t:"Not configured"},
     {name:"TheirStack",on:srcCfg("theirstack"),on_t:"Connected",off_t:"Not configured"},
     {name:"Apify (Fantastic.jobs)",on:srcCfg("fantastic"),on_t:"Connected",off_t:"Not configured"},
+    {name:"APNs push (iOS)",on:!!(j.auth&&j.auth.apnsSet),on_t:((j.auth&&j.auth.pushDevices)||0)+" device(s)",off_t:"Not configured"},
   ];
   box.innerHTML=rows.map(r=>`<div class="connrow ${r.on?'on':''}"><span class="cdot"></span><span class="cname">${r.name}</span><span class="cval">${r.on?r.on_t:r.off_t}</span></div>`).join("");
 }
@@ -1956,6 +1966,16 @@ SET("settingsBtn").onclick=openSettings;
 SET("openSettingsFromMenu").onclick=openSettings;
 SET("settingsCancel").onclick=()=>SET("settingsOverlay").classList.remove("open");
 SET("settingsCancelTop").onclick=()=>SET("settingsOverlay").classList.remove("open");
+SET("purgeTombstonesBtn").onclick=async()=>{
+  const n=rows.filter(x=>x.deleted===true).length;
+  if(!n){SET("tombstoneInfo").textContent="No tombstones to purge.";return;}
+  if(!confirm(`Permanently remove ${n} deleted row(s)?\n\nA snapshot is taken first.`))return;
+  try{const j=await (await fetch("/api/maintenance/purge-tombstones",{method:"POST"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("tombstoneInfo").textContent=`Purged ${j.purged}. ${j.total} rows remain.`;
+    await load();
+  }catch(e){SET("tombstoneInfo").textContent="Purge failed: "+e.message;}
+};
 SET("regenIngestBtn").onclick=async()=>{
   if(!confirm("Regenerate the ChatGPT ingest token?\n\nThe current token stops working immediately — you'll need to paste the new value into your ChatGPT Action."))return;
   const box=SET("ingestTokNew"); box.style.display="block"; box.textContent="Generating…";
@@ -2154,7 +2174,7 @@ F("exportXlsxBtn").onclick=()=>{window.location="/api/export.xlsx";};
 F("exportBtn").onclick=()=>{
   const cols=["company","sector","role","salary","location","remote","fit","prob","expectedVal","tier","conf","status","applied","interview","recruiter","referral","resume","cover","followup","lastcontact","next","added","link","notes"];
   const lines=[cols.join(",")];
-  rows.forEach(x=>{const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
+  rows.filter(x=>x.deleted!==true).forEach(x=>{const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-crm.csv";a.click();
 };
 

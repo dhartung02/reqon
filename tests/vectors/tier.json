@@ -1,0 +1,12 @@
+[
+  { "fit": 8.5, "prob": 7,   "expect": "A" },
+  { "fit": 8,   "prob": 6.5, "expect": "A" },
+  { "fit": 8,   "prob": 6.4, "expect": "B" },
+  { "fit": 7.9, "prob": 9,   "expect": "B" },
+  { "fit": 9,   "prob": 5,   "expect": "B" },
+  { "fit": 6,   "prob": 6.5, "expect": "C" },
+  { "fit": 5,   "prob": 8,   "expect": "B" },
+  { "fit": 4,   "prob": 4,   "expect": "C" },
+  { "fit": 0,   "prob": 0,   "expect": "C" },
+  { "fit": null, "prob": null, "expect": "C" }
+]

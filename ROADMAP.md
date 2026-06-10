@@ -1,271 +1,355 @@
-# Job Pipeline CRM — Roadmap & Execution Plan
+# Roadmap v2 — Job Pipeline CRM → Multi-Surface Command Center
 
-Working backlog and build plan for the next 10 changes. **This is a handoff doc: the
-implementation will be done by Claude Code, not in this session.** Each phase is written
-to be executed independently and safely.
+*Last updated: 2026-06-10. Companion docs: [PRODUCT-POSITIONING.md](PRODUCT-POSITIONING.md)
+(market thesis) · [WORKPLAN.md](WORKPLAN.md) (execution plan for Claude Code).*
 
-Owner: the candidate. Canonical project: `/Users/plex/Documents/job-pipeline-crm`.
-
----
-
-## Non-negotiable operating rules (apply to EVERY phase)
-
-1. **All settings live in the website.** Every knob — scout filters, tier thresholds,
-   min-fit, blockers/negative keywords, remote-only, AI model + budget (calls/run, TTL,
-   JD chars, max tokens), sources on/off, candidate profile, digest schedule, backup
-   retention — **must be editable in the Settings UI and persisted server-side.** The
-   UI is the source of truth; the server writes through to `boards.json` /
-   `watchlist.json` / `.env` / `profile.json`. **Nothing is config-file-only.** Secrets
-   (API keys) are also set from Settings (written to `.env`, never returned to the
-   browser — masked to `keySet` + last 4). Current gaps to close opportunistically:
-   `OPENAI_JD_CHARS`, `OPENAI_MAX_TOKENS`, `minDelaySeconds` are still `.env`/JSON-only and
-   must get UI controls.
-
-2. **Snapshot before you touch anything.** See "Snapshot protocol" below. Take a labeled
-   snapshot before starting each phase, and again before any bulk/data-migrating write.
-   Every phase lists its snapshot point and rollback.
-
-3. **Never blind-overwrite tracking edits.** Adds go through the append-only merge
-   (`POST /api/reqs/merge`) keyed on `company|role`; field updates go through the
-   audit-logged `PATCH /api/reqs/:key`. The board's full-array `PUT /api/reqs` is the one
-   risky path — Phase 0 hardens it.
-
-4. **Deterministic core must keep working with the app/LLM off.** The scout finds +
-   validates without any API key; AI rescoring/assistant are optional and budgeted.
-
-5. **Build config-driven from day one (open-source discipline).** Do NOT bake
-   the candidate-specific constants (name, resume text, scoring rubric specifics, company list)
-   into `scout.py` / UI. Read them from profile/settings so Phase 10 is "expose the
-   config," not "rip out hardcoding."
-
-6. **Verify every phase before calling it done:** `node -c server.js`; `python3 -m
-   py_compile` the changed Python; a headless/jsdom render check for UI; a live
-   `--dry-run` for anything hitting external APIs; confirm `data.json` row count is
-   unchanged unless the phase intentionally migrates (and then only after a snapshot).
-   Server (`server.js`) changes require a restart:
-   `launchctl kickstart -k gui/$(id -u)/com.jobcrm.server`. UI/Python changes are
-   a browser refresh / next run.
+> **Roadmap v1 (2026-06-08) is fully shipped** — data safety, scout filtering, lifecycle
+> tabs, hygiene lanes, apply-mode, candidate profile + narratives, AI assistant, digest,
+> analytics, source health/dedupe/discovery, and the v1.0.0 open-source release, plus the
+> v6 UX redesign, Today command center, lead-enrichment worker, req-ID dedupe, and scoped
+> auth. See git history (`af9bee9..6728d94`) for v1. This document is the next arc.
 
 ---
 
-## Snapshot protocol (rollback safety)
+## 1. Vision & end state
 
-Two kinds of safety — **code** and **data** — because the project is not yet in Git and
-the board can full-save state.
+Today the CRM is **locked to the desktop**: discovery, tracking, and applying all assume the
+Mac. Applying from a phone is effectively impossible, and keeping the CRM current during a
+multi-application session is manual bookkeeping. Desktop autofill (Simplify) is clunky and
+limited, and has **no mobile counterpart at all** — that gap is the opportunity.
 
-**Code (do this in Phase 0, then per phase):**
-```bash
-cd /Users/plex/Documents/job-pipeline-crm
-git init                      # Phase 0 only, once
-git add -A && git commit -m "phase-N: <desc> (pre)"   # before each phase
-# ... make changes ...
-git commit -am "phase-N: <desc> (done)"               # after, when verified
+**End state — three surfaces, one system of record, backend optional:**
+
 ```
-`.gitignore` already excludes `.env`, `__pycache__`, `agent/scout-status.json`. Also add
-`data.json`, `backups/`, `logs/`, `node_modules/` before the first commit (data is
-snapshotted separately; sample/seed data ships instead).
-
-**Data (before each phase and before any bulk write):**
-```bash
-cp data.json "backups/data.phaseN-$(date +%Y%m%d-%H%M%S).json"
-# or hit the endpoint while the server runs:
-curl -X POST localhost:8787/api/backup
+                ┌────────────────────────────────────┐
+                │   SERVER (Mac, OPTIONAL peer)       │
+                │   scout (real cron) · enrichment ·  │
+                │   scoring · desktop board ·         │
+                │   ChatGPT/bookmarklet ingest ·      │
+                │   /api/sync · APNs push             │
+                └─────────▲──────────────▲────────────┘
+            localhost API │              │ sync + push
+        ┌─────────────────┴──┐     ┌─────┴──────────────────────┐
+        │  CHROME EXTENSION   │     │   iOS APP (local-first)    │
+        │  = desktop "hands"  │     │   = mobile hands + brain   │
+        │  clip · fit overlay │     │   full on-device engine ·  │
+        │  STATUS WRITE-BACK  │     │   share-ext capture ·      │
+        │  (form-fill stays   │     │   WKWebView enrich + fill ·│
+        │   with Simplify)    │     │   STATUS WRITE-BACK ·      │
+        └─────────────────────┘     │   APNs push · local notifs │
+                                    │   on-device scout (BG)     │
+                                    └────────────────────────────┘
 ```
 
-**Rollback:**
-- Code: `git checkout -- <file>` or `git reset --hard <pre-commit>`.
-- Data: stop the server, copy the snapshot back over `data.json`, restart.
-- Phase 0 adds in-app snapshot/restore so this becomes a button, not a shell step.
+- **iOS app is local-first.** A complete engine on-device: store, scoring, dedupe,
+  enrichment, capture, apply-assist, notifications. Fully functional with **zero backend**.
+- **Server is an optional peer.** When reachable it adds guaranteed-schedule scouting,
+  push notifications, the desktop board, and ChatGPT/bookmarklet ingestion. When absent,
+  the app degrades gracefully (best-effort background scout + local notifications).
+  Neither side is "the master" — they converge through sync.
+- **Chrome extension stays deliberately thin**: clip + fit overlay + status write-back.
+  Desktop form-fill remains Simplify's job (per PRODUCT-POSITIONING.md §10 — don't rebuild
+  the autofill compatibility matrix where a specialist already exists). Mobile form-fill is
+  ours to build, because nobody fills that gap.
+- **The #1 unlock on every surface is STATUS WRITE-BACK**: the act of applying updates the
+  CRM (status → Applied + date stamp + log) in the same motion. That — not autofill — is
+  what makes "apply effectively anywhere and the CRM stays current" true.
+
+## 2. Core principles (inviolable)
+
+1. **Local-first, privacy-first.** Data lives on the user's devices. No third-party cloud
+   holds the store. Sync is device↔device via the user's own server.
+2. **Never auto-submit.** Fill factual fields only → highlight every filled field → human
+   reviews and submits. No exceptions, ever.
+3. **Never fill sensitive fields.** Hard denylist: passwords, SSN/government IDs,
+   EEO/demographics/disability/veteran status, consent/attestation checkboxes, salary
+   (unless explicitly configured).
+4. **No LinkedIn scraping or automation.** Board APIs + email ingest only. Zero ToS exposure.
+5. **Append-only merge + req-ID dedupe everywhere.** New rows append; tracking edits are
+   never overwritten; distinct same-title postings coexist (posting-id aware).
+6. **Non-destructive by default.** Snapshots before mutation; tombstones, not hard deletes;
+   shrink-guard on full writes.
+7. **Honest scoring, the user's voice.** Conservative fit/prob with visible caveats; AI
+   drafts sound like the candidate (plain, PM-altitude, no filler) — never "ChatGPT-polished."
+8. **All settings live in the UI** (carried from v1): every knob editable in-product and
+   persisted server-/app-side; nothing config-file-only; secrets masked.
+
+## 3. Primary use cases
+
+| ID | Use case | Surface(s) |
+|----|----------|-----------|
+| UC-1 | **Capture anywhere** — see a posting in any app/browser on any device; one action adds it; enrichment fills company/role/location/sector + score automatically | App share-ext, extension, iOS/macOS shortcut, bookmarklet, ChatGPT |
+| UC-2 | **Apply on mobile, CRM stays current** — open the posting in the in-app browser; factual fields pre-fill from the on-device profile; finish + submit manually; one tap marks Applied with today's date | App (WKWebView) |
+| UC-3 | **Apply on desktop, CRM stays current** — apply in Chrome (Simplify fills); click "Mark applied" in the extension; the board updates instantly | Extension |
+| UC-4 | **Morning push triage** — 7am scout runs on the server; phone receives "6 new · 2 follow-ups due"; tap → app opens → synced Today view | Server + app |
+| UC-5 | **Serverless operation** — Mac asleep/away: app still captures, enriches, scores, triages, and notifies locally; best-effort background scout; syncs when the server returns | App |
+| UC-6 | **Guided personal answers** — per screening question choose Auto / Example / Guided; Guided asks 1–3 tap-questions (which story? which angle?) then drafts in the candidate's voice from the narrative library; refine via reaction chips; save good answers as reusable snippets | App + server + desktop board |
+| UC-7 | **Two-device convergence** — apply on the phone at lunch; the desktop board shows Applied that evening. Capture via ChatGPT on desktop; it appears on the phone after sync | All |
+| UC-8 | **Fit overlay while browsing** — on a job page, the extension badges fit/prob/EV + status if tracked, or offers one-click clip if not | Extension |
+| UC-9 | **Workday/unknown-ATS assist** — in the in-app browser, the field matcher fills what it can confidently identify (autocomplete attrs → ATS adapters → fuzzy → LLM fallback), highlights its work, skips what it can't; user finishes + submits | App (WKWebView) |
+
+## 4. Phased delivery
+
+Every phase ships standalone value; no flag-day migrations. P0–P1 live in this repo;
+P2+ adds an Xcode project (separate repo or `ios/` subdirectory — decide at P2 kickoff).
 
 ---
 
-## Current architecture (context for the implementer)
+### Phase 0 — Sync- & push-ready server (foundation)
 
-- **Server:** `server.js` (Node/Express, port 8787). Routes: `GET/PUT /api/reqs`,
-  `POST /api/reqs/merge`, `POST /api/reqs/quickadd`, `GET /api/reqs/needing-enrichment`,
-  `PATCH /api/reqs/:key` (audit-logged), `POST /api/scout/run` + `GET /api/scout/status`,
-  `GET/PUT /api/settings`, `POST /api/backup`, `GET /api/export.xlsx`, `GET /api/health`.
-  Loads `.env` on boot.
-- **Board UI:** `public/index.html` (desktop), `mobile.html` (`/m`). Tier accordion,
-  multi-select + open-in-tabs + bulk Mark-Applied, source filter, Run-Scout menu,
-  Settings modal.
-- **Scout:** `agent/scout.py` (find), `agent/scout_run.py` (orchestrator: find / validate /
-  both / source-backfill; writes `agent/scout-status.json`), `agent/llm_enrich.py`
-  (optional OpenAI rescoring, budget-gated), `agent/sources/` (pluggable adapters +
-  `CATALOG`), `agent/boards.json` (companies, `disabledSources`, `minDelaySeconds`),
-  `agent/watchlist.json` (`searchTerms`: keywords/titles/minFitToAdd),
-  `agent/profile.json` (+ `profile-from-resume.py`), `agent/scout_linkedin.py`.
-- **Store:** `data.json` (source of truth). Row fields include: `company, role, sector,
-  salary, location, remote, fit, prob, tier, conf, link, notes, status, applied,
-  interview, recruiter, referral, resume, cover, followup, lastcontact, next, added,
-  reqCheck, reqCheckedOn, needsEnrichment, source, aiHash, aiEnrichedOn`. Computed:
-  `expectedValue = fit*prob/10`.
-- **Audit logs:** `agent/enrichment-log.jsonl`, `agent/found-log.md`.
+**Goal:** make the existing server a capable *optional peer* before any new client exists.
+Non-breaking; the desktop board behaves identically.
 
----
+**Functional requirements**
+- **FR-SRV-1 Row identity.** Every row gains `id` (UUID, assigned at creation) and
+  `updatedAt` (ISO timestamp). One-time backfill of existing rows on first load
+  (snapshotted; row count unchanged). Every mutation path — board PUT, inline `upd`,
+  merge, quickadd, enrichment (worker + auto), scout merge, PATCH — sets/bumps `updatedAt`.
+- **FR-SRV-2 Soft delete.** `deleted: true` tombstones (with `updatedAt`). Board hides
+  tombstones; the Delete action writes a tombstone instead of splicing; exports exclude
+  them. Hard purge only via an explicit maintenance action.
+- **FR-SRV-3 `POST /api/sync`** (full-auth only): request `{rows: [...], since?: ts}` →
+  reconcile by `id`: unknown ids append (still subject to req-ID dedupe), known ids
+  **last-writer-wins per row** by `updatedAt`, tombstones propagate. Snapshot before
+  write; change-log entry; response `{rows: <merged rows changed since 'since'>, serverTime}`.
+- **FR-SRV-4 `POST /api/push/register`** (full-auth): store APNs device tokens
+  (multi-device, dedup by token).
+- **FR-SRV-5 APNs sender.** Token-based `.p8` auth via `.env`
+  (`APNS_KEY_P8_PATH/APNS_KEY_ID/APNS_TEAM_ID/APNS_BUNDLE_ID`); **inert until configured**
+  (same gating pattern as SMTP/Slack). Send hooks: scout-run complete (counts + top
+  titles in payload), digest schedule, follow-up-due. Connection status row in
+  Settings → Advanced.
+- **FR-SRV-6 Assistant v2 API** (contract in Phase 5; can land with P5).
 
-## Build order (locked)
-
-> Snapshot = labeled `data.json` backup + a git commit before starting.
-> UI rule = every new knob gets a Settings control; nothing config-only.
-
-### Phase 0 — Data safety: backup / change-log guardrails  *(do first)*
-- **Goal:** every change reversible before more automation lands.
-- **Build:** `git init` + commit current state. Auto-snapshot `data.json` before each
-  board `PUT` (debounced), with retention (keep last N). Append a board-edit diff to a
-  change-log JSONL (extend the existing audit pattern). Add `GET /api/backups` (list),
-  `POST /api/restore` (snapshots first, then restores). Harden `PUT /api/reqs` (snapshot
-  before overwrite; reject empty/short arrays as likely corruption).
-- **Settings UI:** retention count, "Snapshot now", "Restore from snapshot" (list +
-  confirm), "Download backup".
-- **Snapshot point:** snapshot `data.json` before wiring the new write path.
-- **Acceptance:** every save leaves a recoverable snapshot; restore works from the UI;
-  retention enforced; a malformed full-save can't wipe the store.
-- **Rollback:** git revert; restore latest pre-phase snapshot.
-
-### Phase 0.5 — Run source backfill  *(no new code — run the built feature)*
-- **Goal:** populate `source` so analytics (Phase 8) has data; ~52 of 119 rows are
-  inferable from their links, the rest stay blank/`other`.
-- **Do:** snapshot, then Run-Scout → "Backfill source from links" (`source-backfill` mode,
-  no network). Confirm rows show `source`.
-- **Acceptance:** `source` populated where link maps to a known ATS.
-- **Rollback:** restore the pre-backfill snapshot.
-
-### Phase 1 — Scout filtering & blockers
-- **Goal:** stop the scout surfacing noise at the source.
-- **Build:** in `scout.py`, enforce min-tier-to-merge (default A/B), skip employment
-  types (contract/associate/intern), remote-only (exists), and user **negative
-  keywords/blockers** (demote or drop). Store in `boards.json` (`minTierToMerge`,
-  `skipEmploymentTypes`) + `watchlist.json` (`negativeKeywords`). Build config-driven.
-- **Settings UI:** tier threshold, employment-type skips, blockers list (textarea),
-  remote-only toggle — all editable, persisted via `PUT /api/settings`.
-- **Snapshot:** git commit (no data migration).
-- **Acceptance:** dry-run shows contract/associate/onsite dropped and blockers demoted;
-  every rule editable in the UI.
-- **Rollback:** git revert; settings revert via UI.
-
-### Phase 2 — Board lifecycle tabs + apply-next default queue
-- **Goal:** organize by lifecycle; surface "apply these next."
-- **Build (UI only):** tabs **Open / Applied / Interviewing / Rejected+Archived**
-  (status-driven) in `index.html` + `mobile.html`. Tier accordion lives inside **Open**.
-  Open default view = Tier A/B · `conf:verified` · `reqCheck:open` · not-applied,
-  EV-sorted (the apply-next queue).
-- **Settings UI:** which statuses map to each tab (sensible defaults; editable).
-- **Snapshot:** git commit (no data change).
-- **Acceptance:** rows route to the right tab by status with counts; Open opens on the
-  apply-next queue.
-- **Rollback:** git revert.
-
-### Phase 3 — Hygiene lanes
-- **Goal:** the core CRM value — don't waste applies, don't drop follow-ups.
-- **Build:** within the tabs, lanes/filters: **needs-verify** (not-applied +
-  `conf:unverified`/`reqCheck:lead`), **follow-up due** (status Applied/active +
-  `applied`/`lastcontact` older than threshold + no movement), **closed-req handling**
-  (`reqCheck:closed` surfaced; offer archive — never silent-delete; 403/anti-bot resolves
-  to `unknown`, not closed). Keep a human gate.
-- **Settings UI:** follow-up threshold (days), verify-lane criteria, closed handling
-  (suggest vs. auto-archive; default suggest).
-- **Snapshot:** snapshot before any bulk archive action.
-- **Acceptance:** lanes populate correctly; thresholds editable in UI; no destructive
-  default behavior.
-- **Rollback:** restore snapshot; git revert.
-
-### Phase 4 — Apply-mode field
-- **Goal:** make the next action explicit per row.
-- **Build:** new row field `applyMode` ∈ {fillable, gated, manual, simplify}, inferred
-  from source/ATS (Greenhouse/Ashby/Lever → fillable; Workday/iCIMS/custom → gated/manual).
-  Backfill by inference (snapshot first). Show on card; add to filters.
-- **Settings UI:** editable source→default-apply-mode mapping.
-- **Snapshot:** snapshot before the backfill write.
-- **Acceptance:** `applyMode` shown + filterable; mapping editable in UI; backfilled.
-- **Rollback:** restore snapshot.
-
-### Phase 5 — Candidate profile & settings + narrative-asset library
-- **Goal:** make scoring about the candidate (and de-hardcode for open-source).
-- **Build:** resume upload (multipart) → run `profile-from-resume.py` → `profile.json`
-  (snapshot the old profile first). Surface profile keywords/weights, role/title terms,
-  industry & sector preferences, and a **narrative-asset library** (CRUD: the reusable
-  story blurbs) — all stored server-side. Scoring reads the profile (already partial).
-  Endpoints: `POST /api/profile/resume`, `GET/PUT /api/profile`, narrative CRUD.
-- **Settings UI:** resume upload control; editable role terms / industry / sector prefs;
-  narrative library editor.
-- **Snapshot:** back up `profile.json` before regenerate; git commit.
-- **Acceptance:** uploading a resume in the UI updates scoring inputs; narrative items
-  editable in UI; **audit confirms no personal constants remain hardcoded in code.**
-- **Rollback:** restore `profile.json`; git revert.
-
-### Phase 6 — AI application assistant
-- **Goal:** multiply apply velocity with grounded drafts.
-- **Build:** per-req "Draft cover note / answer screening Q" using profile + narrative +
-  JD (reuse `llm_enrich` HTTP + budget patterns). Output is editable; **never
-  auto-submit.** New endpoint `POST /api/assist` (budget-gated, logged).
-- **Settings UI:** assistant enable toggle, model (may differ from scoring model), daily
-  call cap / token cap.
-- **Snapshot:** git commit (no data migration).
-- **Acceptance:** generates grounded drafts; cost-capped + visible; human edits before use.
-- **Rollback:** git revert; toggle off in UI.
-
-### Phase 7 — Morning digest
-- **Goal:** push, not pull.
-- **Build:** scheduled job composes a digest (new finds, follow-ups due, newly-closed) and
-  delivers it. **Architecture note for implementer:** the Express server can't call the
-  M365/Slack MCP connectors — deliver via either (a) a scheduled Cowork task that reads the
-  CRM API and posts to Slack/email (mirrors the existing scout task), or (b) server-side
-  SMTP if creds are provided. Pick one and document it.
-- **Settings UI:** digest on/off, time, channel/recipient.
-- **Snapshot:** git commit.
-- **Acceptance:** configurable in UI; delivers on schedule.
-- **Rollback:** disable in UI; git revert.
-
-### Phase 8 — Conversion & source-ROI analytics
-- **Goal:** answer "what's actually converting?"
-- **Build:** an **Analytics** tab computing (client-side from rows) the funnel
-  (Not Applied → Applied → Recruiter Screen → HM → Panel → Offer / Rejected), response
-  rate, interview yield, and time-to-response, broken out by **source, sector, tier, ATS.**
-  Depends on Phase 0.5 backfill.
-- **Settings UI:** date-range / window controls.
-- **Snapshot:** none (read-only view).
-- **Acceptance:** metrics reconcile with the data; source dimension is populated and
-  non-empty.
-- **Rollback:** git revert (UI only).
-
-### Phase 9 — Source health/tests + dedupe + discovery
-- **Goal:** durability before wider use.
-- **Build:** per-source run metadata (last run, count, errors) written by the scout →
-  a **Source Health** panel in Settings. A **test suite** (`tests/`) for adapters (mocked
-  responses), scoring, `parse_ats`, and dedupe. Improve normalized **dedupe** (fix the
-  embellished-vs-official near-dupe gotcha) + company rollup. **Source discovery:** paste a
-  careers URL → detect ATS + slug → add to `boards.json` from the UI.
-- **Settings UI:** "Add company by URL", source-health panel.
-- **Snapshot:** git commit; snapshot before any dedupe merge that rewrites rows.
-- **Acceptance:** health panel shows per-source status; tests pass; discovery adds a
-  company via the UI; dedupe no longer re-adds near-dupes.
-- **Rollback:** restore snapshot; git revert.
-
-### Phase 10 — Open-source packaging
-- **Goal:** publishable, generic, no personal data.
-- **Build:** de-PII audit (no key/resume/name/rubric specifics in code — all via
-  profile/settings/`.env`); anonymized `seed.json`; `README`, `LICENSE` (e.g. MIT),
-  `CONTRIBUTING`, screenshots; generalized `install.sh`; confirm `.env.example` current.
-  Because of the all-settings-in-UI rule, a fresh user configures everything from the web.
-- **Settings UI:** already complete (principle enforced throughout) — verify nothing
-  requires hand-editing a file.
-- **Snapshot:** final git tag (e.g. `v1.0.0`) before publish.
-- **Acceptance:** fresh clone + `npm install` + configure-via-UI runs with zero personal
-  data committed.
-- **Rollback:** git tag/branch.
+**Acceptance criteria**
+- [ ] Fresh load of existing `data.json` backfills `id`/`updatedAt` exactly once; row count unchanged; snapshot exists.
+- [ ] Two simulated clients (curl) editing different rows both converge via `/api/sync`.
+- [ ] Conflicting edits to one row: later `updatedAt` wins; change log records the conflict.
+- [ ] A delete on one client tombstones on the other after sync; board and Excel/CSV exports exclude tombstones.
+- [ ] `/api/sync` + `/api/push/register` reject the scoped INGEST token (401) and accept the full token.
+- [ ] With no APNs key set, push code paths are inert (no log errors).
+- [ ] Regression: board save, merge, quickadd + auto-enrich, scout run, restore — all behave exactly as before.
 
 ---
 
-## Dependencies & sequencing notes
-- **Phase 0 precedes everything** (safety net for all later data writes).
-- **0.5 backfill must precede Phase 8** (analytics needs `source`).
-- **Phase 5 (profile/de-hardcode) gates Phase 10 (open-source)** — keep 1–4 config-driven
-  so 5 is "surface config," not "remove hardcoding."
-- **Phase 6 depends on Phase 5** (profile + narrative are its inputs).
-- Phases 2, 3, 4 are largely independent UI/field work and can interleave.
+### Phase 1 — Chrome extension (thin desktop companion)
 
-## Definition of done (per phase)
-Snapshot taken → built config-driven → all new knobs in Settings UI → verified
-(`node -c`, `py_compile`, headless render, live dry-run) → `data.json` integrity confirmed
-→ committed → restart note honored if `server.js` changed.
+**Goal:** fix the desktop half of "CRM stays current" immediately, with the smallest
+possible surface. **Explicit non-goal: form autofill** (Simplify keeps that job).
+
+**Functional requirements**
+- **FR-EXT-1** Manifest V3 extension. Options page: server origin (default
+  `http://localhost:8787`) + `X-CRM-Token`. Talks **only** to the configured origin.
+- **FR-EXT-2 Clip.** On any job page, one click → `POST /api/reqs/quickadd` (URL + page
+  title + `source:"chrome-ext"`); server auto-enriches. Toast shows added / duplicate.
+- **FR-EXT-3 Fit overlay.** If the current page matches a tracked row (by posting-id,
+  else URL), badge fit / prob / EV / tier + current status; if untracked, show Clip.
+- **FR-EXT-4 Status write-back.** "Mark applied (today)" on the page → updates the row
+  (status, applied, lastcontact, next) with the same semantics as the board's bulk action.
+- **FR-EXT-5 Offline queue.** Server unreachable → actions queue in extension storage and
+  flush on next success.
+
+**Acceptance criteria**
+- [ ] Clip from a greenhouse page → enriched row (correct company via URL slug) on the board within ~5s.
+- [ ] Re-clipping the same posting reports duplicate (req-ID dedupe respected).
+- [ ] On a tracked posting's page the overlay shows fit/prob/EV + status.
+- [ ] "Mark applied" flips the board row to Applied + today's date without touching other fields.
+- [ ] With the server down, a clip queues and lands after the server returns.
+- [ ] DevTools network audit: zero calls to anything but the configured origin.
+
+---
+
+### Phase 2 — iOS app foundation (local-first engine + sync)
+
+**Goal:** a standalone app that replaces the mobile web view and works with **no backend**.
+
+**Functional requirements**
+- **FR-APP-1** SwiftUI + SwiftData (or SQLite) store with full schema parity (all tracking
+  fields + `id`/`updatedAt`/`deleted`) and identical computed semantics (EV = fit×prob/10,
+  tier bands, status enum, lanes).
+- **FR-APP-2** Ported pure logic: `postingId` req-ID dedupe, append-merge, scoring/tier
+  derivation, hygiene lanes, Today action counts. **`agent/scoring-criteria.md` is the
+  canonical spec for both implementations**, enforced by a shared JSON test-vector suite.
+- **FR-APP-3** Views: Today command center (action cards + last-scout strip), Open /
+  Applied / Interviewing / Closed lists (tier + company grouping, applied-date sorts),
+  row detail with all tracking edits + overrides, search/filters.
+- **FR-APP-4 Share Extension.** From Safari/any app: Share → "Add to CRM" → editable
+  confirm sheet (company/role/notes) → saved locally → on-device enrichment fills fields.
+- **FR-APP-5 On-device enrichment.** URLSession fetch + JSON-LD/OG/`<title>`/URL-slug
+  parsing (Swift port of `computeEnrichFields`), optional OpenAI scoring (key in Keychain).
+- **FR-APP-6 SyncEngine.** Optional server URL + full token in settings (Keychain).
+  Pull-push reconcile against `/api/sync` on launch / foregrounding / manual refresh;
+  LWW semantics identical to the server; offline queue-and-retry. App is 100% functional
+  with sync unconfigured.
+- **FR-APP-7 Local notifications** (serverless): follow-up due, N leads need verification.
+- **FR-APP-8 Data safety.** Local snapshots before destructive ops; CSV/JSON export via
+  share sheet.
+
+**Acceptance criteria**
+- [ ] Airplane mode: capture (share ext), edit, score, browse Today/lists — all functional.
+- [ ] Share-ext capture of a greenhouse URL self-enriches to the correct company/role/score on-device.
+- [ ] With sync configured: phone edit appears on the desktop board and vice versa; deletes propagate as tombstones.
+- [ ] Same-title, different-req-id postings captured on phone and desktop both survive sync (no false merge).
+- [ ] Follow-up-due local notification fires per hygiene thresholds with the server off.
+- [ ] Divergent stores (7 simulated offline days) converge with zero data loss (seeded test).
+- [ ] Shared test vectors pass in both JS and Swift (scoring, dedupe, postingId, LWW).
+
+---
+
+### Phase 3 — Push notifications (server → app)
+
+**Goal:** the always-on Mac proactively drives the phone. APNs is **outbound-only from
+the Mac — no inbound tunnel/TLS required** for push itself.
+
+**Functional requirements**
+- **FR-PUSH-1** App registers for remote notifications → token to `/api/push/register`.
+- **FR-PUSH-2** Server pushes on: scout-run complete ("Scout: 6 new · top: …"), morning
+  digest, follow-up-due. **Payload carries the summary** so the alert is useful even when
+  the server isn't reachable for the follow-up sync.
+- **FR-PUSH-3** Tap → app opens Today and triggers a sync when reachable. Optional silent
+  `content-available` push attempts a background sync (best-effort; OS-throttled).
+- **FR-PUSH-4** Graceful degradation: without APNs configured, local notifications cover
+  the same events; when both are possible, event-key dedupe prevents double alerts.
+
+**Acceptance criteria**
+- [ ] Scout run on the Mac → notification on the phone over cellular (off-LAN) with counts.
+- [ ] Tap opens Today; new rows appear after sync when the server is reachable.
+- [ ] Removing the APNs key reverts cleanly to local-notification behavior; no duplicate alerts in mixed mode.
+
+---
+
+### Phase 4 — In-app browser: enrichment + apply-assist (the mobile "hands")
+
+**Goal:** make mobile applying genuinely workable — the capability gap no product fills
+(Simplify has no mobile surface). This is the app's headline feature.
+
+**Functional requirements**
+- **FR-WV-1** `WKWebView` browser opens a row's link in-app; **persistent cookie store**
+  (Workday-style logins survive across sessions).
+- **FR-WV-2 DOM enrichment.** Injected `scrapeJobPosting()` reads the **rendered** page —
+  works on JS-only SPAs that server-side curl cannot read — and updates row columns
+  (company/role/location/salary/remote/JD) + rescores. Auto-run on load + manual button.
+- **FR-WV-3 Apply-fill, tiered field matcher** (per-field confidence, fill only above
+  threshold):
+  1. `autocomplete` attribute (deterministic, exact mapping);
+  2. per-ATS adapters — greenhouse/Ashby/Lever field names; Workday `data-automation-id`
+     for the PII block, with simulated interaction for custom widgets (click-open, type,
+     dispatch events, select option) and a `MutationObserver` to re-run on wizard steps;
+  3. fuzzy synonym match on label/name/placeholder/aria-label (normalized token overlap);
+  4. LLM fallback for unknown labels: `{label, name, placeholder, nearbyText}` + profile
+     schema → `field | none` + confidence (batched; a few tokens per field).
+- **FR-WV-4 Transparency.** Every filled field is visually highlighted; a fill summary
+  lists filled / skipped / low-confidence. Fill values come only from the on-device profile.
+- **FR-WV-5 Hard denylist** (never filled at any confidence): password, SSN/IDs,
+  EEO/demographics/disability/veteran, consent/attestations, salary unless explicitly
+  configured. **Never click Submit.** Skip-not-guess: a miss is cheap, a wrong fill is not.
+- **FR-WV-6** Free-text questions route to the AI assistant (Phase 5), never blind-filled.
+- **FR-WV-7 One-tap "Mark applied"** in the browser chrome → status + date + log locally
+  → syncs. (The UC-2 payoff.)
+
+**Acceptance criteria**
+- [ ] Greenhouse/Ashby/Lever application: name/email/phone/LinkedIn/location filled correctly + highlighted; denylist untouched; Submit untouched.
+- [ ] Workday (after one in-app login): standard PII block fills; custom widgets fill via simulated interaction or are cleanly skipped and listed.
+- [ ] A JS-rendered posting that server enrichment failed on ("no metadata") is fully enriched via WKWebView scrape.
+- [ ] Wrong-fill rate ≈ 0 across the test matrix (low confidence ⇒ skip).
+- [ ] Full loop: open → fill → human submit → one tap → row Applied + dated → visible on the desktop board after sync.
+
+---
+
+### Phase 5 — AI draft assistant v2 (personal voice)
+
+**Goal:** drafts that sound like the candidate, with a chosen level of involvement per
+question — from "let AI run with it" to "interview me first."
+
+**Functional requirements**
+- **FR-AI-1 Three modes per question:** **Auto** (one-shot, today's behavior — fine for
+  boilerplate), **Example** (2 short scaffold variants from different angles to react to),
+  **Guided** (elicit, then draft — default for cover notes / "why us" / behavioral).
+- **FR-AI-2 Guided elicitation is tap-first:** pick the anchor story from the **narrative
+  library**; pick an angle (Impact / Technical / Leadership / Culture-fit); one optional
+  free-text "what should land" (a metric, a hook).
+- **FR-AI-3 Voice fidelity:** prompts include style exemplars (the user's saved past
+  answers); hard tone guardrail — plain, PM-altitude, honest, no filler adverbs, never
+  corporate-ify or inflate.
+- **FR-AI-4 Rough-in mode:** paste bullets / a messy draft → AI lightly edits without
+  polishing the voice out (editor, not ghostwriter).
+- **FR-AI-5 Refinement loop:** reaction chips (more concise · lead with story X · less
+  salesy · more technical) regenerate with the prior draft as context.
+- **FR-AI-6 Save-as-snippet:** accepted answers persist into the narrative library
+  (tagged by question type), becoming exemplars + near-instant answers for similar
+  questions — personalization compounds.
+- **FR-AI-7 API contract:** extend `/api/assist`:
+  request `{key, kind, mode, question?, jd?, narrativeId?, angle?, answers?[], roughDraft?,
+  priorDraft?, reaction?}` → response `{draft, variants?[], followupQuestions?[], tokens,
+  usage}`. Consumed by the desktop board and the app (the app may call OpenAI directly
+  with the same prompt assembly when serverless).
+
+**Acceptance criteria**
+- [ ] Guided flow on a "why this company" question: ≤3 taps + optional line → a draft that references the chosen narrative's real specifics (numbers, systems).
+- [ ] A saved snippet is visibly reused when a similar question recurs.
+- [ ] User evaluation: v2 Guided output reads closer to their own writing than v1 Auto output.
+- [ ] Refinement chips change the draft as directed without losing the anchor story.
+- [ ] Budget/caps and audit logging carry over from v1 assistant.
+
+---
+
+### Phase 6 — On-device scout (full self-sufficiency)
+
+**Goal:** the app discovers roles without the server.
+
+**Functional requirements**
+- **FR-SCT-1** Swift port of board polling (greenhouse/Ashby/Lever public APIs) from a
+  boards config synced from the server or edited in-app; filter → score → append-merge
+  with req-ID dedupe — parity with the Python scout on the same config.
+- **FR-SCT-2** `BGTaskScheduler` background refresh (best-effort; honest "last ran X ago"
+  UX) + a manual Run Scout button.
+- **FR-SCT-3** Local notification on new finds; event-key dedupe with server push
+  (Phase 3) so the same run never alerts twice.
+
+**Acceptance criteria**
+- [ ] Server off: manual in-app scout run finds/scores/merges correctly — sample parity vs the server scout on identical config.
+- [ ] No duplicate notifications when both server push and local scout cover the same finds.
+
+---
+
+## 5. Cross-cutting requirements
+
+- **Auth:** full token for sync/push registration (these are the user's own devices);
+  scoped INGEST token remains capture-only; tokens in iOS Keychain / extension storage;
+  never in URLs.
+- **Transport:** LAN HTTP is acceptable for sync (same trust domain). Off-LAN sync needs
+  the documented Cloudflare-tunnel HTTPS option; **push does not** (outbound-only).
+  iOS ATS exception scoped to the configured host, or the tunnel for clean HTTPS.
+- **Shared law (identity & conflict):** `id` UUID · per-row LWW by `updatedAt` ·
+  tombstones · req-ID dedupe (`postingId` from gh_jid / numeric id / Ashby UUID / query
+  params). Identical implementations in JS and Swift, proven by one shared JSON
+  test-vector suite.
+- **Accounts/costs:** Apple Developer ($99/yr) required for the Share Extension + push.
+- **Out of scope (hard guardrails):** bulk auto-submit; LinkedIn scraping/automation;
+  rebuilding the desktop autofill matrix (Simplify's job); multi-user/cloud SaaS.
+
+## 6. Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| JS + Swift logic drift | `scoring-criteria.md` as canonical spec + shared JSON test vectors asserted in both languages |
+| Workday/ATS DOM drift breaks fill | Tiered matcher degrades to skip-not-wrong; adapters only for ATSs actually used; fill summary makes gaps visible |
+| iOS background limits undercut scout/sync | Server push is the primary scheduler; BG tasks are best-effort by design; honest "last ran" UX |
+| LWW clock skew | Acceptable single-user; sync logs both timestamps for audit |
+| Scope creep toward auto-apply | §2 principles are hard rules; every PR reviewed against them |
+| Solo-maintainer bandwidth | Each phase ships standalone value; stop-anywhere roadmap; P1 alone fixes the desktop pain |
+
+## 7. Sequencing
+
+```
+P0 server sync/push foundation ──► P1 Chrome extension   (desktop loop fixed)
+        │
+        └──► P2 iOS app foundation ──► P3 push ──► P4 in-app browser fill
+                                            │
+                                            └──► P5 assistant v2 ──► P6 on-device scout
+```
+
+**Definition of overall success:** see a job anywhere → one action captures it, enriched
+and scored → triage from a push or Today on any device → apply on phone or desktop with
+factual fields pre-filled and answers in your own voice → the act of applying updates the
+CRM → all surfaces agree — with the Mac server optional throughout.

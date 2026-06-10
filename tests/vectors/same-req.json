@@ -1,0 +1,22 @@
+[
+  { "name": "same title, different posting ids -> distinct",
+    "a": { "company": "Dropbox", "role": "Staff Product Manager", "link": "https://jobs.dropbox.com/listing/9990001?gh_jid=9990001" },
+    "b": { "company": "Dropbox", "role": "Staff Product Manager", "link": "https://jobs.dropbox.com/listing/9990002?gh_jid=9990002" },
+    "expect": false },
+  { "name": "same title, same posting id -> same req",
+    "a": { "company": "Dropbox", "role": "Staff Product Manager", "link": "https://jobs.dropbox.com/listing/9990001?gh_jid=9990001" },
+    "b": { "company": "Dropbox", "role": "Staff Product Manager", "link": "https://www.dropbox.jobs/en/jobs/9990001/staff-product-manager/" },
+    "expect": true },
+  { "name": "same title, one link missing id -> conservative same",
+    "a": { "company": "Acme", "role": "Principal PM", "link": "https://acme.com/careers" },
+    "b": { "company": "Acme", "role": "Principal PM", "link": "https://job-boards.greenhouse.io/acme/jobs/1234567" },
+    "expect": true },
+  { "name": "different company -> distinct",
+    "a": { "company": "Acme", "role": "Principal PM", "link": "" },
+    "b": { "company": "Beta", "role": "Principal PM", "link": "" },
+    "expect": false },
+  { "name": "case-insensitive key (per-field whitespace is significant — documented reqKey behavior)",
+    "a": { "company": "Twilio", "role": "Product Management, L2", "link": "" },
+    "b": { "company": "twilio", "role": "product management, l2", "link": "" },
+    "expect": true }
+]

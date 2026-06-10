@@ -164,7 +164,11 @@ possible surface. **Explicit non-goal: form autofill** (Simplify keeps that job)
 **Goal:** a standalone app that replaces the mobile web view and works with **no backend**.
 
 **Functional requirements**
-- **FR-APP-1** SwiftUI + SwiftData (or SQLite) store with full schema parity (all tracking
+- **Framework: React Native** (decision locked 2026-06-10) — reuses the JS core instead of a
+  Swift re-port (kills logic drift); native Swift shim for the Share Extension + native modules
+  for background fetch/push. A shared dependency-free **`core/` module** is the single source of
+  the pure logic for server + app + extension.
+- **FR-APP-1** RN + a local store (WatermelonDB / op-sqlite) with full schema parity (all tracking
   fields + `id`/`updatedAt`/`deleted`) and identical computed semantics (EV = fit×prob/10,
   tier bands, status enum, lanes).
 - **FR-APP-2** Ported pure logic: `postingId` req-ID dedupe, append-merge, scoring/tier

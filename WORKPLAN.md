@@ -136,31 +136,50 @@ LinkedIn job page, simplify.jobs. DevTools audit: only configured-origin calls.
 
 ---
 
-## WP-2 — iOS app foundation  *(new Xcode project)*
+## WP-2 — iOS app foundation  *(React Native — decision locked 2026-06-10)*
 
-Branch/repo: decide at kickoff — recommend a **separate repo** (`job-pipeline-ios`) to
-keep this repo's open-source surface clean; copy `tests/vectors/` in (or submodule).
-Implements ROADMAP Phase 2 (FR-APP-1…8). Requires: WP-0 merged; Apple Developer account;
-Mac with Xcode (Claude Code can scaffold the project, build/test via `xcodebuild`).
+**Framework: React Native** (Expo bare or RN CLI). Rationale: the whole stack is JS, so the
+app **reuses** the core logic instead of re-porting it to Swift (kills the JS↔Swift drift risk
+the roadmap flags), and the owner has shipped 70k LOC of RN. The in-app browser (WP-4) is
+`react-native-webview` wrapping the same WKWebView with injected JS — framework-agnostic anyway.
+Known RN costs to plan for: a **small native Swift shim** for the Share Extension (RN doesn't run
+in extension memory limits — the shim writes the shared URL into App Group storage; the app reads
+it on next open), and native modules for background fetch (`react-native-background-fetch`) and
+push. *(If you'd rather go fully native Swift, only this WP's wording changes; the server WPs are
+unaffected.)*
 
-**Decisions to confirm at kickoff (ask the user):**
-- Separate repo vs `ios/` subdir · SwiftData vs GRDB/SQLite · min iOS version (17
-  suggested) · bundle id (needed for APNs) · app name.
+Branch/repo: recommend a **separate repo** (`job-pipeline-ios`) to keep this repo's open-source
+surface clean; the shared core (below) is copied in or git-submoduled so the vectors travel with
+it. Implements ROADMAP Phase 2 (FR-APP-1…8).
 
-**Milestones (each independently verifiable)**
-1. **M1 Core engine:** models (full schema + `id`/`updatedAt`/`deleted`), pure-logic port
-  (postingId/sameReq/EV/tier/lanes/Today counts), **vector tests green in Swift** (XCTest
-  reading the shared JSON vectors).
-2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
-   tracking edits; seeded sample store.
-3. **M3 Capture:** Share Extension → confirm sheet → save; on-device enrichment
-   (URLSession port of `computeEnrichFields`, incl. URL-slug company + JSON-LD/OG/title);
-   optional OpenAI scoring (Keychain key).
-4. **M4 Sync:** SyncEngine vs `/api/sync` (configurable URL+token; launch/foreground/
-   manual; LWW; offline queue; idRemap handling). ATS exception for the configured host
-   documented.
-5. **M5 Local notifications + export:** follow-up-due / needs-verify notifs; CSV/JSON
-   share-sheet export; local snapshots.
+**BLOCKED until the owner provides (kickoff gate):**
+- [ ] **Apple Developer account** ($99/yr) — required for the Share Extension + push entitlement.
+- [ ] **Bundle id** (e.g. `com.dhartung.jobpipeline`) — needed for the project + APNs.
+- [ ] **App name** + **min iOS version** (17 suggested).
+- [ ] Repo choice: separate `job-pipeline-ios` vs `ios/` subdir.
+- [ ] A **Mac with Xcode + CocoaPods** in the build environment (Claude Code builds via
+  `xcodebuild` / `expo prebuild`); none of WP-2 is verifiable without it.
+
+**M0 — Shared core (UNBLOCKED — can be done now, in this repo):** extract the pure logic
+(`postingId`, `reqKey`, `sameReq`, `computeTier`, EV, lane predicates, Today counts,
+`extractJobMeta` parser, `reconcileSync`) into a dependency-free **`core/` ES module** that the
+RN app imports verbatim, with id-generation injected (no Node-only `crypto`). Have `server.js`
+import it (retire its inline copies → single source of truth) and add `tests/run-core-vectors.js`.
+This is the concrete RN-enabling step; everything below depends on it.
+
+**Milestones (each independently verifiable; all need the kickoff gate cleared):**
+1. **M1 Core wiring:** RN data layer (WatermelonDB or op-sqlite; full schema + `id`/`updatedAt`/
+   `deleted`) backed by the shared `core/` logic; **vector tests green in the RN/Jest runner**
+   reading the same `tests/vectors/` JSON.
+2. **M2 UI shell:** Today + lists (tier/company grouping, applied-date sorts) + row detail with
+   all tracking edits/overrides; seeded sample store.
+3. **M3 Capture:** native **Share Extension** shim → App Group → confirm sheet → save;
+   on-device enrichment (RN `fetch` + the shared `extractJobMeta`); optional OpenAI scoring
+   (key in Keychain via `react-native-keychain`).
+4. **M4 Sync:** SyncEngine vs `/api/sync` (configurable URL+token; launch/foreground/manual;
+   LWW; offline queue; idRemap handling). ATS exception for the configured host (`Info.plist`).
+5. **M5 Local notifications + export:** follow-up-due / needs-verify (`notifee` or
+   `expo-notifications`); CSV/JSON share-sheet export; local snapshots.
 
 **Acceptance** — ROADMAP Phase 2 checklist (airplane-mode suite, convergence test with a
 seeded divergent store against a dev server instance on :8788).

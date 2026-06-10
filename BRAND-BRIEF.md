@@ -71,14 +71,17 @@ the whole field and you know exactly where to move next.
 
 ## The name — gold for a wordmark
 
-**Reqon** — pronounced **"reckon"** (REK-un). It's a deliberate triple meaning:
-- **recon** — reconnaissance: scouting ahead, gathering intelligence, situational awareness.
-- **req** — requisition: the job posting itself, the atomic unit the whole product revolves around.
-- **reckon** — to judge / estimate: the scoring engine's confident verdict on a role.
+**Reqon** — pronounced **"REE-kon"** (like *recon* / reconnaissance). The spoken brand leads
+with reconnaissance — precise, targeted, intelligence-driven — while the spelling does double
+duty on the page: **rec**on (scouting) + **req** (requisition: the job posting, the atomic unit
+the product revolves around). Two meanings in five letters — one spoken, one silent and visual.
 
-Scout → requisition → judgment, in five letters. The **Q** is the distinctive, ownable letter —
-strong, uncommon, and visually rich (its tail, its enclosed counter). It's a natural anchor for
-a glyph: a radar blip, a target reticle, a scope, a ping.
+*(The "REK-un / reckon" reading was considered and deliberately set aside — its casual,
+colloquial register is wrong for an operator-grade product that sells confident judgment. The
+brand is said "REE-kon," consistently, everywhere — type and voice both lean precise and sharp.)*
+
+The **Q** is the distinctive, ownable letter — strong, uncommon, visually rich (its tail, its
+enclosed counter). A natural anchor for a glyph: a radar blip, a target reticle, a scope, a ping.
 
 ## Visual raw material (explore — don't feel boxed in)
 
@@ -116,4 +119,4 @@ mandate — but the new identity should feel at home on a dark, precise, data-fo
 - *Know which roles are worth it.*
 - *Scout. Score. Pursue.*
 - *Your search, under command.*
-- *Every opportunity, reckoned.*
+- *Lock onto the roles worth pursuing.*

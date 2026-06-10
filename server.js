@@ -94,7 +94,45 @@ function writeStore(rows) {
   fs.writeFileSync(tmp, JSON.stringify(rows, null, 2));
   fs.renameSync(tmp, DATA_FILE);
 }
+// ---------- row identity (WP-0 / sync foundation) ----------
+// Every row carries a stable `id` (UUID) and `updatedAt` (ISO) so two stores can reconcile
+// (per-row last-writer-wins). Deletes are tombstones ({deleted:true} + updatedAt), never splices,
+// so a delete propagates through sync instead of the row resurrecting from the other side.
+const nowIso = () => new Date().toISOString();
+function touchRow(r) { r.updatedAt = nowIso(); r.syncedAt = r.updatedAt; return r; }
+function ensureRowIdentity(rows) {
+  let changed = 0;
+  for (const r of rows) {
+    if (!r || typeof r !== 'object') continue;
+    if (!r.id) { r.id = crypto.randomUUID(); changed++; }
+    // backfill updatedAt from `added` (date-only) so pre-sync rows sort older than fresh edits
+    if (!r.updatedAt) { r.updatedAt = r.added ? (String(r.added).slice(0, 10) + 'T00:00:00.000Z') : nowIso(); changed++; }
+    if (!r.syncedAt) { r.syncedAt = r.updatedAt; changed++; }
+  }
+  return changed;
+}
+const liveRows = rows => rows.filter(r => r && r.deleted !== true);
+
 const reqKey = x => (String(x.company || '') + '|' + String(x.role || '')).toLowerCase().trim();
+// A stable posting id pulled from the link (greenhouse gh_jid / numeric job id, ashby uuid,
+// generic /jobs|listing/<id>, jobId/reqId params). Lets distinct same-title reqs at one company
+// coexist (different ids), while a re-capture of the SAME posting still dedupes.
+function postingId(u) {
+  if (!u) return '';
+  const s = String(u);
+  let m = s.match(/[?&]gh_jid=(\d+)/i) || s.match(/\/listing\/(\d+)/i) || s.match(/\/jobs?\/(\d{4,})/i) || s.match(/[?&](?:jobid|requisitionid|reqid)=([\w-]+)/i);
+  if (m) return m[1].toLowerCase();
+  m = s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);   // ashby/uuid
+  return m ? m[0].toLowerCase() : '';
+}
+// Same posting only if company+role match AND there aren't two provably-different posting ids.
+// Strictly more conservative than reqKey alone — it only SPLITS apart same-title rows that carry
+// different req ids (e.g. 3 "Staff Product Manager" at Dropbox); it never merges more than before.
+function sameReq(a, b) {
+  if (reqKey(a) !== reqKey(b)) return false;
+  const ia = postingId(a.link || a.url), ib = postingId(b.link || b.url);
+  return !(ia && ib && ia !== ib);
+}
 const expectedValue = x => +(((+x.fit || 0) * (+x.prob || 0)) / 10).toFixed(1);
 
 // Tier from fit/prob per agent/scoring-criteria.md (EV = fit*prob/10).
@@ -370,6 +408,19 @@ app.put('/api/reqs', (req, res) => {
       }
     }
   }
+  // WP-0 identity safety net: new rows get ids; changed rows whose client didn't stamp a newer
+  // updatedAt get touched server-side, so per-row LWW always has an honest timestamp.
+  const byId = new Map(current.filter(r => r.id).map(r => [r.id, r]));
+  const stripTs = r => { const { updatedAt, syncedAt, ...rest } = r; return JSON.stringify(rest); };
+  for (const r of rows) {
+    if (!r.id) { r.id = crypto.randomUUID(); r.updatedAt = r.updatedAt || nowIso(); r.syncedAt = nowIso(); continue; }
+    const cur = byId.get(r.id);
+    if (!cur) { r.updatedAt = r.updatedAt || nowIso(); r.syncedAt = nowIso(); continue; }
+    if (stripTs(cur) !== stripTs(r)) {
+      r.syncedAt = nowIso();   // server receive time — the delta-pull (`since`) feed
+      if (!r.updatedAt || r.updatedAt <= (cur.updatedAt || '')) r.updatedAt = nowIso();   // LWW safety net
+    }
+  }
   try {
     if (current.length > 0) snapshotData('auto');   // pre-overwrite safety snapshot
     writeStore(rows);
@@ -392,25 +443,25 @@ app.post('/api/reqs/merge', (req, res) => {
   if (!Array.isArray(incoming)) return res.status(400).json({ ok: false, error: 'Expected a JSON array, or an object { "roles": [...] }.' });
   const rows = readStore();
   const boards = readJsonSafe(BOARDS_FILE, {});
-  const existing = new Set(rows.map(reqKey));
   let added = 0, skippedPolicy = 0;
   const addedKeys = [], policyDrops = [];
   for (const x of incoming) {
     const k = reqKey(x);
     if (!k || k === '|') continue;
-    if (!existing.has(k)) {
+    if (!rows.some(r => sameReq(r, x))) {   // req-id aware: distinct same-title postings coexist
       // default any missing tracking fields so merged rows render cleanly
       const row = Object.assign({
         status: 'Not Applied', applied: '', interview: '', recruiter: '', referral: 'No',
         resume: '—', cover: 'No', followup: '', lastcontact: '', next: '', source: '',
         added: new Date().toISOString().slice(0, 10)
       }, x);
+      if (!row.id) row.id = crypto.randomUUID();
+      row.updatedAt = row.updatedAt || nowIso();
       // enforce the A/B-only + employment policy at the merge boundary (config-driven)
       const block = mergePolicyBlock(row, boards);
       if (block) { skippedPolicy++; policyDrops.push({ key: k, reason: block }); continue; }
       if (!row.applyMode) row.applyMode = inferApplyMode(row, boards);   // Phase 4: stamp how to apply
       rows.push(row);
-      existing.add(k);
       added++;
       addedKeys.push(k);
     }
@@ -482,12 +533,12 @@ app.post('/api/reqs/quickadd', (req, res) => {
     resume: '—', cover: 'No', followup: '', lastcontact: '', next: '',
     added: today, reqCheck: 'lead', reqCheckNote: `Quick-add via ${source}; verify live + score.`, reqCheckedOn: today,
     source: b.sourceType || 'manual',   // origin for the source filter (ATS sources are stamped by the scout)
-    needsEnrichment: true   // Tier 1: every fresh capture is queued for deep enrichment
+    needsEnrichment: true,   // Tier 1: every fresh capture is queued for deep enrichment
+    id: crypto.randomUUID(), updatedAt: nowIso()
   };
   row.applyMode = inferApplyMode(row, readJsonSafe(BOARDS_FILE, {}));   // Phase 4
   const rows = readStore();
-  const k = reqKey(row);
-  if (rows.some(r => reqKey(r) === k)) {
+  if (rows.some(r => sameReq(r, row))) {   // req-id aware: same title at one company is only a dup when the posting id matches
     return res.json({ ok: true, added: 0, skipped: 1, duplicate: true, company, role, total: rows.length });
   }
   rows.push(row);
@@ -693,7 +744,7 @@ function daysSinceServer(d) {
 
 function composeDigest(days) {
   days = Math.max(1, Math.min(60, days || digestDays()));
-  const rows = readStore();
+  const rows = liveRows(readStore());
   const hy = hygieneSettings(readJsonSafe(BOARDS_FILE, {}));
   const ev = r => +(((+r.fit || 0) * (+r.prob || 0)) / 10).toFixed(1);
   const byEv = (a, b) => ev(b) - ev(a);
@@ -806,6 +857,11 @@ async function composeDigestAndDeliver() {
     st.lastSent = new Date().toISOString(); st.lastChannel = r.channel; st.lastCounts = payload.counts;
     writeJsonPretty(DIGEST_STATE, st);
     console.log('[digest] sent via ' + r.channel, payload.counts);
+    // WP-0 push hook: digest summary incl. follow-ups due (FR-SRV-5)
+    const c = payload.counts || {};
+    sendPush({ title: 'Morning digest',
+      body: `${c.newFinds || 0} new · ${c.followUps || 0} follow-ups due · ${c.closed || 0} closed`,
+      eventKey: 'digest-' + new Date().toISOString().slice(0, 10) }).catch(() => {});
   } catch (e) { console.error('[digest] delivery failed:', e.message); }
 }
 
@@ -813,7 +869,7 @@ async function composeDigestAndDeliver() {
 // The scout's STEP 0 reads this queue, then PATCHes each row back with enriched fields.
 app.get('/api/reqs/needing-enrichment', (req, res) => {
   const rows = readStore();
-  const queue = rows.filter(r => r.needsEnrichment === true);
+  const queue = liveRows(rows).filter(r => r.needsEnrichment === true);
   res.json({ ok: true, count: queue.length, rows: queue });
 });
 
@@ -842,6 +898,7 @@ app.patch('/api/reqs/:key', (req, res) => {
     if (JSON.stringify(before[k]) !== JSON.stringify(apply[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: apply[k] };
   }
   Object.assign(rows[idx], apply);
+  touchRow(rows[idx]);
   const after = rows[idx];
   try { writeStore(rows); }
   catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
@@ -861,6 +918,69 @@ app.patch('/api/reqs/:key', (req, res) => {
   logEnrichment(entry);
 
   res.json({ ok: true, key, changes, tier: after.tier, conf: after.conf, needsEnrichment: after.needsEnrichment === true, logged: true });
+});
+
+// ---------- sync (WP-0): device↔server reconcile ----------
+// Pure reconcile, exported for the shared test vectors. Per-row last-writer-wins by updatedAt;
+// unknown ids append (still subject to req-ID dedupe → idRemaps tells the client which of its
+// rows are actually an existing server row); tombstones propagate like any other edit.
+function reconcileSync(serverRows, clientRows) {
+  const out = serverRows.slice();
+  const byId = new Map(out.map((r, i) => [r.id, i]));
+  let applied = 0, conflicts = 0;
+  const idRemaps = [];
+  for (const c of (clientRows || [])) {
+    if (!c || typeof c !== 'object') continue;
+    if (!c.id) c.id = crypto.randomUUID();
+    c.updatedAt = c.updatedAt || nowIso();
+    const i = byId.has(c.id) ? byId.get(c.id) : -1;
+    if (i >= 0) {
+      const s = out[i];
+      if ((c.updatedAt || '') > (s.updatedAt || '')) { c.syncedAt = nowIso(); out[i] = c; applied++; }
+      else if ((c.updatedAt || '') < (s.updatedAt || '') && JSON.stringify(c) !== JSON.stringify(s)) conflicts++;   // server wins; counted for the log
+    } else {
+      // unknown id — dedupe by posting identity before appending (capture raced on two devices)
+      const dup = out.findIndex(r => sameReq(r, c));
+      if (dup >= 0) { idRemaps.push({ from: c.id, to: out[dup].id }); conflicts++; continue; }
+      c.syncedAt = nowIso();
+      out.push(c); applied++;
+    }
+  }
+  return { rows: out, applied, conflicts, idRemaps };
+}
+
+app.post('/api/sync', (req, res) => {
+  const b = req.body || {};
+  const clientRows = Array.isArray(b.rows) ? b.rows : [];
+  const since = typeof b.since === 'string' ? b.since : '';
+  const current = readStore();
+  ensureRowIdentity(current);
+  const { rows: merged, applied, conflicts, idRemaps } = reconcileSync(current, clientRows);
+  try {
+    if (applied > 0) {
+      snapshotData('auto'); pruneAutoBackups();
+      writeStore(merged);
+      logChange({ ts: nowIso(), action: 'sync', clientSent: clientRows.length, applied, conflicts, idRemaps: idRemaps.length, after: merged.length });
+    }
+    const back = since ? merged.filter(r => (r.syncedAt || r.updatedAt || '') > since) : merged;
+    res.json({ ok: true, rows: back, serverTime: nowIso(), applied, conflicts, idRemaps });
+  } catch (e) {
+    console.error('[POST /api/sync]', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Hard-purge tombstones (explicit maintenance only — deletes are otherwise soft).
+app.post('/api/maintenance/purge-tombstones', (req, res) => {
+  const rows = readStore();
+  const keep = rows.filter(r => r.deleted !== true);
+  const purged = rows.length - keep.length;
+  if (purged > 0) {
+    snapshotData('manual');
+    writeStore(keep);
+    logChange({ ts: nowIso(), action: 'purge-tombstones', purged, after: keep.length });
+  }
+  res.json({ ok: true, purged, total: keep.length });
 });
 
 // ---------- lead enrichment worker (fetch posting → JSON-LD/OG → real fields) ----------
@@ -896,7 +1016,7 @@ function parseJsonLdJobs(html) {
   }
   return out;
 }
-function extractJobMeta(html) {
+function extractJobMeta(html, url) {
   const res = { company: '', role: '', location: '', remote: '', jd: '', employmentType: '' };
   const jobs = parseJsonLdJobs(html);
   if (jobs.length) {
@@ -913,17 +1033,37 @@ function extractJobMeta(html) {
     else if (loc) { res.location = loc; res.remote = 'onsite'; }
     res.employmentType = (Array.isArray(j.employmentType) ? j.employmentType.join(',') : j.employmentType) || '';
   }
-  if (!res.role || !res.company) {
-    const og = metaContent(html, 'og:title');
-    if (og) {
-      const t = og.replace(/\s*\|\s*[^|]*$/, '').trim();   // strip "| Simplify" etc.
-      const mm = t.match(/^(.*\S)\s*@\s*(\S.*)$/) || t.match(/^(.*\S)\s+at\s+(\S.*)$/i) || t.match(/^(.*\S)\s+[–—-]\s+(\S.*)$/);
-      if (mm) { res.role = res.role || mm[1].trim(); res.company = res.company || mm[2].trim(); }
-      else res.role = res.role || t;
-    }
+  const ogTitle = (metaContent(html, 'og:title') || '').replace(/\s*\|\s*[^|]*$/, '').trim();
+  const titleTag = stripTags(((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]) || '')
+    .replace(/\s*\|\s*[^|]*$/, '').replace(/^job application for\s+/i, '').trim();
+  // COMPANY — the ATS URL slug is authoritative (greenhouse/ashby/lever put the company in the path).
+  // Title fragments like "Staff Product Manager - Enterprise AI" are a TEAM, not the company, so we
+  // never split a "- X" / ", X" tail off as the company. Fallbacks: JSON-LD org, then "… at Company".
+  const urlCompany = companyFromUrl(url);
+  if (urlCompany) res.company = urlCompany;
+  if (!res.company) { const m = titleTag.match(/\s+at\s+(\S.+)$/i); if (m) res.company = m[1].trim(); }
+  // ROLE — keep the full title (og:title on ATS boards is the pure role and may contain "-"/","); only
+  // trim a trailing " at <company>" if present. Never truncate at a dash/comma.
+  if (!res.role) res.role = ogTitle || titleTag.replace(/\s+at\s+\S.+$/i, '').trim();
+  if (res.role && res.company) {
+    res.role = res.role.replace(new RegExp('\\s+at\\s+' + res.company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i'), '').trim();
   }
   if (!res.jd) { const ogd = metaContent(html, 'og:description'); if (ogd) res.jd = ogd.slice(0, 2000); }
+  if (!res.remote && /\bremote\b/i.test(res.jd.slice(0, 400))) res.remote = 'remote';   // detect remote when JSON-LD didn't
   return res;
+}
+// Company from an ATS URL slug — greenhouse/ashby/lever/workable put it in the path; the most
+// reliable source when page metadata lacks a company. Title-cases the slug (twilio -> Twilio).
+function companyFromUrl(url) {
+  try {
+    const u = new URL(url); const h = u.hostname.toLowerCase();
+    const seg = u.pathname.split('/').filter(Boolean);
+    let slug = '';
+    if (h.includes('greenhouse.io') || h.includes('ashbyhq.com') || h.includes('lever.co') || h.includes('workable.com')) slug = seg[0] || '';
+    else if (h.includes('myworkdayjobs.com')) slug = h.split('.')[0] || '';
+    if (!slug || /^(jobs?|careers?|apply|embed|en|en-us|o|p)$/i.test(slug)) return '';
+    return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+  } catch (e) { return ''; }
 }
 function guessSector(text) {
   const t = (text || '').toLowerCase();
@@ -956,7 +1096,7 @@ async function computeEnrichFields(row, opts) {
   const url = row.link || row.url || '';
   if (!url) return null;
   const html = await fetchHtml(url);
-  const meta = extractJobMeta(html);
+  const meta = extractJobMeta(html, url);
   if (!meta.company && !meta.role) return null;
   const fields = {};
   if (meta.company) fields.company = meta.company;
@@ -974,6 +1114,26 @@ async function computeEnrichFields(row, opts) {
   if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob);
   return { fields, scored };
 }
+// Apply enriched fields to rows[idx], but if the corrected company+role now matches a DIFFERENT
+// existing row (e.g. a lead resolves to a role the scout already tracks), drop the lead instead of
+// duplicating — the existing (possibly edited/verified) row wins. Mutates `rows`.
+function applyEnrichedRow(rows, idx, fields) {
+  // probe with the post-enrichment company/role but the row's existing link (carries the req id)
+  const probe = { company: fields.company || rows[idx].company, role: fields.role || rows[idx].role, link: fields.link || rows[idx].link };
+  const dup = rows.findIndex((r, j) => j !== idx && sameReq(r, probe) && r.deleted !== true);
+  if (dup >= 0) {
+    // tombstone (not splice) so the duplicate lead's removal propagates through sync
+    const removed = rows[idx];
+    removed.deleted = true; touchRow(removed);
+    return { action: 'merged', key: reqKey(removed), into: reqKey(probe), changes: {} };
+  }
+  const before = Object.assign({}, rows[idx]);
+  Object.assign(rows[idx], fields);
+  touchRow(rows[idx]);
+  const changes = {};
+  for (const k of Object.keys(fields)) if (JSON.stringify(before[k]) !== JSON.stringify(fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: fields[k] };
+  return { action: 'updated', key: reqKey(rows[idx]), changes };
+}
 // Fire-and-forget enrichment of one row by key — used by quickadd so a capture becomes a full,
 // scored row on its own. Re-reads the store after the (slow) fetch so a concurrent save isn't lost.
 // Never throws; logs to the enrichment audit log.
@@ -987,12 +1147,11 @@ async function backgroundEnrich(key) {
     rows = readStore();                                   // re-read post-fetch
     idx = rows.findIndex(r => reqKey(r) === key);
     if (idx < 0) return;
-    const before = Object.assign({}, rows[idx]);
-    Object.assign(rows[idx], ce.fields);
-    const changes = {};
-    for (const k of Object.keys(ce.fields)) if (JSON.stringify(before[k]) !== JSON.stringify(ce.fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: ce.fields[k] };
+    const res = applyEnrichedRow(rows, idx, ce.fields);
     writeStore(rows);
-    logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich', result: 'pass', changes, sourceUrl: rows[idx].link || null, note: 'auto-enrich on capture' + (ce.scored ? ' + AI score' : '') });
+    logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich',
+      result: res.action === 'merged' ? 'merged' : 'pass', changes: res.changes,
+      note: res.action === 'merged' ? ('resolved to already-tracked ' + res.into + '; duplicate lead removed') : ('auto-enrich on capture' + (ce.scored ? ' + AI score' : '')) });
   } catch (e) { console.error('[auto-enrich]', e.message); }
 }
 // POST /api/enrich/run  body: {key?: "company|role"} single, or {all:true}/none => all needsEnrichment leads.
@@ -1005,22 +1164,85 @@ app.post('/api/enrich/run', async (req, res) => {
   const targets = rows.map((r, i) => ({ r, i })).filter(o => wantKey ? reqKey(o.r) === wantKey : o.r.needsEnrichment === true);
   if (!targets.length) return res.json({ ok: true, enriched: 0, failed: 0, results: [], note: 'No matching leads to enrich.' });
   let snapped = false; const results = [];
+  // descending index order so a dedupe splice never shifts an index we haven't processed yet
+  targets.sort((a, b) => b.i - a.i);
   for (const { r, i } of targets) {
     try {
       const ce = await computeEnrichFields(r, { score: doScore });
       if (!ce) { results.push({ key: reqKey(r), ok: false, note: 'no link or no metadata (JS-only page?)' }); continue; }
       if (!snapped) { snapshotData('auto'); snapped = true; }
-      const before = Object.assign({}, rows[i]);
-      Object.assign(rows[i], ce.fields);
-      const changes = {};
-      for (const k of Object.keys(ce.fields)) if (JSON.stringify(before[k]) !== JSON.stringify(ce.fields[k])) changes[k] = { old: before[k] === undefined ? null : before[k], new: ce.fields[k] };
-      logEnrichment({ ts: new Date().toISOString(), run: 'enrich-worker', key: reqKey(before), action: 'enrich', result: 'pass', changes, sourceUrl: r.link || null, note: 'JSON-LD/OG enrichment' + (ce.scored ? ' + AI score' : '') });
-      results.push({ key: reqKey(rows[i]), ok: true, company: rows[i].company, role: rows[i].role, scored: !!ce.scored });
+      const res = applyEnrichedRow(rows, i, ce.fields);
+      logEnrichment({ ts: new Date().toISOString(), run: 'enrich-worker', key: res.key, action: 'enrich',
+        result: res.action === 'merged' ? 'merged' : 'pass', changes: res.changes, sourceUrl: r.link || null,
+        note: res.action === 'merged' ? ('resolved to already-tracked ' + res.into + '; duplicate lead removed') : ('JSON-LD/OG enrichment' + (ce.scored ? ' + AI score' : '')) });
+      if (res.action === 'merged') results.push({ key: res.key, ok: true, merged: true, into: res.into });
+      else results.push({ key: res.key, ok: true, company: rows[i].company, role: rows[i].role, scored: !!ce.scored });
     } catch (e) { results.push({ key: reqKey(r), ok: false, note: e.message }); }
   }
   try { writeStore(rows); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   const enriched = results.filter(x => x.ok).length;
   res.json({ ok: true, enriched, failed: results.length - enriched, results });
+});
+
+// ---------- push (WP-0): APNs sender + device registry ----------
+// Token-based APNs (.p8 / ES256 JWT over HTTP/2, zero deps). INERT until the four APNS_* env
+// vars are set — same gating pattern as SMTP/Slack. Outbound-only: works behind NAT, no tunnel.
+const PUSH_TOKENS = path.join(ROOT, 'agent', 'push-tokens.json');
+const apnsConfigured = () => !!(process.env.APNS_KEY_P8_PATH && process.env.APNS_KEY_ID && process.env.APNS_TEAM_ID && process.env.APNS_BUNDLE_ID);
+let apnsJwtCache = { token: '', iat: 0 };
+function apnsAuthToken() {
+  const now = Math.floor(Date.now() / 1000);
+  if (apnsJwtCache.token && now - apnsJwtCache.iat < 2400) return apnsJwtCache.token;   // APNs: reuse 20–60 min
+  const key = fs.readFileSync(path.resolve(ROOT, process.env.APNS_KEY_P8_PATH), 'utf8');
+  const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const unsigned = b64({ alg: 'ES256', kid: process.env.APNS_KEY_ID }) + '.' + b64({ iss: process.env.APNS_TEAM_ID, iat: now });
+  const sig = crypto.sign('sha256', Buffer.from(unsigned), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+  apnsJwtCache = { token: unsigned + '.' + sig, iat: now };
+  return apnsJwtCache.token;
+}
+const pushDevices = () => readJsonSafe(PUSH_TOKENS, []);
+// payload: {title, body, eventKey} — eventKey lets the app dedupe vs its own local notifications.
+async function sendPush(payload) {
+  if (!apnsConfigured()) return { ok: false, skipped: 'apns-not-configured' };
+  const devices = pushDevices();
+  if (!devices.length) return { ok: false, skipped: 'no-devices' };
+  const host = process.env.APNS_ENV === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
+  const body = JSON.stringify({ aps: { alert: { title: payload.title, body: payload.body }, sound: 'default' }, eventKey: payload.eventKey || '' });
+  const http2 = require('http2');
+  let sent = 0, failed = 0;
+  const client = http2.connect('https://' + host);
+  try {
+    await Promise.all(devices.map(d => new Promise(resolve => {
+      const req = client.request({
+        ':method': 'POST', ':path': '/3/device/' + d.token,
+        'authorization': 'bearer ' + apnsAuthToken(),
+        'apns-topic': process.env.APNS_BUNDLE_ID, 'apns-push-type': 'alert',
+        'content-type': 'application/json'
+      });
+      req.on('response', h => { h[':status'] === 200 ? sent++ : failed++; });
+      req.on('error', () => { failed++; resolve(); });
+      req.on('close', resolve);
+      req.end(body);
+    })));
+  } catch (e) { console.error('[push]', e.message); } finally { try { client.close(); } catch (e) {} }
+  console.log(`[push] "${payload.title}" sent=${sent} failed=${failed}`);
+  return { ok: true, sent, failed };
+}
+app.post('/api/push/register', (req, res) => {
+  const b = req.body || {};
+  const token = String(b.token || '').trim();
+  if (!token) return res.status(400).json({ ok: false, error: 'token required' });
+  const list = pushDevices();
+  if (!list.some(d => d.token === token)) {
+    list.push({ token, platform: b.platform || 'ios', registeredAt: nowIso() });
+    writeJsonPretty(PUSH_TOKENS, list);
+  }
+  res.json({ ok: true, devices: list.length, apnsConfigured: apnsConfigured() });
+});
+// Manual test push (full-auth) — verifies the APNs pipeline without waiting on a scout run.
+app.post('/api/push/test', async (req, res) => {
+  const r = await sendPush({ title: 'Job Pipeline CRM', body: (req.body || {}).message || 'Test push from the server.', eventKey: 'test-' + Date.now() });
+  res.json(Object.assign({ ok: true }, r));
 });
 
 // ---------- scout trigger (deterministic core; optional OpenAI enrichment) ----------
@@ -1093,6 +1315,19 @@ app.post('/api/scout/run', (req, res) => {
       if (s.state === 'running') { s.state = code === 0 ? 'done' : 'error'; if (code !== 0) s.error = 'exited ' + code; writeScoutStatus(s); }
     } catch (e) {}
     console.log('[scout] run finished (mode=' + mode + ', code=' + code + ')');
+    // WP-0 push hook: notify registered devices when a successful run lands results
+    if (code === 0) {
+      try {
+        const s = JSON.parse(fs.readFileSync(SCOUT_STATUS, 'utf8'));
+        const added = (s.find && s.find.added) || 0, matches = (s.find && s.find.newMatches) || 0;
+        const refreshed = (s.validate && s.validate.refreshed) || 0;
+        if (added > 0 || matches > 0 || refreshed > 0) {
+          sendPush({ title: 'Scout finished',
+            body: `${added} new added` + (matches ? ` · ${matches} matches` : '') + (refreshed ? ` · ${refreshed} refreshed` : ''),
+            eventKey: 'scout-' + (s.run || Date.now()) }).catch(() => {});
+        }
+      } catch (e) {}
+    }
   });
   res.json({ ok: true, started: true, mode, sources: sources || 'all', llmEnabled: !!process.env.OPENAI_API_KEY });
 });
@@ -1239,6 +1474,8 @@ function settingsPayload() {
     applyModeMap: applyModeMapMerged(boards),
     auth: {
       appTokenSet: !!process.env.APP_TOKEN,
+      apnsSet: apnsConfigured(),
+      pushDevices: pushDevices().length,
       ingestTokenSet: !!process.env.INGEST_TOKEN,
       ingestTokenLast4: last4(process.env.INGEST_TOKEN || '')
     },
@@ -1614,7 +1851,7 @@ async function buildWorkbook(rows) {
 
 app.get('/api/export.xlsx', async (req, res) => {
   try {
-    const wb = await buildWorkbook(readStore());
+    const wb = await buildWorkbook(liveRows(readStore()));
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="job-search-CRM.xlsx"');
     await wb.xlsx.write(res);
@@ -1628,6 +1865,19 @@ app.get('/api/export.xlsx', async (req, res) => {
 // ---------- boot ----------
 ensureConfig();
 ensureStore();
+// Pure logic exported for the shared test-vector suite (tests/run-vectors.js) and future
+// clients. Requiring this module does NOT start the server, schedulers, or the migration.
+module.exports = { postingId, sameReq, reqKey, computeTier, reconcileSync, ensureRowIdentity, extractJobMeta, companyFromUrl, liveRows };
+
+if (require.main !== module) return;   // imported for tests — stop before side effects
+
+// WP-0 one-time identity migration: backfill id/updatedAt on legacy rows (snapshot first).
+try {
+  const rows = readStore();
+  const n = ensureRowIdentity(rows);
+  if (n > 0) { snapshotData('phase'); writeStore(rows); console.log(`[migrate] backfilled id/updatedAt (${n} field(s) across ${rows.length} rows)`); }
+} catch (e) { console.error('[migrate] identity backfill failed:', e.message); }
+
 setInterval(digestScheduler, 60 * 1000);   // morning-digest scheduler (Phase 7)
 app.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces();

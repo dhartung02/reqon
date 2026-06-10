@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Job Pipeline CRM Companion",
+  "version": "0.1.0",
+  "description": "Clip job postings, see your fit/EV overlay on the page, and write Applied status back to your self-hosted Job Pipeline CRM. No autofill — that stays with your form-filler.",
+  "action": { "default_title": "Clip this job to the CRM" },
+  "background": { "service_worker": "bg.js" },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "permissions": ["storage", "activeTab", "alarms"],
+  "host_permissions": ["http://localhost:8787/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://job-boards.greenhouse.io/*",
+        "https://boards.greenhouse.io/*",
+        "https://jobs.ashbyhq.com/*",
+        "https://jobs.lever.co/*",
+        "https://www.linkedin.com/jobs/*",
+        "https://simplify.jobs/*"
+      ],
+      "js": ["content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

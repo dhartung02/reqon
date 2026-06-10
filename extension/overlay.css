@@ -1,0 +1,23 @@
+.jpcrm-box{position:fixed;right:16px;bottom:16px;z-index:2147483647;width:300px;
+  background:#151b23;color:#e8eef5;border:1px solid #333c47;border-radius:12px;
+  box-shadow:0 12px 32px -16px rgba(0,0,0,.55);font:13px/1.4 -apple-system,system-ui,sans-serif;padding:11px 13px}
+.jpcrm-box *{box-sizing:border-box}
+.jpcrm-row{display:flex;align-items:center;gap:8px}
+.jpcrm-logo{font-weight:800;font-size:.62rem;letter-spacing:.12em;color:#e3b95a}
+.jpcrm-status{flex:1;color:#aab6c2;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jpcrm-x{background:none;border:0;color:#8a96a3;font-size:1.1rem;cursor:pointer;line-height:1;padding:0 2px}
+.jpcrm-x:hover{color:#e8eef5}
+.jpcrm-body{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:9px}
+.jpcrm-tier{font-weight:700;font-size:.62rem;padding:2px 7px;border-radius:6px}
+.jpcrm-tA{background:#e3b95a;color:#15110a}.jpcrm-tB{background:#79a6e0;color:#0e1217}.jpcrm-tC{background:#2a3540;color:#aab6c2}
+.jpcrm-metric{font-family:ui-monospace,monospace;font-size:.72rem;color:#aab6c2}
+.jpcrm-ev{color:#e3b95a;font-weight:700}
+.jpcrm-pill{font-size:.7rem;padding:3px 9px;border-radius:7px;border:1px solid #333c47;color:#aab6c2}
+.jpcrm-btn{margin-top:4px;flex-basis:100%;background:transparent;border:1px solid #333c47;color:#e8eef5;
+  border-radius:8px;padding:7px 10px;font-size:.8rem;cursor:pointer;font-family:inherit}
+.jpcrm-btn:hover{border-color:#e3b95a}
+.jpcrm-btn:disabled{opacity:.6;cursor:default}
+.jpcrm-primary{background:#e3b95a;color:#15110a;border-color:#e3b95a;font-weight:700}
+.jpcrm-toast{margin-top:8px;background:#16240f;border:1px solid #345a32;color:#69c57e;border-radius:8px;padding:7px 10px;font-size:.78rem}
+.jpcrm-toast.jpcrm-warn{background:#2f1a16;border-color:#54322b;color:#e8755f}
+@media (prefers-color-scheme: light){.jpcrm-box{background:#fff;color:#1a1f29;border-color:#d0d1d8}.jpcrm-status,.jpcrm-metric{color:#5a5d77}}

@@ -1,0 +1,11 @@
+[
+  { "url": "https://job-boards.greenhouse.io/twilio/jobs/7963691", "expect": "7963691" },
+  { "url": "https://jobs.dropbox.com/listing/7954604?gh_jid=7954604", "expect": "7954604" },
+  { "url": "https://www.dropbox.jobs/en/jobs/7954604/staff-product-manager/?gh_src=aonhf1", "expect": "7954604" },
+  { "url": "https://jobs.ashbyhq.com/vanta/4b9d0f0e-2b8e-41f6-8f46-ca5a7a367028", "expect": "4b9d0f0e-2b8e-41f6-8f46-ca5a7a367028" },
+  { "url": "https://simplify.jobs/p/15fe0c09-5b8e-41f6-8f46-ca5a7a367028/Principal-Technical-Product-Manager", "expect": "15fe0c09-5b8e-41f6-8f46-ca5a7a367028" },
+  { "url": "https://example.com/careers?jobId=ABC-123", "expect": "abc-123" },
+  { "url": "https://example.com/careers/apply?reqid=R4471", "expect": "r4471" },
+  { "url": "https://www.linkedin.com/jobs/search/?keywords=pm", "expect": "" },
+  { "url": "", "expect": "" }
+]

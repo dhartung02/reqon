@@ -1,0 +1,41 @@
+[
+  { "name": "client newer wins whole row",
+    "server": [ { "id": "r1", "company": "Acme", "role": "PM", "status": "Not Applied", "updatedAt": "2026-06-01T00:00:00.000Z" } ],
+    "client": [ { "id": "r1", "company": "Acme", "role": "PM", "status": "Applied", "applied": "2026-06-09", "updatedAt": "2026-06-09T12:00:00.000Z" } ],
+    "expect": { "len": 1, "applied": 1, "conflicts": 0, "idRemaps": 0,
+      "rows": [ { "id": "r1", "field": "status", "value": "Applied" } ] } },
+
+  { "name": "server newer wins; counted as conflict",
+    "server": [ { "id": "r1", "company": "Acme", "role": "PM", "status": "Recruiter Screen", "updatedAt": "2026-06-09T12:00:00.000Z" } ],
+    "client": [ { "id": "r1", "company": "Acme", "role": "PM", "status": "Applied", "updatedAt": "2026-06-05T00:00:00.000Z" } ],
+    "expect": { "len": 1, "applied": 0, "conflicts": 1, "idRemaps": 0,
+      "rows": [ { "id": "r1", "field": "status", "value": "Recruiter Screen" } ] } },
+
+  { "name": "unknown id appends",
+    "server": [ { "id": "r1", "company": "Acme", "role": "PM", "link": "https://job-boards.greenhouse.io/acme/jobs/1111111", "updatedAt": "2026-06-01T00:00:00.000Z" } ],
+    "client": [ { "id": "c9", "company": "Beta", "role": "Staff PM", "link": "https://job-boards.greenhouse.io/beta/jobs/2222222", "updatedAt": "2026-06-09T00:00:00.000Z" } ],
+    "expect": { "len": 2, "applied": 1, "conflicts": 0, "idRemaps": 0,
+      "rows": [ { "id": "c9", "field": "company", "value": "Beta" } ] } },
+
+  { "name": "unknown id but same posting -> idRemap, no duplicate",
+    "server": [ { "id": "r1", "company": "Twilio", "role": "Product Management, L2", "link": "https://job-boards.greenhouse.io/twilio/jobs/7963691", "updatedAt": "2026-06-01T00:00:00.000Z" } ],
+    "client": [ { "id": "c2", "company": "Twilio", "role": "Product Management, L2", "link": "https://job-boards.greenhouse.io/twilio/jobs/7963691", "updatedAt": "2026-06-09T00:00:00.000Z" } ],
+    "expect": { "len": 1, "applied": 0, "conflicts": 1, "idRemaps": 1,
+      "rows": [ { "id": "r1", "field": "company", "value": "Twilio" } ] } },
+
+  { "name": "same title different posting ids coexist through sync",
+    "server": [ { "id": "r1", "company": "Dropbox", "role": "Staff Product Manager", "link": "https://jobs.dropbox.com/listing/9990001?gh_jid=9990001", "updatedAt": "2026-06-01T00:00:00.000Z" } ],
+    "client": [ { "id": "c5", "company": "Dropbox", "role": "Staff Product Manager", "link": "https://jobs.dropbox.com/listing/9990002?gh_jid=9990002", "updatedAt": "2026-06-09T00:00:00.000Z" } ],
+    "expect": { "len": 2, "applied": 1, "conflicts": 0, "idRemaps": 0, "rows": [] } },
+
+  { "name": "tombstone propagates from client",
+    "server": [ { "id": "r1", "company": "Acme", "role": "PM", "status": "Not Applied", "updatedAt": "2026-06-01T00:00:00.000Z" } ],
+    "client": [ { "id": "r1", "company": "Acme", "role": "PM", "deleted": true, "updatedAt": "2026-06-09T00:00:00.000Z" } ],
+    "expect": { "len": 1, "applied": 1, "conflicts": 0, "idRemaps": 0,
+      "rows": [ { "id": "r1", "field": "deleted", "value": true } ] } },
+
+  { "name": "identical rows are a no-op (no conflict, no apply)",
+    "server": [ { "id": "r1", "company": "Acme", "role": "PM", "updatedAt": "2026-06-05T00:00:00.000Z" } ],
+    "client": [ { "id": "r1", "company": "Acme", "role": "PM", "updatedAt": "2026-06-05T00:00:00.000Z" } ],
+    "expect": { "len": 1, "applied": 0, "conflicts": 0, "idRemaps": 0, "rows": [] } }
+]

@@ -196,6 +196,11 @@
   .recent-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:11px 14px;margin:0 2px 12px}
   .recent-head .rh-title{font-weight:700}
   .recent-head .rh-desc{color:var(--dim);font-size:.78rem;flex:1 1 220px}
+  /* group-by-company sections */
+  .grp-sec{margin-bottom:14px}
+  .grp-head{display:flex;align-items:center;gap:10px;padding:6px 2px 8px;border-bottom:1px solid var(--line);margin-bottom:9px}
+  .grp-head .gname{font-weight:700;font-size:.95rem}
+  .grp-head .gcount{font-size:.82rem;color:var(--dim)}
   /* apply-mode badge */
   .am{font-family:"Spline Sans Mono",monospace;font-size:.62rem;letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:5px;border:1px solid var(--line-2);color:var(--dim);white-space:nowrap;flex:none}
   .am.fillable{color:var(--green);border-color:#2d5a3a}
@@ -451,7 +456,14 @@
       <option value="fit">Sort: Fit</option>
       <option value="prob">Sort: Interview probability</option>
       <option value="company">Sort: Company A–Z</option>
+      <option value="applied_desc">Sort: Applied date (newest)</option>
+      <option value="applied_asc">Sort: Applied date (oldest)</option>
       <option value="followup">Sort: Follow-up date</option>
+    </select>
+    <select id="groupBy" title="Group the Open / Applied list">
+      <option value="tier" selected>Group: Tier</option>
+      <option value="company">Group: Company</option>
+      <option value="none">Group: None (flat)</option>
     </select>
     <div class="popwrap">
       <button class="btn ghost" id="filtersBtn" type="button">⚲ Filters<span class="fcount" id="filtersCount"></span> ▾</button>
@@ -508,6 +520,7 @@
   <div class="selbar" id="selbar">
     <span class="selcount"><span id="selCount">0</span> selected</span>
     <button class="btn" id="openTabsBtn">Open <span id="openN">0</span> in tabs ↗</button>
+    <button class="btn ghost" id="copyLinksBtn">Copy links</button>
     <button class="btn apply" id="markAppliedBtn">✓ Mark Applied (today)</button>
     <button class="btn ghost" id="archiveSelBtn">Archive</button>
     <button class="btn ghost" id="exportSelBtn">Export</button>
@@ -780,6 +793,10 @@
             </div>
             <div id="backupList" class="bklist"><div class="setmuted" style="padding:8px">loading…</div></div>
           </div>
+          <div class="field"><label>Deleted rows (tombstones)</label>
+            <div class="ahintrow"><button class="mini danger" id="purgeTombstonesBtn" type="button">Purge tombstones</button> <span id="tombstoneInfo" class="setmuted"></span></div>
+            <p class="hint" style="margin:6px 0 0">Deletes are soft (tombstones) so they sync to other devices. Purging permanently removes them (snapshots first).</p>
+          </div>
         </section>
 
         <section class="sset" data-sect="advanced" hidden>
@@ -1027,6 +1044,9 @@ function reqCardHTML(x,i){
     </div>
     <div class="fitrat">${fitRationale(x).map(r=>`<div class="fr ${r.t}"><span class="frl">${r.l}</span><span class="frv">${esc(r.v)}</span></div>`).join("")}</div>
     <div class="crm">
+      <div class="cell"><label>Company (override)</label><input type="text" value="${(x.company||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'company',this.value)"></div>
+      <div class="cell"><label>Sector</label><input type="text" value="${(x.sector||'').replace(/"/g,'&quot;')}" placeholder="CDP / AI Platform / Data Infra…" onchange="upd(${i},'sector',this.value)"></div>
+      <div class="cell full"><label>Role / title (override)</label><input type="text" value="${(x.role||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'role',this.value)"></div>
       <div class="cell"><label>Status</label>
         <select class="status-sel" style="color:${STATUS_COLOR[x.status]||'var(--text)'}" onchange="upd(${i},'status',this.value)">
           ${STATUS_ORDER.map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join("")}
@@ -1084,7 +1104,7 @@ function render(){
   applyNextOnly=F("applyNextOnly").checked;
 
   // base = all rows after the GLOBAL filters (everything EXCEPT the lifecycle tab + apply-next)
-  let base=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)}));
+  let base=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)})).filter(x=>x.deleted!==true);
   if(qy)base=base.filter(x=>(x.company+" "+x.role+" "+(x.notes||"")+" "+(x.recruiter||"")+" "+(x.next||"")+" "+(x.sector||"")).toLowerCase().includes(qy));
   if(sf)base=base.filter(x=>x.status===sf);
   if(tf)base=base.filter(x=>x.tier===tf);
@@ -1110,6 +1130,7 @@ function render(){
   F("laneBar").innerHTML=`<span class="llbl">Lanes</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
     LANE_DEFS.map(d=>`<div class="lane ${activeLane===d.key?'active':''}" onclick="setLane('${d.key}')"><span>${d.label}</span><span class="lcnt">${base.filter(d.pred).length}</span></div>`).join("");
   F("applyNextWrap").style.display=(activeTab==="open"&&!laneActive&&!analytics)?"":"none";
+  F("groupBy").style.display=((activeTab==="open"||activeTab==="applied")&&!laneActive&&!recentOnly)?"":"none";   // grouping only applies to the accordion tabs
   // active-filter count badge on the Filters button
   const fc=(sf?1:0)+(tf?1:0)+(srcf?1:0)+(amf?1:0)+(remoteOnly?1:0)+(activeOnly?1:0)+(notAppliedOnly?1:0)+((activeTab==="open"&&applyNextOnly)?1:0);
   const fcEl=F("filtersCount"); fcEl.textContent=fc; fcEl.classList.toggle("on",fc>0);
@@ -1126,16 +1147,17 @@ function render(){
     :((activeTab==="open"&&applyNextOnly)?tabBase.filter(isApplyNext):tabBase);
 
   // KPIs (always full-set, unaffected by filters) — split: primary operating · secondary health
-  const total=rows.length;
-  const openCount=rows.filter(x=>tabKeyForStatus(x.status)==="open").length;
-  const applied=rows.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
-  const followups=rows.filter(followUpDue).length;
-  const inInterview=rows.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)).length;
-  const offers=rows.filter(x=>x.status==="Offer").length;
-  const tierA=rows.filter(x=>x.tier==="A").length;
-  const rejected=rows.filter(x=>x.status==="Rejected").length;
+  const live=rows.filter(x=>x.deleted!==true);
+  const total=live.length;
+  const openCount=live.filter(x=>tabKeyForStatus(x.status)==="open").length;
+  const applied=live.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
+  const followups=live.filter(followUpDue).length;
+  const inInterview=live.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)).length;
+  const offers=live.filter(x=>x.status==="Offer").length;
+  const tierA=live.filter(x=>x.tier==="A").length;
+  const rejected=live.filter(x=>x.status==="Rejected").length;
   const rejRate=applied?Math.round(rejected/applied*1000)/10:0;
-  const am=anMetrics(rows);
+  const am=anMetrics(live);
   const kpi=(k,v,cls="",extra="")=>`<div class="kpi ${cls}"><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
   document.getElementById("stats").innerHTML=
     kpi("Open",openCount,"accent")+
@@ -1155,6 +1177,8 @@ function render(){
     if(sortKey==="prob")return (+b.prob||0)-(+a.prob||0);
     if(sortKey==="fit")return (+b.fit||0)-(+a.fit||0);
     if(sortKey==="followup"){const da=a.followup?Date.parse(a.followup):8.64e15,db=b.followup?Date.parse(b.followup):8.64e15;return da-db;}
+    if(sortKey==="applied_desc"){const da=a.applied?Date.parse(a.applied):0,db=b.applied?Date.parse(b.applied):0;return db-da;}   // newest first; undated last
+    if(sortKey==="applied_asc"){const da=a.applied?Date.parse(a.applied):8.64e15,db=b.applied?Date.parse(b.applied):8.64e15;return da-db;}   // oldest first; undated last
     return b._ev-a._ev;   // "expected" + default
   };
 
@@ -1196,33 +1220,54 @@ function render(){
     else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
     html+=`</div>`;
   } else if(activeTab==="open"||activeTab==="applied"){
-    // Open + Applied keep the tier accordion so tier counts stay visible.
-    // Open: "of N" is relative to all Open rows pre-apply-next. Applied: list===tabBase.
-    const tiers={A:[],B:[],C:[]};
-    list.forEach(x=>{(tiers[x.tier]||tiers.C).push(x);});
-    const totals={A:0,B:0,C:0}; tabBase.forEach(x=>{totals[x.tier]=(totals[x.tier]||0)+1;});
-    ["A","B","C"].forEach(t=>tiers[t].sort(cmp));
-    const filterActive=!!(qy||sf||tf||srcf||remoteOnly||activeOnly||notAppliedOnly||applyNextOnly);
     const applied=activeTab==="applied";
-    ["A","B","C"].forEach(t=>{
-      const items=tiers[t];
-      const isC = filterActive ? items.length===0 : !tierOpen[t];
-      const ofN = items.length!==totals[t] ? `<span class="of"> of ${totals[t]}</span>` : "";
-      const tsum = applied ? `${items.length} applied` : (t==='A'?'apply now':(t==='B'?'strong':'monitor'));
-      html+=`<div class="tier-sec tier${t} ${isC?'collapsed':''}">
-        <div class="tier-head" onclick="toggleTier('${t}')">
-          <span class="caret">▼</span>
-          <span class="tdot ${t}"></span>
-          <span class="tname">Tier ${t}</span>
-          <span class="tcount">(${items.length}${ofN})</span>
-          <span class="tsum">${tsum}</span>
-          ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible Tier ${t} row(s)">Select all</button>`:""}
-        </div>
-        <div class="tier-body">`;
-      if(!items.length) html+=`<div class="tier-empty">${applied?`No Tier ${t} applications yet.`:`No matching Tier ${t} requisitions.`}</div>`;
+    const groupMode=F("groupBy").value;
+    if(groupMode==="company"){
+      // group by company; companies A–Z, rows within sorted by the chosen sort
+      const groups={};
+      list.forEach(x=>{(groups[x.company||"—"]=groups[x.company||"—"]||[]).push(x);});
+      const names=Object.keys(groups).sort((a,b)=>a.localeCompare(b));
+      if(!names.length) html+=`<div class="flat-empty">${applied?"No applications yet.":"Nothing matches."}</div>`;
+      names.forEach(name=>{
+        const items=groups[name].sort(cmp);
+        html+=`<div class="grp-sec"><div class="grp-head"><span class="gname">${esc(name)}</span><span class="gcount">${items.length}</span></div>`;
+        items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
+        html+=`</div>`;
+      });
+    } else if(groupMode==="none"){
+      // flat list, sorted
+      const items=[...list].sort(cmp);
+      html+='<div class="flatlist">';
+      if(!items.length) html+=`<div class="flat-empty">${applied?"No applications yet.":"Nothing matches."}</div>`;
       else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
-      html+=`</div></div>`;
-    });
+      html+='</div>';
+    } else {
+      // default: tier accordion (keeps the per-tier counts). "of N" is relative to the tab's full set.
+      const tiers={A:[],B:[],C:[]};
+      list.forEach(x=>{(tiers[x.tier]||tiers.C).push(x);});
+      const totals={A:0,B:0,C:0}; tabBase.forEach(x=>{totals[x.tier]=(totals[x.tier]||0)+1;});
+      ["A","B","C"].forEach(t=>tiers[t].sort(cmp));
+      const filterActive=!!(qy||sf||tf||srcf||remoteOnly||activeOnly||notAppliedOnly||applyNextOnly);
+      ["A","B","C"].forEach(t=>{
+        const items=tiers[t];
+        const isC = filterActive ? items.length===0 : !tierOpen[t];
+        const ofN = items.length!==totals[t] ? `<span class="of"> of ${totals[t]}</span>` : "";
+        const tsum = applied ? `${items.length} applied` : (t==='A'?'apply now':(t==='B'?'strong':'monitor'));
+        html+=`<div class="tier-sec tier${t} ${isC?'collapsed':''}">
+          <div class="tier-head" onclick="toggleTier('${t}')">
+            <span class="caret">▼</span>
+            <span class="tdot ${t}"></span>
+            <span class="tname">Tier ${t}</span>
+            <span class="tcount">(${items.length}${ofN})</span>
+            <span class="tsum">${tsum}</span>
+            ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible Tier ${t} row(s)">Select all</button>`:""}
+          </div>
+          <div class="tier-body">`;
+        if(!items.length) html+=`<div class="tier-empty">${applied?`No Tier ${t} applications yet.`:`No matching Tier ${t} requisitions.`}</div>`;
+        else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
+        html+=`</div></div>`;
+      });
+    }
   } else {
     // Applied / Interviewing / Rejected+Archived -> flat EV-sorted list
     const items=[...list].sort(cmp);
@@ -1269,7 +1314,7 @@ function scoutRunStripHTML(){
     `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
 }
 function renderToday(){
-  const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)}));
+  const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)})).filter(x=>x.deleted!==true);
   const cut=recentCut(), anchored=!!(scoutLast&&scoutLast.when);
   const newSince=all.filter(x=>x.status==="Not Applied"&&(x.added||"")>=cut);
   const tierAOpen=all.filter(x=>x.tier==="A"&&x.status==="Not Applied");
@@ -1303,7 +1348,7 @@ function renderToday(){
     <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
     ${queue}
     ${pipeline}
-    <div class="today-foot">${rows.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
+    <div class="today-foot">${all.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
   </div>`;
 }
 window.todoGo=function(view){
@@ -1382,7 +1427,7 @@ function buildInsights(rs,m){
   return out;
 }
 function renderAnalytics(f){
-  let rs=rows.slice();
+  let rs=rows.filter(x=>x.deleted!==true);
   if(f.qy)rs=rs.filter(x=>(x.company+" "+x.role+" "+(x.notes||"")+" "+(x.sector||"")).toLowerCase().includes(f.qy));
   if(f.srcf)rs=rs.filter(x=>rowSource(x)===f.srcf);
   if(f.tf)rs=rs.filter(x=>x.tier===f.tf);
@@ -1429,7 +1474,7 @@ async function archiveRow(i){
   const r=rows[i]; if(!r)return;
   if(!confirm(`Archive "${r.company} — ${r.role}"?\n\nYour data is snapshotted first; this sets status to Archived (not deleted).`))return;
   await fetch("/api/backup",{method:"POST"}).catch(()=>{});
-  rows[i].status="Archived"; persistNow(); render();
+  rows[i].status="Archived"; stampRow(i); persistNow(); render();
 }
 async function archiveAllClosed(){
   // only the closed rows CURRENTLY SHOWN (respects search/source/tier/apply-mode filters),
@@ -1438,7 +1483,7 @@ async function archiveAllClosed(){
   if(!targets.length){alert("No closed reqs in the current view to archive.");return;}
   if(!confirm(`Archive ${targets.length} closed req(s) shown in this view?\n\nYour data is snapshotted first; statuses set to Archived (not deleted).`))return;
   await fetch("/api/backup",{method:"POST"}).catch(()=>{});
-  targets.forEach(o=>{rows[o.i].status="Archived";});
+  targets.forEach(o=>{rows[o.i].status="Archived";stampRow(o.i);});
   persistNow(); render();
 }
 window.archiveRow=archiveRow; window.archiveAllClosed=archiveAllClosed;
@@ -1503,21 +1548,34 @@ window.clearSel=function(){
 window.openSelectedTabs=function(){
   const ids=[...selected];
   const st=document.getElementById("selStatus");
-  if(!ids.length){st.textContent="Nothing selected.";return;}
-  let opened=0,blocked=0,search=0,nolink=0;
+  if(!ids.length){st.textContent="Nothing selected.";st.classList.remove("warn");return;}
+  // Real anchor clicks open as TABS and survive the multi-open throttle better than
+  // window.open(...,"noopener"), which Chrome treats as pop-up windows and blocks past the first.
+  let opened=0,search=0,nolink=0;
   ids.forEach(i=>{
     const x=rows[i]; if(!x)return;
     if(!x.link){nolink++;return;}
     if(isLinkedInSearch(x.link))search++;
-    const w=window.open(x.link,"_blank","noopener");
-    if(w)opened++; else blocked++;
+    const a=document.createElement("a");
+    a.href=x.link; a.target="_blank"; a.rel="noopener noreferrer";
+    document.body.appendChild(a); a.click(); a.remove();
+    opened++;
   });
-  let msg=`Opened ${opened} tab${opened===1?"":"s"}.`;
-  if(blocked>0)msg+=` ${blocked} blocked — allow pop-ups for this site and click again.`;
-  if(search>0)msg+=` ${search} open to a LinkedIn search, not the exact posting.`;
+  let msg=`Opening ${opened} tab${opened===1?"":"s"}.`;
+  if(search>0)msg+=` ${search} go to a LinkedIn search, not the exact posting.`;
   if(nolink>0)msg+=` ${nolink} had no link.`;
-  st.textContent=msg;
-  st.classList.toggle("warn",blocked>0);
+  if(opened>1)msg+=` If fewer opened, allow pop-ups for this site, or use Copy links.`;
+  st.textContent=msg; st.classList.remove("warn");
+};
+window.copySelectedLinks=function(){
+  const st=document.getElementById("selStatus");
+  const links=[...selected].map(i=>rows[i]&&rows[i].link).filter(Boolean);
+  if(!links.length){st.textContent="No links in the selection.";st.classList.add("warn");return;}
+  const text=links.join("\n");
+  const done=()=>{st.textContent=`Copied ${links.length} link${links.length===1?"":"s"} to the clipboard.`;st.classList.remove("warn");};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done).catch(()=>fallback());}
+  else fallback();
+  function fallback(){const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");}catch(e){}ta.remove();done();}
 };
 // Bulk mark Applied — auto-captures today's date. Only promotes rows not already applied/beyond;
 // non-destructive on existing applied dates and next-action text. Persists via the normal PUT save.
@@ -1532,7 +1590,7 @@ window.markSelectedApplied=function(){
   const today=new Date().toISOString().slice(0,10);
   if(!confirm(`Mark ${eligible.length} role${eligible.length>1?"s":""} as Applied today (${today})?`+(skipped?`\n\n${skipped} already Applied/beyond will be skipped.`:""))) return;
   eligible.forEach(i=>{const x=rows[i];
-    x.status="Applied";
+    x.status="Applied";stampRow(i);
     if(!x.applied)x.applied=today;
     x.lastcontact=today;
     if(!x.next)x.next="Await recruiter response";
@@ -1551,7 +1609,7 @@ window.archiveSelected=async function(){
   if(!ids.length){st.textContent="Nothing to archive (selection already archived or empty).";st.classList.add("warn");return;}
   if(!confirm(`Archive ${ids.length} selected role${ids.length>1?"s":""}?\n\nYour data is snapshotted first; statuses set to Archived (not deleted).`))return;
   await fetch("/api/backup",{method:"POST"}).catch(()=>{});
-  ids.forEach(i=>{rows[i].status="Archived";});
+  ids.forEach(i=>{rows[i].status="Archived";stampRow(i);});
   selected.clear(); persistNow(); render();
   st.textContent=`Archived ${ids.length}.`; st.classList.remove("warn");
 };
@@ -1565,7 +1623,15 @@ window.exportSelected=function(){
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-selected.csv";a.click();
   st.textContent=`Exported ${ids.length} row(s).`; st.classList.remove("warn");
 };
-window.upd=function(i,field,val){rows[i][field]=val;persist();if(field==='status')render();};
+// WP-0: every client-side edit stamps updatedAt so per-row last-writer-wins has honest timestamps
+function stampRow(i){if(rows[i])rows[i].updatedAt=new Date().toISOString();}
+window.upd=function(i,field,val){
+  rows[i][field]=val;stampRow(i);
+  // moving to Applied auto-stamps today's applied date (only if not already set — never overwrites)
+  if(field==='status'&&val==='Applied'&&!rows[i].applied){rows[i].applied=new Date().toISOString().slice(0,10);}
+  persist();
+  if(['status','company','role','sector','tier'].includes(field))render();   // refresh header/rationale on overrides
+};
 
 let editingIndex=-1;
 const F=id=>document.getElementById(id);
@@ -1577,19 +1643,20 @@ function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("
 function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
 function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);return o;}
 window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit requisition");};
-window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?")){rows.splice(i,1);persistNow();render();}};
+window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?\n\nKept as a recoverable tombstone (purge in Settings → Data safety) so the delete syncs to other devices.")){rows[i].deleted=true;stampRow(i);persistNow();render();}};
 F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition");};
 F("cancelBtn").onclick=closeModal;
 F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
-F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0)rows[editingIndex]={...rows[editingIndex],...o};else rows.unshift(o);persistNow();render();closeModal();};
+F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0){rows[editingIndex]={...rows[editingIndex],...o};stampRow(editingIndex);}else rows.unshift(o);persistNow();render();closeModal();};
 ["search","statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("input",render));
 ["statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("change",render));
-F("remoteOnly").onchange=render;F("activeOnly").onchange=render;F("notAppliedOnly").onchange=render;F("applyNextOnly").onchange=render;
+F("remoteOnly").onchange=render;F("activeOnly").onchange=render;F("notAppliedOnly").onchange=render;F("applyNextOnly").onchange=render;F("groupBy").onchange=render;
 
 // Accordion expand/collapse-all + selection toolbar wiring
 F("expandAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=true;render();};
 F("collapseAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=false;render();};
 F("openTabsBtn").onclick=openSelectedTabs;
+F("copyLinksBtn").onclick=copySelectedLinks;
 F("markAppliedBtn").onclick=markSelectedApplied;
 F("archiveSelBtn").onclick=archiveSelected;
 F("exportSelBtn").onclick=exportSelected;
@@ -1727,6 +1794,8 @@ function fillSettings(j){
   SET("appTokState").className="tokstate"+(au.appTokenSet?" on":"");
   SET("ingestTokState").textContent=au.ingestTokenSet?("Set ••••"+(au.ingestTokenLast4||"")):"Not set";
   SET("ingestTokState").className="tokstate"+(au.ingestTokenSet?" on":"");
+  const tomb=rows.filter(x=>x.deleted===true).length;
+  SET("tombstoneInfo").textContent=tomb?`${tomb} tombstone(s) pending purge.`:"No tombstones.";
 }
 // Advanced → connection status indicators (#16). Derives state from the settings payload.
 function buildConnStatus(j){
@@ -1738,6 +1807,7 @@ function buildConnStatus(j){
     {name:"Slack webhook",on:!!(j.digest&&j.digest.webhookSet),on_t:"Connected",off_t:"Not configured"},
     {name:"TheirStack",on:srcCfg("theirstack"),on_t:"Connected",off_t:"Not configured"},
     {name:"Apify (Fantastic.jobs)",on:srcCfg("fantastic"),on_t:"Connected",off_t:"Not configured"},
+    {name:"APNs push (iOS)",on:!!(j.auth&&j.auth.apnsSet),on_t:((j.auth&&j.auth.pushDevices)||0)+" device(s)",off_t:"Not configured"},
   ];
   box.innerHTML=rows.map(r=>`<div class="connrow ${r.on?'on':''}"><span class="cdot"></span><span class="cname">${r.name}</span><span class="cval">${r.on?r.on_t:r.off_t}</span></div>`).join("");
 }
@@ -1896,6 +1966,16 @@ SET("settingsBtn").onclick=openSettings;
 SET("openSettingsFromMenu").onclick=openSettings;
 SET("settingsCancel").onclick=()=>SET("settingsOverlay").classList.remove("open");
 SET("settingsCancelTop").onclick=()=>SET("settingsOverlay").classList.remove("open");
+SET("purgeTombstonesBtn").onclick=async()=>{
+  const n=rows.filter(x=>x.deleted===true).length;
+  if(!n){SET("tombstoneInfo").textContent="No tombstones to purge.";return;}
+  if(!confirm(`Permanently remove ${n} deleted row(s)?\n\nA snapshot is taken first.`))return;
+  try{const j=await (await fetch("/api/maintenance/purge-tombstones",{method:"POST"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("tombstoneInfo").textContent=`Purged ${j.purged}. ${j.total} rows remain.`;
+    await load();
+  }catch(e){SET("tombstoneInfo").textContent="Purge failed: "+e.message;}
+};
 SET("regenIngestBtn").onclick=async()=>{
   if(!confirm("Regenerate the ChatGPT ingest token?\n\nThe current token stops working immediately — you'll need to paste the new value into your ChatGPT Action."))return;
   const box=SET("ingestTokNew"); box.style.display="block"; box.textContent="Generating…";
@@ -2094,7 +2174,7 @@ F("exportXlsxBtn").onclick=()=>{window.location="/api/export.xlsx";};
 F("exportBtn").onclick=()=>{
   const cols=["company","sector","role","salary","location","remote","fit","prob","expectedVal","tier","conf","status","applied","interview","recruiter","referral","resume","cover","followup","lastcontact","next","added","link","notes"];
   const lines=[cols.join(",")];
-  rows.forEach(x=>{const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
+  rows.filter(x=>x.deleted!==true).forEach(x=>{const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-crm.csv";a.click();
 };
 

@@ -175,10 +175,18 @@ Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
      (`npm test` in app/ runs `tests/vectors/` through the app); `tsc --noEmit` clean; dark
      proof-of-life `App.tsx` scores a sample via the shared core. Name **Reqon**, bundle id
      `com.reqon.app`, expo-sqlite + expo-secure-store installed.
-   - **Blocked on Xcode:** simulator boot (`expo run:ios`) — full Xcode not yet installed.
+   - **Blocked on Xcode license:** simulator boot — Xcode installed; run
+     `sudo xcodebuild -license accept` once. (Git also routes through Xcode now; use
+     `DEVELOPER_DIR=/Library/Developer/CommandLineTools` until the license is accepted.)
    - **Remaining:** local store (expo-sqlite schema + CRUD + tombstones).
 2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
    tracking edits; seeded sample store.
+   - **Done (Today screen):** `ReqonGlyph` (react-native-svg), `RoleCard` (tier-colored,
+     suppressed Tier C), `TodayScreen` ("Today's Perimeter" + scout status + scored pipeline),
+     wired in `App.tsx` with sample roles scored via `@reqon/core`. Built from the designer's
+     Today layout; tsc clean, jest green. Brand tokens extended (`text-base`, tracking, alpha).
+   - **Remaining:** Open/Applied/Interviewing/Closed lists + grouping/sorts + row detail;
+     load brand fonts (expo-font); visual sim verification (after Xcode license).
 3. **M3 Capture:** native Swift Share-Extension → confirm sheet → save (App Group → RN
    store); on-device enrichment (`fetch` port of `computeEnrichFields`, incl. URL-slug
    company + JSON-LD/OG/title); optional OpenAI scoring (expo-secure-store key).

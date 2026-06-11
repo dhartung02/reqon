@@ -1,58 +1,32 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
 import { computeTier, expectedValue } from '@reqon/core';
-import { colors, tierColor } from './src/theme';
+import { TodayScreen } from './src/screens/TodayScreen';
+import type { PipelineRole } from './src/components/RoleCard';
 
-// Proof-of-life: the app entry imports the SAME shared core the server and extension use
-// (repo-root core/crm-core.js, via the @reqon/core alias) and the locked Emerald Command palette
-// (src/theme.ts). A real sample row is scored here so the wiring is exercised at runtime, not just
-// in tests. M2 replaces this with the real UI.
-const sample = { company: 'Acme', role: 'Principal PM, Data Platform', fit: 8.5, prob: 7 };
-const tier = computeTier(sample.fit, sample.prob);
-const ev = expectedValue(sample);
+// Sample roles scored through the SHARED core (computeTier + expectedValue) — the same logic the
+// server runs — then rendered by the Today screen. M3 replaces this seed with the local store.
+const SEED = [
+  { id: '1', role: 'Principal Systems Architect', company: 'Autonomous Infrastructure Corp', fit: 9.4, prob: 9, age: '2h ago', status: 'Scouted via Clip', action: 'Review Draft Voice' },
+  { id: '2', role: 'Director of Engineering (Local-First)', company: 'Cryptographic Systems Inc', fit: 7.8, prob: 9, age: '1d ago', status: 'Sync Pending', action: 'Verify Fit' },
+  { id: '3', role: 'Senior Technical Lead', company: 'Mass-Market Logistics Group', fit: 4.2, prob: 8, age: '3d ago' },
+];
+
+const roles: PipelineRole[] = SEED.map((r) => ({
+  id: r.id,
+  role: r.role,
+  company: r.company,
+  age: r.age,
+  status: r.status,
+  action: r.action,
+  tier: computeTier(r.fit, r.prob),
+  score: expectedValue({ fit: r.fit, prob: r.prob }),
+}));
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.brand}>REQON</Text>
-      <Text style={styles.tag}>Recon for your career</Text>
-      <View style={styles.card}>
-        <Text style={styles.role}>{sample.role}</Text>
-        <View style={styles.row}>
-          <Text style={[styles.tierBadge, { color: tierColor(tier) }]}>Tier {tier}</Text>
-          <Text style={styles.meta}>
-            EV {ev} · fit {sample.fit} / prob {sample.prob}
-          </Text>
-        </View>
-        <Text style={styles.note}>scored by @reqon/core (shared with the server)</Text>
-      </View>
+    <>
+      <TodayScreen roles={roles} />
       <StatusBar style="light" />
-    </View>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  brand: { color: colors.textHigh, fontSize: 34, fontWeight: '800', letterSpacing: 4 },
-  tag: { color: colors.muted, fontSize: 14, marginTop: 6, marginBottom: 28 },
-  card: {
-    backgroundColor: colors.element,
-    borderColor: '#222A31',
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 18,
-    width: '100%',
-    maxWidth: 360,
-  },
-  role: { color: colors.textHigh, fontSize: 17, fontWeight: '600' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
-  tierBadge: { fontSize: 14, fontWeight: '700' },
-  meta: { color: colors.muted, fontSize: 14 },
-  note: { color: colors.muted, fontSize: 12, marginTop: 12, opacity: 0.7 },
-});

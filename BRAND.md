@@ -51,10 +51,16 @@ Projects absolute control, executive judgment, high data density.
 | `element` | Command Gray | `#16181C` | Cards, pipeline containers, inputs |
 | `emerald` | Tactical Emerald | `#00E5A3` | Tier A / live "signal acquired" / **the glyph** |
 | `amber` | Radar Amber | `#FFB800` | Tier B / pending sync action — **never the logo** |
-| `muted` | Recon Muted | `#64748B` | Tier C / background technical details |
-| `text-high` | Clean White | `#E2E8F0` | High-contrast crisp technical typography |
+| `muted` | Recon Muted | `#64748B` | Tier C / secondary text / suppressed noise |
+| `text-high` | Clean White | `#E2E8F0` | High-contrast primary data text |
+| `text-base` | — | `#94A3B8` | Standard descriptive text |
 
-Authoritative token files: [`brand/tokens.json`](brand/tokens.json), [`brand/tokens.css`](brand/tokens.css).
+Type: **Spline Sans** (UI / metrics / data grids), **Fraunces** (editorial headers / north-star
+lines). All-caps wordmark/label tracking: **`0.18em`**. **Contrast guardrail:** never put `emerald`
+text on a pure-white (light) background — swap to a deeper `#008F66`. Reqon is dark-mode-first.
+
+Authoritative token files: [`brand/tokens.json`](brand/tokens.json), [`brand/tokens.css`](brand/tokens.css),
+[`brand/tailwind.config.js`](brand/tailwind.config.js). App theme: [`app/src/theme.ts`](app/src/theme.ts).
 
 ## 4. Application & scalability
 

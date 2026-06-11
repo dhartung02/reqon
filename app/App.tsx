@@ -14,6 +14,7 @@ import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
+import { runScout } from './src/scout/scout';
 
 const VIEW_TITLE: Record<Lane, string> = {
   today: "Today's perimeter",
@@ -36,6 +37,21 @@ export default function App() {
   const [sort, setSort] = useState<SortKey>('ev');
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [scouting, setScouting] = useState(false);
+  const [scoutMsg, setScoutMsg] = useState<string | null>(null);
+
+  const onScout = async () => {
+    setScouting(true);
+    setScoutMsg(null);
+    try {
+      const r = await runScout({ existing: roles, onAdd: add });
+      setScoutMsg(`Scanned ${r.scanned} · ${r.matched} matched · +${r.added} new${r.errors ? ` · ${r.errors} board errors` : ''}`);
+      await refresh();
+    } catch {
+      setScoutMsg('Scout failed — check connection');
+    }
+    setScouting(false);
+  };
 
   // Today = actionable (non-closed) roles, highest expected value first.
   const todayRoles = useMemo(
@@ -105,7 +121,13 @@ export default function App() {
 
         <View style={styles.body}>
           {lane === 'today' ? (
-            <TodayScreen roles={todayRoles} onPressRole={(r) => setSelectedId(r.id)} />
+            <TodayScreen
+              roles={todayRoles}
+              onPressRole={(r) => setSelectedId(r.id)}
+              onScout={onScout}
+              scouting={scouting}
+              scoutMsg={scoutMsg}
+            />
           ) : lane === 'analytics' ? (
             <AnalyticsScreen roles={roles} />
           ) : (

@@ -181,12 +181,14 @@ Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
    - **Remaining:** local store (expo-sqlite schema + CRUD + tombstones).
 2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
    tracking edits; seeded sample store.
-   - **Done (Today screen):** `ReqonGlyph` (react-native-svg), `RoleCard` (tier-colored,
-     suppressed Tier C), `TodayScreen` ("Today's Perimeter" + scout status + scored pipeline),
-     wired in `App.tsx` with sample roles scored via `@reqon/core`. Built from the designer's
-     Today layout; tsc clean, jest green. Brand tokens extended (`text-base`, tracking, alpha).
-   - **Remaining:** Open/Applied/Interviewing/Closed lists + grouping/sorts + row detail;
-     load brand fonts (expo-font); visual sim verification (after Xcode license).
+   - **Done:** brand bar + `TabBar` (Today/Open/Applied/Interviewing/Closed + counts); Today body
+     (scout strip + scored pipeline); `PipelineScreen` (per-lane, grouped by tier, sorted by EV);
+     `RoleDetailScreen` (full tracking fields, status pill, open-posting); `RoleCard` (Role-typed,
+     tappable, status pill). `model.ts` (Role/Status/Lane, lane mapping, statusColor, scoreRole via
+     shared core) + `data/sample.ts` (12 roles). Brand fonts bundled + loaded (expo-font); Fraunces/
+     Spline Sans applied. State-based nav (no nav lib yet). tsc clean, jest green.
+   - **Remaining:** search/sort controls + Analytics tab; visual sim verification (after Xcode
+     license); editing writes through to the store in M3.
 3. **M3 Capture:** native Swift Share-Extension → confirm sheet → save (App Group → RN
    store); on-device enrichment (`fetch` port of `computeEnrichFields`, incl. URL-slug
    company + JSON-LD/OG/title); optional OpenAI scoring (expo-secure-store key).

@@ -80,6 +80,15 @@ export default function App() {
 
   const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
+  // Pull-to-refresh: sync (if configured) + re-read the store.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await autoSync();
+    await refresh();
+    setRefreshing(false);
+  }, [autoSync, refresh]);
+
   const onScout = async () => {
     setScouting(true);
     setScoutMsg(null);
@@ -164,9 +173,11 @@ export default function App() {
               scouting={scouting}
               scoutMsg={scoutMsg}
               scoutEnabled={scoutOn}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
             />
           ) : lane === 'analytics' ? (
-            <AnalyticsScreen roles={roles} />
+            <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
           ) : (
             <PipelineScreen
               lane={lane}
@@ -174,6 +185,8 @@ export default function App() {
               query={query}
               sort={sort}
               onPressRole={(r) => setSelectedId(r.id)}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
             />
           )}
         </View>

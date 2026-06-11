@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { colors, fonts } from '../theme';
 import { RoleCard } from '../components/RoleCard';
 import {
@@ -23,12 +23,16 @@ export function PipelineScreen({
   query,
   sort,
   onPressRole,
+  refreshing,
+  onRefresh,
 }: {
   lane: StatusLane;
   roles: Role[];
   query: string;
   sort: SortKey;
   onPressRole: (r: Role) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }) {
   const groups = useMemo(() => {
     const inLane = rolesInLane(roles, lane).filter((r) => matchesQuery(r, query));
@@ -52,7 +56,10 @@ export function PipelineScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.emerald} />}
+    >
       {groups.map((g) => (
         <View key={g.tier} style={styles.group}>
           <View style={styles.groupHead}>

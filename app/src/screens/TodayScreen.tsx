@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { colors, alpha, fonts } from '../theme';
 import type { Role, Lane } from '../model';
 import { todayLanes, isApplyNext, type Tone } from '../today';
@@ -20,6 +20,8 @@ export function TodayScreen({
   scouting,
   scoutMsg,
   scoutEnabled,
+  refreshing,
+  onRefresh,
 }: {
   roles: Role[];
   onJump: (l: Lane) => void;
@@ -27,13 +29,18 @@ export function TodayScreen({
   scouting: boolean;
   scoutMsg: string | null;
   scoutEnabled: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
 }) {
   const lanes = todayLanes(roles);
   const tierA = roles.filter((r) => r.tier === 'A').length;
   const applyNext = roles.filter(isApplyNext).length;
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.emerald} />}
+    >
       <View style={styles.scoutStrip}>
         <View style={styles.scoutLeft}>
           <View style={styles.pulse} />

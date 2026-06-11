@@ -1,10 +1,18 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { colors, alpha, fonts, tierColor } from '../theme';
 import { rolesInLane, type Role, type Tier } from '../model';
 
 // Pipeline analytics: headline KPIs + tier distribution. Computed from the same roles the lists use.
-export function AnalyticsScreen({ roles }: { roles: Role[] }) {
+export function AnalyticsScreen({
+  roles,
+  refreshing,
+  onRefresh,
+}: {
+  roles: Role[];
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
   const m = useMemo(() => {
     const applied = rolesInLane(roles, 'applied').length;
     const interviewing = rolesInLane(roles, 'interviewing').length;
@@ -39,7 +47,10 @@ export function AnalyticsScreen({ roles }: { roles: Role[] }) {
   const tierTotal = m.tiers.A + m.tiers.B + m.tiers.C || 1;
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.emerald} />}
+    >
       <View style={styles.grid}>
         {kpis.map((k) => (
           <View key={k.label} style={styles.kpi}>

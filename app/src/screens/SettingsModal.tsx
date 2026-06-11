@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { colors, alpha, fonts } from '../theme';
 import { getConfig, setConfig } from '../sync/config';
-import { testConnection, pullAll } from '../sync/sync';
+import { testConnection, syncTwoWay } from '../sync/sync';
 
 // Sync settings: server URL + token (keychain), connection test, and a full pull.
 export function SettingsModal({
@@ -39,8 +39,11 @@ export function SettingsModal({
     setStatus(null);
     await persist();
     try {
-      const { applied } = await pullAll();
-      setStatus({ kind: 'ok', text: `Pulled ${applied} roles from server` });
+      const { pushed, pulled, remaps } = await syncTwoWay();
+      setStatus({
+        kind: 'ok',
+        text: `Synced · pushed ${pushed}, pulled ${pulled}${remaps ? `, ${remaps} merged` : ''}`,
+      });
       onSynced();
     } catch (e) {
       setStatus({ kind: 'err', text: e instanceof Error ? e.message : 'sync failed' });
@@ -62,7 +65,7 @@ export function SettingsModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. Pull replaces local data with the server&apos;s.</Text>
+            <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. Sync pushes your local edits and pulls server changes (last-writer-wins).</Text>
             <View style={styles.labeled}>
               <Text style={styles.label}>Server URL</Text>
               <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={colors.muted} style={styles.input} />
@@ -80,7 +83,7 @@ export function SettingsModal({
                 <Text style={styles.btnGhostText}>Test connection</Text>
               </Pressable>
               <Pressable style={[styles.btn, styles.btnPrimary]} onPress={sync} disabled={busy}>
-                <Text style={styles.btnPrimaryText}>Sync now (pull)</Text>
+                <Text style={styles.btnPrimaryText}>Sync now</Text>
               </Pressable>
             </View>
           </ScrollView>

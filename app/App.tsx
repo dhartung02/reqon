@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { laneOf, rolesInLane, type Lane, type SortKey, type Status } from './src/model';
+import { rolesInLane, type Lane, type SortKey, type Status } from './src/model';
+import { todayActionCount } from './src/today';
 import { colors, fonts } from './src/theme';
 import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
@@ -14,6 +15,9 @@ import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
+import { runScout } from './src/scout/scout';
+import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
+import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
   today: "Today's perimeter",
@@ -36,22 +40,70 @@ export default function App() {
   const [sort, setSort] = useState<SortKey>('ev');
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [scouting, setScouting] = useState(false);
+  const [scoutMsg, setScoutMsg] = useState<string | null>(null);
+  const [serverUrl, setServerUrl] = useState('');
+  const [scoutMode, setScoutMode] = useState<ScoutMode>('auto');
+
+  // Auto-sync: silent push+pull whenever configured. Manual "Sync now" remains a force option.
+  const autoSync = useCallback(async () => {
+    const { url } = await getConfig();
+    if (!url) return;
+    try {
+      await syncTwoWay();
+      await refresh();
+    } catch {
+      /* offline / unreachable — try again next foreground */
+    }
+  }, [refresh]);
+
+  const loadConfig = useCallback(async () => {
+    const [{ url }, mode] = await Promise.all([getConfig(), getScoutMode()]);
+    setServerUrl(url);
+    setScoutMode(mode);
+  }, []);
+
+  // On launch: load config + sync. On foreground: sync. (ROADMAP FR-APP-6.)
+  useEffect(() => {
+    (async () => {
+      await loadConfig();
+      await autoSync();
+    })();
+  }, [loadConfig, autoSync]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') autoSync();
+    });
+    return () => sub.remove();
+  }, [autoSync]);
+
+  const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
+
+  const onScout = async () => {
+    setScouting(true);
+    setScoutMsg(null);
+    try {
+      const r = await runScout({ existing: roles, onAdd: add });
+      setScoutMsg(`Scanned ${r.scanned} · ${r.matched} matched · +${r.added} new${r.errors ? ` · ${r.errors} board errors` : ''}`);
+      await refresh();
+    } catch {
+      setScoutMsg('Scout failed — check connection');
+    }
+    setScouting(false);
+  };
 
   // Today = actionable (non-closed) roles, highest expected value first.
-  const todayRoles = useMemo(
-    () => roles.filter((r) => laneOf(r.status) !== 'closed').sort((a, b) => b.score - a.score),
-    [roles],
-  );
   const counts = useMemo<Record<Lane, number>>(
     () => ({
-      today: todayRoles.length,
+      today: todayActionCount(roles),
       open: rolesInLane(roles, 'open').length,
       applied: rolesInLane(roles, 'applied').length,
       interviewing: rolesInLane(roles, 'interviewing').length,
       closed: rolesInLane(roles, 'closed').length,
       analytics: roles.length,
     }),
-    [roles, todayRoles],
+    [roles],
   );
 
   if (!fontsLoaded || loading) return null;
@@ -105,7 +157,14 @@ export default function App() {
 
         <View style={styles.body}>
           {lane === 'today' ? (
-            <TodayScreen roles={todayRoles} onPressRole={(r) => setSelectedId(r.id)} />
+            <TodayScreen
+              roles={roles}
+              onJump={setLane}
+              onScout={onScout}
+              scouting={scouting}
+              scoutMsg={scoutMsg}
+              scoutEnabled={scoutOn}
+            />
           ) : lane === 'analytics' ? (
             <AnalyticsScreen roles={roles} />
           ) : (
@@ -120,7 +179,14 @@ export default function App() {
         </View>
       </View>
       <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
-      <SettingsModal visible={showSettings} onClose={() => setShowSettings(false)} onSynced={refresh} />
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => {
+          setShowSettings(false);
+          loadConfig().then(autoSync);
+        }}
+        onSynced={refresh}
+      />
       <StatusBar style="light" />
     </SafeAreaView>
   );

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { colors, alpha, fonts } from '../theme';
-import { getConfig, setConfig } from '../sync/config';
-import { testConnection, pullAll } from '../sync/sync';
+import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
+import { testConnection, syncTwoWay } from '../sync/sync';
 
 // Sync settings: server URL + token (keychain), connection test, and a full pull.
 export function SettingsModal({
@@ -18,10 +18,25 @@ export function SettingsModal({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null);
+  const [scout, setScout] = useState<ScoutMode>('auto');
 
   useEffect(() => {
-    if (visible) getConfig().then((c) => { setUrl(c.url); setToken(c.token); setStatus(null); });
+    if (visible) {
+      getConfig().then((c) => { setUrl(c.url); setToken(c.token); setStatus(null); });
+      getScoutMode().then(setScout);
+    }
   }, [visible]);
+
+  const pickScout = (m: ScoutMode) => {
+    setScout(m);
+    setScoutMode(m);
+  };
+  const scoutHelp =
+    scout === 'auto'
+      ? 'Auto: on-device scout runs only when no server is connected (server is the source of truth when synced).'
+      : scout === 'on'
+        ? 'Always scout on device.'
+        : 'Never scout on device — rely on the server.';
 
   const persist = () => setConfig({ url, token });
 
@@ -39,8 +54,11 @@ export function SettingsModal({
     setStatus(null);
     await persist();
     try {
-      const { applied } = await pullAll();
-      setStatus({ kind: 'ok', text: `Pulled ${applied} roles from server` });
+      const { pushed, pulled, remaps } = await syncTwoWay();
+      setStatus({
+        kind: 'ok',
+        text: `Synced · pushed ${pushed}, pulled ${pulled}${remaps ? `, ${remaps} merged` : ''}`,
+      });
       onSynced();
     } catch (e) {
       setStatus({ kind: 'err', text: e instanceof Error ? e.message : 'sync failed' });
@@ -62,7 +80,7 @@ export function SettingsModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. Pull replaces local data with the server&apos;s.</Text>
+            <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. When configured, sync runs automatically on launch and foreground (push local edits + pull server changes, last-writer-wins); the button below forces it now.</Text>
             <View style={styles.labeled}>
               <Text style={styles.label}>Server URL</Text>
               <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={colors.muted} style={styles.input} />
@@ -70,6 +88,20 @@ export function SettingsModal({
             <View style={styles.labeled}>
               <Text style={styles.label}>Token (X-CRM-Token)</Text>
               <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="APP_TOKEN" placeholderTextColor={colors.muted} style={styles.input} />
+            </View>
+
+            <View style={styles.labeled}>
+              <Text style={styles.label}>On-device scout</Text>
+              <View style={styles.seg}>
+                {(['auto', 'on', 'off'] as ScoutMode[]).map((m) => (
+                  <Pressable key={m} style={[styles.segBtn, scout === m && styles.segBtnOn]} onPress={() => pickScout(m)}>
+                    <Text style={[styles.segText, scout === m && styles.segTextOn]}>
+                      {m === 'auto' ? 'Auto' : m === 'on' ? 'On' : 'Off'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.help}>{scoutHelp}</Text>
             </View>
 
             {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
@@ -80,7 +112,7 @@ export function SettingsModal({
                 <Text style={styles.btnGhostText}>Test connection</Text>
               </Pressable>
               <Pressable style={[styles.btn, styles.btnPrimary]} onPress={sync} disabled={busy}>
-                <Text style={styles.btnPrimaryText}>Sync now (pull)</Text>
+                <Text style={styles.btnPrimaryText}>Sync now</Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -110,6 +142,19 @@ const styles = StyleSheet.create({
   help: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, lineHeight: 19 },
   labeled: { gap: 6 },
   label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: colors.muted },
+  seg: { flexDirection: 'row', gap: 8 },
+  segBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 9,
+    backgroundColor: colors.element,
+    borderWidth: 1,
+    borderColor: colors.element,
+    alignItems: 'center',
+  },
+  segBtnOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.1) },
+  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: colors.textBase },
+  segTextOn: { color: colors.emerald },
   input: {
     backgroundColor: colors.element,
     borderWidth: 1,

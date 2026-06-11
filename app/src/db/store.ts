@@ -54,7 +54,24 @@ async function db(): Promise<SQLite.SQLiteDatabase> {
   if (!cols.some((c) => c.name === 'raw')) {
     await _db.execAsync('ALTER TABLE roles ADD COLUMN raw TEXT');
   }
+  // `seed` marks the offline demo rows so they are NEVER pushed to a real server (and are purged
+  // once real synced rows arrive). `meta` holds sync bookkeeping (lastSync cursor).
+  if (!cols.some((c) => c.name === 'seed')) {
+    await _db.execAsync('ALTER TABLE roles ADD COLUMN seed INTEGER NOT NULL DEFAULT 0');
+  }
+  await _db.execAsync('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY NOT NULL, value TEXT);');
   return _db;
+}
+
+export async function getMeta(key: string): Promise<string | null> {
+  const d = await db();
+  const r = await d.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', [key]);
+  return r?.value ?? null;
+}
+
+export async function setMeta(key: string, value: string): Promise<void> {
+  const d = await db();
+  await d.runAsync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [key, value]);
 }
 
 /** Open the DB and seed it from the sample roles on first run (empty table only). */
@@ -65,8 +82,8 @@ export async function initDb(): Promise<void> {
   const ts = nowIso();
   for (const s of sampleSeed) {
     await d.runAsync(
-      `INSERT INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+      `INSERT INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted, seed)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,1)`,
       [
         s.id, s.role, s.company, s.status, s.fit, s.prob,
         s.salary ?? null, s.location ?? null, s.link ?? null, s.applied ?? null,
@@ -76,8 +93,10 @@ export async function initDb(): Promise<void> {
   }
 }
 
-const toRole = (r: Row): Role =>
-  scoreRole({
+const toRole = (r: Row & { raw?: string | null }): Role => {
+  // Hygiene/triage fields live in the full server row (raw); surface them for the Today lanes.
+  const x = typeof r.raw === 'string' ? (JSON.parse(r.raw) as Record<string, unknown>) : {};
+  return scoreRole({
     id: r.id,
     role: r.role,
     company: r.company,
@@ -87,17 +106,22 @@ const toRole = (r: Row): Role =>
     salary: r.salary ?? undefined,
     location: r.location ?? undefined,
     link: r.link ?? undefined,
-    applied: r.applied ?? undefined,
+    applied: r.applied ?? (x.applied as string) ?? undefined,
     recruiter: r.recruiter ?? undefined,
     next: r.next ?? undefined,
     notes: r.notes ?? undefined,
     age: r.age,
+    conf: (x.conf as string) ?? undefined,
+    reqCheck: (x.reqCheck as string) ?? undefined,
+    lastcontact: (x.lastcontact as string) ?? undefined,
+    added: (x.added as string) ?? undefined,
   }) as Role;
+};
 
 /** All live (non-tombstoned) roles, tier + score derived. */
 export async function getAllRoles(): Promise<Role[]> {
   const d = await db();
-  const rows = await d.getAllAsync<Row>('SELECT * FROM roles WHERE deleted = 0');
+  const rows = await d.getAllAsync<Row & { raw?: string | null }>('SELECT * FROM roles WHERE deleted = 0');
   return rows.map(toRole);
 }
 
@@ -166,6 +190,82 @@ export async function replaceAllFromServer(rows: unknown[]): Promise<number> {
     );
     n++;
   }
+  return n;
+}
+
+/**
+ * Full local rows for a PUSH (Stage 2) — excludes demo seed rows, includes tombstones. Overlays
+ * the app's current fields onto the stored `raw` server JSON so server-only fields round-trip.
+ */
+export async function getRowsForSync(): Promise<Record<string, unknown>[]> {
+  const d = await db();
+  const rows = await d.getAllAsync<Record<string, unknown>>('SELECT * FROM roles WHERE seed = 0');
+  return rows.map((r) => {
+    const base = typeof r.raw === 'string' ? JSON.parse(r.raw) : {};
+    return {
+      ...base,
+      id: r.id,
+      role: r.role,
+      company: r.company,
+      status: r.status,
+      fit: r.fit,
+      prob: r.prob,
+      salary: r.salary,
+      location: r.location,
+      link: r.link,
+      applied: r.applied,
+      recruiter: r.recruiter,
+      next: r.next,
+      notes: r.notes,
+      updatedAt: r.updatedAt,
+      deleted: r.deleted === 1,
+    };
+  });
+}
+
+/**
+ * Apply the server's post-reconcile rows (Stage 2). idRemaps: server deduped a client row to an
+ * existing one — drop the local `from` id (the canonical `to` row arrives in `rows`). Upserts with
+ * the row's tombstone flag. Once real rows land, the demo seed is purged.
+ */
+export async function applySyncRows(
+  rows: unknown[],
+  idRemaps?: { from: string; to: string }[],
+): Promise<number> {
+  const d = await db();
+  for (const m of idRemaps ?? []) {
+    await d.runAsync('DELETE FROM roles WHERE id = ?', [String(m.from)]);
+  }
+  let n = 0;
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    if (!r || !r.id) continue;
+    await d.runAsync(
+      `INSERT OR REPLACE INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted, raw, seed)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+      [
+        String(r.id),
+        String(r.role ?? ''),
+        String(r.company ?? ''),
+        String(r.status ?? 'Not Applied'),
+        Number(r.fit) || 0,
+        Number(r.prob) || 0,
+        (r.salary as string) ?? null,
+        (r.location as string) ?? null,
+        (r.link as string) ?? null,
+        (r.applied as string) ?? null,
+        (r.recruiter as string) ?? null,
+        (r.next as string) ?? null,
+        (r.notes as string) ?? null,
+        'synced',
+        (r.updatedAt as string) ?? nowIso(),
+        r.deleted ? 1 : 0,
+        JSON.stringify(r),
+      ],
+    );
+    n++;
+  }
+  if (n > 0) await d.runAsync('DELETE FROM roles WHERE seed = 1');
   return n;
 }
 

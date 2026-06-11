@@ -1,0 +1,10 @@
+/* Reqon — "Emerald Command" palette (dark-mode first). Canonical source: BRAND.md §3.
+   Keep in sync with brand/tokens.json and app/src/theme.ts. */
+:root {
+  --reqon-canvas: #0B0C0E;    /* Rich Obsidian deep background */
+  --reqon-element: #16181C;   /* Control cards / pipeline containers */
+  --reqon-emerald: #00E5A3;   /* Primary glyph / high fit (Tier A) / signal acquired */
+  --reqon-amber: #FFB800;     /* Warning / mid fit (Tier B) / pending sync action */
+  --reqon-muted: #64748B;     /* Low fit (Tier C) / background technical details */
+  --reqon-text-high: #E2E8F0; /* High-contrast, crisp technical typography */
+}

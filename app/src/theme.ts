@@ -7,6 +7,8 @@ export const colors = {
   element: '#16181C', // Command Gray — cards, pipeline containers, inputs
   emerald: '#00E5A3', // Tactical Emerald — Tier A, live "signal acquired", the glyph
   amber: '#FFB800', // Radar Amber — Tier B / pending sync action (never the logo)
+  active: '#2DD4BF', // teal — in-interview statuses
+  danger: '#F87171', // coral — rejected / error
   muted: '#64748B', // Recon Muted — Tier C, suppressed noise, secondary text
   textHigh: '#E2E8F0', // Clean White — high-contrast primary data text
   textBase: '#94A3B8', // standard descriptive text

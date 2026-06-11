@@ -1,38 +1,90 @@
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { computeTier, expectedValue } from '@reqon/core';
+import { sampleRoles } from './src/data/sample';
+import { laneOf, rolesInLane, type Lane, type Role } from './src/model';
+import { colors, fonts } from './src/theme';
+import { ReqonGlyph } from './src/components/ReqonGlyph';
+import { TabBar } from './src/components/TabBar';
 import { TodayScreen } from './src/screens/TodayScreen';
-import type { PipelineRole } from './src/components/RoleCard';
+import { PipelineScreen } from './src/screens/PipelineScreen';
+import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 
-// Sample roles scored through the SHARED core (computeTier + expectedValue) — the same logic the
-// server runs — then rendered by the Today screen. M3 replaces this seed with the local store.
-const SEED = [
-  { id: '1', role: 'Principal Systems Architect', company: 'Autonomous Infrastructure Corp', fit: 9.4, prob: 9, age: '2h ago', status: 'Scouted via Clip', action: 'Review Draft Voice' },
-  { id: '2', role: 'Director of Engineering (Local-First)', company: 'Cryptographic Systems Inc', fit: 7.8, prob: 9, age: '1d ago', status: 'Sync Pending', action: 'Verify Fit' },
-  { id: '3', role: 'Senior Technical Lead', company: 'Mass-Market Logistics Group', fit: 4.2, prob: 8, age: '3d ago' },
-];
-
-const roles: PipelineRole[] = SEED.map((r) => ({
-  id: r.id,
-  role: r.role,
-  company: r.company,
-  age: r.age,
-  status: r.status,
-  action: r.action,
-  tier: computeTier(r.fit, r.prob),
-  score: expectedValue({ fit: r.fit, prob: r.prob }),
-}));
+const VIEW_TITLE: Record<Lane, string> = {
+  today: "Today's perimeter",
+  open: 'Open roles',
+  applied: 'Applied',
+  interviewing: 'Interviewing',
+  closed: 'Rejected + archived',
+};
 
 export default function App() {
   const [fontsLoaded] = useFonts({
     SplineSans: require('./assets/fonts/SplineSans.ttf'),
     Fraunces: require('./assets/fonts/Fraunces.ttf'),
   });
+  const [lane, setLane] = useState<Lane>('today');
+  const [selected, setSelected] = useState<Role | null>(null);
+
+  // Today = actionable (non-closed) roles, highest expected value first.
+  const todayRoles = useMemo(
+    () => sampleRoles.filter((r) => laneOf(r.status) !== 'closed').sort((a, b) => b.score - a.score),
+    [],
+  );
+  const counts = useMemo<Record<Lane, number>>(
+    () => ({
+      today: todayRoles.length,
+      open: rolesInLane(sampleRoles, 'open').length,
+      applied: rolesInLane(sampleRoles, 'applied').length,
+      interviewing: rolesInLane(sampleRoles, 'interviewing').length,
+      closed: rolesInLane(sampleRoles, 'closed').length,
+    }),
+    [todayRoles],
+  );
+
   if (!fontsLoaded) return null;
+
+  if (selected) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <RoleDetailScreen role={selected} onBack={() => setSelected(null)} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <>
-      <TodayScreen roles={roles} />
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.shell}>
+        <View style={styles.brandbar}>
+          <ReqonGlyph size={26} />
+          <View>
+            <Text style={styles.brand}>REQON</Text>
+            <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
+          </View>
+        </View>
+
+        <TabBar active={lane} counts={counts} onChange={setLane} />
+
+        <View style={styles.body}>
+          {lane === 'today' ? (
+            <TodayScreen roles={todayRoles} onPressRole={setSelected} />
+          ) : (
+            <PipelineScreen lane={lane} roles={sampleRoles} onPressRole={setSelected} />
+          )}
+        </View>
+      </View>
       <StatusBar style="light" />
-    </>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  shell: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
+  brandbar: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 16 },
+  brand: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '600', letterSpacing: 2.6, color: colors.emerald },
+  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: colors.textHigh, letterSpacing: -0.2 },
+  body: { flex: 1 },
+});

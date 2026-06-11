@@ -1,0 +1,53 @@
+import { ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { colors, alpha, fonts } from '../theme';
+import { LANES, type Lane } from '../model';
+
+// Horizontal lane pills (Today · Open · Applied · Interviewing · Closed) with counts — mirrors the
+// board's top tabs. Active pill gets an emerald ring.
+export function TabBar({
+  active,
+  counts,
+  onChange,
+}: {
+  active: Lane;
+  counts: Record<Lane, number>;
+  onChange: (l: Lane) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+    >
+      {LANES.map(({ key, label }) => {
+        const on = key === active;
+        return (
+          <Pressable key={key} onPress={() => onChange(key)} style={[styles.pill, on && styles.pillOn]}>
+            <Text style={[styles.label, on && styles.labelOn]}>{label}</Text>
+            <Text style={[styles.count, on && styles.countOn]}>{counts[key] ?? 0}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: { gap: 8, paddingVertical: 2 },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: colors.element,
+    borderWidth: 1,
+    borderColor: colors.element,
+  },
+  pillOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.08) },
+  label: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: colors.textBase },
+  labelOn: { color: colors.textHigh },
+  count: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
+  countOn: { color: colors.emerald },
+});

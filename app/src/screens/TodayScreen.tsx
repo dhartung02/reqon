@@ -1,72 +1,47 @@
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { colors, alpha, fonts } from '../theme';
-import { ReqonGlyph } from '../components/ReqonGlyph';
-import { RoleCard, type PipelineRole } from '../components/RoleCard';
+import { RoleCard } from '../components/RoleCard';
+import type { Role } from '../model';
 
-// "Today's Perimeter" — the app's command center (BRAND design). Header + scout status + the
-// scored pipeline. Data is passed in already scored by @reqon/core (see App.tsx). Fonts fall back
-// to system for now; brand faces (Spline Sans / Fraunces) load via expo-font in a later pass.
-export function TodayScreen({ roles }: { roles: PipelineRole[] }) {
+// The Today body: a scout-status strip + the scored pipeline (top actionable roles). The app shell
+// (App.tsx) provides the brand bar + lane tabs; this is just the lane content.
+export function TodayScreen({ roles, onPressRole }: { roles: Role[]; onPressRole: (r: Role) => void }) {
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.h1}>Today's Perimeter</Text>
-            <Text style={styles.sub}>Reqon Scout active • {roles.length} roles tracked</Text>
-          </View>
-          <View style={styles.glyphBox}>
-            <ReqonGlyph size={24} color={colors.emerald} variant="reticle" />
-          </View>
-        </View>
+    <ScrollView contentContainerStyle={styles.scroll}>
+      <View style={styles.scoutStrip}>
+        <View style={styles.pulse} />
+        <Text style={styles.scoutText}>Reqon Scout active • {roles.length} roles tracked</Text>
+      </View>
 
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>SCORED PIPELINE</Text>
-          <Text style={styles.signal}>98% Signal</Text>
-        </View>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>SCORED PIPELINE</Text>
+        <Text style={styles.signal}>98% Signal</Text>
+      </View>
 
-        <View style={styles.list}>
-          {roles.map((r) => (
-            <RoleCard key={r.id} role={r} />
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <View style={styles.list}>
+        {roles.map((r) => (
+          <RoleCard key={r.id} role={r} onPress={() => onPressRole(r)} />
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  scroll: { padding: 24, gap: 16 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.element,
-    paddingBottom: 16,
-  },
-  headerText: { flex: 1 },
-  h1: { fontFamily: fonts.serif, fontSize: 24, fontWeight: '600', color: colors.textHigh, letterSpacing: -0.3 },
-  sub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, marginTop: 4 },
-  glyphBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.element,
-    borderWidth: 1,
-    borderColor: alpha(colors.emerald, 0.2),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  scroll: { paddingTop: 16, paddingBottom: 32, gap: 16 },
+  scoutStrip: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pulse: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.emerald },
+  scoutText: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: {
+    fontFamily: fonts.sans,
     fontSize: 12,
     fontWeight: '500',
-    letterSpacing: 2.2, // ~0.18em at 12px
+    letterSpacing: 2.2,
     color: colors.muted,
   },
   signal: {
+    fontFamily: fonts.sans,
     fontSize: 12,
     fontWeight: '500',
     color: colors.emerald,

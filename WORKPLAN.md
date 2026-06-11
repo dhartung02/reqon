@@ -187,8 +187,11 @@ Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
      tappable, status pill). `model.ts` (Role/Status/Lane, lane mapping, statusColor, scoreRole via
      shared core) + `data/sample.ts` (12 roles). Brand fonts bundled + loaded (expo-font); Fraunces/
      Spline Sans applied. State-based nav (no nav lib yet). tsc clean, jest green.
-   - **Remaining:** search/sort controls + Analytics tab; visual sim verification (after Xcode
-     license); editing writes through to the store in M3.
+   - **Done (cont.):** `ControlBar` (search + sort by EV/fit/company) on lane lists;
+     `AnalyticsScreen` (KPI grid + tier distribution). M2 UI shell complete.
+   - **Remaining:** visual sim verification — Xcode 26.5 + license done, but an **iOS simulator
+     runtime must be installed** (0 present; `xcodebuild -downloadPlatform iOS`) and CocoaPods for a
+     dev-client build, or use Expo Go once a runtime exists. Editing/writes land in M3.
 3. **M3 Capture:** native Swift Share-Extension → confirm sheet → save (App Group → RN
    store); on-device enrichment (`fetch` port of `computeEnrichFields`, incl. URL-slug
    company + JSON-LD/OG/title); optional OpenAI scoring (expo-secure-store key).

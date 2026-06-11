@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { sampleRoles } from './src/data/sample';
-import { laneOf, rolesInLane, type Lane, type Role } from './src/model';
+import { laneOf, rolesInLane, type Lane, type Role, type SortKey } from './src/model';
 import { colors, fonts } from './src/theme';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
 import { TabBar } from './src/components/TabBar';
+import { ControlBar } from './src/components/ControlBar';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { PipelineScreen } from './src/screens/PipelineScreen';
 import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
+import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 
 const VIEW_TITLE: Record<Lane, string> = {
   today: "Today's perimeter",
@@ -17,6 +19,7 @@ const VIEW_TITLE: Record<Lane, string> = {
   applied: 'Applied',
   interviewing: 'Interviewing',
   closed: 'Rejected + archived',
+  analytics: 'Analytics',
 };
 
 export default function App() {
@@ -26,6 +29,8 @@ export default function App() {
   });
   const [lane, setLane] = useState<Lane>('today');
   const [selected, setSelected] = useState<Role | null>(null);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortKey>('ev');
 
   // Today = actionable (non-closed) roles, highest expected value first.
   const todayRoles = useMemo(
@@ -39,6 +44,7 @@ export default function App() {
       applied: rolesInLane(sampleRoles, 'applied').length,
       interviewing: rolesInLane(sampleRoles, 'interviewing').length,
       closed: rolesInLane(sampleRoles, 'closed').length,
+      analytics: sampleRoles.length,
     }),
     [todayRoles],
   );
@@ -67,11 +73,23 @@ export default function App() {
 
         <TabBar active={lane} counts={counts} onChange={setLane} />
 
+        {lane !== 'today' && lane !== 'analytics' ? (
+          <ControlBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} />
+        ) : null}
+
         <View style={styles.body}>
           {lane === 'today' ? (
             <TodayScreen roles={todayRoles} onPressRole={setSelected} />
+          ) : lane === 'analytics' ? (
+            <AnalyticsScreen roles={sampleRoles} />
           ) : (
-            <PipelineScreen lane={lane} roles={sampleRoles} onPressRole={setSelected} />
+            <PipelineScreen
+              lane={lane}
+              roles={sampleRoles}
+              query={query}
+              sort={sort}
+              onPressRole={setSelected}
+            />
           )}
         </View>
       </View>

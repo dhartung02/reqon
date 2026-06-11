@@ -2,36 +2,51 @@ import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { colors, fonts } from '../theme';
 import { RoleCard } from '../components/RoleCard';
-import { rolesInLane, type Lane, type Role, type Tier } from '../model';
+import {
+  rolesInLane,
+  matchesQuery,
+  sortRoles,
+  type StatusLane,
+  type Role,
+  type Tier,
+  type SortKey,
+} from '../model';
 
-// A lane list (Open/Applied/Interviewing/Closed): roles grouped by tier (A→B→C), sorted by score
-// within each group. Tapping a card opens the detail.
+// A lane list (Open/Applied/Interviewing/Closed): roles filtered by search, grouped by tier
+// (A→B→C), sorted within each group. Tapping a card opens the detail.
 const TIER_ORDER: Tier[] = ['A', 'B', 'C'];
 const TIER_LABEL: Record<Tier, string> = { A: 'Tier A', B: 'Tier B', C: 'Tier C' };
 
 export function PipelineScreen({
   lane,
   roles,
+  query,
+  sort,
   onPressRole,
 }: {
-  lane: Exclude<Lane, 'today'>;
+  lane: StatusLane;
   roles: Role[];
+  query: string;
+  sort: SortKey;
   onPressRole: (r: Role) => void;
 }) {
   const groups = useMemo(() => {
-    const inLane = rolesInLane(roles, lane);
+    const inLane = rolesInLane(roles, lane).filter((r) => matchesQuery(r, query));
     return TIER_ORDER.map((tier) => ({
       tier,
-      rows: inLane.filter((r) => r.tier === tier).sort((a, b) => b.score - a.score),
+      rows: sortRoles(
+        inLane.filter((r) => r.tier === tier),
+        sort,
+      ),
     })).filter((g) => g.rows.length > 0);
-  }, [roles, lane]);
+  }, [roles, lane, query, sort]);
 
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
 
   if (total === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>No roles in this lane.</Text>
+        <Text style={styles.emptyText}>{query.trim() ? 'No roles match your search.' : 'No roles in this lane.'}</Text>
       </View>
     );
   }

@@ -15,7 +15,8 @@ export type Status =
   | 'Rejected'
   | 'Archived';
 
-export type Lane = 'today' | 'open' | 'applied' | 'interviewing' | 'closed';
+export type Lane = 'today' | 'open' | 'applied' | 'interviewing' | 'closed' | 'analytics';
+export type StatusLane = Exclude<Lane, 'today' | 'analytics'>;
 
 export interface Role {
   id: string;
@@ -37,7 +38,7 @@ export interface Role {
 }
 
 // Lane → statuses, mirroring the server's TAB_MAP_DEFAULT.
-export const LANE_STATUS: Record<Exclude<Lane, 'today'>, Status[]> = {
+export const LANE_STATUS: Record<StatusLane, Status[]> = {
   open: ['Not Applied'],
   applied: ['Applied'],
   interviewing: ['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'],
@@ -50,17 +51,42 @@ export const LANES: { key: Lane; label: string }[] = [
   { key: 'applied', label: 'Applied' },
   { key: 'interviewing', label: 'Interviewing' },
   { key: 'closed', label: 'Closed' },
+  { key: 'analytics', label: 'Analytics' },
 ];
 
-export const laneOf = (s: Status): Exclude<Lane, 'today'> => {
+export const laneOf = (s: Status): StatusLane => {
   for (const lane of ['open', 'applied', 'interviewing', 'closed'] as const) {
     if (LANE_STATUS[lane].includes(s)) return lane;
   }
   return 'open';
 };
 
-export const rolesInLane = (roles: Role[], lane: Exclude<Lane, 'today'>): Role[] =>
+export const rolesInLane = (roles: Role[], lane: StatusLane): Role[] =>
   roles.filter((r) => LANE_STATUS[lane].includes(r.status));
+
+// ---- search + sort ----
+export type SortKey = 'ev' | 'company' | 'fit';
+export const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'ev', label: 'Expected value' },
+  { key: 'fit', label: 'Fit' },
+  { key: 'company', label: 'Company' },
+];
+
+export const matchesQuery = (r: Role, q: string): boolean => {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return (
+    r.role.toLowerCase().includes(s) ||
+    r.company.toLowerCase().includes(s) ||
+    (r.recruiter || '').toLowerCase().includes(s) ||
+    (r.notes || '').toLowerCase().includes(s)
+  );
+};
+
+export const sortRoles = (roles: Role[], key: SortKey): Role[] =>
+  [...roles].sort((a, b) =>
+    key === 'company' ? a.company.localeCompare(b.company) : key === 'fit' ? b.fit - a.fit : b.score - a.score,
+  );
 
 /** Status → accent color for pills/dots. */
 export const statusColor = (s: Status): string => {

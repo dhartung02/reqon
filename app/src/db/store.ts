@@ -76,8 +76,10 @@ export async function initDb(): Promise<void> {
   }
 }
 
-const toRole = (r: Row): Role =>
-  scoreRole({
+const toRole = (r: Row & { raw?: string | null }): Role => {
+  // Hygiene/triage fields live in the full server row (raw); surface them for the Today lanes.
+  const x = typeof r.raw === 'string' ? (JSON.parse(r.raw) as Record<string, unknown>) : {};
+  return scoreRole({
     id: r.id,
     role: r.role,
     company: r.company,
@@ -87,17 +89,22 @@ const toRole = (r: Row): Role =>
     salary: r.salary ?? undefined,
     location: r.location ?? undefined,
     link: r.link ?? undefined,
-    applied: r.applied ?? undefined,
+    applied: r.applied ?? (x.applied as string) ?? undefined,
     recruiter: r.recruiter ?? undefined,
     next: r.next ?? undefined,
     notes: r.notes ?? undefined,
     age: r.age,
+    conf: (x.conf as string) ?? undefined,
+    reqCheck: (x.reqCheck as string) ?? undefined,
+    lastcontact: (x.lastcontact as string) ?? undefined,
+    added: (x.added as string) ?? undefined,
   }) as Role;
+};
 
 /** All live (non-tombstoned) roles, tier + score derived. */
 export async function getAllRoles(): Promise<Role[]> {
   const d = await db();
-  const rows = await d.getAllAsync<Row>('SELECT * FROM roles WHERE deleted = 0');
+  const rows = await d.getAllAsync<Row & { raw?: string | null }>('SELECT * FROM roles WHERE deleted = 0');
   return rows.map(toRole);
 }
 

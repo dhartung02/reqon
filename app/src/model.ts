@@ -35,6 +35,11 @@ export interface Role {
   next?: string; // next action
   notes?: string;
   age: string; // display-only "2h ago"
+  // Hygiene/triage fields — populated from synced server rows (undefined for local-only rows).
+  conf?: string; // verified | boardonly | unverified
+  reqCheck?: string; // open | closed | lead | unknown | open-applied
+  lastcontact?: string; // ISO date
+  added?: string; // ISO date the row was added
 }
 
 // Lane → statuses, mirroring the server's TAB_MAP_DEFAULT.

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { laneOf, rolesInLane, type Lane, type SortKey, type Status } from './src/model';
+import { rolesInLane, type Lane, type SortKey, type Status } from './src/model';
+import { todayActionCount } from './src/today';
 import { colors, fonts } from './src/theme';
 import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
@@ -54,20 +55,16 @@ export default function App() {
   };
 
   // Today = actionable (non-closed) roles, highest expected value first.
-  const todayRoles = useMemo(
-    () => roles.filter((r) => laneOf(r.status) !== 'closed').sort((a, b) => b.score - a.score),
-    [roles],
-  );
   const counts = useMemo<Record<Lane, number>>(
     () => ({
-      today: todayRoles.length,
+      today: todayActionCount(roles),
       open: rolesInLane(roles, 'open').length,
       applied: rolesInLane(roles, 'applied').length,
       interviewing: rolesInLane(roles, 'interviewing').length,
       closed: rolesInLane(roles, 'closed').length,
       analytics: roles.length,
     }),
-    [roles, todayRoles],
+    [roles],
   );
 
   if (!fontsLoaded || loading) return null;
@@ -122,8 +119,8 @@ export default function App() {
         <View style={styles.body}>
           {lane === 'today' ? (
             <TodayScreen
-              roles={todayRoles}
-              onPressRole={(r) => setSelectedId(r.id)}
+              roles={roles}
+              onJump={setLane}
               onScout={onScout}
               scouting={scouting}
               scoutMsg={scoutMsg}

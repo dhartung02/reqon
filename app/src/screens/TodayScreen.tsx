@@ -19,12 +19,14 @@ export function TodayScreen({
   onScout,
   scouting,
   scoutMsg,
+  scoutEnabled,
 }: {
   roles: Role[];
   onJump: (l: Lane) => void;
   onScout: () => void;
   scouting: boolean;
   scoutMsg: string | null;
+  scoutEnabled: boolean;
 }) {
   const lanes = todayLanes(roles);
   const tierA = roles.filter((r) => r.tier === 'A').length;
@@ -37,13 +39,17 @@ export function TodayScreen({
           <View style={styles.pulse} />
           <Text style={styles.scoutText}>Reqon Scout • {roles.length} tracked</Text>
         </View>
-        <Pressable style={styles.scoutBtn} onPress={onScout} disabled={scouting}>
-          {scouting ? (
-            <ActivityIndicator size="small" color={colors.emerald} />
-          ) : (
-            <Text style={styles.scoutBtnText}>Run Scout</Text>
-          )}
-        </Pressable>
+        {scoutEnabled ? (
+          <Pressable style={styles.scoutBtn} onPress={onScout} disabled={scouting}>
+            {scouting ? (
+              <ActivityIndicator size="small" color={colors.emerald} />
+            ) : (
+              <Text style={styles.scoutBtnText}>Run Scout</Text>
+            )}
+          </Pressable>
+        ) : (
+          <Text style={styles.serverScout}>Server scout · synced</Text>
+        )}
       </View>
       {scoutMsg ? <Text style={styles.scoutMsg}>{scoutMsg}</Text> : null}
 
@@ -92,6 +98,7 @@ const styles = StyleSheet.create({
     minWidth: 84,
   },
   scoutBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: colors.emerald },
+  serverScout: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
   scoutMsg: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '500', letterSpacing: 1.4, color: colors.muted },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

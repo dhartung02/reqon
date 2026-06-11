@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { rolesInLane, type Lane, type SortKey, type Status } from './src/model';
@@ -16,6 +16,8 @@ import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
 import { runScout } from './src/scout/scout';
+import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
+import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
   today: "Today's perimeter",
@@ -40,6 +42,43 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
+  const [serverUrl, setServerUrl] = useState('');
+  const [scoutMode, setScoutMode] = useState<ScoutMode>('auto');
+
+  // Auto-sync: silent push+pull whenever configured. Manual "Sync now" remains a force option.
+  const autoSync = useCallback(async () => {
+    const { url } = await getConfig();
+    if (!url) return;
+    try {
+      await syncTwoWay();
+      await refresh();
+    } catch {
+      /* offline / unreachable — try again next foreground */
+    }
+  }, [refresh]);
+
+  const loadConfig = useCallback(async () => {
+    const [{ url }, mode] = await Promise.all([getConfig(), getScoutMode()]);
+    setServerUrl(url);
+    setScoutMode(mode);
+  }, []);
+
+  // On launch: load config + sync. On foreground: sync. (ROADMAP FR-APP-6.)
+  useEffect(() => {
+    (async () => {
+      await loadConfig();
+      await autoSync();
+    })();
+  }, [loadConfig, autoSync]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') autoSync();
+    });
+    return () => sub.remove();
+  }, [autoSync]);
+
+  const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
   const onScout = async () => {
     setScouting(true);
@@ -124,6 +163,7 @@ export default function App() {
               onScout={onScout}
               scouting={scouting}
               scoutMsg={scoutMsg}
+              scoutEnabled={scoutOn}
             />
           ) : lane === 'analytics' ? (
             <AnalyticsScreen roles={roles} />
@@ -139,7 +179,14 @@ export default function App() {
         </View>
       </View>
       <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
-      <SettingsModal visible={showSettings} onClose={() => setShowSettings(false)} onSynced={refresh} />
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => {
+          setShowSettings(false);
+          loadConfig().then(autoSync);
+        }}
+        onSynced={refresh}
+      />
       <StatusBar style="light" />
     </SafeAreaView>
   );

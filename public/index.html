@@ -41,6 +41,8 @@
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:18px}
   .appbar-l{display:flex;align-items:center;gap:10px;position:relative}
   .appbar h1{font-family:"Fraunces",serif;font-weight:900;font-size:1.45rem;line-height:1;letter-spacing:-.01em}
+  .brandwrap{display:flex;flex-direction:column;gap:2px}
+  .brandmark{font-family:"Spline Sans",sans-serif;font-weight:600;font-size:.6rem;letter-spacing:.26em;text-transform:uppercase;color:var(--accent);line-height:1}
   .brand-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
   .appbar-r{display:flex;align-items:center;gap:12px}
   .infobtn{width:21px;height:21px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--dim);font-size:.78rem;font-style:italic;font-family:Georgia,"Times New Roman",serif;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
@@ -437,7 +439,10 @@
         <circle cx="50" cy="50" r="35" stroke="var(--accent)" stroke-width="10" stroke-dasharray="70 15 70 15"/>
         <line x1="50" y1="50" x2="75" y2="75" stroke="var(--accent)" stroke-width="10" stroke-linecap="round"/>
       </svg>
-      <h1>Requisition pipeline</h1>
+      <div class="brandwrap">
+        <span class="brandmark">Reqon</span>
+        <h1>Requisition pipeline</h1>
+      </div>
       <button class="infobtn" id="aboutBtn" title="About this board" aria-label="About this board">i</button>
       <div class="about-pop" id="aboutPop">
         <p><b>Reqon — self-hosted job-search command center.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>

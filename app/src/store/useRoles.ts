@@ -61,5 +61,5 @@ export function useRoles() {
     [refresh],
   );
 
-  return { roles, loading, setStatus, remove, update, add };
+  return { roles, loading, setStatus, remove, update, add, refresh };
 }

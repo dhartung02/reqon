@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
-import { colors, alpha } from '../theme';
+import { colors, alpha, fonts } from '../theme';
 import { ReqonGlyph } from '../components/ReqonGlyph';
 import { RoleCard, type PipelineRole } from '../components/RoleCard';
 
@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerText: { flex: 1 },
-  h1: { fontSize: 24, fontWeight: '600', color: colors.textHigh, letterSpacing: -0.3 },
-  sub: { fontSize: 13, color: colors.muted, marginTop: 4 },
+  h1: { fontFamily: fonts.serif, fontSize: 24, fontWeight: '600', color: colors.textHigh, letterSpacing: -0.3 },
+  sub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, marginTop: 4 },
   glyphBox: {
     width: 40,
     height: 40,

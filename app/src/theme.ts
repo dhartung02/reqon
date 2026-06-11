@@ -12,6 +12,9 @@ export const colors = {
   textBase: '#94A3B8', // standard descriptive text
 } as const;
 
+/** Brand typefaces (bundled TTFs, loaded via expo-font in App.tsx). */
+export const fonts = { sans: 'SplineSans', serif: 'Fraunces' } as const;
+
 /** All-caps command tracking — ~0.18em; RN letterSpacing is px, so scale by font size where needed. */
 export const tracking = { command: 4 } as const;
 

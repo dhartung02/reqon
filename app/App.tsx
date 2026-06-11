@@ -1,4 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import { computeTier, expectedValue } from '@reqon/core';
 import { TodayScreen } from './src/screens/TodayScreen';
 import type { PipelineRole } from './src/components/RoleCard';
@@ -23,6 +24,11 @@ const roles: PipelineRole[] = SEED.map((r) => ({
 }));
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    SplineSans: require('./assets/fonts/SplineSans.ttf'),
+    Fraunces: require('./assets/fonts/Fraunces.ttf'),
+  });
+  if (!fontsLoaded) return null;
   return (
     <>
       <TodayScreen roles={roles} />

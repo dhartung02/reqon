@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import type { Tier } from '@reqon/core';
-import { colors, tierColor, alpha, tracking } from '../theme';
+import { colors, tierColor, alpha, tracking, fonts } from '../theme';
 
 export interface PipelineRole {
   id: string;
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   scoreText: { fontSize: 12, color: colors.muted },
   age: { fontSize: 12, color: colors.muted },
-  title: { fontSize: 18, fontWeight: '500', color: colors.textHigh, paddingTop: 6 },
+  title: { fontFamily: fonts.sans, fontSize: 18, fontWeight: '500', color: colors.textHigh, paddingTop: 6 },
   titleSuppressed: { color: colors.textBase, textDecorationLine: 'line-through' },
   company: { fontSize: 14, color: colors.textBase, marginTop: 2 },
   companySuppressed: { color: colors.muted },

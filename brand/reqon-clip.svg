@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 110" role="img" aria-label="REQON CLIP">
+  <!-- Sub-brand lockup: leading emerald glyph + REQON (bold, white) + CLIP (medium, suffix color).
+       Suffix color signals product role — CLIP = Tactical Emerald (active capture). BRAND.md §5. -->
+  <g transform="translate(10,18) scale(0.74)" fill="none" stroke="#00E5A3" stroke-width="10">
+    <circle cx="50" cy="50" r="35" stroke-dasharray="70 15 70 15"/>
+    <line x1="50" y1="50" x2="75" y2="75" stroke-linecap="round"/>
+  </g>
+  <g font-family="'Spline Sans','Inter',system-ui,sans-serif" font-size="46" letter-spacing="3" text-anchor="start">
+    <text x="104" y="72" font-weight="700" fill="#E2E8F0">REQON</text>
+    <text x="312" y="72" font-weight="500" fill="#00E5A3">CLIP</text>
+  </g>
+</svg>

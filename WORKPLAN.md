@@ -175,10 +175,23 @@ Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
      (`npm test` in app/ runs `tests/vectors/` through the app); `tsc --noEmit` clean; dark
      proof-of-life `App.tsx` scores a sample via the shared core. Name **Reqon**, bundle id
      `com.reqon.app`, expo-sqlite + expo-secure-store installed.
-   - **Blocked on Xcode:** simulator boot (`expo run:ios`) — full Xcode not yet installed.
+   - **Blocked on Xcode license:** simulator boot — Xcode installed; run
+     `sudo xcodebuild -license accept` once. (Git also routes through Xcode now; use
+     `DEVELOPER_DIR=/Library/Developer/CommandLineTools` until the license is accepted.)
    - **Remaining:** local store (expo-sqlite schema + CRUD + tombstones).
 2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
    tracking edits; seeded sample store.
+   - **Done:** brand bar + `TabBar` (Today/Open/Applied/Interviewing/Closed + counts); Today body
+     (scout strip + scored pipeline); `PipelineScreen` (per-lane, grouped by tier, sorted by EV);
+     `RoleDetailScreen` (full tracking fields, status pill, open-posting); `RoleCard` (Role-typed,
+     tappable, status pill). `model.ts` (Role/Status/Lane, lane mapping, statusColor, scoreRole via
+     shared core) + `data/sample.ts` (12 roles). Brand fonts bundled + loaded (expo-font); Fraunces/
+     Spline Sans applied. State-based nav (no nav lib yet). tsc clean, jest green.
+   - **Done (cont.):** `ControlBar` (search + sort by EV/fit/company) on lane lists;
+     `AnalyticsScreen` (KPI grid + tier distribution). M2 UI shell complete.
+   - **Remaining:** visual sim verification — Xcode 26.5 + license done, but an **iOS simulator
+     runtime must be installed** (0 present; `xcodebuild -downloadPlatform iOS`) and CocoaPods for a
+     dev-client build, or use Expo Go once a runtime exists. Editing/writes land in M3.
 3. **M3 Capture:** native Swift Share-Extension → confirm sheet → save (App Group → RN
    store); on-device enrichment (`fetch` port of `computeEnrichFields`, incl. URL-slug
    company + JSON-LD/OG/title); optional OpenAI scoring (expo-secure-store key).

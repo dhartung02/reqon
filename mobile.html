@@ -5,15 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
 <meta name="theme-color" content="#0e1217" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<title>Pipeline · mobile</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<title>Reqon</title>
+<style>
+  /* Bundled locally for offline (served from public/fonts; see public/fonts/LICENSE.md) */
+  @font-face{font-family:"Spline Sans";src:url("/fonts/SplineSans.ttf") format("truetype");font-weight:300 700;font-display:swap}
+  @font-face{font-family:"Spline Sans Mono";src:url("/fonts/SplineSansMono.ttf") format("truetype");font-weight:400 700;font-display:swap}
+  @font-face{font-family:"Fraunces";src:url("/fonts/Fraunces.ttf") format("truetype");font-weight:400 900;font-display:swap}
+</style>
 <style>
   :root{
-    --bg:#0e1217; --panel:#161d26; --panel-2:#1b232e; --line:#28333f; --line-2:#33414f;
-    --text:#e9eef4; --text-2:#b2bdc9; --dim:#7c8794;
-    --gold:#edc05a; --teal:#3fd3b4; --green:#9ed35f; --coral:#ef8268; --blue:#86a6dd; --violet:#a78bdb;
+    /* Reqon "Emerald Command" palette — see BRAND.md §3 */
+    --bg:#0B0C0E; --panel:#16181C; --panel-2:#1B1F25; --line:#232A31; --line-2:#2E3741;
+    --text:#E2E8F0; --text-2:#94A3B8; --dim:#64748B;
+    --gold:#00E5A3; --teal:#2DD4BF; --green:#00E5A3; --coral:#F87171; --blue:#79A6E0; --violet:#A78BDB;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html{-webkit-text-size-adjust:100%}

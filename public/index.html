@@ -3,23 +3,27 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Job Pipeline CRM</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<title>Reqon</title>
+<style>
+  /* Bundled locally for offline / local-first (served from public/fonts; see public/fonts/LICENSE.md) */
+  @font-face{font-family:"Spline Sans";src:url("/fonts/SplineSans.ttf") format("truetype");font-weight:300 700;font-display:swap}
+  @font-face{font-family:"Spline Sans Mono";src:url("/fonts/SplineSansMono.ttf") format("truetype");font-weight:400 700;font-display:swap}
+  @font-face{font-family:"Fraunces";src:url("/fonts/Fraunces.ttf") format("truetype");font-weight:400 900;font-display:swap}
+</style>
 <style>
   :root{
-    --bg:#0d1117; --panel:#151b23; --panel-2:#1b222b; --line:#262d37; --line-2:#333c47;
-    --text:#e8eef5; --text-2:#aab6c2; --dim:#8a96a3;
+    /* Reqon "Emerald Command" palette (dark-mode first) — see BRAND.md §3 */
+    --bg:#0B0C0E; --panel:#16181C; --panel-2:#1B1F25; --line:#232A31; --line-2:#2E3741;
+    --text:#E2E8F0; --text-2:#94A3B8; --dim:#64748B;
     /* Functional color roles (#19) — meaning, not decoration:
        accent=primary action/active · positive=applied/fillable · info=verified/source
        warning=gated/needs-attention · danger=rejected/error · ai=scoring/AI · muted=manual/inactive */
-    --accent:#e3b95a; --positive:#69c57e; --active:#39c2b0; --info:#79a6e0; --warning:#e0a23c; --danger:#e8755f; --ai:#a78bdb; --muted:#6f7b88;
+    --accent:#00E5A3; --positive:#00E5A3; --active:#2DD4BF; --info:#79A6E0; --warning:#FFB800; --danger:#F87171; --ai:#A78BDB; --muted:#64748B;
     /* legacy aliases kept so existing rules resolve; remapped onto the role tokens */
     --gold:var(--accent); --teal:var(--active); --green:var(--positive); --coral:var(--danger); --blue:var(--info); --violet:var(--ai);
-    /* score bands — desaturated, functional: strong→ok→possible→low */
-    --t9:#5bbf8e; --t7:#8fbf6a; --t5:#d2a64a; --t3:#d97b63;
-    --shadow:0 12px 32px -16px rgba(0,0,0,.55);
+    /* score bands — Tier A emerald → strong → possible amber → low muted */
+    --t9:#00E5A3; --t7:#5BD6A0; --t5:#FFB800; --t3:#64748B;
+    --shadow:0 12px 32px -16px rgba(0,0,0,.6);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
@@ -37,6 +41,8 @@
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:18px}
   .appbar-l{display:flex;align-items:center;gap:10px;position:relative}
   .appbar h1{font-family:"Fraunces",serif;font-weight:900;font-size:1.45rem;line-height:1;letter-spacing:-.01em}
+  .brandwrap{display:flex;flex-direction:column;gap:2px}
+  .brandmark{font-family:"Spline Sans",sans-serif;font-weight:600;font-size:.6rem;letter-spacing:.26em;text-transform:uppercase;color:var(--accent);line-height:1}
   .brand-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
   .appbar-r{display:flex;align-items:center;gap:12px}
   .infobtn{width:21px;height:21px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--dim);font-size:.78rem;font-style:italic;font-family:Georgia,"Times New Roman",serif;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
@@ -429,11 +435,17 @@
 <div class="wrap">
   <header class="appbar">
     <div class="appbar-l">
-      <span class="brand-dot"></span>
-      <h1>Requisition pipeline</h1>
+      <svg width="24" height="24" viewBox="0 0 100 100" fill="none" aria-hidden="true" style="filter:drop-shadow(0 0 6px rgba(0,229,163,.35))">
+        <circle cx="50" cy="50" r="35" stroke="var(--accent)" stroke-width="10" stroke-dasharray="70 15 70 15"/>
+        <line x1="50" y1="50" x2="75" y2="75" stroke="var(--accent)" stroke-width="10" stroke-linecap="round"/>
+      </svg>
+      <div class="brandwrap">
+        <span class="brandmark">Reqon</span>
+        <h1>Requisition pipeline</h1>
+      </div>
       <button class="infobtn" id="aboutBtn" title="About this board" aria-label="About this board">i</button>
       <div class="about-pop" id="aboutPop">
-        <p><b>Self-hosted job-search CRM.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
+        <p><b>Reqon — self-hosted job-search command center.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
         <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Tier</b> is set by expected value.</p>
         <p>Every edit saves server-side and persists. Use <b>Run Scout</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs action.</p>
       </div>
@@ -535,7 +547,7 @@
   <footer>
     <b>Link confidence.</b> <span style="color:var(--teal)">Verified</span> = I confirmed a live req this session. <span style="color:var(--gold)">Board-only</span> = link goes to the company's careers board (filter for the title); individual req URLs rotate/expire. <span style="color:var(--coral)">Unverified</span> = sourced from your uploaded doc, not yet confirmed — check before relying on it.<br>
     <b>Fit</b> = domain/résumé match (your earlier 7-axis model, condensed). <b>Interview probability</b> = my estimate of landing a screen given seniority, remote competition, and how directly your background maps — deliberately separate from fit, since some perfect-fit roles are hard to land. <b>Expected value</b> = fit × probability, your best apply-effort allocator. <b>Tier A</b> refined by expected value, not raw fit. <b>Bands</b> (shown when a row is expanded): 8.0+ <span style="color:var(--green)">Excellent</span> · 6.5–7.9 <span style="color:var(--green)">Strong</span> · 5.0–6.4 <span style="color:var(--gold)">Possible</span> · &lt;5.0 <span style="color:var(--dim)">Low priority</span> — Tier A maps to Excellent/Strong, B to Possible, C below. All scores are estimates, salary ranges indicative — verify on each board.<br>
-    <b>Status.</b> Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks the tier (A gold · B blue · C grey).
+    <b>Status.</b> Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks the tier (<span style="color:var(--t9)">A emerald</span> · <span style="color:var(--warning)">B amber</span> · <span style="color:var(--muted)">C muted</span>).
   </footer>
 </div>
 
@@ -2003,7 +2015,7 @@ let PROFILE_NARRATIVES=[];
 const csvList=v=>String(v||"").split(",").map(s=>s.trim()).filter(Boolean);
 async function loadProfile(){ try{const j=await (await fetch("/api/profile",{cache:"no-store"})).json(); if(j.ok){fillProfile(j.profile); brandFromProfile(j.profile);} }catch(e){} }
 // personalize the title from the profile (no hardcoded name in markup)
-function brandFromProfile(p){ const n=(p&&p.applicant&&p.applicant.name||"").trim(); if(n)document.title="Job Pipeline CRM — "+n; }
+function brandFromProfile(p){ const n=(p&&p.applicant&&p.applicant.name||"").trim(); if(n)document.title="Reqon — "+n; }
 loadProfile();   // sets the title at startup; re-runs when Settings opens
 function fillProfile(p){
   p=p||{}; const a=p.applicant||{};

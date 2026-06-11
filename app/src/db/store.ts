@@ -48,6 +48,12 @@ async function db(): Promise<SQLite.SQLiteDatabase> {
       deleted INTEGER NOT NULL DEFAULT 0
     );
   `);
+  // Migration: `raw` holds the full server row JSON so a sync round-trip preserves fields the
+  // app doesn't model (full fidelity / no clobber when push lands in Stage 2).
+  const cols = await _db.getAllAsync<{ name: string }>('PRAGMA table_info(roles)');
+  if (!cols.some((c) => c.name === 'raw')) {
+    await _db.execAsync('ALTER TABLE roles ADD COLUMN raw TEXT');
+  }
   return _db;
 }
 
@@ -123,6 +129,44 @@ export async function updateRole(id: string, patch: Partial<Pick<Role, 'next' | 
 export async function softDeleteRole(id: string): Promise<void> {
   const d = await db();
   await d.runAsync('UPDATE roles SET deleted = 1, updatedAt = ? WHERE id = ?', [nowIso(), id]);
+}
+
+/**
+ * Replace the local store with the server's rows (Stage-1 full pull — server is source of truth).
+ * Stores the full row JSON in `raw` for fidelity; skips tombstones. Returns rows applied.
+ */
+export async function replaceAllFromServer(rows: unknown[]): Promise<number> {
+  const d = await db();
+  await d.execAsync('DELETE FROM roles');
+  let n = 0;
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    if (!r || !r.id || r.deleted) continue;
+    await d.runAsync(
+      `INSERT OR REPLACE INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted, raw)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
+      [
+        String(r.id),
+        String(r.role ?? ''),
+        String(r.company ?? ''),
+        String(r.status ?? 'Not Applied'),
+        Number(r.fit) || 0,
+        Number(r.prob) || 0,
+        (r.salary as string) ?? null,
+        (r.location as string) ?? null,
+        (r.link as string) ?? null,
+        (r.applied as string) ?? null,
+        (r.recruiter as string) ?? null,
+        (r.next as string) ?? null,
+        (r.notes as string) ?? null,
+        'synced',
+        (r.updatedAt as string) ?? nowIso(),
+        JSON.stringify(r),
+      ],
+    );
+    n++;
+  }
+  return n;
 }
 
 export interface NewRole {

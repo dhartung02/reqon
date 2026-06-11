@@ -13,6 +13,7 @@ import { PipelineScreen } from './src/screens/PipelineScreen';
 import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
+import { SettingsModal } from './src/screens/SettingsModal';
 
 const VIEW_TITLE: Record<Lane, string> = {
   today: "Today's perimeter",
@@ -28,12 +29,13 @@ export default function App() {
     SplineSans: require('./assets/fonts/SplineSans.ttf'),
     Fraunces: require('./assets/fonts/Fraunces.ttf'),
   });
-  const { roles, loading, setStatus, update, remove, add } = useRoles();
+  const { roles, loading, setStatus, update, remove, add, refresh } = useRoles();
   const [lane, setLane] = useState<Lane>('today');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('ev');
   const [showAdd, setShowAdd] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Today = actionable (non-closed) roles, highest expected value first.
   const todayRoles = useMemo(
@@ -85,9 +87,14 @@ export default function App() {
               <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
             </View>
           </View>
-          <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={6}>
-            <Text style={styles.addBtnText}>+</Text>
-          </Pressable>
+          <View style={styles.brandRight}>
+            <Pressable style={styles.syncBtn} onPress={() => setShowSettings(true)} hitSlop={6}>
+              <Text style={styles.syncBtnText}>Sync</Text>
+            </Pressable>
+            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={6}>
+              <Text style={styles.addBtnText}>+</Text>
+            </Pressable>
+          </View>
         </View>
 
         <TabBar active={lane} counts={counts} onChange={setLane} />
@@ -113,6 +120,7 @@ export default function App() {
         </View>
       </View>
       <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
+      <SettingsModal visible={showSettings} onClose={() => setShowSettings(false)} onSynced={refresh} />
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -123,6 +131,18 @@ const styles = StyleSheet.create({
   shell: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
   brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  brandRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  syncBtn: {
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.element,
+    borderWidth: 1,
+    borderColor: colors.emerald + '55',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: colors.emerald },
   addBtn: {
     width: 34,
     height: 34,

@@ -124,3 +124,29 @@ export async function softDeleteRole(id: string): Promise<void> {
   const d = await db();
   await d.runAsync('UPDATE roles SET deleted = 1, updatedAt = ? WHERE id = ?', [nowIso(), id]);
 }
+
+export interface NewRole {
+  role: string;
+  company: string;
+  fit: number;
+  prob: number;
+  salary?: string;
+  location?: string;
+  link?: string;
+}
+
+/** Insert a new role (status 'Not Applied'). Returns the generated id. */
+export async function addRole(input: NewRole): Promise<string> {
+  const d = await db();
+  const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  await d.runAsync(
+    `INSERT INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    [
+      id, input.role, input.company, 'Not Applied', input.fit, input.prob,
+      input.salary ?? null, input.location ?? null, input.link ?? null,
+      null, null, null, null, 'just now', nowIso(),
+    ],
+  );
+  return id;
+}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { laneOf, rolesInLane, type Lane, type SortKey, type Status } from './src/model';
@@ -12,6 +12,7 @@ import { TodayScreen } from './src/screens/TodayScreen';
 import { PipelineScreen } from './src/screens/PipelineScreen';
 import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
+import { AddRoleModal } from './src/components/AddRoleModal';
 
 const VIEW_TITLE: Record<Lane, string> = {
   today: "Today's perimeter",
@@ -27,11 +28,12 @@ export default function App() {
     SplineSans: require('./assets/fonts/SplineSans.ttf'),
     Fraunces: require('./assets/fonts/Fraunces.ttf'),
   });
-  const { roles, loading, setStatus } = useRoles();
+  const { roles, loading, setStatus, update, remove, add } = useRoles();
   const [lane, setLane] = useState<Lane>('today');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('ev');
+  const [showAdd, setShowAdd] = useState(false);
 
   // Today = actionable (non-closed) roles, highest expected value first.
   const todayRoles = useMemo(
@@ -57,9 +59,15 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safe}>
         <RoleDetailScreen
+          key={selected.id}
           role={selected}
           onBack={() => setSelectedId(null)}
           onStatusChange={(s: Status) => setStatus(selected.id, s)}
+          onUpdate={(patch) => update(selected.id, patch)}
+          onDelete={() => {
+            remove(selected.id);
+            setSelectedId(null);
+          }}
         />
         <StatusBar style="light" />
       </SafeAreaView>
@@ -70,11 +78,16 @@ export default function App() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.shell}>
         <View style={styles.brandbar}>
-          <ReqonGlyph size={26} />
-          <View>
-            <Text style={styles.brand}>REQON</Text>
-            <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
+          <View style={styles.brandLeft}>
+            <ReqonGlyph size={26} />
+            <View>
+              <Text style={styles.brand}>REQON</Text>
+              <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
+            </View>
           </View>
+          <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={6}>
+            <Text style={styles.addBtnText}>+</Text>
+          </Pressable>
         </View>
 
         <TabBar active={lane} counts={counts} onChange={setLane} />
@@ -99,6 +112,7 @@ export default function App() {
           )}
         </View>
       </View>
+      <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -107,7 +121,19 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   shell: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
-  brandbar: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 16 },
+  brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  addBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.element,
+    borderWidth: 1,
+    borderColor: colors.emerald + '55',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBtnText: { fontSize: 22, lineHeight: 24, color: colors.emerald, fontWeight: '600' },
   brand: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '600', letterSpacing: 2.6, color: colors.emerald },
   title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: colors.textHigh, letterSpacing: -0.2 },
   body: { flex: 1 },

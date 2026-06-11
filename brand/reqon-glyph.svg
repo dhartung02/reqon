@@ -1,20 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Reqon">
-  <!-- Reticle Q (full / high-res): circle d=80 @ (50,50), 10px stroke, 45° tail with 1.5×stroke
-       clearance, micro-gaps at 12/3/6/9 o'clock (tactical scope). Code-built from BRAND.md §2. -->
+  <!-- Reticle Q (full / high-res): circle d=80 @ (50,50), 10px stroke, micro-gaps at 12/3/6/9,
+       a center scope-crosshair, and the 45° tail with 1.5×stroke clearance. Built from BRAND.md §2. -->
   <defs>
     <mask id="reticle" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
       <rect width="100" height="100" fill="#fff"/>
-      <!-- tail clearance notch (15px gap each side of the 10px tail) -->
       <line x1="60" y1="60" x2="97" y2="97" stroke="#000" stroke-width="40" stroke-linecap="round"/>
-      <!-- micro-gaps: 12, 6, 3, 9 o'clock -->
-      <rect x="45" y="1"  width="10" height="17" fill="#000"/>
+      <rect x="45" y="1" width="10" height="17" fill="#000"/>
       <rect x="45" y="82" width="10" height="17" fill="#000"/>
       <rect x="82" y="45" width="17" height="10" fill="#000"/>
-      <rect x="1"  y="45" width="17" height="10" fill="#000"/>
+      <rect x="1" y="45" width="17" height="10" fill="#000"/>
     </mask>
   </defs>
   <g fill="none" stroke="#00E5A3" stroke-width="10">
     <circle cx="50" cy="50" r="40" mask="url(#reticle)"/>
     <line x1="69" y1="69" x2="87" y2="87" stroke-linecap="round"/>
   </g>
+  <g stroke="#00E5A3" stroke-width="7" stroke-linecap="round">
+    <line x1="50" y1="29" x2="50" y2="41"/>
+    <line x1="50" y1="59" x2="50" y2="71"/>
+    <line x1="29" y1="50" x2="41" y2="50"/>
+    <line x1="59" y1="50" x2="71" y2="50"/>
+  </g>
+  <circle cx="50" cy="50" r="3" fill="#00E5A3"/>
 </svg>

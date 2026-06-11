@@ -21,6 +21,8 @@ Projects absolute control, executive judgment, high data density.
 - **Weight:** Bold / Extra Bold for the primary letters (R, E, O, N).
 - **Case:** ALL CAPS, strictly (sheds the "friendly startup" / consumer-utility vibe).
 - **Tracking:** +15% to +20% (`0.15em`–`0.2em`) — letters breathe; premium-dashboard feel.
+- **Tagline:** **Fraunces**, Recon Muted (`#64748B`), all-caps — e.g. RECON FOR YOUR CAREER.
+- In the lockup the **emerald Reticle Q occupies the "O" slot** (REQ**O**N).
 
 ## 2. The "Q" — custom-modified, not typed straight
 
@@ -38,6 +40,8 @@ Projects absolute control, executive judgment, high data density.
   and projecting outward.
 - **Tactical breaks (optional, high-res only — e.g. iOS icon):** micro-gaps at the **12 / 3 / 6 / 9
   o'clock** positions to mimic a targeting-scope reticle.
+- **Center crosshair:** four short inward ticks at 12/3/6/9 plus a small center dot inside the bowl —
+  the scope's aiming point. Present in the app + extension marks; dropped only at the very smallest sizes.
 
 ## 3. Palette — "Emerald Command" (dark-mode only)
 

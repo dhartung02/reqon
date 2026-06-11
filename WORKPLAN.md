@@ -178,7 +178,10 @@ Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
    - **Blocked on Xcode license:** simulator boot — Xcode installed; run
      `sudo xcodebuild -license accept` once. (Git also routes through Xcode now; use
      `DEVELOPER_DIR=/Library/Developer/CommandLineTools` until the license is accepted.)
-   - **Remaining:** local store (expo-sqlite schema + CRUD + tombstones).
+   - **Local store DONE (M3 foundation):** `db/store.ts` (expo-sqlite — schema with
+     `updatedAt`/`deleted` mirroring the sync model, seed-on-first-run, getAllRoles/setRoleStatus/
+     updateRole/softDeleteRole), `store/useRoles.ts` hook; the whole app reads/writes the DB and
+     detail status edits persist. tsc clean. Runtime (DB I/O) verification needs a simulator/device.
 2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
    tracking edits; seeded sample store.
    - **Done:** brand bar + `TabBar` (Today/Open/Applied/Interviewing/Closed + counts); Today body

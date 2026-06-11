@@ -1,8 +1,8 @@
 import { scoreRole, type Role, type Status } from '../model';
 
-// Seed roles spanning every lane, scored through the shared core. M3 replaces this with the
-// expo-sqlite local store; the shape is the M3 target so the swap is mechanical.
-interface Seed {
+// Seed roles spanning every lane. Stored raw (fit/prob/status/…) in the expo-sqlite DB on first
+// run; tier + score are derived on read via the shared core (scoreRole).
+export interface Seed {
   id: string;
   role: string;
   company: string;
@@ -34,4 +34,5 @@ const SEED: Seed[] = [
   { id: '12', role: 'PM, Internal Tools', company: 'Legacy Retail Inc', status: 'Archived', fit: 5.0, prob: 4, age: '20d ago', notes: 'Onsite-only — out of scope.' },
 ];
 
+export const sampleSeed: Seed[] = SEED;
 export const sampleRoles: Role[] = SEED.map((s) => scoreRole(s) as Role);

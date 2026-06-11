@@ -1,6 +1,17 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
 import { colors, alpha, fonts, tierColor } from '../theme';
-import { statusColor, type Role } from '../model';
+import { statusColor, type Role, type Status } from '../model';
+
+const STATUSES: Status[] = [
+  'Not Applied',
+  'Applied',
+  'Recruiter Screen',
+  'Hiring Manager',
+  'Panel',
+  'Offer',
+  'Rejected',
+  'Archived',
+];
 
 // Row detail: all tracking fields for a role. Read-only in M2; inline editing + status changes
 // (writing through to the local store) land with M3.
@@ -14,7 +25,15 @@ function Field({ label, value, accent }: { label: string; value?: string; accent
   );
 }
 
-export function RoleDetailScreen({ role, onBack }: { role: Role; onBack: () => void }) {
+export function RoleDetailScreen({
+  role,
+  onBack,
+  onStatusChange,
+}: {
+  role: Role;
+  onBack: () => void;
+  onStatusChange: (s: Status) => void;
+}) {
   const c = tierColor(role.tier);
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
@@ -32,6 +51,25 @@ export function RoleDetailScreen({ role, onBack }: { role: Role; onBack: () => v
         <View style={styles.statusWrap}>
           <View style={[styles.dot, { backgroundColor: statusColor(role.status) }]} />
           <Text style={[styles.statusText, { color: statusColor(role.status) }]}>{role.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>SET STATUS</Text>
+        <View style={styles.chips}>
+          {STATUSES.map((s) => {
+            const on = s === role.status;
+            const c = statusColor(s);
+            return (
+              <Pressable
+                key={s}
+                onPress={() => onStatusChange(s)}
+                style={[styles.chip, on && { borderColor: c, backgroundColor: alpha(c, 0.12) }]}
+              >
+                <Text style={[styles.chipText, on && { color: c }]}>{s}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -76,6 +114,18 @@ const styles = StyleSheet.create({
   statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
+  section: { gap: 8 },
+  sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: colors.muted },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: colors.element,
+    borderWidth: 1,
+    borderColor: colors.element,
+  },
+  chipText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
   card: {
     backgroundColor: colors.element,
     borderRadius: 14,

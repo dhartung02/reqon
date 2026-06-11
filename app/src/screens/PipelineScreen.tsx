@@ -71,8 +71,8 @@ export function PipelineScreen({
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingTop: 16, paddingBottom: 32, gap: 22 },
-  group: { gap: 12 },
+  scroll: { paddingTop: 16, paddingBottom: 32, gap: 18 },
+  group: { gap: 10 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   groupTitle: {
     fontFamily: fonts.sans,

@@ -51,5 +51,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
   },
-  list: { gap: 16 },
+  list: { gap: 10 },
 });

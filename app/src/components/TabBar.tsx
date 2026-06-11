@@ -17,6 +17,7 @@ export function TabBar({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.bar}
       contentContainerStyle={styles.row}
     >
       {LANES.map(({ key, label }) => {
@@ -33,7 +34,8 @@ export function TabBar({
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 8, paddingVertical: 2 },
+  bar: { flexGrow: 0, flexShrink: 0 },
+  row: { gap: 8, paddingVertical: 2, alignItems: 'center' },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',

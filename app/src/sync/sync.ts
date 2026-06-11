@@ -1,5 +1,5 @@
 import { getConfig } from './config';
-import { replaceAllFromServer } from '../db/store';
+import { replaceAllFromServer, getRowsForSync, applySyncRows, getMeta, setMeta } from '../db/store';
 
 const normalize = (url: string) => url.trim().replace(/\/+$/, '');
 
@@ -39,4 +39,28 @@ export async function pullAll(): Promise<{ applied: number }> {
   const rows = Array.isArray(j.rows) ? j.rows : [];
   const applied = await replaceAllFromServer(rows);
   return { applied };
+}
+
+/**
+ * Stage-2 bidirectional sync: push all local rows (excl. demo seed) with the last-sync cursor,
+ * the server reconciles (last-writer-wins) and returns the rows changed since `since` + any
+ * id remaps; we apply them locally and advance the cursor.
+ */
+export async function syncTwoWay(): Promise<{ pushed: number; pulled: number; remaps: number }> {
+  const { url, token } = await getConfig();
+  if (!url) throw new Error('No server configured');
+  const since = await getMeta('lastSync');
+  const localRows = await getRowsForSync();
+  const res = await fetch(`${normalize(url)}/api/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CRM-Token': token },
+    body: JSON.stringify({ rows: localRows, since: since || undefined }),
+  });
+  if (!res.ok) throw new Error(`Sync failed: HTTP ${res.status}`);
+  const j = await res.json();
+  const rows = Array.isArray(j.rows) ? j.rows : [];
+  const idRemaps = Array.isArray(j.idRemaps) ? j.idRemaps : [];
+  const pulled = await applySyncRows(rows, idRemaps);
+  if (j.serverTime) await setMeta('lastSync', String(j.serverTime));
+  return { pushed: localRows.length, pulled, remaps: idRemaps.length };
 }

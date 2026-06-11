@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Linking, TextInput } from 'react-native';
 import { colors, alpha, fonts, tierColor } from '../theme';
 import { statusColor, type Role, type Status } from '../model';
 
@@ -13,14 +14,46 @@ const STATUSES: Status[] = [
   'Archived',
 ];
 
-// Row detail: all tracking fields for a role. Read-only in M2; inline editing + status changes
-// (writing through to the local store) land with M3.
-function Field({ label, value, accent }: { label: string; value?: string; accent?: string }) {
+type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location'>>;
+
+// Read-only fact row.
+function Field({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <Text style={[styles.fieldValue, accent ? { color: accent } : null]}>{value}</Text>
+      <Text style={styles.fieldValue}>{value}</Text>
+    </View>
+  );
+}
+
+// Editable tracking field — persists on blur via onSave.
+function EditField({
+  label,
+  value,
+  field,
+  onSave,
+  multiline,
+}: {
+  label: string;
+  value?: string;
+  field: keyof EditablePatch;
+  onSave: (patch: EditablePatch) => void;
+  multiline?: boolean;
+}) {
+  const [v, setV] = useState(value ?? '');
+  return (
+    <View style={styles.editRow}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        value={v}
+        onChangeText={setV}
+        onEndEditing={() => onSave({ [field]: v.trim() || undefined } as EditablePatch)}
+        placeholder="—"
+        placeholderTextColor={colors.muted}
+        multiline={multiline}
+        style={[styles.input, multiline && styles.inputMultiline]}
+      />
     </View>
   );
 }
@@ -29,16 +62,20 @@ export function RoleDetailScreen({
   role,
   onBack,
   onStatusChange,
+  onUpdate,
+  onDelete,
 }: {
   role: Role;
   onBack: () => void;
   onStatusChange: (s: Status) => void;
+  onUpdate: (patch: EditablePatch) => void;
+  onDelete: () => void;
 }) {
   const c = tierColor(role.tier);
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       <Pressable onPress={onBack} hitSlop={8} style={styles.back}>
-        <Text style={styles.backText}>‹ Pipeline</Text>
+        <Text style={styles.backText}>‹ Back</Text>
       </Pressable>
 
       <View style={styles.head}>
@@ -59,17 +96,26 @@ export function RoleDetailScreen({
         <View style={styles.chips}>
           {STATUSES.map((s) => {
             const on = s === role.status;
-            const c = statusColor(s);
+            const sc = statusColor(s);
             return (
               <Pressable
                 key={s}
                 onPress={() => onStatusChange(s)}
-                style={[styles.chip, on && { borderColor: c, backgroundColor: alpha(c, 0.12) }]}
+                style={[styles.chip, on && { borderColor: sc, backgroundColor: alpha(sc, 0.12) }]}
               >
-                <Text style={[styles.chipText, on && { color: c }]}>{s}</Text>
+                <Text style={[styles.chipText, on && { color: sc }]}>{s}</Text>
               </Pressable>
             );
           })}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>TRACKING</Text>
+        <View style={styles.card}>
+          <EditField label="Recruiter" value={role.recruiter} field="recruiter" onSave={onUpdate} />
+          <EditField label="Next action" value={role.next} field="next" onSave={onUpdate} />
+          <EditField label="Notes" value={role.notes} field="notes" onSave={onUpdate} multiline />
         </View>
       </View>
 
@@ -77,9 +123,6 @@ export function RoleDetailScreen({
         <Field label="Salary" value={role.salary} />
         <Field label="Location" value={role.location} />
         <Field label="Applied" value={role.applied} />
-        <Field label="Recruiter" value={role.recruiter} />
-        <Field label="Next action" value={role.next} accent={colors.emerald} />
-        <Field label="Notes" value={role.notes} />
         <Field label="Added" value={role.age} />
       </View>
 
@@ -88,6 +131,10 @@ export function RoleDetailScreen({
           <Text style={styles.linkBtnText}>Open posting</Text>
         </Pressable>
       ) : null}
+
+      <Pressable style={styles.deleteBtn} onPress={onDelete}>
+        <Text style={styles.deleteText}>Delete role</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -126,11 +173,7 @@ const styles = StyleSheet.create({
     borderColor: colors.element,
   },
   chipText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
-  card: {
-    backgroundColor: colors.element,
-    borderRadius: 14,
-    padding: 4,
-  },
+  card: { backgroundColor: colors.element, borderRadius: 14, padding: 4 },
   field: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -142,11 +185,17 @@ const styles = StyleSheet.create({
   },
   fieldLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
   fieldValue: { fontFamily: fonts.sans, fontSize: 14, color: colors.textHigh, flexShrink: 1, textAlign: 'right' },
-  linkBtn: {
-    backgroundColor: colors.emerald,
-    borderRadius: 10,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
+  editRow: { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: alpha(colors.canvas, 0.5), gap: 4 },
+  input: { fontFamily: fonts.sans, fontSize: 14, color: colors.textHigh, padding: 0 },
+  inputMultiline: { minHeight: 54, textAlignVertical: 'top' },
+  linkBtn: { backgroundColor: colors.emerald, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   linkBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: colors.canvas },
+  deleteBtn: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: alpha(colors.danger, 0.4),
+  },
+  deleteText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: colors.danger },
 });

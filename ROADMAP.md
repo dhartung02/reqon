@@ -91,7 +91,10 @@ limited, and has **no mobile counterpart at all** — that gap is the opportunit
 ## 4. Phased delivery
 
 Every phase ships standalone value; no flag-day migrations. P0–P1 live in this repo;
-P2+ adds an Xcode project (separate repo or `ios/` subdirectory — decide at P2 kickoff).
+P2+ adds a **React Native (Expo)** project (separate repo or `app/` subdirectory — decide
+at P2 kickoff). RN is the chosen stack so the app **imports `core/crm-core.js` verbatim**
+rather than re-porting the scoring/dedupe/sync logic into Swift; native code is limited to
+a thin Swift Share-Extension shim and the WKWebView used for enrich/apply-assist.
 
 ---
 
@@ -159,27 +162,33 @@ possible surface. **Explicit non-goal: form autofill** (Simplify keeps that job)
 
 ---
 
-### Phase 2 — iOS app foundation (local-first engine + sync)
+### Phase 2 — Reqon iOS app foundation (local-first engine + sync)
 
-**Goal:** a standalone app that replaces the mobile web view and works with **no backend**.
+**Goal:** a standalone **React Native (Expo)** app — **Reqon** — that replaces the mobile
+web view and works with **no backend**. Lives in this repo as the `app/` workspace and
+imports `core/crm-core.js` directly.
 
 **Functional requirements**
-- **FR-APP-1** SwiftUI + SwiftData (or SQLite) store with full schema parity (all tracking
-  fields + `id`/`updatedAt`/`deleted`) and identical computed semantics (EV = fit×prob/10,
-  tier bands, status enum, lanes).
-- **FR-APP-2** Ported pure logic: `postingId` req-ID dedupe, append-merge, scoring/tier
-  derivation, hygiene lanes, Today action counts. **`agent/scoring-criteria.md` is the
-  canonical spec for both implementations**, enforced by a shared JSON test-vector suite.
+- **FR-APP-1** Local store (expo-sqlite / op-sqlite, optionally WatermelonDB) with full
+  schema parity (all tracking fields + `id`/`updatedAt`/`deleted`) and computed semantics
+  imported from `core/crm-core.js` — EV = fit×prob/10, tier bands, status enum, lanes.
+- **FR-APP-2** Pure logic is **not re-ported**: the app imports `core/crm-core.js`
+  (`postingId` req-ID dedupe, append-merge, scoring/tier, `reconcileSync`) directly.
+  **`agent/scoring-criteria.md` is the canonical spec**; the shared JSON test-vector suite
+  runs against the same module the app ships, so server and app cannot drift.
 - **FR-APP-3** Views: Today command center (action cards + last-scout strip), Open /
   Applied / Interviewing / Closed lists (tier + company grouping, applied-date sorts),
   row detail with all tracking edits + overrides, search/filters.
 - **FR-APP-4 Share Extension.** From Safari/any app: Share → "Add to CRM" → editable
   confirm sheet (company/role/notes) → saved locally → on-device enrichment fills fields.
-- **FR-APP-5 On-device enrichment.** URLSession fetch + JSON-LD/OG/`<title>`/URL-slug
-  parsing (Swift port of `computeEnrichFields`), optional OpenAI scoring (key in Keychain).
-- **FR-APP-6 SyncEngine.** Optional server URL + full token in settings (Keychain).
+  Implemented via a thin native Swift share-extension target that hands the URL to the RN
+  store (App Group).
+- **FR-APP-5 On-device enrichment.** `fetch` + JSON-LD/OG/`<title>`/URL-slug parsing
+  (JS port of `computeEnrichFields`, reusing the same slug/company rules as the server),
+  optional OpenAI scoring (key in expo-secure-store / Keychain).
+- **FR-APP-6 SyncEngine.** Optional server URL + full token in settings (secure store).
   Pull-push reconcile against `/api/sync` on launch / foregrounding / manual refresh;
-  LWW semantics identical to the server; offline queue-and-retry. App is 100% functional
+  LWW via the shared `reconcileSync`; offline queue-and-retry. App is 100% functional
   with sync unconfigured.
 - **FR-APP-7 Local notifications** (serverless): follow-up due, N leads need verification.
 - **FR-APP-8 Data safety.** Local snapshots before destructive ops; CSV/JSON export via
@@ -192,7 +201,7 @@ possible surface. **Explicit non-goal: form autofill** (Simplify keeps that job)
 - [ ] Same-title, different-req-id postings captured on phone and desktop both survive sync (no false merge).
 - [ ] Follow-up-due local notification fires per hygiene thresholds with the server off.
 - [ ] Divergent stores (7 simulated offline days) converge with zero data loss (seeded test).
-- [ ] Shared test vectors pass in both JS and Swift (scoring, dedupe, postingId, LWW).
+- [ ] Shared test vectors pass against `core/crm-core.js` — the same module the app imports (scoring, dedupe, postingId, LWW).
 
 ---
 
@@ -298,11 +307,12 @@ question — from "let AI run with it" to "interview me first."
 **Goal:** the app discovers roles without the server.
 
 **Functional requirements**
-- **FR-SCT-1** Swift port of board polling (greenhouse/Ashby/Lever public APIs) from a
-  boards config synced from the server or edited in-app; filter → score → append-merge
-  with req-ID dedupe — parity with the Python scout on the same config.
-- **FR-SCT-2** `BGTaskScheduler` background refresh (best-effort; honest "last ran X ago"
-  UX) + a manual Run Scout button.
+- **FR-SCT-1** JS/TS port of board polling (greenhouse/Ashby/Lever public APIs) from a
+  boards config synced from the server or edited in-app; filter → score (via
+  `core/crm-core.js`) → append-merge with req-ID dedupe — parity with the Python scout on
+  the same config.
+- **FR-SCT-2** expo background-fetch / BGTaskScheduler-backed background refresh (best-effort;
+  honest "last ran X ago" UX) + a manual Run Scout button.
 - **FR-SCT-3** Local notification on new finds; event-key dedupe with server push
   (Phase 3) so the same run never alerts twice.
 
@@ -315,15 +325,15 @@ question — from "let AI run with it" to "interview me first."
 ## 5. Cross-cutting requirements
 
 - **Auth:** full token for sync/push registration (these are the user's own devices);
-  scoped INGEST token remains capture-only; tokens in iOS Keychain / extension storage;
-  never in URLs.
+  scoped INGEST token remains capture-only; tokens in secure store (iOS Keychain via
+  expo-secure-store) / extension storage; never in URLs.
 - **Transport:** LAN HTTP is acceptable for sync (same trust domain). Off-LAN sync needs
   the documented Cloudflare-tunnel HTTPS option; **push does not** (outbound-only).
   iOS ATS exception scoped to the configured host, or the tunnel for clean HTTPS.
 - **Shared law (identity & conflict):** `id` UUID · per-row LWW by `updatedAt` ·
   tombstones · req-ID dedupe (`postingId` from gh_jid / numeric id / Ashby UUID / query
-  params). Identical implementations in JS and Swift, proven by one shared JSON
-  test-vector suite.
+  params). One implementation (`core/crm-core.js`) shared verbatim by server, app, and
+  extension, proven by one shared JSON test-vector suite.
 - **Accounts/costs:** Apple Developer ($99/yr) required for the Share Extension + push.
 - **Out of scope (hard guardrails):** bulk auto-submit; LinkedIn scraping/automation;
   rebuilding the desktop autofill matrix (Simplify's job); multi-user/cloud SaaS.
@@ -332,7 +342,7 @@ question — from "let AI run with it" to "interview me first."
 
 | Risk | Mitigation |
 |---|---|
-| JS + Swift logic drift | `scoring-criteria.md` as canonical spec + shared JSON test vectors asserted in both languages |
+| Core logic drift across consumers | React Native lets the app **import `core/crm-core.js` verbatim** (no Swift re-port); `scoring-criteria.md` is the canonical spec; one shared JSON test-vector suite runs against that single module |
 | Workday/ATS DOM drift breaks fill | Tiered matcher degrades to skip-not-wrong; adapters only for ATSs actually used; fill summary makes gaps visible |
 | iOS background limits undercut scout/sync | Server push is the primary scheduler; BG tasks are best-effort by design; honest "last ran" UX |
 | LWW clock skew | Acceptable single-user; sync logs both timestamps for audit |

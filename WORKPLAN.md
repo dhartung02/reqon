@@ -170,6 +170,13 @@ Node. Build/run via Expo prebuild → simulator (`npx expo run:ios`).
 1. **M1 Core engine:** RN project scaffolds; local store (full schema + `id`/`updatedAt`/
    `deleted`); imports `core/crm-core.js` for postingId/sameReq/EV/tier/reconcile; the
    shared vectors run green inside the RN bundle (jest reading `tests/vectors/`).
+   - **Done (env + wiring):** `app/` Expo SDK 56 / RN 0.85 / React 19 scaffolded (blank-ts);
+     `@reqon/core` alias → `core/crm-core.js` via metro+jest+ambient types; parity test green
+     (`npm test` in app/ runs `tests/vectors/` through the app); `tsc --noEmit` clean; dark
+     proof-of-life `App.tsx` scores a sample via the shared core. Name **Reqon**, bundle id
+     `com.reqon.app`, expo-sqlite + expo-secure-store installed.
+   - **Blocked on Xcode:** simulator boot (`expo run:ios`) — full Xcode not yet installed.
+   - **Remaining:** local store (expo-sqlite schema + CRUD + tombstones).
 2. **M2 UI shell:** Today + lists (tier/company grouping, sorts) + row detail with all
    tracking edits; seeded sample store.
 3. **M3 Capture:** native Swift Share-Extension → confirm sheet → save (App Group → RN

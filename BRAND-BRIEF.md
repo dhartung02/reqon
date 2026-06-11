@@ -1,5 +1,9 @@
 # Reqon — Brand brief
 
+> ✅ **Direction chosen: Concept A — Reticle Q.** The locked visual spec (logo construction,
+> "Emerald Command" palette, scalability, sub-brand hierarchy) lives in [BRAND.md](BRAND.md).
+> This file remains the *input* brief that informed it.
+
 *For the UX / brand designer. Goal: enough feel for the product, its personality, and its
 surfaces to express it in a logo, wordmark, and identity system. Color is open — the
 sections below are raw material and constraints, not prescriptions.*

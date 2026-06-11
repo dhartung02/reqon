@@ -1,9 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Job Pipeline CRM Companion",
+  "name": "Reqon Clip",
   "version": "0.1.0",
-  "description": "Clip job postings, see your fit/EV overlay on the page, and write Applied status back to your self-hosted Job Pipeline CRM. No autofill — that stays with your form-filler.",
-  "action": { "default_title": "Clip this job to the CRM" },
+  "description": "Clip job postings, see your fit/EV overlay on the page, and write Applied status back to your self-hosted Reqon pipeline. No autofill — that stays with your form-filler.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Clip this job to Reqon",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
   "background": { "service_worker": "bg.js" },
   "options_ui": { "page": "options.html", "open_in_tab": true },
   "permissions": ["storage", "activeTab", "alarms"],

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Linking, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { colors, alpha, fonts, tierColor } from '../theme';
 import { statusColor, type Role, type Status } from '../model';
 
@@ -64,12 +64,14 @@ export function RoleDetailScreen({
   onStatusChange,
   onUpdate,
   onDelete,
+  onOpenPosting,
 }: {
   role: Role;
   onBack: () => void;
   onStatusChange: (s: Status) => void;
   onUpdate: (patch: EditablePatch) => void;
   onDelete: () => void;
+  onOpenPosting: (url: string) => void;
 }) {
   const c = tierColor(role.tier);
   return (
@@ -127,8 +129,8 @@ export function RoleDetailScreen({
       </View>
 
       {role.link ? (
-        <Pressable style={styles.linkBtn} onPress={() => Linking.openURL(role.link as string)}>
-          <Text style={styles.linkBtnText}>Open posting</Text>
+        <Pressable style={styles.linkBtn} onPress={() => onOpenPosting(role.link as string)}>
+          <Text style={styles.linkBtnText}>Open posting · apply-assist</Text>
         </Pressable>
       ) : null}
 

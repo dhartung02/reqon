@@ -10,15 +10,20 @@ import { getProfile, profileHasData, type Profile } from '../sync/profile';
 
 // Built per BRAND/roadmap guardrails: factual fields only; never password/EEO/consent; never submit.
 const buildFillJs = (p: Profile) => {
+  const a = p.applicant;
+  const name = (a.name ?? '').trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  // Factual fields only — EEO/demographics in p.eeo are deliberately NOT included (never auto-filled).
   const profile = JSON.stringify({
-    firstName: p.firstName ?? '',
-    lastName: p.lastName ?? '',
-    fullName: [p.firstName, p.lastName].filter(Boolean).join(' '),
-    email: p.email ?? '',
-    phone: p.phone ?? '',
-    linkedin: p.linkedin ?? '',
-    location: p.location ?? '',
-    website: p.website ?? '',
+    firstName: parts[0] ?? '',
+    lastName: parts.length > 1 ? parts.slice(1).join(' ') : '',
+    fullName: name,
+    email: a.email ?? '',
+    phone: a.phone ?? '',
+    linkedin: a.linkedin ?? '',
+    github: a.github ?? '',
+    location: a.location ?? '',
+    website: a.website ?? '',
   });
   return `(function(){try{
     var P=${profile};
@@ -29,6 +34,7 @@ const buildFillJs = (p: Profile) => {
       {keys:['email','e-mail'],val:P.email,type:'email'},
       {keys:['phone','tel','mobile','telephone'],val:P.phone,type:'tel'},
       {keys:['linkedin','linked in'],val:P.linkedin},
+      {keys:['github','git hub'],val:P.github},
       {keys:['location','city','where are you','current location'],val:P.location},
       {keys:['website','portfolio','personal site','personal website'],val:P.website}
     ];

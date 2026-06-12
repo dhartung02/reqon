@@ -7,6 +7,7 @@ import { todayActionCount } from './src/today';
 import { colors, fonts } from './src/theme';
 import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
+import { SettingsIcon } from './src/components/SettingsIcon';
 import { TabBar } from './src/components/TabBar';
 import { ControlBar } from './src/components/ControlBar';
 import { TodayScreen } from './src/screens/TodayScreen';
@@ -161,10 +162,10 @@ export default function App() {
             </View>
           </View>
           <View style={styles.brandRight}>
-            <Pressable style={styles.syncBtn} onPress={() => setShowSettings(true)} hitSlop={6}>
-              <Text style={styles.syncBtnText}>Sync</Text>
+            <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={6} accessibilityLabel="Settings & sync">
+              <SettingsIcon size={18} color={colors.textBase} />
             </Pressable>
-            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={6}>
+            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={6} accessibilityLabel="Add role">
               <Text style={styles.addBtnText}>+</Text>
             </Pressable>
           </View>
@@ -223,17 +224,16 @@ const styles = StyleSheet.create({
   brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  syncBtn: {
-    paddingHorizontal: 12,
+  iconBtn: {
+    width: 34,
     height: 34,
     borderRadius: 10,
     backgroundColor: colors.element,
     borderWidth: 1,
-    borderColor: colors.emerald + '55',
+    borderColor: colors.element,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  syncBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: colors.emerald },
   addBtn: {
     width: 34,
     height: 34,

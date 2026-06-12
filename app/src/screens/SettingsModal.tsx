@@ -10,11 +10,13 @@ export function SettingsModal({
   onClose,
   onSynced,
   onEditProfile,
+  onEditSearch,
 }: {
   visible: boolean;
   onClose: () => void;
   onSynced: () => void;
   onEditProfile: () => void;
+  onEditSearch: () => void;
 }) {
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
@@ -112,6 +114,14 @@ export function SettingsModal({
               <View style={styles.flex1}>
                 <Text style={styles.label}>Profile · apply-assist</Text>
                 <Text style={styles.help}>Name, links, education, work history, EEO + résumé upload</Text>
+              </View>
+              <Text style={styles.profileChev}>›</Text>
+            </Pressable>
+
+            <Pressable style={styles.profileRow} onPress={onEditSearch}>
+              <View style={styles.flex1}>
+                <Text style={styles.label}>Search criteria</Text>
+                <Text style={styles.help}>Role titles, keywords, min-fit, salary floor + remote</Text>
               </View>
               <Text style={styles.profileChev}>›</Text>
             </Pressable>

@@ -1419,6 +1419,7 @@ function settingsPayload() {
     keywords: st.keywords || [],
     titles: st.titles || [],
     minFit: st.minFitToAdd != null ? st.minFitToAdd : 6.0,
+    salaryFloor: st.minSalary != null && !isNaN(+st.minSalary) ? +st.minSalary : 0,
     remoteOnly: boards.remoteOnly !== false,
     minDelaySeconds: boards.minDelaySeconds != null ? boards.minDelaySeconds : 0.4,
     analyticsWindowDays: boards.analyticsWindowDays != null ? boards.analyticsWindowDays : 0,
@@ -1516,6 +1517,7 @@ app.put('/api/settings', (req, res) => {
     if (Array.isArray(b.keywords)) { watch.searchTerms.keywords = b.keywords.map(String).filter(Boolean); touchedWatch = true; }
     if (Array.isArray(b.titles)) { watch.searchTerms.titles = b.titles.map(String).filter(Boolean); touchedWatch = true; }
     if (b.minFit != null && !isNaN(+b.minFit)) { watch.searchTerms.minFitToAdd = Math.max(0, Math.min(10, +b.minFit)); touchedWatch = true; }
+    if (b.salaryFloor != null && !isNaN(+b.salaryFloor)) { watch.searchTerms.minSalary = Math.max(0, Math.min(2000000, Math.round(+b.salaryFloor))); touchedWatch = true; }
 
     if (touchedWatch) writeJsonPretty(WATCHLIST_FILE, watch);
 

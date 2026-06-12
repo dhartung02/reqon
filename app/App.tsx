@@ -15,6 +15,7 @@ import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
+import { BrowserScreen } from './src/screens/BrowserScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { syncTwoWay } from './src/sync/sync';
@@ -36,6 +37,7 @@ export default function App() {
   const { roles, loading, setStatus, update, remove, add, refresh } = useRoles();
   const [lane, setLane] = useState<Lane>('today');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('ev');
   const [showAdd, setShowAdd] = useState(false);
@@ -80,6 +82,15 @@ export default function App() {
 
   const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
+  // Pull-to-refresh: sync (if configured) + re-read the store.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await autoSync();
+    await refresh();
+    setRefreshing(false);
+  }, [autoSync, refresh]);
+
   const onScout = async () => {
     setScouting(true);
     setScoutMsg(null);
@@ -108,6 +119,15 @@ export default function App() {
 
   if (!fontsLoaded || loading) return null;
 
+  if (browserUrl) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <BrowserScreen url={browserUrl} onBack={() => setBrowserUrl(null)} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
+
   const selected = selectedId ? roles.find((r) => r.id === selectedId) ?? null : null;
   if (selected) {
     return (
@@ -122,6 +142,7 @@ export default function App() {
             remove(selected.id);
             setSelectedId(null);
           }}
+          onOpenPosting={(u) => setBrowserUrl(u)}
         />
         <StatusBar style="light" />
       </SafeAreaView>
@@ -164,9 +185,11 @@ export default function App() {
               scouting={scouting}
               scoutMsg={scoutMsg}
               scoutEnabled={scoutOn}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
             />
           ) : lane === 'analytics' ? (
-            <AnalyticsScreen roles={roles} />
+            <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
           ) : (
             <PipelineScreen
               lane={lane}
@@ -174,6 +197,8 @@ export default function App() {
               query={query}
               sort={sort}
               onPressRole={(r) => setSelectedId(r.id)}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
             />
           )}
         </View>

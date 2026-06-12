@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { colors, alpha, fonts } from '../theme';
 import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
+import { getProfile, setProfile, type Profile } from '../sync/profile';
 import { testConnection, syncTwoWay } from '../sync/sync';
 
 // Sync settings: server URL + token (keychain), connection test, and a full pull.
@@ -19,17 +20,24 @@ export function SettingsModal({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null);
   const [scout, setScout] = useState<ScoutMode>('auto');
+  const [profile, setProfileState] = useState<Profile>({});
 
   useEffect(() => {
     if (visible) {
       getConfig().then((c) => { setUrl(c.url); setToken(c.token); setStatus(null); });
       getScoutMode().then(setScout);
+      getProfile().then(setProfileState);
     }
   }, [visible]);
 
   const pickScout = (m: ScoutMode) => {
     setScout(m);
     setScoutMode(m);
+  };
+  const setField = (k: keyof Profile, v: string) => setProfileState((p) => ({ ...p, [k]: v }));
+  const done = () => {
+    setProfile(profile);
+    onClose();
   };
   const scoutHelp =
     scout === 'auto'
@@ -38,7 +46,10 @@ export function SettingsModal({
         ? 'Always scout on device.'
         : 'Never scout on device — rely on the server.';
 
-  const persist = () => setConfig({ url, token });
+  const persist = () => {
+    setConfig({ url, token });
+    setProfile(profile);
+  };
 
   const test = async () => {
     setBusy(true);
@@ -74,7 +85,7 @@ export function SettingsModal({
         <View style={styles.sheet}>
           <View style={styles.headRow}>
             <Text style={styles.title}>Sync</Text>
-            <Pressable onPress={onClose} hitSlop={8}>
+            <Pressable onPress={done} hitSlop={8}>
               <Text style={styles.cancel}>Done</Text>
             </Pressable>
           </View>
@@ -102,6 +113,19 @@ export function SettingsModal({
                 ))}
               </View>
               <Text style={styles.help}>{scoutHelp}</Text>
+            </View>
+
+            <View style={styles.labeled}>
+              <Text style={styles.label}>Profile · apply-assist</Text>
+              <Text style={styles.help}>The in-app browser fills these factual fields on application forms. Never submitted — you review and complete.</Text>
+              <View style={styles.row2}>
+                <TextInput value={profile.firstName ?? ''} onChangeText={(v) => setField('firstName', v)} placeholder="First name" placeholderTextColor={colors.muted} style={[styles.input, styles.flex1]} />
+                <TextInput value={profile.lastName ?? ''} onChangeText={(v) => setField('lastName', v)} placeholder="Last name" placeholderTextColor={colors.muted} style={[styles.input, styles.flex1]} />
+              </View>
+              <TextInput value={profile.email ?? ''} onChangeText={(v) => setField('email', v)} autoCapitalize="none" keyboardType="email-address" placeholder="Email" placeholderTextColor={colors.muted} style={styles.input} />
+              <TextInput value={profile.phone ?? ''} onChangeText={(v) => setField('phone', v)} keyboardType="phone-pad" placeholder="Phone" placeholderTextColor={colors.muted} style={styles.input} />
+              <TextInput value={profile.linkedin ?? ''} onChangeText={(v) => setField('linkedin', v)} autoCapitalize="none" placeholder="LinkedIn URL" placeholderTextColor={colors.muted} style={styles.input} />
+              <TextInput value={profile.location ?? ''} onChangeText={(v) => setField('location', v)} placeholder="Location (e.g. Remote — US)" placeholderTextColor={colors.muted} style={styles.input} />
             </View>
 
             {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
@@ -155,6 +179,8 @@ const styles = StyleSheet.create({
   segBtnOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.1) },
   segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: colors.textBase },
   segTextOn: { color: colors.emerald },
+  row2: { flexDirection: 'row', gap: 10 },
+  flex1: { flex: 1 },
   input: {
     backgroundColor: colors.element,
     borderWidth: 1,

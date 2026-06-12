@@ -17,6 +17,7 @@ import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
 import { BrowserScreen } from './src/screens/BrowserScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { syncTwoWay } from './src/sync/sync';
@@ -43,6 +44,7 @@ export default function App() {
   const [sort, setSort] = useState<SortKey>('ev');
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -126,6 +128,15 @@ export default function App() {
       <SafeAreaView style={[styles.safe, styles.center]}>
         <ReqonGlyph size={44} />
         <ActivityIndicator color={colors.emerald} style={styles.loadSpin} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
+
+  if (showProfile) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ProfileScreen onBack={() => setShowProfile(false)} />
         <StatusBar style="light" />
       </SafeAreaView>
     );
@@ -225,6 +236,10 @@ export default function App() {
           loadConfig().then(autoSync);
         }}
         onSynced={refresh}
+        onEditProfile={() => {
+          setShowSettings(false);
+          setShowProfile(true);
+        }}
       />
       <StatusBar style="light" />
     </SafeAreaView>

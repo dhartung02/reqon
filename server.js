@@ -584,6 +584,14 @@ app.put('/api/profile', (req, res) => {
     }));
   }
   if (typeof b.remoteOnly === 'boolean') next.remoteOnly = b.remoteOnly;
+  // Rich CV sections (Reqon app): structured entries + simple lists + EEO (stored only — never
+  // auto-submitted; the apply-assist deliberately skips demographic fields).
+  const objArr = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object') : null);
+  for (const k of ['education', 'workHistory']) { const a = objArr(b[k]); if (a) next[k] = a; }
+  for (const k of ['awards', 'certs', 'volunteer']) {
+    if (Array.isArray(b[k])) next[k] = b[k].map(String).map((s) => s.trim()).filter(Boolean);
+  }
+  if (b.eeo && typeof b.eeo === 'object') next.eeo = Object.assign({}, cur.eeo, b.eeo);
   try { snapshotProfile(); writeJsonPretty(PROFILE_FILE, next); res.json({ ok: true, profile: next }); }
   catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });

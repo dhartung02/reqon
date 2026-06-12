@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { colors, alpha, fonts, tierColor } from '../theme';
 import { statusColor, type Role, type Status } from '../model';
+import { DraftModal } from './DraftModal';
 
 const STATUSES: Status[] = [
   'Not Applied',
@@ -74,6 +75,7 @@ export function RoleDetailScreen({
   onOpenPosting: (url: string) => void;
 }) {
   const c = tierColor(role.tier);
+  const [showDraft, setShowDraft] = useState(false);
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       <Pressable onPress={onBack} hitSlop={8} style={styles.back}>
@@ -134,9 +136,15 @@ export function RoleDetailScreen({
         </Pressable>
       ) : null}
 
+      <Pressable style={styles.draftBtn} onPress={() => setShowDraft(true)}>
+        <Text style={styles.draftBtnText}>Draft application text · AI</Text>
+      </Pressable>
+
       <Pressable style={styles.deleteBtn} onPress={onDelete}>
         <Text style={styles.deleteText}>Delete role</Text>
       </Pressable>
+
+      <DraftModal visible={showDraft} company={role.company} role={role.role} onClose={() => setShowDraft(false)} />
     </ScrollView>
   );
 }
@@ -192,6 +200,15 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 54, textAlignVertical: 'top' },
   linkBtn: { backgroundColor: colors.emerald, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   linkBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: colors.canvas },
+  draftBtn: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: alpha(colors.emerald, 0.1),
+    borderWidth: 1,
+    borderColor: alpha(colors.emerald, 0.4),
+  },
+  draftBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: colors.emerald },
   deleteBtn: {
     borderRadius: 10,
     paddingVertical: 12,

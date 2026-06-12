@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
-import { colors, alpha, fonts, tierColor } from '../theme';
+import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, type Role, type Status } from '../model';
 import { DraftModal } from './DraftModal';
 
@@ -19,6 +19,7 @@ type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary
 
 // Read-only fact row.
 function Field({ label, value }: { label: string; value?: string }) {
+  const { styles } = useThemedStyles(makeStyles);
   if (!value) return null;
   return (
     <View style={styles.field}>
@@ -42,6 +43,7 @@ function EditField({
   onSave: (patch: EditablePatch) => void;
   multiline?: boolean;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const [v, setV] = useState(value ?? '');
   return (
     <View style={styles.editRow}>
@@ -51,7 +53,7 @@ function EditField({
         onChangeText={setV}
         onEndEditing={() => onSave({ [field]: v.trim() || undefined } as EditablePatch)}
         placeholder="—"
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={c.muted}
         multiline={multiline}
         style={[styles.input, multiline && styles.inputMultiline]}
       />
@@ -74,7 +76,8 @@ export function RoleDetailScreen({
   onDelete: () => void;
   onOpenPosting: (url: string) => void;
 }) {
-  const c = tierColor(role.tier);
+  const { c, styles } = useThemedStyles(makeStyles);
+  const accent = tierColor(role.tier, c);
   const [showDraft, setShowDraft] = useState(false);
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -84,14 +87,14 @@ export function RoleDetailScreen({
 
       <View style={styles.head}>
         <View style={styles.badgeRow}>
-          <Text style={[styles.tierBadge, { color: c, backgroundColor: alpha(c, 0.1) }]}>TIER {role.tier}</Text>
+          <Text style={[styles.tierBadge, { color: accent, backgroundColor: alpha(accent, 0.1) }]}>TIER {role.tier}</Text>
           <Text style={styles.score}>EV {role.score.toFixed(1)} · fit {role.fit} / prob {role.prob}</Text>
         </View>
         <Text style={styles.role}>{role.role}</Text>
         <Text style={styles.company}>{role.company}</Text>
         <View style={styles.statusWrap}>
-          <View style={[styles.dot, { backgroundColor: statusColor(role.status) }]} />
-          <Text style={[styles.statusText, { color: statusColor(role.status) }]}>{role.status}</Text>
+          <View style={[styles.dot, { backgroundColor: statusColor(role.status, c) }]} />
+          <Text style={[styles.statusText, { color: statusColor(role.status, c) }]}>{role.status}</Text>
         </View>
       </View>
 
@@ -100,7 +103,7 @@ export function RoleDetailScreen({
         <View style={styles.chips}>
           {STATUSES.map((s) => {
             const on = s === role.status;
-            const sc = statusColor(s);
+            const sc = statusColor(s, c);
             return (
               <Pressable
                 key={s}
@@ -149,10 +152,10 @@ export function RoleDetailScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { padding: 24, gap: 18 },
   back: { paddingVertical: 4 },
-  backText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: colors.emerald },
+  backText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: c.emerald },
   head: { gap: 6 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tierBadge: {
@@ -165,25 +168,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  score: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
-  role: { fontFamily: fonts.serif, fontSize: 24, fontWeight: '600', color: colors.textHigh, marginTop: 2 },
-  company: { fontFamily: fonts.sans, fontSize: 15, color: colors.textBase },
+  score: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
+  role: { fontFamily: fonts.serif, fontSize: 24, fontWeight: '600', color: c.textHigh, marginTop: 2 },
+  company: { fontFamily: fonts.sans, fontSize: 15, color: c.textBase },
   statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   section: { gap: 8 },
-  sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: colors.muted },
+  sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
   },
-  chipText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
-  card: { backgroundColor: colors.element, borderRadius: 14, padding: 4 },
+  chipText: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
+  card: { backgroundColor: c.element, borderRadius: 14, padding: 4 },
   field: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -191,30 +194,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: alpha(colors.canvas, 0.5),
+    borderBottomColor: alpha(c.canvas, 0.5),
   },
-  fieldLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-  fieldValue: { fontFamily: fonts.sans, fontSize: 14, color: colors.textHigh, flexShrink: 1, textAlign: 'right' },
-  editRow: { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: alpha(colors.canvas, 0.5), gap: 4 },
-  input: { fontFamily: fonts.sans, fontSize: 14, color: colors.textHigh, padding: 0 },
+  fieldLabel: { fontFamily: fonts.sans, fontSize: 13, color: c.muted },
+  fieldValue: { fontFamily: fonts.sans, fontSize: 14, color: c.textHigh, flexShrink: 1, textAlign: 'right' },
+  editRow: { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: alpha(c.canvas, 0.5), gap: 4 },
+  input: { fontFamily: fonts.sans, fontSize: 14, color: c.textHigh, padding: 0 },
   inputMultiline: { minHeight: 54, textAlignVertical: 'top' },
-  linkBtn: { backgroundColor: colors.emerald, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  linkBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: colors.canvas },
+  linkBtn: { backgroundColor: c.emerald, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  linkBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: c.canvas },
   draftBtn: {
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: alpha(colors.emerald, 0.1),
+    backgroundColor: alpha(c.emerald, 0.1),
     borderWidth: 1,
-    borderColor: alpha(colors.emerald, 0.4),
+    borderColor: alpha(c.emerald, 0.4),
   },
-  draftBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: colors.emerald },
+  draftBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.emerald },
   deleteBtn: {
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: alpha(colors.danger, 0.4),
+    borderColor: alpha(c.danger, 0.4),
   },
-  deleteText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: colors.danger },
+  deleteText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: c.danger },
 });

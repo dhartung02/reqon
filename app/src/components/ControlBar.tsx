@@ -1,5 +1,5 @@
 import { View, TextInput, Pressable, Text, StyleSheet, ScrollView } from 'react-native';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { SORTS, type SortKey } from '../model';
 
 // Search box + sort pills for the lane lists.
@@ -14,13 +14,14 @@ export function ControlBar({
   sort: SortKey;
   onSort: (k: SortKey) => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   return (
     <View style={styles.wrap}>
       <TextInput
         value={query}
         onChangeText={onQuery}
         placeholder="Search company, role, recruiter…"
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={c.muted}
         style={styles.input}
         autoCorrect={false}
         clearButtonMode="while-editing"
@@ -39,16 +40,16 @@ export function ControlBar({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   wrap: { gap: 10, paddingTop: 14 },
   input: {
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     borderRadius: 10,
     paddingHorizontal: 13,
     paddingVertical: 10,
-    color: colors.textHigh,
+    color: c.textHigh,
     fontFamily: fonts.sans,
     fontSize: 14,
   },
@@ -57,11 +58,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
   },
-  pillOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.08) },
-  pillText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
-  pillTextOn: { color: colors.emerald },
+  pillOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.08) },
+  pillText: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
+  pillTextOn: { color: c.emerald },
 });

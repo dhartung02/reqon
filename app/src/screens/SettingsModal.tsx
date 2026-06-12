@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, useScheme, type Palette, type SchemePref } from '../theme';
 import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
 import { testConnection, syncTwoWay } from '../sync/sync';
 
@@ -20,6 +20,8 @@ export function SettingsModal({
   onEditSearch: () => void;
   onEditRules: () => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
+  const { pref, setScheme } = useScheme();
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,7 +30,7 @@ export function SettingsModal({
 
   useEffect(() => {
     if (visible) {
-      getConfig().then((c) => { setUrl(c.url); setToken(c.token); setStatus(null); });
+      getConfig().then((cfg) => { setUrl(cfg.url); setToken(cfg.token); setStatus(null); });
       getScoutMode().then(setScout);
     }
   }, [visible]);
@@ -74,7 +76,7 @@ export function SettingsModal({
     setBusy(false);
   };
 
-  const statusColorFor = (k: string) => (k === 'ok' ? colors.emerald : k === 'err' ? colors.danger : colors.muted);
+  const statusColorFor = (k: string) => (k === 'ok' ? c.emerald : k === 'err' ? c.danger : c.muted);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -91,11 +93,11 @@ export function SettingsModal({
             <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. When configured, sync runs automatically on launch and foreground (push local edits + pull server changes, last-writer-wins); the button below forces it now.</Text>
             <View style={styles.labeled}>
               <Text style={styles.label}>Server URL</Text>
-              <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={colors.muted} style={styles.input} />
+              <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={c.muted} style={styles.input} />
             </View>
             <View style={styles.labeled}>
               <Text style={styles.label}>Token (X-CRM-Token)</Text>
-              <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="APP_TOKEN" placeholderTextColor={colors.muted} style={styles.input} />
+              <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="APP_TOKEN" placeholderTextColor={c.muted} style={styles.input} />
             </View>
 
             <View style={styles.labeled}>
@@ -110,6 +112,20 @@ export function SettingsModal({
                 ))}
               </View>
               <Text style={styles.help}>{scoutHelp}</Text>
+            </View>
+
+            <View style={styles.labeled}>
+              <Text style={styles.label}>Appearance</Text>
+              <View style={styles.seg}>
+                {(['light', 'dark', 'system'] as SchemePref[]).map((m) => (
+                  <Pressable key={m} style={[styles.segBtn, pref === m && styles.segBtnOn]} onPress={() => setScheme(m)}>
+                    <Text style={[styles.segText, pref === m && styles.segTextOn]}>
+                      {m === 'light' ? 'Light' : m === 'dark' ? 'Dark' : 'System'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
             </View>
 
             <Pressable style={styles.profileRow} onPress={onEditProfile}>
@@ -139,7 +155,7 @@ export function SettingsModal({
             <Text style={styles.serverOnly}>Server-only by design: morning digest + email/Slack (SMTP), push notifications (APNs), AI keys & enrichment budgets, scheduling, and access tokens are managed on the server.</Text>
 
             {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
-            {busy ? <ActivityIndicator color={colors.emerald} /> : null}
+            {busy ? <ActivityIndicator color={c.emerald} /> : null}
 
             <View style={styles.actions}>
               <Pressable style={[styles.btn, styles.btnGhost]} onPress={test} disabled={busy}>
@@ -156,67 +172,67 @@ export function SettingsModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.canvas,
+    backgroundColor: c.canvas,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderTopWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 28,
     maxHeight: '85%',
   },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: colors.textHigh },
-  cancel: { fontFamily: fonts.sans, fontSize: 15, color: colors.emerald, fontWeight: '500' },
+  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh },
+  cancel: { fontFamily: fonts.sans, fontSize: 15, color: c.emerald, fontWeight: '500' },
   form: { gap: 14, paddingBottom: 8 },
-  help: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, lineHeight: 19 },
+  help: { fontFamily: fonts.sans, fontSize: 13, color: c.muted, lineHeight: 19 },
   labeled: { gap: 6 },
-  label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: colors.muted },
+  label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.muted },
   seg: { flexDirection: 'row', gap: 8 },
   segBtn: {
     flex: 1,
     paddingVertical: 9,
     borderRadius: 9,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     alignItems: 'center',
   },
-  segBtnOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.1) },
-  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: colors.textBase },
-  segTextOn: { color: colors.emerald },
+  segBtnOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.1) },
+  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: c.textBase },
+  segTextOn: { color: c.emerald },
   flex1: { flex: 1 },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  profileChev: { fontSize: 22, color: colors.muted, lineHeight: 22 },
-  serverOnly: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted, lineHeight: 16, fontStyle: 'italic' },
+  profileChev: { fontSize: 22, color: c.muted, lineHeight: 22 },
+  serverOnly: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, lineHeight: 16, fontStyle: 'italic' },
   input: {
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     borderRadius: 10,
     paddingHorizontal: 13,
     paddingVertical: 11,
-    color: colors.textHigh,
+    color: c.textHigh,
     fontFamily: fonts.sans,
     fontSize: 15,
   },
   status: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
   btn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  btnGhost: { backgroundColor: colors.element, borderWidth: 1, borderColor: colors.element },
-  btnGhostText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: colors.textHigh },
-  btnPrimary: { backgroundColor: colors.emerald },
-  btnPrimaryText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: colors.canvas },
+  btnGhost: { backgroundColor: c.element, borderWidth: 1, borderColor: c.element },
+  btnGhostText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: c.textHigh },
+  btnPrimary: { backgroundColor: c.emerald },
+  btnPrimaryText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: c.canvas },
 });

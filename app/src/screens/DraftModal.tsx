@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator, Share } from 'react-native';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { requestDraft } from '../sync/assist';
 
 type Kind = 'cover' | 'screening';
@@ -18,6 +18,7 @@ export function DraftModal({
   role: string;
   onClose: () => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const [kind, setKind] = useState<Kind>('cover');
   const [question, setQuestion] = useState('');
   const [draft, setDraft] = useState('');
@@ -58,14 +59,14 @@ export function DraftModal({
               value={question}
               onChangeText={setQuestion}
               placeholder="Paste the screening question…"
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={c.muted}
               multiline
               style={styles.qInput}
             />
           ) : null}
 
           <Pressable style={[styles.gen, busy && styles.genBusy]} onPress={generate} disabled={busy}>
-            {busy ? <ActivityIndicator color={colors.canvas} /> : <Text style={styles.genText}>{draft ? 'Regenerate' : 'Draft it'}</Text>}
+            {busy ? <ActivityIndicator color={c.canvas} /> : <Text style={styles.genText}>{draft ? 'Regenerate' : 'Draft it'}</Text>}
           </Pressable>
 
           {error ? <Text style={styles.err}>{error}</Text> : null}
@@ -89,14 +90,14 @@ export function DraftModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.canvas,
+    backgroundColor: c.canvas,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderTopWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 28,
@@ -104,31 +105,31 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: colors.textHigh },
-  cancel: { fontFamily: fonts.sans, fontSize: 15, color: colors.emerald, fontWeight: '500' },
-  sub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, marginTop: -6 },
+  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh },
+  cancel: { fontFamily: fonts.sans, fontSize: 15, color: c.emerald, fontWeight: '500' },
+  sub: { fontFamily: fonts.sans, fontSize: 13, color: c.muted, marginTop: -6 },
   seg: { flexDirection: 'row', gap: 8 },
-  segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, backgroundColor: colors.element, borderWidth: 1, borderColor: colors.element, alignItems: 'center' },
-  segBtnOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.1) },
-  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: colors.textBase },
-  segTextOn: { color: colors.emerald },
+  segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, backgroundColor: c.element, borderWidth: 1, borderColor: c.element, alignItems: 'center' },
+  segBtnOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.1) },
+  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: c.textBase },
+  segTextOn: { color: c.emerald },
   qInput: {
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderRadius: 10,
     padding: 12,
     minHeight: 60,
     textAlignVertical: 'top',
-    color: colors.textHigh,
+    color: c.textHigh,
     fontFamily: fonts.sans,
     fontSize: 14,
   },
-  gen: { backgroundColor: colors.emerald, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  gen: { backgroundColor: c.emerald, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   genBusy: { opacity: 0.7 },
-  genText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: colors.canvas },
-  err: { fontFamily: fonts.sans, fontSize: 13, color: colors.danger },
-  draftBox: { backgroundColor: colors.element, borderRadius: 12, maxHeight: 280 },
-  draftText: { fontFamily: fonts.sans, fontSize: 15, color: colors.textHigh, lineHeight: 22 },
+  genText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: c.canvas },
+  err: { fontFamily: fonts.sans, fontSize: 13, color: c.danger },
+  draftBox: { backgroundColor: c.element, borderRadius: 12, maxHeight: 280 },
+  draftText: { fontFamily: fonts.sans, fontSize: 15, color: c.textHigh, lineHeight: 22 },
   footRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  note: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, flexShrink: 1 },
-  share: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: colors.emerald },
+  note: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, flexShrink: 1 },
+  share: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.emerald },
 });

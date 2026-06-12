@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { rolesInLane, type Lane, type SortKey, type Status } from './src/model';
@@ -48,6 +48,8 @@ export default function App() {
   const [serverUrl, setServerUrl] = useState('');
   const [scoutMode, setScoutMode] = useState<ScoutMode>('auto');
 
+  const [syncState, setSyncState] = useState<{ at?: number; error?: boolean }>({});
+
   // Auto-sync: silent push+pull whenever configured. Manual "Sync now" remains a force option.
   const autoSync = useCallback(async () => {
     const { url } = await getConfig();
@@ -55,8 +57,9 @@ export default function App() {
     try {
       await syncTwoWay();
       await refresh();
+      setSyncState({ at: Date.now() });
     } catch {
-      /* offline / unreachable — try again next foreground */
+      setSyncState((s) => ({ ...s, error: true })); // offline / unreachable — retry next foreground
     }
   }, [refresh]);
 
@@ -118,7 +121,15 @@ export default function App() {
     [roles],
   );
 
-  if (!fontsLoaded || loading) return null;
+  if (!fontsLoaded || loading) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <ReqonGlyph size={44} />
+        <ActivityIndicator color={colors.emerald} style={styles.loadSpin} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
 
   if (browserUrl) {
     return (
@@ -188,6 +199,8 @@ export default function App() {
               scoutEnabled={scoutOn}
               refreshing={refreshing}
               onRefresh={onRefresh}
+              serverConfigured={!!serverUrl}
+              syncState={syncState}
             />
           ) : lane === 'analytics' ? (
             <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
@@ -220,6 +233,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  loadSpin: { marginTop: 16 },
   shell: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
   brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },

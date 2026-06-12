@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import {
   pullProfile,
   pushProfile,
@@ -14,10 +14,11 @@ import {
 
 // Field input helper.
 function Field({ label, value, onChange, ...rest }: { label: string; value?: string; onChange: (v: string) => void } & Omit<Partial<React.ComponentProps<typeof TextInput>>, 'onChange' | 'value'>) {
+  const { c, styles } = useThemedStyles(makeStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput value={value ?? ''} onChangeText={onChange} placeholderTextColor={colors.muted} style={styles.input} {...rest} />
+      <TextInput value={value ?? ''} onChangeText={onChange} placeholderTextColor={c.muted} style={styles.input} {...rest} />
     </View>
   );
 }
@@ -25,6 +26,7 @@ function Field({ label, value, onChange, ...rest }: { label: string; value?: str
 const linesToArr = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
 export function ProfileScreen({ onBack }: { onBack: () => void }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const [p, setP] = useState<Profile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -62,7 +64,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
   if (loading) {
     return (
       <View style={[styles.wrap, styles.center]}>
-        <ActivityIndicator color={colors.emerald} />
+        <ActivityIndicator color={c.emerald} />
       </View>
     );
   }
@@ -82,7 +84,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
       <Pressable style={styles.resumeBtn} onPress={pickResume} disabled={busy}>
         <Text style={styles.resumeText}>Upload résumé · parse</Text>
       </Pressable>
-      {status ? <Text style={[styles.status, { color: status.ok ? colors.emerald : colors.danger }]}>{status.text}</Text> : null}
+      {status ? <Text style={[styles.status, { color: status.ok ? c.emerald : c.danger }]}>{status.text}</Text> : null}
 
       <Section title="BASICS">
         <Field label="Full name" value={p.applicant.name} onChange={(v) => setApplicant('name', v)} />
@@ -144,6 +146,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
 }
 
 function Section({ title, children, onAdd }: { title: string; children: React.ReactNode; onAdd?: () => void }) {
+  const { styles } = useThemedStyles(makeStyles);
   return (
     <View style={styles.section}>
       <View style={styles.sectionHead}>
@@ -160,6 +163,7 @@ function Section({ title, children, onAdd }: { title: string; children: React.Re
 }
 
 function EntryCard({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  const { styles } = useThemedStyles(makeStyles);
   return (
     <View style={styles.entry}>
       {children}
@@ -171,13 +175,14 @@ function EntryCard({ children, onRemove }: { children: React.ReactNode; onRemove
 }
 
 function ListSection({ title, value, onChange }: { title: string; value: string[]; onChange: (a: string[]) => void }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   return (
     <Section title={title}>
       <TextInput
         value={value.join('\n')}
         onChangeText={(t) => onChange(linesToArr(t))}
         placeholder="One per line"
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={c.muted}
         multiline
         style={[styles.input, styles.multi]}
       />
@@ -185,28 +190,28 @@ function ListSection({ title, value, onChange }: { title: string; value: string[
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.canvas },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: c.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 24, gap: 18, paddingBottom: 48 },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  back: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: colors.emerald },
-  save: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: colors.emerald },
-  title: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: colors.textHigh, marginTop: -8 },
-  resumeBtn: { backgroundColor: alpha(colors.emerald, 0.1), borderWidth: 1, borderColor: alpha(colors.emerald, 0.4), borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  resumeText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: colors.emerald },
+  back: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: c.emerald },
+  save: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: c.emerald },
+  title: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, marginTop: -8 },
+  resumeBtn: { backgroundColor: alpha(c.emerald, 0.1), borderWidth: 1, borderColor: alpha(c.emerald, 0.4), borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  resumeText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.emerald },
   status: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   section: { gap: 10 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 1.6, color: colors.muted },
-  add: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: colors.emerald },
+  sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 1.6, color: c.muted },
+  add: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   field: { gap: 5, flex: 1 },
-  fieldLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted },
-  input: { backgroundColor: colors.element, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, color: colors.textHigh, fontFamily: fonts.sans, fontSize: 15 },
+  fieldLabel: { fontFamily: fonts.sans, fontSize: 11, color: c.muted },
+  input: { backgroundColor: c.element, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, color: c.textHigh, fontFamily: fonts.sans, fontSize: 15 },
   multi: { minHeight: 80, textAlignVertical: 'top' },
   row2: { flexDirection: 'row', gap: 10 },
-  entry: { backgroundColor: alpha(colors.element, 0.5), borderRadius: 12, padding: 12, gap: 10 },
+  entry: { backgroundColor: alpha(c.element, 0.5), borderRadius: 12, padding: 12, gap: 10 },
   remove: { alignSelf: 'flex-start' },
-  removeText: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger },
-  note: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, lineHeight: 17 },
+  removeText: { fontFamily: fonts.sans, fontSize: 12, color: c.danger },
+  note: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, lineHeight: 17 },
 });

@@ -1,12 +1,13 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { colors, tierColor, alpha, fonts } from '../theme';
+import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, type Role } from '../model';
 
 // Tier-scored pipeline card: left edge + badge in the tier color, score, title, company, and a
 // status pill. Tappable → row detail. Tier C is dimmed (suppressed noise) but still readable.
 export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }) {
-  const c = tierColor(role.tier);
-  const sc = statusColor(role.status);
+  const { c, styles } = useThemedStyles(makeStyles);
+  const accent = tierColor(role.tier, c);
+  const sc = statusColor(role.status, c);
   const suppressed = role.tier === 'C';
 
   return (
@@ -14,14 +15,14 @@ export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { borderLeftColor: c },
+        { borderLeftColor: accent },
         suppressed && styles.cardSuppressed,
         pressed && styles.pressed,
       ]}
     >
       <View style={styles.topRow}>
         <View style={styles.badgeRow}>
-          <Text style={[styles.tierBadge, { color: c, backgroundColor: alpha(c, 0.1) }]}>TIER {role.tier}</Text>
+          <Text style={[styles.tierBadge, { color: accent, backgroundColor: alpha(accent, 0.1) }]}>TIER {role.tier}</Text>
           <Text style={styles.scoreText}>Score: {role.score.toFixed(1)}/10</Text>
         </View>
         <Text style={styles.age}>{role.age}</Text>
@@ -41,16 +42,16 @@ export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   card: {
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderLeftWidth: 4,
     borderTopRightRadius: 12,
     borderBottomRightRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  cardSuppressed: { backgroundColor: alpha(colors.element, 0.4), opacity: 0.6 },
+  cardSuppressed: { backgroundColor: alpha(c.element, 0.4), opacity: 0.6 },
   pressed: { opacity: 0.85 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -64,12 +65,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  scoreText: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
-  age: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
-  title: { fontFamily: fonts.sans, fontSize: 16, fontWeight: '500', color: colors.textHigh, paddingTop: 3 },
-  titleSuppressed: { color: colors.textBase, textDecorationLine: 'line-through' },
-  company: { fontFamily: fonts.sans, fontSize: 14, color: colors.textBase, marginTop: 2 },
-  companySuppressed: { color: colors.muted },
+  scoreText: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
+  age: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
+  title: { fontFamily: fonts.sans, fontSize: 16, fontWeight: '500', color: c.textHigh, paddingTop: 3 },
+  titleSuppressed: { color: c.textBase, textDecorationLine: 'line-through' },
+  company: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, marginTop: 2 },
+  companySuppressed: { color: c.muted },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -77,10 +78,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 9,
     borderTopWidth: 1,
-    borderTopColor: alpha(colors.canvas, 0.5),
+    borderTopColor: alpha(c.canvas, 0.5),
   },
   statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500' },
-  chev: { fontSize: 20, color: colors.muted, lineHeight: 20 },
+  chev: { fontSize: 20, color: c.muted, lineHeight: 20 },
 });

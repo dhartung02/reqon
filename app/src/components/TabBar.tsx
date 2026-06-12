@@ -1,5 +1,5 @@
 import { ScrollView, Pressable, Text, StyleSheet } from 'react-native';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { LANES, type Lane } from '../model';
 
 // Horizontal lane pills (Today · Open · Applied · Interviewing · Closed) with counts — mirrors the
@@ -13,6 +13,7 @@ export function TabBar({
   counts: Record<Lane, number>;
   onChange: (l: Lane) => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   return (
     <ScrollView
       horizontal
@@ -33,7 +34,7 @@ export function TabBar({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   bar: { flexGrow: 0, flexShrink: 0 },
   row: { gap: 8, paddingVertical: 2, alignItems: 'center' },
   pill: {
@@ -43,13 +44,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
   },
-  pillOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.08) },
-  label: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: colors.textBase },
-  labelOn: { color: colors.textHigh },
-  count: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
-  countOn: { color: colors.emerald },
+  pillOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.08) },
+  label: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: c.textBase },
+  labelOn: { color: c.textHigh },
+  count: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
+  countOn: { color: c.emerald },
 });

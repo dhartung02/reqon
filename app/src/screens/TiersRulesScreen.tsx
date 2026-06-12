@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import type { Tier } from '@reqon/core';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { pullRules, pushRules, DEFAULT_RULES, type Rules } from '../sync/rules';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const clamp = (n: number) => Math.max(0, Math.min(10, round1(n)));
 
 export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const [r, setR] = useState<Rules>(DEFAULT_RULES);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,7 @@ export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
   if (loading) {
     return (
       <View style={[styles.wrap, styles.center]}>
-        <ActivityIndicator color={colors.emerald} />
+        <ActivityIndicator color={c.emerald} />
       </View>
     );
   }
@@ -52,7 +53,7 @@ export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
       </View>
       <Text style={styles.title}>Tiers & rules</Text>
       <Text style={styles.intro}>How A/B/C tiers are defined and the scout's merge rules. Expected value (EV) = fit × prob ÷ 10. Synced with the server when connected.</Text>
-      {status ? <Text style={[styles.status, { color: status.ok ? colors.emerald : colors.danger }]}>{status.text}</Text> : null}
+      {status ? <Text style={[styles.status, { color: status.ok ? c.emerald : c.danger }]}>{status.text}</Text> : null}
 
       <View style={styles.section}>
         <View style={styles.sectionHead}>
@@ -104,6 +105,7 @@ export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
 }
 
 function Stepper({ label, value, onChange, step, min = 0, max = 10, integer }: { label: string; value: number; onChange: (v: number) => void; step: number; min?: number; max?: number; integer?: boolean }) {
+  const { styles } = useThemedStyles(makeStyles);
   const show = integer ? String(Math.round(value)) : value.toFixed(1);
   return (
     <View style={styles.stepRow}>
@@ -121,30 +123,30 @@ function Stepper({ label, value, onChange, step, min = 0, max = 10, integer }: {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.canvas },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: c.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 24, gap: 20, paddingBottom: 48 },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  back: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: colors.emerald },
-  save: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: colors.emerald },
-  title: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: colors.textHigh, marginTop: -8 },
-  intro: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted, lineHeight: 19, marginTop: -8 },
+  back: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: c.emerald },
+  save: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: c.emerald },
+  title: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, marginTop: -8 },
+  intro: { fontFamily: fonts.sans, fontSize: 13, color: c.muted, lineHeight: 19, marginTop: -8 },
   status: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   section: { gap: 10 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 1.6, color: colors.muted },
-  reset: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '600', color: colors.emerald },
-  help: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted, lineHeight: 17 },
+  sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 1.6, color: c.muted },
+  reset: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '600', color: c.emerald },
+  help: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, lineHeight: 17 },
   stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  stepLabel: { fontFamily: fonts.sans, fontSize: 14, color: colors.textBase, flex: 1 },
+  stepLabel: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, flex: 1 },
   stepControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  stepBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.element, alignItems: 'center', justifyContent: 'center' },
-  stepTxt: { fontFamily: fonts.sans, fontSize: 22, color: colors.emerald, lineHeight: 24 },
-  stepVal: { fontFamily: fonts.serif, fontSize: 18, fontWeight: '600', color: colors.textHigh, minWidth: 38, textAlign: 'center' },
+  stepBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.element, alignItems: 'center', justifyContent: 'center' },
+  stepTxt: { fontFamily: fonts.sans, fontSize: 22, color: c.emerald, lineHeight: 24 },
+  stepVal: { fontFamily: fonts.serif, fontSize: 18, fontWeight: '600', color: c.textHigh, minWidth: 38, textAlign: 'center' },
   seg: { flexDirection: 'row', gap: 8 },
-  segBtn: { flex: 1, paddingVertical: 10, borderRadius: 9, backgroundColor: colors.element, borderWidth: 1, borderColor: colors.element, alignItems: 'center' },
-  segBtnOn: { borderColor: alpha(colors.emerald, 0.5), backgroundColor: alpha(colors.emerald, 0.1) },
-  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: colors.textBase },
-  segTextOn: { color: colors.emerald },
+  segBtn: { flex: 1, paddingVertical: 10, borderRadius: 9, backgroundColor: c.element, borderWidth: 1, borderColor: c.element, alignItems: 'center' },
+  segBtnOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.1) },
+  segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: c.textBase },
+  segTextOn: { color: c.emerald },
 });

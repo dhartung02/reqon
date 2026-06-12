@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { colors, fonts } from '../theme';
+import { fonts, useThemedStyles, type Palette } from '../theme';
 import { RoleCard } from '../components/RoleCard';
 import {
   rolesInLane,
@@ -34,6 +34,7 @@ export function PipelineScreen({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const groups = useMemo(() => {
     const inLane = rolesInLane(roles, lane).filter((r) => matchesQuery(r, query));
     return TIER_ORDER.map((tier) => ({
@@ -58,7 +59,7 @@ export function PipelineScreen({
   return (
     <ScrollView
       contentContainerStyle={styles.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.emerald} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
     >
       {groups.map((g) => (
         <View key={g.tier} style={styles.group}>
@@ -77,7 +78,7 @@ export function PipelineScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { paddingTop: 16, paddingBottom: 32, gap: 18 },
   group: { gap: 10 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -87,10 +88,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.muted,
+    color: c.muted,
   },
-  groupCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
+  groupCount: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
   list: { gap: 12 },
   empty: { paddingTop: 64, alignItems: 'center' },
-  emptyText: { fontFamily: fonts.sans, fontSize: 14, color: colors.muted },
+  emptyText: { fontFamily: fonts.sans, fontSize: 14, color: c.muted },
 });

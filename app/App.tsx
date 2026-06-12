@@ -173,10 +173,10 @@ export default function App() {
             </View>
           </View>
           <View style={styles.brandRight}>
-            <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={6} accessibilityLabel="Settings & sync">
+            <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={14} accessibilityLabel="Settings & sync">
               <SettingsIcon size={18} color={colors.textBase} />
             </Pressable>
-            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={6} accessibilityLabel="Add role">
+            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add role">
               <Text style={styles.addBtnText}>+</Text>
             </Pressable>
           </View>
@@ -240,9 +240,9 @@ const styles = StyleSheet.create({
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 11,
     backgroundColor: colors.element,
     borderWidth: 1,
     borderColor: colors.element,
@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 11,
     backgroundColor: colors.element,
     borderWidth: 1,
     borderColor: colors.emerald + '55',

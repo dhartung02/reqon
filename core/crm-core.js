@@ -36,11 +36,19 @@ function sameReq(a, b) {
 // ---- scoring ----
 const expectedValue = x => +(((+x.fit || 0) * (+x.prob || 0)) / 10).toFixed(1);
 
-// Tier from fit/prob per agent/scoring-criteria.md (EV = fit*prob/10).
-function computeTier(fit, prob) {
+// Tier from fit/prob per agent/scoring-criteria.md (EV = fit*prob/10). Optional `thr` overrides the
+// default thresholds (Reqon "Tiers & rules" setting); omitting it preserves the canonical model so
+// every existing caller is unchanged.
+const DEFAULT_TIER_THRESHOLDS = { aEv: 5.2, aFit: 8, aProb: 6.5, bEv: 4.0 };
+function computeTier(fit, prob, thr) {
+  const t = thr || DEFAULT_TIER_THRESHOLDS;
+  const aEv = t.aEv != null ? +t.aEv : 5.2;
+  const aFit = t.aFit != null ? +t.aFit : 8;
+  const aProb = t.aProb != null ? +t.aProb : 6.5;
+  const bEv = t.bEv != null ? +t.bEv : 4.0;
   const f = +fit || 0, p = +prob || 0, ev = +((f * p) / 10).toFixed(1);
-  if (ev >= 5.2 && f >= 8 && p >= 6.5) return 'A';
-  if (ev >= 4.0) return 'B';
+  if (ev >= aEv && f >= aFit && p >= aProb) return 'A';
+  if (ev >= bEv) return 'B';
   return 'C';
 }
 
@@ -75,4 +83,4 @@ function reconcileSync(serverRows, clientRows, deps) {
   return { rows: out, applied, conflicts, idRemaps };
 }
 
-module.exports = { reqKey, postingId, sameReq, expectedValue, computeTier, reconcileSync };
+module.exports = { reqKey, postingId, sameReq, expectedValue, computeTier, reconcileSync, DEFAULT_TIER_THRESHOLDS };

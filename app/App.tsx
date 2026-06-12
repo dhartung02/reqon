@@ -19,9 +19,11 @@ import { SettingsModal } from './src/screens/SettingsModal';
 import { BrowserScreen } from './src/screens/BrowserScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
+import { TiersRulesScreen } from './src/screens/TiersRulesScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { getCriteria } from './src/sync/searchCriteria';
+import { pullRules, getRules } from './src/sync/rules';
 import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
@@ -48,6 +50,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -74,13 +77,16 @@ export default function App() {
     setScoutMode(mode);
   }, []);
 
-  // On launch: load config + sync. On foreground: sync. (ROADMAP FR-APP-6.)
+  // On launch: load config, apply scoring rules (tier thresholds + follow-up days), then sync.
+  // On foreground: sync. (ROADMAP FR-APP-6.)
   useEffect(() => {
     (async () => {
       await loadConfig();
+      await pullRules(); // apply active tier thresholds + follow-up days before rows derive
+      await refresh(); // re-derive tiers/Today with the active rules
       await autoSync();
     })();
-  }, [loadConfig, autoSync]);
+  }, [loadConfig, autoSync, refresh]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
@@ -104,7 +110,7 @@ export default function App() {
     setScouting(true);
     setScoutMsg(null);
     try {
-      const crit = await getCriteria();
+      const [crit, rules] = await Promise.all([getCriteria(), getRules()]);
       const r = await runScout({
         existing: roles,
         onAdd: add,
@@ -112,6 +118,7 @@ export default function App() {
         remoteOnly: crit.remoteOnly,
         salaryFloor: crit.salaryFloor,
         negativeKeywords: crit.negativeKeywords,
+        minTier: rules.minTierToMerge,
       });
       setScoutMsg(`Scanned ${r.scanned} · ${r.matched} matched · +${r.added} new${r.errors ? ` · ${r.errors} board errors` : ''}`);
       await refresh();
@@ -157,6 +164,15 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safe}>
         <SearchCriteriaScreen onBack={() => setShowSearch(false)} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
+
+  if (showRules) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <TiersRulesScreen onBack={() => { setShowRules(false); refresh(); }} />
         <StatusBar style="light" />
       </SafeAreaView>
     );
@@ -263,6 +279,10 @@ export default function App() {
         onEditSearch={() => {
           setShowSettings(false);
           setShowSearch(true);
+        }}
+        onEditRules={() => {
+          setShowSettings(false);
+          setShowRules(true);
         }}
       />
       <StatusBar style="light" />

@@ -11,12 +11,14 @@ export function SettingsModal({
   onSynced,
   onEditProfile,
   onEditSearch,
+  onEditRules,
 }: {
   visible: boolean;
   onClose: () => void;
   onSynced: () => void;
   onEditProfile: () => void;
   onEditSearch: () => void;
+  onEditRules: () => void;
 }) {
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
@@ -126,6 +128,16 @@ export function SettingsModal({
               <Text style={styles.profileChev}>›</Text>
             </Pressable>
 
+            <Pressable style={styles.profileRow} onPress={onEditRules}>
+              <View style={styles.flex1}>
+                <Text style={styles.label}>Tiers & rules</Text>
+                <Text style={styles.help}>A/B/C thresholds, scout merge tier, follow-up days, AI drafts</Text>
+              </View>
+              <Text style={styles.profileChev}>›</Text>
+            </Pressable>
+
+            <Text style={styles.serverOnly}>Server-only by design: morning digest + email/Slack (SMTP), push notifications (APNs), AI keys & enrichment budgets, scheduling, and access tokens are managed on the server.</Text>
+
             {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
             {busy ? <ActivityIndicator color={colors.emerald} /> : null}
 
@@ -188,6 +200,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   profileChev: { fontSize: 22, color: colors.muted, lineHeight: 22 },
+  serverOnly: { fontFamily: fonts.sans, fontSize: 11, color: colors.muted, lineHeight: 16, fontStyle: 'italic' },
   input: {
     backgroundColor: colors.element,
     borderWidth: 1,

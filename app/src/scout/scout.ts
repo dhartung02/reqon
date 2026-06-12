@@ -1,7 +1,10 @@
-import { sameReq } from '@reqon/core';
+import { sameReq, computeTier, type Tier } from '@reqon/core';
 import { BOARDS, type Board } from './boards';
+import { getActiveTier } from '../model';
 import { isPmRole, remoteMode, usEligible, scoreFit, scoreProb } from './scoring';
 import { belowSalaryFloor } from './salary';
+
+const TIER_RANK: Record<Tier, number> = { A: 3, B: 2, C: 1 };
 
 // On-device scout: poll Greenhouse / Ashby / Lever boards, filter to senior PM + domain + remote,
 // score via the shared logic, dedupe against existing roles (sameReq), and add the new ones. Pure
@@ -92,10 +95,12 @@ export async function runScout(opts: {
   remoteOnly?: boolean;
   salaryFloor?: number;
   negativeKeywords?: string[];
+  minTier?: Tier;
 }): Promise<ScoutResult> {
   const minFit = opts.minFit ?? 6.0;
   const remoteOnly = opts.remoteOnly ?? true;
   const salaryFloor = opts.salaryFloor ?? 0;
+  const minTierRank = opts.minTier ? TIER_RANK[opts.minTier] : 0;
   const negatives = (opts.negativeKeywords ?? []).map((k) => k.toLowerCase().trim()).filter(Boolean);
   const res: ScoutResult = { scanned: 0, matched: 0, added: 0, boards: 0, errors: 0 };
   const seen = new Set<string>();
@@ -125,6 +130,7 @@ export async function runScout(opts: {
       const fit = scoreFit(title, desc);
       if (fit < minFit) continue;
       const prob = scoreProb(fit, title, rmode, !!b.heritage);
+      if (minTierRank > 0 && TIER_RANK[computeTier(fit, prob, getActiveTier())] < minTierRank) continue;
       const cand = { company: b.name, role: title, link: url };
       if (opts.existing.some((e) => sameReq(e as never, cand as never))) continue;
       const key = `${b.name}|${title}`.toLowerCase();

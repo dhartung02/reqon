@@ -4,7 +4,13 @@ import type { Role, Lane } from './model';
 // "Today" count = action items needing attention = needsVerify + followUpDue + closedReq.
 
 const FOLLOWUP_STATUSES = ['Applied', 'Recruiter Screen', 'Hiring Manager', 'Panel'];
-const FOLLOWUP_DAYS = 7;
+const DEFAULT_FOLLOWUP_DAYS = 7;
+// Tunable via the "Tiers & rules" setting (synced from the server hygiene config). Module-level so
+// the pure lane predicates honor it without a config arg; defaults to 7 (and tests rely on that).
+let followupDays = DEFAULT_FOLLOWUP_DAYS;
+export function setFollowupDays(n?: number): void {
+  followupDays = n != null && !isNaN(n) && n >= 0 ? Math.round(n) : DEFAULT_FOLLOWUP_DAYS;
+}
 const INTERVIEW_STATUSES = ['Recruiter Screen', 'Hiring Manager', 'Panel'];
 const NEW_SINCE_DAYS = 3;
 
@@ -30,7 +36,7 @@ export const needsVerify = (x: Role) =>
 export const followUpDue = (x: Role) => {
   if (!FOLLOWUP_STATUSES.includes(x.status)) return false;
   const n = daysSince(x.lastcontact || x.applied);
-  return n != null && n >= FOLLOWUP_DAYS;
+  return n != null && n >= followupDays;
 };
 export const closedReq = (x: Role) => (x.reqCheck || '') === 'closed';
 export const isApplyNext = (x: Role) =>

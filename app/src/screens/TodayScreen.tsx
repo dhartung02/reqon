@@ -22,6 +22,8 @@ export function TodayScreen({
   scoutEnabled,
   refreshing,
   onRefresh,
+  serverConfigured,
+  syncState,
 }: {
   roles: Role[];
   onJump: (l: Lane) => void;
@@ -31,7 +33,13 @@ export function TodayScreen({
   scoutEnabled: boolean;
   refreshing: boolean;
   onRefresh: () => void;
+  serverConfigured: boolean;
+  syncState: { at?: number; error?: boolean };
 }) {
+  const rel = (t: number) => {
+    const s = (Date.now() - t) / 1000;
+    return s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
+  };
   const lanes = todayLanes(roles);
   const tierA = roles.filter((r) => r.tier === 'A').length;
   const applyNext = roles.filter(isApplyNext).length;
@@ -54,8 +62,12 @@ export function TodayScreen({
               <Text style={styles.scoutBtnText}>Run Scout</Text>
             )}
           </Pressable>
+        ) : serverConfigured ? (
+          <Text style={[styles.serverScout, syncState.error && styles.syncErr]}>
+            {syncState.error ? 'Sync failed' : syncState.at ? `Synced ${rel(syncState.at)}` : 'Server scout'}
+          </Text>
         ) : (
-          <Text style={styles.serverScout}>Server scout · synced</Text>
+          <Text style={styles.serverScout}>Scout off</Text>
         )}
       </View>
       {scoutMsg ? <Text style={styles.scoutMsg}>{scoutMsg}</Text> : null}
@@ -106,6 +118,7 @@ const styles = StyleSheet.create({
   },
   scoutBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: colors.emerald },
   serverScout: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
+  syncErr: { color: colors.danger },
   scoutMsg: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '500', letterSpacing: 1.4, color: colors.muted },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

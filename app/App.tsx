@@ -18,8 +18,10 @@ import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
 import { BrowserScreen } from './src/screens/BrowserScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
+import { getCriteria } from './src/sync/searchCriteria';
 import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
@@ -45,6 +47,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -101,7 +104,15 @@ export default function App() {
     setScouting(true);
     setScoutMsg(null);
     try {
-      const r = await runScout({ existing: roles, onAdd: add });
+      const crit = await getCriteria();
+      const r = await runScout({
+        existing: roles,
+        onAdd: add,
+        minFit: crit.minFit,
+        remoteOnly: crit.remoteOnly,
+        salaryFloor: crit.salaryFloor,
+        negativeKeywords: crit.negativeKeywords,
+      });
       setScoutMsg(`Scanned ${r.scanned} · ${r.matched} matched · +${r.added} new${r.errors ? ` · ${r.errors} board errors` : ''}`);
       await refresh();
     } catch {
@@ -137,6 +148,15 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safe}>
         <ProfileScreen onBack={() => setShowProfile(false)} />
+        <StatusBar style="light" />
+      </SafeAreaView>
+    );
+  }
+
+  if (showSearch) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <SearchCriteriaScreen onBack={() => setShowSearch(false)} />
         <StatusBar style="light" />
       </SafeAreaView>
     );
@@ -239,6 +259,10 @@ export default function App() {
         onEditProfile={() => {
           setShowSettings(false);
           setShowProfile(true);
+        }}
+        onEditSearch={() => {
+          setShowSettings(false);
+          setShowSearch(true);
         }}
       />
       <StatusBar style="light" />

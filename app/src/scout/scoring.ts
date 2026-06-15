@@ -29,10 +29,16 @@ export type RemoteMode = 'remote' | 'flex' | 'onsite';
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const countKw = (text: string, kws: string[]) => kws.reduce((n, k) => n + (text.includes(k) ? 1 : 0), 0);
 
-export function isPmRole(title: string): boolean {
+const norm = (s: string) => s.toLowerCase().trim();
+
+// `extraTitles` = the candidate's target titles from Search criteria. They widen acceptance: a
+// posting also counts as a PM role if its title contains one of those phrases (e.g. a user adds
+// "Head of Platform"). EXCLUDE_TITLE still wins as a safety net. Default [] = unchanged behavior.
+export function isPmRole(title: string, extraTitles: string[] = []): boolean {
   const t = title.toLowerCase();
   if (EXCLUDE_TITLE.some((x) => t.includes(x))) return false;
-  return PM_PHRASES.some((p) => t.includes(p));
+  if (PM_PHRASES.some((p) => t.includes(p))) return true;
+  return extraTitles.map(norm).filter(Boolean).some((p) => t.includes(p));
 }
 
 export function remoteMode(location?: string): RemoteMode {
@@ -53,11 +59,17 @@ export function usEligible(location?: string): boolean {
   return true;
 }
 
-export function scoreFit(title: string, desc: string): number {
+// `extraKeywords` = the candidate's keywords from Search criteria. They count as PRIORITY signals
+// (additive — merged with the built-ins, deduped), so tuning keywords actually changes what scores
+// high. Default [] = the canonical scout.py behavior, so the locked fixtures are unaffected.
+export function scoreFit(title: string, desc: string, extraKeywords: string[] = []): number {
   const tt = title.toLowerCase();
   const dd = desc.toLowerCase();
-  const priT = countKw(tt, PRIORITY_KW);
-  const priD = countKw(dd, PRIORITY_KW);
+  const priority = extraKeywords.length
+    ? Array.from(new Set([...PRIORITY_KW, ...extraKeywords.map(norm).filter(Boolean)]))
+    : PRIORITY_KW;
+  const priT = countKw(tt, priority);
+  const priD = countKw(dd, priority);
   const secT = countKw(tt, SECONDARY_KW);
   const secD = countKw(dd, SECONDARY_KW);
   const genT = countKw(tt, GENERIC_KW);

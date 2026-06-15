@@ -11,6 +11,28 @@ describe('scout scoring — PM filter', () => {
   });
 });
 
+describe('scout scoring — Search-criteria wiring', () => {
+  it('isPmRole accepts a candidate target title that has no built-in PM phrase', () => {
+    expect(isPmRole('Head of Platform')).toBe(false); // not a built-in PM phrase
+    expect(isPmRole('Head of Platform', ['Head of Platform'])).toBe(true); // user targets it
+    expect(isPmRole('Head of Platform', ['head of platform'])).toBe(true); // case-insensitive
+  });
+  it('isPmRole still rejects excluded titles even if a target title would match', () => {
+    expect(isPmRole('Product Marketing Manager', ['Product Marketing Manager'])).toBe(false);
+  });
+  it('scoreFit treats a user keyword as a priority signal', () => {
+    // "supply chain" is in none of the built-in lists → nothing-matched baseline.
+    expect(scoreFit('Product Manager, Supply Chain', '')).toBe(5.0);
+    // with it as a user keyword → priority tier in title.
+    expect(scoreFit('Product Manager, Supply Chain', '', ['supply chain'])).toBe(8.5);
+  });
+  it('scoreFit with empty/duplicate keywords matches the canonical baseline', () => {
+    expect(scoreFit('Senior Product Manager, Data Platform', '', [])).toBe(8.5);
+    // a duplicate of a built-in must not double-count into the +0.1-per-extra bonus.
+    expect(scoreFit('Senior Product Manager, Data Platform', '', ['data platform'])).toBe(8.5);
+  });
+});
+
 describe('scout scoring — location', () => {
   it('remoteMode', () => {
     expect(remoteMode('Remote, United States')).toBe('remote');

@@ -95,6 +95,8 @@ export async function runScout(opts: {
   remoteOnly?: boolean;
   salaryFloor?: number;
   negativeKeywords?: string[];
+  keywords?: string[];
+  titles?: string[];
   minTier?: Tier;
 }): Promise<ScoutResult> {
   const minFit = opts.minFit ?? 6.0;
@@ -102,6 +104,8 @@ export async function runScout(opts: {
   const salaryFloor = opts.salaryFloor ?? 0;
   const minTierRank = opts.minTier ? TIER_RANK[opts.minTier] : 0;
   const negatives = (opts.negativeKeywords ?? []).map((k) => k.toLowerCase().trim()).filter(Boolean);
+  const keywords = opts.keywords ?? [];
+  const titles = opts.titles ?? [];
   const res: ScoutResult = { scanned: 0, matched: 0, added: 0, boards: 0, errors: 0 };
   const seen = new Set<string>();
 
@@ -117,7 +121,7 @@ export async function runScout(opts: {
     for (const job of jobs) {
       res.scanned++;
       const { title, location, url, desc } = job;
-      if (!isPmRole(title)) continue;
+      if (!isPmRole(title, titles)) continue;
       if (negatives.length) {
         const hay = `${title} ${desc}`.toLowerCase();
         if (negatives.some((n) => hay.includes(n))) continue;
@@ -127,7 +131,7 @@ export async function runScout(opts: {
       if (!usEligible(location)) continue;
       if (belowSalaryFloor(desc, salaryFloor)) continue;
       res.matched++;
-      const fit = scoreFit(title, desc);
+      const fit = scoreFit(title, desc, keywords);
       if (fit < minFit) continue;
       const prob = scoreProb(fit, title, rmode, !!b.heritage);
       if (minTierRank > 0 && TIER_RANK[computeTier(fit, prob, getActiveTier())] < minTierRank) continue;

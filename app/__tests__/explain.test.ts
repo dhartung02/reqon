@@ -1,4 +1,4 @@
-import { explainScore } from '../src/scout/explain';
+import { explainScore, remoteBadge } from '../src/scout/explain';
 import type { Role } from '../src/model';
 
 const role = (p: Partial<Role>): Role =>
@@ -28,5 +28,18 @@ describe('explainScore', () => {
   it('always explains the tier via expected value', () => {
     const lines = explainScore(role({ tier: 'B', fit: 7, prob: 7, score: 4.9 }));
     expect(lines[lines.length - 1].text).toMatch(/Tier B — expected value 4\.9/);
+  });
+});
+
+describe('remoteBadge', () => {
+  it('maps location to a posture badge', () => {
+    expect(remoteBadge('Remote, United States')).toEqual({ label: 'Remote', tone: 'good' });
+    expect(remoteBadge('Hybrid - SF')).toEqual({ label: 'Hybrid', tone: 'neutral' });
+    expect(remoteBadge('New York, NY')).toEqual({ label: 'On-site', tone: 'bad' });
+  });
+  it('returns null for an unknown location', () => {
+    expect(remoteBadge('')).toBeNull();
+    expect(remoteBadge(undefined)).toBeNull();
+    expect(remoteBadge('   ')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { computeTier, expectedValue, type Tier, type TierThresholds } from '@reqon/core';
-import { colors } from './theme';
+import type { Palette } from './theme';
 
 export type { Tier };
 
@@ -93,22 +93,22 @@ export const sortRoles = (roles: Role[], key: SortKey): Role[] =>
     key === 'company' ? a.company.localeCompare(b.company) : key === 'fit' ? b.fit - a.fit : b.score - a.score,
   );
 
-/** Status → accent color for pills/dots. */
-export const statusColor = (s: Status): string => {
+/** Status → accent color for pills/dots. Pass the active palette. */
+export const statusColor = (s: Status, c: Palette): string => {
   switch (s) {
     case 'Applied':
-      return colors.emerald;
+      return c.emerald;
     case 'Recruiter Screen':
     case 'Hiring Manager':
     case 'Panel':
     case 'Offer':
-      return colors.active;
+      return c.active;
     case 'Rejected':
-      return colors.danger;
+      return c.danger;
     case 'Archived':
-      return colors.muted;
+      return c.muted;
     default:
-      return colors.textBase; // Not Applied
+      return c.textBase; // Not Applied
   }
 };
 

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { colors, alpha, fonts, tierColor } from '../theme';
+import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { rolesInLane, type Role, type Tier } from '../model';
 
 // Pipeline analytics: headline KPIs + tier distribution. Computed from the same roles the lists use.
@@ -13,6 +13,8 @@ export function AnalyticsScreen({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
+
   const m = useMemo(() => {
     const applied = rolesInLane(roles, 'applied').length;
     const interviewing = rolesInLane(roles, 'interviewing').length;
@@ -35,12 +37,12 @@ export function AnalyticsScreen({
 
   const kpis: { label: string; value: string; accent?: string }[] = [
     { label: 'Total roles', value: String(m.total) },
-    { label: 'Tier A', value: String(m.tiers.A), accent: colors.emerald },
+    { label: 'Tier A', value: String(m.tiers.A), accent: c.emerald },
     { label: 'Open', value: String(m.open) },
     { label: 'Applied', value: String(m.applied) },
-    { label: 'Interviewing', value: String(m.interviewing), accent: colors.active },
-    { label: 'Offers', value: String(m.offers), accent: colors.emerald },
-    { label: 'Rejected', value: String(m.rejected), accent: colors.danger },
+    { label: 'Interviewing', value: String(m.interviewing), accent: c.active },
+    { label: 'Offers', value: String(m.offers), accent: c.emerald },
+    { label: 'Rejected', value: String(m.rejected), accent: c.danger },
     { label: 'Response rate', value: `${m.respRate}%` },
   ];
 
@@ -49,7 +51,7 @@ export function AnalyticsScreen({
   return (
     <ScrollView
       contentContainerStyle={styles.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.emerald} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
     >
       <View style={styles.grid}>
         {kpis.map((k) => (
@@ -66,7 +68,7 @@ export function AnalyticsScreen({
           m.tiers[t] ? (
             <View
               key={t}
-              style={{ flex: m.tiers[t] / tierTotal, backgroundColor: tierColor(t), height: 10 }}
+              style={{ flex: m.tiers[t] / tierTotal, backgroundColor: tierColor(t, c), height: 10 }}
             />
           ) : null,
         )}
@@ -74,7 +76,7 @@ export function AnalyticsScreen({
       <View style={styles.legend}>
         {(['A', 'B', 'C'] as Tier[]).map((t) => (
           <View key={t} style={styles.legendItem}>
-            <View style={[styles.dot, { backgroundColor: tierColor(t) }]} />
+            <View style={[styles.dot, { backgroundColor: tierColor(t, c) }]} />
             <Text style={styles.legendText}>
               Tier {t} · {m.tiers[t]}
             </Text>
@@ -85,22 +87,22 @@ export function AnalyticsScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { paddingTop: 16, paddingBottom: 32, gap: 18 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   kpi: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderRadius: 12,
     padding: 14,
   },
-  kpiLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase', color: colors.muted },
-  kpiValue: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: colors.textHigh, marginTop: 4 },
-  sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: colors.muted, marginTop: 4 },
-  bar: { flexDirection: 'row', borderRadius: 5, overflow: 'hidden', backgroundColor: alpha(colors.muted, 0.2) },
+  kpiLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase', color: c.muted },
+  kpiValue: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, marginTop: 4 },
+  sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted, marginTop: 4 },
+  bar: { flexDirection: 'row', borderRadius: 5, overflow: 'hidden', backgroundColor: alpha(c.muted, 0.2) },
   legend: { flexDirection: 'row', gap: 16 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase },
+  legendText: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
 });

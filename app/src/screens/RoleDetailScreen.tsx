@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, type Role, type Status } from '../model';
+import { explainScore, type RationaleTone } from '../scout/explain';
 import { DraftModal } from './DraftModal';
 
 const STATUSES: Status[] = [
@@ -79,6 +80,7 @@ export function RoleDetailScreen({
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
   const [showDraft, setShowDraft] = useState(false);
+  const toneColor: Record<RationaleTone, string> = { good: c.emerald, bad: c.danger, neutral: c.muted };
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       <Pressable onPress={onBack} hitSlop={8} style={styles.back}>
@@ -96,6 +98,16 @@ export function RoleDetailScreen({
           <View style={[styles.dot, { backgroundColor: statusColor(role.status, c) }]} />
           <Text style={[styles.statusText, { color: statusColor(role.status, c) }]}>{role.status}</Text>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>WHY THIS SCORE</Text>
+        {explainScore(role).map((line, i) => (
+          <View key={i} style={styles.whyRow}>
+            <View style={[styles.whyDot, { backgroundColor: toneColor[line.tone] }]} />
+            <Text style={styles.whyText}>{line.text}</Text>
+          </View>
+        ))}
       </View>
 
       <View style={styles.section}>
@@ -176,6 +188,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   statusText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   section: { gap: 8 },
   sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted },
+  whyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  whyDot: { width: 7, height: 7, borderRadius: 4, marginTop: 6 },
+  whyText: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: c.textBase, lineHeight: 19 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 11,

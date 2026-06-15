@@ -1,4 +1,5 @@
 import { computeTier, expectedValue, type Tier, type TierThresholds } from '@reqon/core';
+import { parseMaxSalary } from './scout/salary';
 import type { Palette } from './theme';
 
 export type { Tier };
@@ -70,10 +71,11 @@ export const rolesInLane = (roles: Role[], lane: StatusLane): Role[] =>
   roles.filter((r) => LANE_STATUS[lane].includes(r.status));
 
 // ---- search + sort ----
-export type SortKey = 'ev' | 'company' | 'fit';
+export type SortKey = 'ev' | 'company' | 'fit' | 'salary';
 export const SORTS: { key: SortKey; label: string }[] = [
   { key: 'ev', label: 'Expected value' },
   { key: 'fit', label: 'Fit' },
+  { key: 'salary', label: 'Salary' },
   { key: 'company', label: 'Company' },
 ];
 
@@ -88,10 +90,22 @@ export const matchesQuery = (r: Role, q: string): boolean => {
   );
 };
 
+// Top-of-band salary for sorting; roles with no parseable pay sort last (descending).
+const salaryRank = (r: Role): number => parseMaxSalary(r.salary) ?? -1;
+
 export const sortRoles = (roles: Role[], key: SortKey): Role[] =>
-  [...roles].sort((a, b) =>
-    key === 'company' ? a.company.localeCompare(b.company) : key === 'fit' ? b.fit - a.fit : b.score - a.score,
-  );
+  [...roles].sort((a, b) => {
+    switch (key) {
+      case 'company':
+        return a.company.localeCompare(b.company);
+      case 'fit':
+        return b.fit - a.fit;
+      case 'salary':
+        return salaryRank(b) - salaryRank(a);
+      default:
+        return b.score - a.score;
+    }
+  });
 
 /** Status → accent color for pills/dots. Pass the active palette. */
 export const statusColor = (s: Status, c: Palette): string => {

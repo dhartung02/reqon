@@ -121,6 +121,8 @@ function AppInner() {
         remoteOnly: crit.remoteOnly,
         salaryFloor: crit.salaryFloor,
         negativeKeywords: crit.negativeKeywords,
+        keywords: crit.keywords,
+        titles: crit.titles,
         minTier: rules.minTierToMerge,
       });
       setScoutMsg(`Scanned ${r.scanned} · ${r.matched} matched · +${r.added} new${r.errors ? ` · ${r.errors} board errors` : ''}`);

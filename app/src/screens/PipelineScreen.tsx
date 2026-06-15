@@ -6,10 +6,13 @@ import {
   rolesInLane,
   matchesQuery,
   sortRoles,
+  applyFilters,
+  activeFilterCount,
   type StatusLane,
   type Role,
   type Tier,
   type SortKey,
+  type RoleFilter,
 } from '../model';
 
 // A lane list (Open/Applied/Interviewing/Closed): roles filtered by search, grouped by tier
@@ -22,6 +25,7 @@ export function PipelineScreen({
   roles,
   query,
   sort,
+  filter,
   onPressRole,
   refreshing,
   onRefresh,
@@ -30,13 +34,14 @@ export function PipelineScreen({
   roles: Role[];
   query: string;
   sort: SortKey;
+  filter: RoleFilter;
   onPressRole: (r: Role) => void;
   refreshing: boolean;
   onRefresh: () => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const groups = useMemo(() => {
-    const inLane = rolesInLane(roles, lane).filter((r) => matchesQuery(r, query));
+    const inLane = applyFilters(rolesInLane(roles, lane).filter((r) => matchesQuery(r, query)), filter);
     return TIER_ORDER.map((tier) => ({
       tier,
       rows: sortRoles(
@@ -44,14 +49,20 @@ export function PipelineScreen({
         sort,
       ),
     })).filter((g) => g.rows.length > 0);
-  }, [roles, lane, query, sort]);
+  }, [roles, lane, query, sort, filter]);
 
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
 
   if (total === 0) {
+    const filtered = activeFilterCount(filter) > 0;
+    const msg = query.trim()
+      ? 'No roles match your search.'
+      : filtered
+        ? 'No roles match your filters.'
+        : 'No roles in this lane.';
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>{query.trim() ? 'No roles match your search.' : 'No roles in this lane.'}</Text>
+        <Text style={styles.emptyText}>{msg}</Text>
       </View>
     );
   }

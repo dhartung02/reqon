@@ -1,5 +1,6 @@
 import { computeTier, expectedValue, type Tier, type TierThresholds } from '@reqon/core';
 import { parseMaxSalary } from './scout/salary';
+import { remoteMode } from './scout/scoring';
 import type { Palette } from './theme';
 
 export type { Tier };
@@ -105,6 +106,26 @@ export const sortRoles = (roles: Role[], key: SortKey): Role[] =>
       default:
         return b.score - a.score;
     }
+  });
+
+// ---- filters ----
+// Lane lists already split by status and group by tier; these narrow further on the axes that
+// matter most for a remote-only, verify-first search. Each is a simple toggle.
+export interface RoleFilter {
+  noOnsite: boolean; // drop roles whose location is a known on-site (unknown locations are kept)
+  verifiedOnly: boolean; // only confirmed-live postings (conf === 'verified')
+  hideTierC: boolean; // suppress Tier C noise
+}
+export const EMPTY_FILTER: RoleFilter = { noOnsite: false, verifiedOnly: false, hideTierC: false };
+export const activeFilterCount = (f: RoleFilter): number =>
+  Number(f.noOnsite) + Number(f.verifiedOnly) + Number(f.hideTierC);
+
+export const applyFilters = (roles: Role[], f: RoleFilter): Role[] =>
+  roles.filter((r) => {
+    if (f.hideTierC && r.tier === 'C') return false;
+    if (f.verifiedOnly && r.conf !== 'verified') return false;
+    if (f.noOnsite && r.location?.trim() && remoteMode(r.location) === 'onsite') return false;
+    return true;
   });
 
 /** Status → accent color for pills/dots. Pass the active palette. */

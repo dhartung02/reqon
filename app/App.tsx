@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { rolesInLane, type Lane, type SortKey, type Status } from './src/model';
+import { rolesInLane, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
 import { todayActionCount } from './src/today';
 import { fonts, useThemedStyles, useScheme, ThemeProvider, type Palette } from './src/theme';
 import { useRoles } from './src/store/useRoles';
@@ -49,6 +49,7 @@ function AppInner() {
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('ev');
+  const [filter, setFilter] = useState<RoleFilter>(EMPTY_FILTER);
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -237,7 +238,7 @@ function AppInner() {
         <TabBar active={lane} counts={counts} onChange={setLane} />
 
         {lane !== 'today' && lane !== 'analytics' ? (
-          <ControlBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} />
+          <ControlBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} filter={filter} onFilter={setFilter} />
         ) : null}
 
         <View style={styles.body}>
@@ -262,6 +263,7 @@ function AppInner() {
               roles={roles}
               query={query}
               sort={sort}
+              filter={filter}
               onPressRole={(r) => setSelectedId(r.id)}
               refreshing={refreshing}
               onRefresh={onRefresh}

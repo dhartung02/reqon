@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, type Role } from '../model';
+import { remoteBadge, type RationaleTone } from '../scout/explain';
 
 // Tier-scored pipeline card: left edge + badge in the tier color, score, title, company, and a
 // status pill. Tappable → row detail. Tier C is dimmed (suppressed noise) but still readable.
@@ -9,6 +10,9 @@ export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }
   const accent = tierColor(role.tier, c);
   const sc = statusColor(role.status, c);
   const suppressed = role.tier === 'C';
+  const remote = remoteBadge(role.location);
+  const toneColor: Record<RationaleTone, string> = { good: c.emerald, bad: c.danger, neutral: c.muted };
+  const salary = role.salary?.trim();
 
   return (
     <Pressable
@@ -30,6 +34,18 @@ export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }
 
       <Text style={[styles.title, suppressed && styles.titleSuppressed]}>{role.role}</Text>
       <Text style={[styles.company, suppressed && styles.companySuppressed]}>{role.company}</Text>
+
+      {remote || salary ? (
+        <View style={styles.meta}>
+          {remote ? (
+            <View style={[styles.remoteChip, { borderColor: alpha(toneColor[remote.tone], 0.4) }]}>
+              <View style={[styles.dot, { backgroundColor: toneColor[remote.tone] }]} />
+              <Text style={[styles.remoteText, { color: toneColor[remote.tone] }]}>{remote.label}</Text>
+            </View>
+          ) : null}
+          {salary ? <Text style={styles.salary} numberOfLines={1}>{salary}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.footer}>
         <View style={styles.statusWrap}>
@@ -71,6 +87,18 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   titleSuppressed: { color: c.textBase, textDecorationLine: 'line-through' },
   company: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, marginTop: 2 },
   companySuppressed: { color: c.muted },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  remoteChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  remoteText: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '600' },
+  salary: { flex: 1, fontFamily: fonts.sans, fontSize: 12, color: c.muted },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

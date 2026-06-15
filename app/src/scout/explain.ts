@@ -11,6 +11,19 @@ export interface RationaleLine {
   tone: RationaleTone;
 }
 
+/** Compact remote-posture badge for list rows. null when the location is unknown. */
+export interface RemoteBadge {
+  label: string;
+  tone: RationaleTone;
+}
+export function remoteBadge(location?: string): RemoteBadge | null {
+  if (!location || !location.trim()) return null;
+  const rm = remoteMode(location);
+  if (rm === 'remote') return { label: 'Remote', tone: 'good' };
+  if (rm === 'flex') return { label: 'Hybrid', tone: 'neutral' };
+  return { label: 'On-site', tone: 'bad' };
+}
+
 const found = (text: string, kws: string[]) => kws.filter((k) => text.includes(k));
 const quote = (xs: string[]) => xs.slice(0, 3).map((x) => `“${x}”`).join(', ');
 

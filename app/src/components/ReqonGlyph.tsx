@@ -1,5 +1,5 @@
 import Svg, { Circle, Line } from 'react-native-svg';
-import { colors } from '../theme';
+import { darkColors } from '../theme';
 
 type Variant = 'reticle' | 'solid';
 
@@ -12,7 +12,8 @@ interface Props {
 
 // The Reticle Q, on a 100×100 grid (BRAND.md §2). 'reticle' renders the 12/3/6/9 micro-gaps via a
 // dash pattern; 'solid' drops them for ultra-low-resolution legibility (extension / tiny sizes).
-export function ReqonGlyph({ size = 24, color = colors.emerald, variant = 'reticle' }: Props) {
+// The glyph is the brand mark — it stays Tactical Emerald in both light and dark themes.
+export function ReqonGlyph({ size = 24, color = darkColors.emerald, variant = 'reticle' }: Props) {
   const solid = variant === 'solid';
   const stroke = solid ? 14 : 10;
   return (

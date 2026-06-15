@@ -116,7 +116,18 @@ const liveRows = rows => rows.filter(r => r && r.deleted !== true);
 // Pure identity/scoring/sync logic now lives in core/crm-core.js — the single source shared by
 // the server, the React Native app, and the Chrome extension (pinned by tests/vectors/).
 const core = require('./core/crm-core');
-const { reqKey, postingId, sameReq, expectedValue, computeTier } = core;
+const { reqKey, postingId, sameReq, expectedValue, computeTier, DEFAULT_TIER_THRESHOLDS } = core;
+// Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
+// canonical defaults so a partial override is fine and tiering stays consistent server-side.
+function tierThresholds(boards) {
+  const t = (boards && boards.tierThresholds && typeof boards.tierThresholds === 'object') ? boards.tierThresholds : {};
+  return {
+    aEv: t.aEv != null && !isNaN(+t.aEv) ? +t.aEv : DEFAULT_TIER_THRESHOLDS.aEv,
+    aFit: t.aFit != null && !isNaN(+t.aFit) ? +t.aFit : DEFAULT_TIER_THRESHOLDS.aFit,
+    aProb: t.aProb != null && !isNaN(+t.aProb) ? +t.aProb : DEFAULT_TIER_THRESHOLDS.aProb,
+    bEv: t.bEv != null && !isNaN(+t.bEv) ? +t.bEv : DEFAULT_TIER_THRESHOLDS.bEv,
+  };
+}
 // reconcileSync needs a uuid + clock; inject the server's so the change feed stamps real times.
 const reconcileSync = (serverRows, clientRows) => core.reconcileSync(serverRows, clientRows, { genId: () => crypto.randomUUID(), now: nowIso });
 
@@ -131,7 +142,7 @@ function mergePolicyBlock(row, boards) {
   const title = String(row.role || '').toLowerCase();
   const hit = skip.find(s => s && title.includes(String(s).toLowerCase()));
   if (hit) return 'employment-type:' + hit;
-  const tier = row.tier || computeTier(row.fit, row.prob);
+  const tier = row.tier || computeTier(row.fit, row.prob, tierThresholds(boards));
   if ((TIER_RANK[tier] || 0) < (TIER_RANK[minTier] || 2)) return 'below-tier:' + tier + '<' + minTier;
   return null;
 }
@@ -875,7 +886,7 @@ app.patch('/api/reqs/:key', (req, res) => {
   const apply = Object.assign({}, fields);
   // auto-derive tier when scoring changed but tier wasn't explicitly provided (AUTO-promote/demote)
   if ((('fit' in apply) || ('prob' in apply)) && !('tier' in apply)) {
-    apply.tier = computeTier(apply.fit != null ? apply.fit : before.fit, apply.prob != null ? apply.prob : before.prob);
+    apply.tier = computeTier(apply.fit != null ? apply.fit : before.fit, apply.prob != null ? apply.prob : before.prob, tierThresholds(readJsonSafe(BOARDS_FILE, {})));
   }
   const changes = {};
   for (const k of Object.keys(apply)) {
@@ -1068,7 +1079,7 @@ async function computeEnrichFields(row, opts) {
   fields.sector = sector;
   fields.conf = 'boardonly';
   fields.needsEnrichment = false;
-  if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob);
+  if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob, tierThresholds(readJsonSafe(BOARDS_FILE, {})));
   return { fields, scored };
 }
 // Apply enriched fields to rows[idx], but if the corrected company+role now matches a DIFFERENT
@@ -1419,10 +1430,12 @@ function settingsPayload() {
     keywords: st.keywords || [],
     titles: st.titles || [],
     minFit: st.minFitToAdd != null ? st.minFitToAdd : 6.0,
+    salaryFloor: st.minSalary != null && !isNaN(+st.minSalary) ? +st.minSalary : 0,
     remoteOnly: boards.remoteOnly !== false,
     minDelaySeconds: boards.minDelaySeconds != null ? boards.minDelaySeconds : 0.4,
     analyticsWindowDays: boards.analyticsWindowDays != null ? boards.analyticsWindowDays : 0,
     minTierToMerge: ['A', 'B', 'C'].includes(String(boards.minTierToMerge || '').toUpperCase()) ? String(boards.minTierToMerge).toUpperCase() : 'B',
+    tierThresholds: tierThresholds(boards),
     skipEmploymentTypes: Array.isArray(boards.skipEmploymentTypes) ? boards.skipEmploymentTypes : DEFAULT_SKIP_TYPES,
     negativeKeywords: st.negativeKeywords || [],
     tabStatusMap: (boards.tabStatusMap && typeof boards.tabStatusMap === 'object') ? boards.tabStatusMap : DEFAULT_TAB_MAP,
@@ -1483,6 +1496,18 @@ app.put('/api/settings', (req, res) => {
     }
     if (typeof b.remoteOnly === 'boolean') { boards.remoteOnly = b.remoteOnly; touchedBoards = true; }
     if (typeof b.minTierToMerge === 'string' && ['A', 'B', 'C'].includes(b.minTierToMerge.toUpperCase())) { boards.minTierToMerge = b.minTierToMerge.toUpperCase(); touchedBoards = true; }
+    if (b.tierThresholds && typeof b.tierThresholds === 'object') {
+      const cur = tierThresholds(boards);
+      const t = b.tierThresholds;
+      const clampScore = (v, d) => (v != null && !isNaN(+v)) ? Math.max(0, Math.min(10, +v)) : d;
+      boards.tierThresholds = {
+        aEv: clampScore(t.aEv, cur.aEv),
+        aFit: clampScore(t.aFit, cur.aFit),
+        aProb: clampScore(t.aProb, cur.aProb),
+        bEv: clampScore(t.bEv, cur.bEv),
+      };
+      touchedBoards = true;
+    }
     if (Array.isArray(b.skipEmploymentTypes)) { boards.skipEmploymentTypes = b.skipEmploymentTypes.map(s => String(s).toLowerCase().trim()).filter(Boolean); touchedBoards = true; }
     if (Array.isArray(b.negativeKeywords)) { watch.searchTerms.negativeKeywords = b.negativeKeywords.map(String).map(s => s.trim()).filter(Boolean); touchedWatch = true; }
     if (b.tabStatusMap && typeof b.tabStatusMap === 'object') {
@@ -1516,6 +1541,7 @@ app.put('/api/settings', (req, res) => {
     if (Array.isArray(b.keywords)) { watch.searchTerms.keywords = b.keywords.map(String).filter(Boolean); touchedWatch = true; }
     if (Array.isArray(b.titles)) { watch.searchTerms.titles = b.titles.map(String).filter(Boolean); touchedWatch = true; }
     if (b.minFit != null && !isNaN(+b.minFit)) { watch.searchTerms.minFitToAdd = Math.max(0, Math.min(10, +b.minFit)); touchedWatch = true; }
+    if (b.salaryFloor != null && !isNaN(+b.salaryFloor)) { watch.searchTerms.minSalary = Math.max(0, Math.min(2000000, Math.round(+b.salaryFloor))); touchedWatch = true; }
 
     if (touchedWatch) writeJsonPretty(WATCHLIST_FILE, watch);
 

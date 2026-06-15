@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { computeTier, expectedValue } from '@reqon/core';
 import type { NewRole } from '../db/store';
 
@@ -14,6 +14,7 @@ export function AddRoleModal({
   onClose: () => void;
   onAdd: (r: NewRole) => void;
 }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
   const [fit, setFit] = useState('');
@@ -58,31 +59,31 @@ export function AddRoleModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Labeled label="Company">
-              <TextInput value={company} onChangeText={setCompany} placeholder="Acme" placeholderTextColor={colors.muted} style={styles.input} />
+            <Labeled label="Company" styles={styles}>
+              <TextInput value={company} onChangeText={setCompany} placeholder="Acme" placeholderTextColor={c.muted} style={styles.input} />
             </Labeled>
-            <Labeled label="Role">
-              <TextInput value={role} onChangeText={setRole} placeholder="Principal PM, Data Platform" placeholderTextColor={colors.muted} style={styles.input} />
+            <Labeled label="Role" styles={styles}>
+              <TextInput value={role} onChangeText={setRole} placeholder="Principal PM, Data Platform" placeholderTextColor={c.muted} style={styles.input} />
             </Labeled>
             <View style={styles.twoCol}>
-              <Labeled label="Fit (0–10)" style={styles.col}>
-                <TextInput value={fit} onChangeText={setFit} keyboardType="decimal-pad" placeholder="8.5" placeholderTextColor={colors.muted} style={styles.input} />
+              <Labeled label="Fit (0–10)" style={styles.col} styles={styles}>
+                <TextInput value={fit} onChangeText={setFit} keyboardType="decimal-pad" placeholder="8.5" placeholderTextColor={c.muted} style={styles.input} />
               </Labeled>
-              <Labeled label="Prob (0–10)" style={styles.col}>
-                <TextInput value={prob} onChangeText={setProb} keyboardType="decimal-pad" placeholder="7" placeholderTextColor={colors.muted} style={styles.input} />
+              <Labeled label="Prob (0–10)" style={styles.col} styles={styles}>
+                <TextInput value={prob} onChangeText={setProb} keyboardType="decimal-pad" placeholder="7" placeholderTextColor={c.muted} style={styles.input} />
               </Labeled>
             </View>
             <Text style={styles.preview}>
               Tier {tier} · EV {ev.toFixed(1)}
             </Text>
-            <Labeled label="Salary (optional)">
-              <TextInput value={salary} onChangeText={setSalary} placeholder="$240–280K" placeholderTextColor={colors.muted} style={styles.input} />
+            <Labeled label="Salary (optional)" styles={styles}>
+              <TextInput value={salary} onChangeText={setSalary} placeholder="$240–280K" placeholderTextColor={c.muted} style={styles.input} />
             </Labeled>
-            <Labeled label="Location (optional)">
-              <TextInput value={location} onChangeText={setLocation} placeholder="Remote" placeholderTextColor={colors.muted} style={styles.input} />
+            <Labeled label="Location (optional)" styles={styles}>
+              <TextInput value={location} onChangeText={setLocation} placeholder="Remote" placeholderTextColor={c.muted} style={styles.input} />
             </Labeled>
-            <Labeled label="Link (optional)">
-              <TextInput value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://…" placeholderTextColor={colors.muted} style={styles.input} />
+            <Labeled label="Link (optional)" styles={styles}>
+              <TextInput value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://…" placeholderTextColor={c.muted} style={styles.input} />
             </Labeled>
           </ScrollView>
 
@@ -97,7 +98,7 @@ export function AddRoleModal({
 
 const clamp = (n: number) => (isNaN(n) ? 0 : Math.max(0, Math.min(10, n)));
 
-function Labeled({ label, children, style }: { label: string; children: React.ReactNode; style?: object }) {
+function Labeled({ label, children, style, styles }: { label: string; children: React.ReactNode; style?: object; styles: ReturnType<typeof makeStyles> }) {
   return (
     <View style={[styles.labeled, style]}>
       <Text style={styles.label}>{label}</Text>
@@ -106,40 +107,40 @@ function Labeled({ label, children, style }: { label: string; children: React.Re
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.canvas,
+    backgroundColor: c.canvas,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderTopWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 28,
     maxHeight: '88%',
   },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: colors.textHigh },
-  cancel: { fontFamily: fonts.sans, fontSize: 15, color: colors.muted },
+  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh },
+  cancel: { fontFamily: fonts.sans, fontSize: 15, color: c.muted },
   form: { gap: 14, paddingBottom: 16 },
   labeled: { gap: 6 },
-  label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: colors.muted },
+  label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.muted },
   input: {
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     borderRadius: 10,
     paddingHorizontal: 13,
     paddingVertical: 11,
-    color: colors.textHigh,
+    color: c.textHigh,
     fontFamily: fonts.sans,
     fontSize: 15,
   },
   twoCol: { flexDirection: 'row', gap: 12 },
   col: { flex: 1 },
-  preview: { fontFamily: fonts.sans, fontSize: 13, color: colors.emerald, fontWeight: '500' },
-  save: { backgroundColor: colors.emerald, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
-  saveDisabled: { backgroundColor: alpha(colors.emerald, 0.35) },
-  saveText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: colors.canvas },
+  preview: { fontFamily: fonts.sans, fontSize: 13, color: c.emerald, fontWeight: '500' },
+  save: { backgroundColor: c.emerald, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
+  saveDisabled: { backgroundColor: alpha(c.emerald, 0.35) },
+  saveText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: c.canvas },
 });

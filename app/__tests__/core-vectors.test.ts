@@ -39,6 +39,18 @@ describe('@reqon/core — shared identity/scoring vectors (app parity)', () => {
     }
   });
 
+  it('computeTier honors custom thresholds (Tiers & rules override)', () => {
+    // fit 8 × prob 6 → ev 4.8: default B; but with a looser A gate it promotes to A.
+    expect(computeTier(8, 6)).toBe('B');
+    expect(computeTier(8, 6, { aEv: 4.5, aFit: 8, aProb: 6, bEv: 4.0 })).toBe('A');
+    // stricter B floor demotes a default-B to C.
+    expect(computeTier(7, 6)).toBe('B'); // ev 4.2 ≥ 4.0
+    expect(computeTier(7, 6, { bEv: 5.0 })).toBe('C');
+    // omitted fields fall back to defaults (partial override).
+    expect(computeTier(9, 7, { aFit: 9 })).toBe('A'); // ev 6.3, fit 9 ≥ 9, prob 7 ≥ 6.5
+    expect(computeTier(8.5, 7, { aFit: 9 })).toBe('B'); // fit 8.5 < 9 → fails A, ev 5.95 ≥ 4 → B
+  });
+
   it('expectedValue is fit*prob/10 (1dp)', () => {
     expect(expectedValue({ fit: 8, prob: 7 })).toBe(5.6);
     expect(expectedValue({})).toBe(0);

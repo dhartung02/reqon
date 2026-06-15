@@ -21,6 +21,15 @@ declare module '@reqon/core' {
 
   export type Tier = 'A' | 'B' | 'C';
 
+  /** Tunable tier thresholds (Reqon "Tiers & rules" setting). Omit any field to use the default. */
+  export interface TierThresholds {
+    aEv?: number;
+    aFit?: number;
+    aProb?: number;
+    bEv?: number;
+  }
+  export const DEFAULT_TIER_THRESHOLDS: Required<TierThresholds>;
+
   /** Injected environment so the core stays dependency-free (no Node/DOM clock or uuid). */
   export interface SyncDeps {
     genId(): string;
@@ -43,7 +52,7 @@ declare module '@reqon/core' {
   export function postingId(u?: string | null): string;
   export function sameReq(a: Req, b: Req): boolean;
   export function expectedValue(x: Req): number;
-  export function computeTier(fit?: number | null, prob?: number | null): Tier;
+  export function computeTier(fit?: number | null, prob?: number | null, thr?: TierThresholds): Tier;
   export function reconcileSync(serverRows: Req[], clientRows: Req[], deps?: SyncDeps): SyncResult;
 
   const core: {
@@ -53,6 +62,7 @@ declare module '@reqon/core' {
     expectedValue: typeof expectedValue;
     computeTier: typeof computeTier;
     reconcileSync: typeof reconcileSync;
+    DEFAULT_TIER_THRESHOLDS: Required<TierThresholds>;
   };
   export default core;
 }

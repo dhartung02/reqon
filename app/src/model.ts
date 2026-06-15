@@ -1,5 +1,5 @@
-import { computeTier, expectedValue, type Tier } from '@reqon/core';
-import { colors } from './theme';
+import { computeTier, expectedValue, type Tier, type TierThresholds } from '@reqon/core';
+import type { Palette } from './theme';
 
 export type { Tier };
 
@@ -93,26 +93,37 @@ export const sortRoles = (roles: Role[], key: SortKey): Role[] =>
     key === 'company' ? a.company.localeCompare(b.company) : key === 'fit' ? b.fit - a.fit : b.score - a.score,
   );
 
-/** Status → accent color for pills/dots. */
-export const statusColor = (s: Status): string => {
+/** Status → accent color for pills/dots. Pass the active palette. */
+export const statusColor = (s: Status, c: Palette): string => {
   switch (s) {
     case 'Applied':
-      return colors.emerald;
+      return c.emerald;
     case 'Recruiter Screen':
     case 'Hiring Manager':
     case 'Panel':
     case 'Offer':
-      return colors.active;
+      return c.active;
     case 'Rejected':
-      return colors.danger;
+      return c.danger;
     case 'Archived':
-      return colors.muted;
+      return c.muted;
     default:
-      return colors.textBase; // Not Applied
+      return c.textBase; // Not Applied
   }
 };
 
+// Active tier thresholds (the candidate's "Tiers & rules" setting). Undefined → the core defaults.
+// Held module-level so the synchronous scoreRole() can honor it without threading config everywhere;
+// set once at app boot + whenever the setting is saved, then rows re-derive on the next read.
+let activeTier: TierThresholds | undefined;
+export function setActiveTier(t?: TierThresholds): void {
+  activeTier = t;
+}
+export function getActiveTier(): TierThresholds | undefined {
+  return activeTier;
+}
+
 /** Derive tier + score from raw fit/prob via the shared core (single source of truth). */
 export function scoreRole<T extends { fit: number; prob: number }>(r: T): T & { tier: Tier; score: number } {
-  return { ...r, tier: computeTier(r.fit, r.prob), score: expectedValue({ fit: r.fit, prob: r.prob }) };
+  return { ...r, tier: computeTier(r.fit, r.prob, activeTier), score: expectedValue({ fit: r.fit, prob: r.prob }) };
 }

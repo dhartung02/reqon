@@ -1,5 +1,5 @@
 // Locks the Today lane predicates (app/src/today.ts) against the web's daily-loop logic.
-import { needsVerify, followUpDue, closedReq, isApplyNext, tierANotApplied, todayActionCount } from '../src/today';
+import { needsVerify, followUpDue, closedReq, isApplyNext, tierANotApplied, todayActionCount, setFollowupDays } from '../src/today';
 import type { Role } from '../src/model';
 
 // Minimal Role builder — only the fields the predicates read.
@@ -20,6 +20,14 @@ describe('today predicates', () => {
     expect(followUpDue(role({ status: 'Applied', applied: isoDaysAgo(2) }))).toBe(false);
     expect(followUpDue(role({ status: 'Not Applied', applied: isoDaysAgo(10) }))).toBe(false);
     expect(followUpDue(role({ status: 'Applied', lastcontact: isoDaysAgo(1), applied: isoDaysAgo(30) }))).toBe(false);
+  });
+  it('followUpDue honors a tuned threshold (Tiers & rules), then resets to 7', () => {
+    const r = role({ status: 'Applied', applied: isoDaysAgo(5) });
+    expect(followUpDue(r)).toBe(false); // 5d < default 7d
+    setFollowupDays(3);
+    expect(followUpDue(r)).toBe(true); // 5d ≥ 3d
+    setFollowupDays(undefined); // back to default for the rest of the suite
+    expect(followUpDue(r)).toBe(false);
   });
   it('closedReq / tierANotApplied', () => {
     expect(closedReq(role({ reqCheck: 'closed' }))).toBe(true);

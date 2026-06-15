@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { rolesInLane, type Lane, type SortKey, type Status } from './src/model';
 import { todayActionCount } from './src/today';
-import { colors, fonts } from './src/theme';
+import { fonts, useThemedStyles, useScheme, ThemeProvider, type Palette } from './src/theme';
 import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
 import { SettingsIcon } from './src/components/SettingsIcon';
@@ -18,8 +18,12 @@ import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
 import { BrowserScreen } from './src/screens/BrowserScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
+import { TiersRulesScreen } from './src/screens/TiersRulesScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
+import { getCriteria } from './src/sync/searchCriteria';
+import { pullRules, getRules } from './src/sync/rules';
 import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
@@ -31,7 +35,10 @@ const VIEW_TITLE: Record<Lane, string> = {
   analytics: 'Analytics',
 };
 
-export default function App() {
+function AppInner() {
+  const { c, styles } = useThemedStyles(makeStyles);
+  const { scheme } = useScheme();
+  const statusBar = scheme === 'light' ? 'dark' : 'light';
   const [fontsLoaded] = useFonts({
     SplineSans: require('./assets/fonts/SplineSans.ttf'),
     Fraunces: require('./assets/fonts/Fraunces.ttf'),
@@ -45,6 +52,8 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -71,13 +80,16 @@ export default function App() {
     setScoutMode(mode);
   }, []);
 
-  // On launch: load config + sync. On foreground: sync. (ROADMAP FR-APP-6.)
+  // On launch: load config, apply scoring rules (tier thresholds + follow-up days), then sync.
+  // On foreground: sync. (ROADMAP FR-APP-6.)
   useEffect(() => {
     (async () => {
       await loadConfig();
+      await pullRules(); // apply active tier thresholds + follow-up days before rows derive
+      await refresh(); // re-derive tiers/Today with the active rules
       await autoSync();
     })();
-  }, [loadConfig, autoSync]);
+  }, [loadConfig, autoSync, refresh]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
@@ -101,7 +113,16 @@ export default function App() {
     setScouting(true);
     setScoutMsg(null);
     try {
-      const r = await runScout({ existing: roles, onAdd: add });
+      const [crit, rules] = await Promise.all([getCriteria(), getRules()]);
+      const r = await runScout({
+        existing: roles,
+        onAdd: add,
+        minFit: crit.minFit,
+        remoteOnly: crit.remoteOnly,
+        salaryFloor: crit.salaryFloor,
+        negativeKeywords: crit.negativeKeywords,
+        minTier: rules.minTierToMerge,
+      });
       setScoutMsg(`Scanned ${r.scanned} · ${r.matched} matched · +${r.added} new${r.errors ? ` · ${r.errors} board errors` : ''}`);
       await refresh();
     } catch {
@@ -127,8 +148,8 @@ export default function App() {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
         <ReqonGlyph size={44} />
-        <ActivityIndicator color={colors.emerald} style={styles.loadSpin} />
-        <StatusBar style="light" />
+        <ActivityIndicator color={c.emerald} style={styles.loadSpin} />
+        <StatusBar style={statusBar} />
       </SafeAreaView>
     );
   }
@@ -137,7 +158,25 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safe}>
         <ProfileScreen onBack={() => setShowProfile(false)} />
-        <StatusBar style="light" />
+        <StatusBar style={statusBar} />
+      </SafeAreaView>
+    );
+  }
+
+  if (showSearch) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <SearchCriteriaScreen onBack={() => setShowSearch(false)} />
+        <StatusBar style={statusBar} />
+      </SafeAreaView>
+    );
+  }
+
+  if (showRules) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <TiersRulesScreen onBack={() => { setShowRules(false); refresh(); }} />
+        <StatusBar style={statusBar} />
       </SafeAreaView>
     );
   }
@@ -146,7 +185,7 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safe}>
         <BrowserScreen url={browserUrl} onBack={() => setBrowserUrl(null)} />
-        <StatusBar style="light" />
+        <StatusBar style={statusBar} />
       </SafeAreaView>
     );
   }
@@ -167,7 +206,7 @@ export default function App() {
           }}
           onOpenPosting={(u) => setBrowserUrl(u)}
         />
-        <StatusBar style="light" />
+        <StatusBar style={statusBar} />
       </SafeAreaView>
     );
   }
@@ -185,7 +224,7 @@ export default function App() {
           </View>
           <View style={styles.brandRight}>
             <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={14} accessibilityLabel="Settings & sync">
-              <SettingsIcon size={18} color={colors.textBase} />
+              <SettingsIcon size={18} color={c.textBase} />
             </Pressable>
             <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add role">
               <Text style={styles.addBtnText}>+</Text>
@@ -240,14 +279,30 @@ export default function App() {
           setShowSettings(false);
           setShowProfile(true);
         }}
+        onEditSearch={() => {
+          setShowSettings(false);
+          setShowSearch(true);
+        }}
+        onEditRules={() => {
+          setShowSettings(false);
+          setShowRules(true);
+        }}
       />
-      <StatusBar style="light" />
+      <StatusBar style={statusBar} />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
+  );
+}
+
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.canvas },
   center: { alignItems: 'center', justifyContent: 'center' },
   loadSpin: { marginTop: 16 },
   shell: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
@@ -258,9 +313,9 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 11,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.element,
+    borderColor: c.element,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -268,14 +323,14 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 11,
-    backgroundColor: colors.element,
+    backgroundColor: c.element,
     borderWidth: 1,
-    borderColor: colors.emerald + '55',
+    borderColor: c.emerald + '55',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addBtnText: { fontSize: 22, lineHeight: 24, color: colors.emerald, fontWeight: '600' },
-  brand: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '600', letterSpacing: 2.6, color: colors.emerald },
-  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: colors.textHigh, letterSpacing: -0.2 },
+  addBtnText: { fontSize: 22, lineHeight: 24, color: c.emerald, fontWeight: '600' },
+  brand: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '600', letterSpacing: 2.6, color: c.emerald },
+  title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh, letterSpacing: -0.2 },
   body: { flex: 1 },
 });

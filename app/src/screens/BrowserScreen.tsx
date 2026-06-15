@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Linking } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { colors, alpha, fonts } from '../theme';
+import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { getProfile, profileHasData, type Profile } from '../sync/profile';
 
 // In-app browser + apply-assist. Opens a posting in a WKWebView; "Fill" injects JS that fuzzy-
@@ -59,6 +59,7 @@ const buildFillJs = (p: Profile) => {
 };
 
 export function BrowserScreen({ url, onBack }: { url: string; onBack: () => void }) {
+  const { c, styles } = useThemedStyles(makeStyles);
   const ref = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
@@ -104,15 +105,15 @@ export function BrowserScreen({ url, onBack }: { url: string; onBack: () => void
       />
       {loading ? (
         <View style={styles.loader} pointerEvents="none">
-          <ActivityIndicator color={colors.emerald} />
+          <ActivityIndicator color={c.emerald} />
         </View>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.canvas },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: c.canvas },
   bar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -120,21 +121,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.element,
+    borderBottomColor: c.element,
   },
-  back: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: colors.emerald },
+  back: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: c.emerald },
   barActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   fillBtn: {
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: alpha(colors.emerald, 0.1),
+    backgroundColor: alpha(c.emerald, 0.1),
     borderWidth: 1,
-    borderColor: alpha(colors.emerald, 0.4),
+    borderColor: alpha(c.emerald, 0.4),
   },
-  fillText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: colors.emerald },
-  ext: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-  msg: { fontFamily: fonts.sans, fontSize: 12, color: colors.textBase, paddingHorizontal: 16, paddingVertical: 8 },
+  fillText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
+  ext: { fontFamily: fonts.sans, fontSize: 13, color: c.muted },
+  msg: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase, paddingHorizontal: 16, paddingVertical: 8 },
   web: { flex: 1, backgroundColor: '#fff' },
   loader: { position: 'absolute', top: 80, left: 0, right: 0, alignItems: 'center' },
 });

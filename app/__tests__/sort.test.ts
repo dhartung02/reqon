@@ -1,4 +1,4 @@
-import { sortRoles, type Role } from '../src/model';
+import { sortRoles, applyFilters, activeFilterCount, EMPTY_FILTER, type Role } from '../src/model';
 
 const role = (p: Partial<Role>): Role =>
   ({ id: Math.random().toString(), role: 'PM', company: 'Co', status: 'Not Applied', tier: 'B', score: 5, fit: 7, prob: 7, age: '', ...p } as Role);
@@ -27,5 +27,35 @@ describe('sortRoles — salary', () => {
     const roles = [role({ company: 'B', fit: 6 }), role({ company: 'A', fit: 9 })];
     expect(sortRoles(roles, 'company').map((r) => r.company)).toEqual(['A', 'B']);
     expect(sortRoles(roles, 'fit').map((r) => r.fit)).toEqual([9, 6]);
+  });
+});
+
+describe('applyFilters', () => {
+  const roles = [
+    role({ company: 'A', tier: 'A', conf: 'verified', location: 'Remote, US' }),
+    role({ company: 'B', tier: 'B', conf: 'boardonly', location: 'New York, NY' }),
+    role({ company: 'C', tier: 'C', conf: 'unverified', location: 'Remote' }),
+    role({ company: 'U', tier: 'B', conf: 'verified', location: undefined }),
+  ];
+
+  it('no filters → everything passes', () => {
+    expect(applyFilters(roles, EMPTY_FILTER)).toHaveLength(4);
+  });
+  it('noOnsite drops known on-site but keeps unknown locations', () => {
+    const out = applyFilters(roles, { ...EMPTY_FILTER, noOnsite: true }).map((r) => r.company);
+    expect(out).toEqual(['A', 'C', 'U']); // B (New York) dropped; U (no location) kept
+  });
+  it('verifiedOnly keeps only confirmed-live', () => {
+    expect(applyFilters(roles, { ...EMPTY_FILTER, verifiedOnly: true }).map((r) => r.company)).toEqual(['A', 'U']);
+  });
+  it('hideTierC suppresses Tier C', () => {
+    expect(applyFilters(roles, { ...EMPTY_FILTER, hideTierC: true }).every((r) => r.tier !== 'C')).toBe(true);
+  });
+  it('filters compose', () => {
+    expect(applyFilters(roles, { noOnsite: true, verifiedOnly: true, hideTierC: true }).map((r) => r.company)).toEqual(['A', 'U']);
+  });
+  it('activeFilterCount counts enabled toggles', () => {
+    expect(activeFilterCount(EMPTY_FILTER)).toBe(0);
+    expect(activeFilterCount({ noOnsite: true, verifiedOnly: true, hideTierC: false })).toBe(2);
   });
 });

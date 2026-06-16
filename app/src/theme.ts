@@ -41,9 +41,6 @@ export type SchemePref = 'light' | 'dark' | 'system';
 /** Brand typefaces (bundled TTFs, loaded via expo-font in App.tsx). */
 export const fonts = { sans: 'SplineSans', serif: 'Fraunces' } as const;
 
-/** All-caps command tracking — ~0.18em; RN letterSpacing is px, so scale by font size where needed. */
-export const tracking = { command: 4 } as const;
-
 /** Append an alpha channel to a 6-digit hex (#RRGGBB → #RRGGBBAA) for tint fills/borders. */
 export const alpha = (hex: string, a: number): string =>
   hex + Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0');

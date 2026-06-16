@@ -603,6 +603,17 @@ app.put('/api/profile', (req, res) => {
     if (Array.isArray(b[k])) next[k] = b[k].map(String).map((s) => s.trim()).filter(Boolean);
   }
   if (b.eeo && typeof b.eeo === 'object') next.eeo = Object.assign({}, cur.eeo, b.eeo);
+  // Saved-answers library (Reqon): reusable Q&A + saved drafts the apply-assist / AI can pull from.
+  if (Array.isArray(b.answers)) {
+    next.answers = b.answers
+      .filter((x) => x && typeof x === 'object' && (x.q || x.a))
+      .map((x) => ({
+        id: x.id ? String(x.id) : ('a' + crypto.randomBytes(4).toString('hex')),
+        q: String(x.q || ''),
+        a: String(x.a || ''),
+        tags: Array.isArray(x.tags) ? x.tags.map(String).map((s) => s.trim()).filter(Boolean) : [],
+      }));
+  }
   try { snapshotProfile(); writeJsonPretty(PROFILE_FILE, next); res.json({ ok: true, profile: next }); }
   catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
@@ -633,9 +644,12 @@ app.post('/api/profile/resume', (req, res) => {
     clearTimeout(killer);
     if (code !== 0) return finish(500, { ok: false, error: 'resume parse failed: ' + (err.trim() || ('exit ' + code)) });
     const regen = readProfile();   // profile-from-resume.py rewrote applicant/seniority/keywords
-    for (const k of ['roleTerms', 'industries', 'sectors', 'priorityKeywords', 'secondaryKeywords', 'narratives']) {
-      if (Array.isArray(preserved[k]) && preserved[k].length) regen[k] = preserved[k];   // keep manual edits
+    // Keep manually-curated sections the parser doesn't produce (incl. the Reqon CV + answers library).
+    for (const k of ['roleTerms', 'industries', 'sectors', 'priorityKeywords', 'secondaryKeywords', 'narratives',
+      'education', 'workHistory', 'awards', 'certs', 'volunteer', 'answers']) {
+      if (Array.isArray(preserved[k]) && preserved[k].length) regen[k] = preserved[k];
     }
+    if (preserved.eeo && typeof preserved.eeo === 'object') regen.eeo = preserved.eeo;
     try { writeJsonPretty(PROFILE_FILE, regen); } catch (e) { return finish(500, { ok: false, error: e.message }); }
     finish(200, { ok: true, profile: regen });
   });

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator, Share } from 'react-native';
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { requestDraft } from '../sync/assist';
+import { appendAnswer } from '../sync/profile';
 
 type Kind = 'cover' | 'screening';
 
@@ -24,14 +25,23 @@ export function DraftModal({
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   const generate = async () => {
     setBusy(true);
     setError(null);
+    setSaved(false);
     const r = await requestDraft({ company, role, kind, question: kind === 'screening' ? question : undefined });
     setBusy(false);
     if (r.error) setError(r.error);
     else setDraft(r.draft ?? '');
+  };
+
+  const saveToLibrary = async () => {
+    const q = kind === 'screening' ? question.trim() || `Screening — ${company}` : `Cover note — ${company}`;
+    const r = await appendAnswer({ q, a: draft, tags: [kind, company].filter(Boolean) });
+    if (r.ok) setSaved(true);
+    else setError(r.error || 'Could not save');
   };
 
   return (
@@ -78,9 +88,14 @@ export function DraftModal({
               </ScrollView>
               <View style={styles.footRow}>
                 <Text style={styles.note}>Drafted in your voice · review before sending</Text>
-                <Pressable onPress={() => Share.share({ message: draft })} hitSlop={8}>
-                  <Text style={styles.share}>Share / copy</Text>
-                </Pressable>
+                <View style={styles.footActions}>
+                  <Pressable onPress={saveToLibrary} hitSlop={8} disabled={saved}>
+                    <Text style={[styles.share, saved && styles.savedText]}>{saved ? '✓ Saved' : 'Save to library'}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => Share.share({ message: draft })} hitSlop={8}>
+                    <Text style={styles.share}>Share / copy</Text>
+                  </Pressable>
+                </View>
               </View>
             </>
           ) : null}
@@ -129,7 +144,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   err: { fontFamily: fonts.sans, fontSize: 13, color: c.danger },
   draftBox: { backgroundColor: c.element, borderRadius: 12, maxHeight: 280 },
   draftText: { fontFamily: fonts.sans, fontSize: 15, color: c.textHigh, lineHeight: 22 },
-  footRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  footRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  footActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   note: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, flexShrink: 1 },
   share: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.emerald },
+  savedText: { color: c.muted },
 });

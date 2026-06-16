@@ -61,6 +61,7 @@ function AppInner() {
   const [showGuide, setShowGuide] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
   const [showCv, setShowCv] = useState(false);
+  const [cvTarget, setCvTarget] = useState<{ role: string; company: string; jd: string } | null>(null);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -202,7 +203,15 @@ function AppInner() {
   if (showCv) {
     return (
       <SafeAreaView style={styles.safe}>
-        <BuildCvScreen onBack={() => { setShowCv(false); setShowSettings(true); }} />
+        <BuildCvScreen
+          initialTarget={cvTarget ?? undefined}
+          onBack={() => {
+            const fromRole = !!cvTarget;
+            setShowCv(false);
+            setCvTarget(null);
+            if (!fromRole) setShowSettings(true); // from a role → fall back to the role detail
+          }}
+        />
         <StatusBar style={statusBar} />
       </SafeAreaView>
     );
@@ -241,6 +250,10 @@ function AppInner() {
             setSelectedId(null);
           }}
           onOpenPosting={(u) => setBrowserUrl(u)}
+          onBuildCv={(r) => {
+            setCvTarget({ role: r.role, company: r.company, jd: r.notes ?? '' });
+            setShowCv(true);
+          }}
         />
         <StatusBar style={statusBar} />
       </SafeAreaView>
@@ -331,6 +344,7 @@ function AppInner() {
         }}
         onBuildCv={() => {
           setShowSettings(false);
+          setCvTarget(null); // general CV from Settings; role-tailored entry comes from a role
           setShowCv(true);
         }}
         onOpenGuide={() => {

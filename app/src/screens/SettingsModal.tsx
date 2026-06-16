@@ -13,6 +13,7 @@ export function SettingsModal({
   onEditSearch,
   onEditRules,
   onEditAnswers,
+  onBuildCv,
   onOpenGuide,
 }: {
   visible: boolean;
@@ -22,6 +23,7 @@ export function SettingsModal({
   onEditSearch: () => void;
   onEditRules: () => void;
   onEditAnswers: () => void;
+  onBuildCv: () => void;
   onOpenGuide: () => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
@@ -160,6 +162,14 @@ export function SettingsModal({
               <View style={styles.flex1}>
                 <Text style={styles.label}>Saved answers</Text>
                 <Text style={styles.help}>Reusable Q&A + saved AI drafts — searchable, tagged</Text>
+              </View>
+              <Text style={styles.profileChev}>›</Text>
+            </Pressable>
+
+            <Pressable style={styles.profileRow} onPress={onBuildCv}>
+              <View style={styles.flex1}>
+                <Text style={styles.label}>Build CV</Text>
+                <Text style={styles.help}>Generate a .docx CV from your profile + narratives</Text>
               </View>
               <Text style={styles.profileChev}>›</Text>
             </Pressable>

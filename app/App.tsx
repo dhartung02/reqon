@@ -22,6 +22,7 @@ import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
 import { TiersRulesScreen } from './src/screens/TiersRulesScreen';
 import { ScoringGuideScreen } from './src/screens/ScoringGuideScreen';
 import { SavedAnswersScreen } from './src/screens/SavedAnswersScreen';
+import { BuildCvScreen } from './src/screens/BuildCvScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { getCriteria } from './src/sync/searchCriteria';
@@ -59,6 +60,7 @@ function AppInner() {
   const [showRules, setShowRules] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
+  const [showCv, setShowCv] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -197,6 +199,15 @@ function AppInner() {
     );
   }
 
+  if (showCv) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <BuildCvScreen onBack={() => { setShowCv(false); setShowSettings(true); }} />
+        <StatusBar style={statusBar} />
+      </SafeAreaView>
+    );
+  }
+
   if (showGuide) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -317,6 +328,10 @@ function AppInner() {
         onEditAnswers={() => {
           setShowSettings(false);
           setShowAnswers(true);
+        }}
+        onBuildCv={() => {
+          setShowSettings(false);
+          setShowCv(true);
         }}
         onOpenGuide={() => {
           setShowSettings(false);

@@ -18,6 +18,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const ExcelJS = require('exceljs');
+const docx = require('docx');
 
 // --- minimal .env loader (no dependency) ---------------------------------------
 // Loads <project>/.env into process.env on boot so secrets (e.g. OPENAI_API_KEY)
@@ -726,6 +727,118 @@ app.post('/api/assist', async (req, res) => {
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message });
   }
+});
+
+// ---------- CV builder (Reqon) ----------
+// Assembles a downloadable .docx CV from the candidate's profile. The summary is AI-written when a
+// key is available (grounded in the same facts), else deterministic. Body sections are ALWAYS the
+// real structured fields (work history / education / narratives / awards) — never invented.
+const CV_CACHE = path.join(ROOT, 'agent', 'cv-latest.json');
+
+function cvSections(p) {
+  const a = p.applicant || {};
+  const list = (v) => (Array.isArray(v) ? v : []);
+  return {
+    name: String(a.name || ''),
+    contact: [a.email, a.phone, a.location].filter(Boolean).map(String),
+    links: [a.linkedin, a.github, a.website || a.personalUrl].filter(Boolean).map(String),
+    experience: list(p.workHistory).filter((w) => w && (w.company || w.role)).map((w) => ({
+      company: String(w.company || ''), role: String(w.role || ''),
+      dates: [w.start, w.end].filter(Boolean).join(' – '), description: String(w.description || ''),
+    })),
+    education: list(p.education).filter((e) => e && (e.school || e.field)).map((e) => ({
+      school: String(e.school || ''), level: String(e.level || e.degree || ''),
+      field: String(e.field || ''), dates: [e.start, e.end].filter(Boolean).join(' – '),
+    })),
+    highlights: list(p.narratives).filter((n) => n && (n.title || n.body))
+      .map((n) => (n.title && n.body ? `${n.title} — ${n.body}` : String(n.title || n.body))),
+    awards: list(p.awards).map(String), certs: list(p.certs).map(String), volunteer: list(p.volunteer).map(String),
+  };
+}
+
+async function cvSummary(p) {
+  const a = p.applicant || {};
+  const facts = [
+    a.name ? `Name: ${a.name}` : '',
+    (p.seniority || []).length ? `Seniority: ${(p.seniority || []).join(', ')}` : '',
+    (p.sectors || []).length ? `Domains: ${(p.sectors || []).join(', ')}` : '',
+    (p.workHistory || []).map((w) => `${w.role || ''} at ${w.company || ''}: ${w.description || ''}`).filter((x) => x.trim() !== ' at : ').join('\n'),
+    (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n'),
+  ].filter(Boolean).join('\n').trim();
+  if (facts && process.env.OPENAI_API_KEY && assistEnabled()) {
+    try {
+      const system = 'Write a 2–3 sentence professional summary for the top of a CV, in a crisp résumé voice. Ground ONLY in the facts provided — never invent employers, titles, or metrics. No first-person pronouns, no flowery phrasing.';
+      const { content } = await openaiChat({ model: assistModel(), system, user: facts, maxTokens: 220 });
+      if (content && content.trim()) return { text: content.trim(), source: 'ai' };
+    } catch (e) { /* fall through to deterministic */ }
+  }
+  const sen = (p.seniority || [])[0] || 'Product leader';
+  const dom = (p.sectors || []).slice(0, 3).join(', ');
+  return { text: dom ? `${sen} focused on ${dom}.` : (facts ? `${sen}.` : ''), source: 'template' };
+}
+
+function cvMarkdown(s, summary) {
+  const L = [];
+  if (s.name) L.push(`# ${s.name}`);
+  if (s.contact.length) L.push(s.contact.join(' · '));
+  if (s.links.length) L.push(s.links.join(' · '));
+  if (summary) L.push('', '## Summary', summary);
+  if (s.experience.length) { L.push('', '## Experience'); for (const e of s.experience) { L.push(`**${e.role}** — ${e.company}${e.dates ? ` (${e.dates})` : ''}`); if (e.description) L.push(e.description); } }
+  if (s.highlights.length) { L.push('', '## Highlights'); for (const h of s.highlights) L.push(`- ${h}`); }
+  if (s.education.length) { L.push('', '## Education'); for (const e of s.education) L.push(`${[e.level, e.field].filter(Boolean).join(', ')}${e.school ? ` — ${e.school}` : ''}${e.dates ? ` (${e.dates})` : ''}`); }
+  for (const [t, arr] of [['Awards', s.awards], ['Certifications', s.certs], ['Volunteer', s.volunteer]]) if (arr.length) { L.push('', `## ${t}`); for (const x of arr) L.push(`- ${x}`); }
+  return L.join('\n');
+}
+
+function cvDocxBuffer(s, summary) {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
+  const kids = [];
+  const para = (text) => new Paragraph({ children: [new TextRun({ text })] });
+  const head = (t) => new Paragraph({ text: t, heading: HeadingLevel.HEADING_2, spacing: { before: 220, after: 60 } });
+  const bullets = (arr) => arr.forEach((x) => kids.push(new Paragraph({ text: x, bullet: { level: 0 } })));
+  if (s.name) kids.push(new Paragraph({ children: [new TextRun({ text: s.name, bold: true, size: 36 })] }));
+  if (s.contact.length) kids.push(new Paragraph({ children: [new TextRun({ text: s.contact.join('   ·   '), size: 20 })] }));
+  if (s.links.length) kids.push(new Paragraph({ children: [new TextRun({ text: s.links.join('   ·   '), size: 20 })] }));
+  if (summary) { kids.push(head('Summary')); kids.push(para(summary)); }
+  if (s.experience.length) {
+    kids.push(head('Experience'));
+    for (const e of s.experience) {
+      kids.push(new Paragraph({ children: [new TextRun({ text: e.role || '', bold: true }), new TextRun({ text: e.company ? `   —   ${e.company}` : '' }), ...(e.dates ? [new TextRun({ text: `    ${e.dates}`, italics: true })] : [])] }));
+      if (e.description) kids.push(para(e.description));
+    }
+  }
+  if (s.highlights.length) { kids.push(head('Highlights')); bullets(s.highlights); }
+  if (s.education.length) { kids.push(head('Education')); for (const e of s.education) kids.push(para(`${[e.level, e.field].filter(Boolean).join(', ')}${e.school ? ` — ${e.school}` : ''}${e.dates ? `  (${e.dates})` : ''}`)); }
+  if (s.awards.length) { kids.push(head('Awards')); bullets(s.awards); }
+  if (s.certs.length) { kids.push(head('Certifications')); bullets(s.certs); }
+  if (s.volunteer.length) { kids.push(head('Volunteer')); bullets(s.volunteer); }
+  if (!kids.length) kids.push(para('Add work history, education, and narratives in your profile to build a CV.'));
+  return Packer.toBuffer(new Document({ sections: [{ children: kids }] }));
+}
+
+// Build CV content (AI summary if available) + cache it; returns the markdown preview + source.
+app.post('/api/cv', async (req, res) => {
+  try {
+    const p = readProfile();
+    const s = cvSections(p);
+    const { text: summary, source } = await cvSummary(p);
+    const markdown = cvMarkdown(s, summary);
+    try { writeJsonPretty(CV_CACHE, { sections: s, summary, source, builtAt: new Date().toISOString() }); } catch (e) {}
+    res.json({ ok: true, markdown, source, name: s.name });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// Stream the CV as a .docx (uses the last POST /api/cv content, else builds fresh).
+app.get('/api/cv.docx', async (req, res) => {
+  try {
+    let cache = readJsonSafe(CV_CACHE, null);
+    if (!cache || !cache.sections) { const p = readProfile(); cache = { sections: cvSections(p), summary: (await cvSummary(p)).text }; }
+    const buf = await cvDocxBuffer(cache.sections, cache.summary || '');
+    const safe = (String(cache.sections.name || 'CV').replace(/[^\w .-]/g, '').trim() || 'CV') + ' CV.docx';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${safe}"`);
+    res.send(buf);
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // ---------- morning digest (Phase 7) ----------

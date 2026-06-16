@@ -1,8 +1,11 @@
 # WORKPLAN — Executing Roadmap v2
 
 *Handoff doc for Claude Code sessions. Read [ROADMAP.md](ROADMAP.md) first for the why;
-this file is the how. Last updated: 2026-06-10. No code has been written against this
-plan yet — Work Package 0 is the starting point.*
+this file is the how. Last updated: 2026-06-16. **Status: WP-0 through WP-6 are all shipped
+and merged to `main`** (status table at the bottom). The app then grew well past the original
+roadmap — see "Beyond the roadmap (shipped)" below. The only roadmap work still open is
+**dev-build-gated** (native Share Extension, on-device push registration, local
+notifications) and needs an EAS/Xcode dev build — not buildable in Expo Go.*
 
 ---
 
@@ -251,16 +254,52 @@ Acceptance per ROADMAP Phase 6.
 
 | WP | Scope | Depends on | Status |
 |----|-------|-----------|--------|
-| WP-0 | Server sync/push foundation | — | **next up** |
-| WP-1 | Chrome extension | — (parallel-safe) | pending |
-| WP-2 | iOS app foundation | WP-0 | pending |
-| WP-3 | Push | WP-0, WP-2 | pending |
-| WP-4 | In-app browser fill | WP-2 | pending |
-| WP-5 | Assistant v2 | WP-2 (app UI); server part anytime | pending |
-| WP-6 | On-device scout | WP-2 | pending |
+| WP-0 | Server sync/push foundation | — | ✅ shipped |
+| WP-1 | Chrome extension | — (parallel-safe) | ✅ shipped |
+| WP-2 | iOS app foundation | WP-0 | ✅ shipped (Expo Go) |
+| WP-3 | Push | WP-0, WP-2 | ◑ server done; **device side needs dev build** |
+| WP-4 | In-app browser fill | WP-2 | ✅ shipped |
+| WP-5 | Assistant v2 | WP-2 (app UI); server part anytime | ✅ shipped |
+| WP-6 | On-device scout | WP-2 | ✅ shipped (multi-ATS GH/Ashby/Lever) |
+
+WP-2's M3 (native Share Extension) and M5 (local notifications) remain — both **dev-build-gated**.
+
+## Beyond the roadmap (shipped after WP-0…6)
+
+The app grew past the original plan. All of the following are merged to `main`, `tsc` clean,
+with jest coverage on the pure logic (60 tests across core vectors, scout scoring + criteria
+wiring + salary parse, Today lanes, tier thresholds, analytics, score rationale, answers
+search/match):
+
+- **Full Settings parity** — Profile (multi-entry education / work history / awards / certs /
+  volunteer / EEO + résumé upload→parse), Search criteria (titles / keywords / negative
+  keywords / min-fit / salary floor / remote), Tiers & rules (A/B/C thresholds + scout-merge
+  tier + follow-up days + assist toggle — a synced override of the shared core), all synced
+  with the server (`/api/profile`, `/api/settings`); "How scoring works" guide.
+- **Light / Dark / System** theme (runtime palette via ThemeProvider/useThemedStyles).
+- **Triage** — pipeline filters (no on-site / verified-only / hide Tier C), sort by salary
+  (top-of-band), remote-posture + salary on cards, "why this score" rationale on detail,
+  bulk status actions.
+- **Analytics** — application funnel + conversion rates (`analytics.ts`).
+- **Scout** — saved Search criteria (keywords/titles) feed the on-device scorer; salary floor
+  + negative-keyword + min-tier filtering.
+- **Saved-answers library** — reusable Q&A + saved AI drafts, searchable/tagged; apply-assist
+  can auto-match or manually insert them into application forms.
+- **Build CV** — server generates a CV from profile + narratives (AI summary when a key is set,
+  deterministic fallback), downloadable as **.docx** (`docx`) and **PDF** (print-styled HTML);
+  optional **per-role tailoring** (incl. one-tap "tailored to this role" from a role).
+- **Apply-assist** (in-app browser) — factual-field fill (never EEO/consent/submit) + the
+  answers fill above.
+
+## Open work (all dev-build-gated — needs EAS/Xcode)
+
+- Native **Share Extension** (FR-APP-4): Safari Share → "Add to CRM" + on-device enrichment.
+- **On-device push** (FR-PUSH-1…4): register for remote notifications → existing
+  `/api/push/register`; the server APNs sender is built and inert until configured.
+- **Local notifications** (FR-APP-7): follow-up-due / leads-to-verify via `expo-notifications`.
 
 **Kickoff prompt for a fresh Claude Code session:**
-> Read CLAUDE.md, ROADMAP.md, and WORKPLAN.md. Execute WP-<N> on a feature branch:
-> follow the operating rules (snapshot, settings-in-UI, guardrails), satisfy every
-> acceptance criterion for the matching ROADMAP phase, verify per the WP's verification
-> section, and open a PR. Do not start the next WP without confirmation.
+> Read CLAUDE.md, ROADMAP.md, and WORKPLAN.md. WP-0…6 are shipped; remaining work is
+> dev-build-gated (Share Extension, on-device push, local notifications). To tackle it,
+> set up an EAS/Xcode dev build first, then implement on a feature branch following the
+> operating rules (snapshot, settings-in-UI, guardrails) and open a PR.

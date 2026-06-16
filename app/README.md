@@ -24,11 +24,11 @@ and server can't silently drift.
 ## Prerequisites
 
 - Node 20+ (repo uses 24 LTS), already covered by the monorepo.
-- **Full Xcode** (App Store) for the iOS simulator — *not yet installed on this machine* (only
-  Command Line Tools). Until it's installed, the JS layer (tests, typecheck, Metro bundling) works,
-  but `expo run:ios` / the simulator does not.
-- Apple Developer account ($99/yr) is **not** needed for the simulator — only later, for the
-  Share Extension on-device and APNs push (WP-3).
+- **Day-to-day dev runs in Expo Go** — `npx expo start`, scan with the device/simulator. No
+  custom native modules are used, so Expo Go is sufficient for everything currently shipped.
+- A **dev build** (EAS or `expo run:ios` with full Xcode + an Apple Developer account, $99/yr)
+  is required only for the remaining dev-build-gated work: the native Share Extension, on-device
+  push (APNs), and local notifications.
 
 ## Commands
 
@@ -41,13 +41,27 @@ npx expo start         # Metro dev server (Expo Go / web)
 npx expo run:ios       # build to the iOS simulator  ← needs full Xcode
 ```
 
-## Status
+## Status — shipped (runs in Expo Go)
 
-- **M0 shared core** ✅ (repo) · **M1 engine wiring** ✅ — Expo SDK 56 / RN 0.85 / React 19
-  scaffolded; `@reqon/core` wired and proven by green vectors + clean tsc; dark-themed proof-of-life
-  `App.tsx` scores a sample row through the shared core.
-- **Next:** M1 simulator boot (after Xcode), then M2 (local store via `expo-sqlite` + the real
-  Today / lists / detail UI).
+WP-2 (Phase 2) is shipped, and the app grew well past it. All merged to `main`, `tsc` clean,
+60 jest tests on the pure logic.
+
+- **Core + store** — `@reqon/core` shared module (scoring/dedupe/tier/sync), `expo-sqlite`
+  local store with `id`/`updatedAt`/`deleted`, two-way `/api/sync`.
+- **Screens** — Today command center; pipeline lanes (search · sort incl. salary · filters:
+  no-onsite / verified / hide-Tier-C); role detail with tracking edits + "why this score"
+  rationale; bulk status actions; Analytics (KPIs · tier mix · application funnel + conversion).
+- **Settings (synced)** — Profile (full CV + EEO + résumé upload→parse), Search criteria,
+  Tiers & rules (synced override of the core thresholds), Saved answers, Build CV, "How scoring
+  works" guide, sync config, on-device scout toggle, **Light/Dark/System**.
+- **Apply-assist** — in-app browser fills factual fields + saved answers (auto-match or manual);
+  never EEO/consent/submit.
+- **Scout** — on-device multi-ATS (Greenhouse/Ashby/Lever) poll → score → dedupe → add.
+- **CV** — server-generated **.docx + PDF**, AI-or-deterministic summary, per-role tailoring.
+
+**Open (dev-build-gated — needs EAS/Xcode, not Expo Go):** native Share Extension (M3),
+on-device push registration (WP-3; the server APNs sender is built + inert until configured),
+local notifications (M5).
 
 ## Config
 

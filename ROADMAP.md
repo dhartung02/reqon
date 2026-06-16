@@ -1,7 +1,19 @@
 # Roadmap v2 — Job Pipeline CRM → Multi-Surface Command Center
 
-*Last updated: 2026-06-10. Companion docs: [PRODUCT-POSITIONING.md](PRODUCT-POSITIONING.md)
+*Last updated: 2026-06-16. Companion docs: [PRODUCT-POSITIONING.md](PRODUCT-POSITIONING.md)
 (market thesis) · [WORKPLAN.md](WORKPLAN.md) (execution plan for Claude Code).*
+
+> **Roadmap v2 status (2026-06-16): substantially shipped.** Phases 0, 1, 4, 5, 6 are done
+> (server sync/tombstones/`/api/sync` + APNs sender; Chrome extension; in-app browser
+> apply-assist; AI assistant + saved-answers library; multi-ATS on-device scout). Phase 2
+> (the Reqon iOS app) is shipped and running in **Expo Go**, and the app grew well beyond
+> this plan — full Settings parity, light/dark/system theming, pipeline filters + salary
+> sort, analytics funnel, score-rationale, bulk actions, and a server **CV generator**
+> (.docx/PDF, AI-or-deterministic, per-role tailoring). **What's left is dev-build-gated**
+> and needs an EAS/Xcode dev build: native **Share Extension** (Phase 2 M3 / FR-APP-4),
+> **on-device push** (Phase 3 / FR-PUSH — the server side is built and inert until
+> configured), and **local notifications** (FR-APP-7). See [WORKPLAN.md](WORKPLAN.md) for
+> the per-PR breakdown.
 
 > **Roadmap v1 (2026-06-08) is fully shipped** — data safety, scout filtering, lifecycle
 > tabs, hygiene lanes, apply-mode, candidate profile + narratives, AI assistant, digest,

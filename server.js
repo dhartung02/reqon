@@ -828,6 +828,52 @@ app.post('/api/cv', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
+// Print-styled HTML CV — open in a browser and "Save as PDF" (no PDF dependency needed).
+function cvHtml(s, summary) {
+  const esc = (x) => String(x == null ? '' : x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const ul = (arr) => (arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '');
+  const sec = (title, inner) => (inner ? `<h2>${esc(title)}</h2>${inner}` : '');
+  const item = (head, org, dates, body) =>
+    `<div class="item"><div class="row"><span class="role">${esc(head)}</span>${org ? `<span class="org"> — ${esc(org)}</span>` : ''}${dates ? `<span class="dates">${esc(dates)}</span>` : ''}</div>${body ? `<p>${esc(body)}</p>` : ''}</div>`;
+  const exp = s.experience.map((e) => item(e.role, e.company, e.dates, e.description)).join('');
+  const edu = s.education.map((e) => item([e.level, e.field].filter(Boolean).join(', '), e.school, e.dates, '')).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.name || 'CV')} — CV</title>
+<style>
+  :root{--ink:#16181c;--muted:#5a5d77;--accent:#00936b}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);max-width:760px;margin:0 auto;padding:32px;line-height:1.5}
+  h1{font-size:26px;margin:0 0 2px}
+  .contact,.links{color:var(--muted);font-size:13px;margin:2px 0}
+  h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid #e3e3e8;padding-bottom:4px;margin:22px 0 8px}
+  .item{margin:8px 0}.row{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+  .role{font-weight:600}.dates{margin-left:auto;color:var(--muted);font-size:12px}
+  p{margin:4px 0}ul{margin:4px 0;padding-left:18px}li{margin:2px 0}
+  .hint{background:#f4f6f9;border:1px solid #e3e3e8;border-radius:8px;padding:10px 12px;color:var(--muted);font-size:13px;margin-bottom:18px}
+  @media print{.hint{display:none}body{padding:0;max-width:none}}
+</style></head><body>
+<div class="hint">Use your browser's Share / Print → "Save as PDF" to download this CV.</div>
+${s.name ? `<h1>${esc(s.name)}</h1>` : ''}
+${s.contact.length ? `<div class="contact">${s.contact.map(esc).join(' · ')}</div>` : ''}
+${s.links.length ? `<div class="links">${s.links.map(esc).join(' · ')}</div>` : ''}
+${summary ? sec('Summary', `<p>${esc(summary)}</p>`) : ''}
+${sec('Experience', exp)}
+${s.highlights.length ? sec('Highlights', ul(s.highlights)) : ''}
+${sec('Education', edu)}
+${s.awards.length ? sec('Awards', ul(s.awards)) : ''}
+${s.certs.length ? sec('Certifications', ul(s.certs)) : ''}
+${s.volunteer.length ? sec('Volunteer', ul(s.volunteer)) : ''}
+</body></html>`;
+}
+
+app.get('/api/cv.html', async (req, res) => {
+  try {
+    let cache = readJsonSafe(CV_CACHE, null);
+    if (!cache || !cache.sections) { const p = readProfile(); cache = { sections: cvSections(p), summary: (await cvSummary(p)).text }; }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(cvHtml(cache.sections, cache.summary || ''));
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
 // Stream the CV as a .docx (uses the last POST /api/cv content, else builds fresh).
 app.get('/api/cv.docx', async (req, res) => {
   try {

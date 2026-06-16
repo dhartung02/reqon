@@ -31,3 +31,9 @@ export async function cvDocxUrl(): Promise<string | null> {
   const { url } = await getConfig();
   return url ? `${normalize(url)}/api/cv.docx` : null;
 }
+
+/** URL to the print-styled HTML CV — open in a browser and "Save as PDF". */
+export async function cvHtmlUrl(): Promise<string | null> {
+  const { url } = await getConfig();
+  return url ? `${normalize(url)}/api/cv.html` : null;
+}

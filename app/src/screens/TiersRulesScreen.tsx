@@ -75,9 +75,13 @@ export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
         <Text style={styles.sectionTitle}>SCOUT MERGE</Text>
         <Text style={styles.help}>Lowest tier the scout will add to your pipeline.</Text>
         <View style={styles.seg}>
-          {(['A', 'B', 'C'] as Tier[]).map((m) => (
+          {([
+            ['A', 'A only'],
+            ['B', 'A & B'],
+            ['C', 'All tiers'],
+          ] as [Tier, string][]).map(([m, label]) => (
             <Pressable key={m} style={[styles.segBtn, r.minTierToMerge === m && styles.segBtnOn]} onPress={() => setR((s) => ({ ...s, minTierToMerge: m }))}>
-              <Text style={[styles.segText, r.minTierToMerge === m && styles.segTextOn]}>{m}+ only</Text>
+              <Text style={[styles.segText, r.minTierToMerge === m && styles.segTextOn]}>{label}</Text>
             </Pressable>
           ))}
         </View>

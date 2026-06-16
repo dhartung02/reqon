@@ -1,5 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system';
+// Legacy entry: the SDK 56 main export deprecated readAsStringAsync (it warns + the new File/Directory
+// API replaces it), which broke résumé upload. The legacy module keeps the base64 read working.
+import * as FileSystem from 'expo-file-system/legacy';
 import { getConfig } from './config';
 
 // Full applicant profile — mirrors the server profile shape so it's ONE profile (server-optional).

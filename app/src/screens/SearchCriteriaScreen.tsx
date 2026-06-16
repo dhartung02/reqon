@@ -113,15 +113,20 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ListSection({ title, hint, value, onChange }: { title: string; hint: string; value: string[]; onChange: (a: string[]) => void }) {
   const { c, styles } = useThemedStyles(makeStyles);
+  // Hold the raw multi-line text locally so a trailing newline survives (parsing to an array on each
+  // keystroke would strip the empty line and make it impossible to start the next entry). Initialized
+  // once from the loaded value — the screen only renders this after its data has loaded.
+  const [text, setText] = useState(value.join('\n'));
   return (
     <Section title={title}>
       <Text style={styles.help}>{hint}</Text>
       <TextInput
-        value={value.join('\n')}
-        onChangeText={(t) => onChange(linesToArr(t))}
+        value={text}
+        onChangeText={(t) => { setText(t); onChange(linesToArr(t)); }}
         placeholder="One per line"
         placeholderTextColor={c.muted}
         multiline
+        submitBehavior="newline"
         autoCapitalize="none"
         style={[styles.input, styles.multi]}
       />

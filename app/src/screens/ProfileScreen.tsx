@@ -122,7 +122,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
               <Field label="Start" value={w.start} onChange={(v) => setWork(i, 'start', v)} />
               <Field label="End" value={w.end} onChange={(v) => setWork(i, 'end', v)} />
             </View>
-            <Field label="Description" value={w.description} onChange={(v) => setWork(i, 'description', v)} multiline />
+            <Field label="Description" value={w.description} onChange={(v) => setWork(i, 'description', v)} multiline submitBehavior="newline" />
           </EntryCard>
         ))}
       </Section>
@@ -176,14 +176,17 @@ function EntryCard({ children, onRemove }: { children: React.ReactNode; onRemove
 
 function ListSection({ title, value, onChange }: { title: string; value: string[]; onChange: (a: string[]) => void }) {
   const { c, styles } = useThemedStyles(makeStyles);
+  // Local raw text so a trailing newline isn't stripped mid-edit (see SearchCriteriaScreen).
+  const [text, setText] = useState(value.join('\n'));
   return (
     <Section title={title}>
       <TextInput
-        value={value.join('\n')}
-        onChangeText={(t) => onChange(linesToArr(t))}
+        value={text}
+        onChangeText={(t) => { setText(t); onChange(linesToArr(t)); }}
         placeholder="One per line"
         placeholderTextColor={c.muted}
         multiline
+        submitBehavior="newline"
         style={[styles.input, styles.multi]}
       />
     </Section>

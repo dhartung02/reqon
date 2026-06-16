@@ -20,6 +20,7 @@ import { BrowserScreen } from './src/screens/BrowserScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
 import { TiersRulesScreen } from './src/screens/TiersRulesScreen';
+import { ScoringGuideScreen } from './src/screens/ScoringGuideScreen';
 import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { getCriteria } from './src/sync/searchCriteria';
@@ -55,6 +56,7 @@ function AppInner() {
   const [showProfile, setShowProfile] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
@@ -160,7 +162,7 @@ function AppInner() {
   if (showProfile) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ProfileScreen onBack={() => setShowProfile(false)} />
+        <ProfileScreen onBack={() => { setShowProfile(false); setShowSettings(true); }} />
         <StatusBar style={statusBar} />
       </SafeAreaView>
     );
@@ -169,7 +171,7 @@ function AppInner() {
   if (showSearch) {
     return (
       <SafeAreaView style={styles.safe}>
-        <SearchCriteriaScreen onBack={() => setShowSearch(false)} />
+        <SearchCriteriaScreen onBack={() => { setShowSearch(false); setShowSettings(true); }} />
         <StatusBar style={statusBar} />
       </SafeAreaView>
     );
@@ -178,7 +180,16 @@ function AppInner() {
   if (showRules) {
     return (
       <SafeAreaView style={styles.safe}>
-        <TiersRulesScreen onBack={() => { setShowRules(false); refresh(); }} />
+        <TiersRulesScreen onBack={() => { setShowRules(false); setShowSettings(true); refresh(); }} />
+        <StatusBar style={statusBar} />
+      </SafeAreaView>
+    );
+  }
+
+  if (showGuide) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScoringGuideScreen onBack={() => { setShowGuide(false); setShowSettings(true); }} />
         <StatusBar style={statusBar} />
       </SafeAreaView>
     );
@@ -226,7 +237,7 @@ function AppInner() {
             </View>
           </View>
           <View style={styles.brandRight}>
-            <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={14} accessibilityLabel="Settings & sync">
+            <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={22} accessibilityLabel="Settings & sync">
               <SettingsIcon size={18} color={c.textBase} />
             </Pressable>
             <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add role">
@@ -291,6 +302,10 @@ function AppInner() {
         onEditRules={() => {
           setShowSettings(false);
           setShowRules(true);
+        }}
+        onOpenGuide={() => {
+          setShowSettings(false);
+          setShowGuide(true);
         }}
       />
       <StatusBar style={statusBar} />

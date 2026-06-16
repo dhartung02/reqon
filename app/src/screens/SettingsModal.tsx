@@ -12,6 +12,7 @@ export function SettingsModal({
   onEditProfile,
   onEditSearch,
   onEditRules,
+  onOpenGuide,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -19,6 +20,7 @@ export function SettingsModal({
   onEditProfile: () => void;
   onEditSearch: () => void;
   onEditRules: () => void;
+  onOpenGuide: () => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const { pref, setScheme } = useScheme();
@@ -148,6 +150,14 @@ export function SettingsModal({
               <View style={styles.flex1}>
                 <Text style={styles.label}>Tiers & rules</Text>
                 <Text style={styles.help}>A/B/C thresholds, scout merge tier, follow-up days, AI drafts</Text>
+              </View>
+              <Text style={styles.profileChev}>›</Text>
+            </Pressable>
+
+            <Pressable style={styles.profileRow} onPress={onOpenGuide}>
+              <View style={styles.flex1}>
+                <Text style={styles.label}>How scoring works</Text>
+                <Text style={styles.help}>What Fit, Interview probability, EV, and tiers mean</Text>
               </View>
               <Text style={styles.profileChev}>›</Text>
             </Pressable>

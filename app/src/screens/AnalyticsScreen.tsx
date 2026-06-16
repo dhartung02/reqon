@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
-import { rolesInLane, type Role, type Tier } from '../model';
+import { type Role, type Tier } from '../model';
+import { pipelineMetrics } from '../analytics';
 
-// Pipeline analytics: headline KPIs + tier distribution. Computed from the same roles the lists use.
+// Pipeline analytics: headline KPIs, application funnel + conversion, and tier distribution.
+// All metrics come from the pure pipelineMetrics() helper.
 export function AnalyticsScreen({
   roles,
   refreshing,
@@ -15,25 +17,7 @@ export function AnalyticsScreen({
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
 
-  const m = useMemo(() => {
-    const applied = rolesInLane(roles, 'applied').length;
-    const interviewing = rolesInLane(roles, 'interviewing').length;
-    const closed = rolesInLane(roles, 'closed').length;
-    const open = rolesInLane(roles, 'open').length;
-    const offers = roles.filter((r) => r.status === 'Offer').length;
-    const rejected = roles.filter((r) => r.status === 'Rejected').length;
-    const advanced = roles.filter((r) =>
-      ['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'].includes(r.status),
-    ).length;
-    const appliedTotal = applied + interviewing + closed; // ever-applied
-    const respRate = appliedTotal ? Math.round((advanced / appliedTotal) * 100) : 0;
-    const tiers: Record<Tier, number> = {
-      A: roles.filter((r) => r.tier === 'A').length,
-      B: roles.filter((r) => r.tier === 'B').length,
-      C: roles.filter((r) => r.tier === 'C').length,
-    };
-    return { total: roles.length, open, applied, interviewing, offers, rejected, respRate, tiers };
-  }, [roles]);
+  const m = useMemo(() => pipelineMetrics(roles), [roles]);
 
   const kpis: { label: string; value: string; accent?: string }[] = [
     { label: 'Total roles', value: String(m.total) },
@@ -42,10 +26,11 @@ export function AnalyticsScreen({
     { label: 'Applied', value: String(m.applied) },
     { label: 'Interviewing', value: String(m.interviewing), accent: c.active },
     { label: 'Offers', value: String(m.offers), accent: c.emerald },
-    { label: 'Rejected', value: String(m.rejected), accent: c.danger },
     { label: 'Response rate', value: `${m.respRate}%` },
+    { label: 'Interview → offer', value: `${m.interviewToOffer}%` },
   ];
 
+  const funnelMax = Math.max(1, ...m.funnel.map((s) => s.count));
   const tierTotal = m.tiers.A + m.tiers.B + m.tiers.C || 1;
 
   return (
@@ -61,6 +46,26 @@ export function AnalyticsScreen({
           </View>
         ))}
       </View>
+
+      <View>
+        <Text style={styles.sectionTitle}>APPLICATION FUNNEL</Text>
+        <Text style={styles.caption}>Roles currently at each stage · {m.everApplied} ever applied</Text>
+      </View>
+      {m.everApplied === 0 ? (
+        <Text style={styles.legendText}>No applications yet — apply to a role to start the funnel.</Text>
+      ) : (
+        <View style={styles.funnel}>
+          {m.funnel.map((s) => (
+            <View key={s.status} style={styles.funnelRow}>
+              <Text style={styles.funnelLabel}>{s.status}</Text>
+              <View style={styles.funnelTrack}>
+                <View style={[styles.funnelFill, { width: `${(s.count / funnelMax) * 100}%` }]} />
+              </View>
+              <Text style={styles.funnelCount}>{s.count}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.sectionTitle}>TIER DISTRIBUTION</Text>
       <View style={styles.bar}>
@@ -100,6 +105,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   kpiLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase', color: c.muted },
   kpiValue: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, marginTop: 4 },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted, marginTop: 4 },
+  caption: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, marginTop: 3 },
+  funnel: { gap: 8 },
+  funnelRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  funnelLabel: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase, width: 104 },
+  funnelTrack: { flex: 1, height: 16, borderRadius: 5, overflow: 'hidden', backgroundColor: alpha(c.muted, 0.18) },
+  funnelFill: { height: 16, borderRadius: 5, backgroundColor: c.active, minWidth: 2 },
+  funnelCount: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '600', color: c.textHigh, width: 24, textAlign: 'right' },
   bar: { flexDirection: 'row', borderRadius: 5, overflow: 'hidden', backgroundColor: alpha(c.muted, 0.2) },
   legend: { flexDirection: 'row', gap: 16 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },

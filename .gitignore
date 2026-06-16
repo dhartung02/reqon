@@ -42,6 +42,7 @@ agent/_rescout.json
 # Runtime state / generated artifacts
 agent/assist-usage.json
 agent/assist-log.jsonl
+agent/cv-latest.json
 agent/digest-state.json
 agent/digest-latest.html
 agent/digest-latest.txt

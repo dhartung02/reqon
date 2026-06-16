@@ -37,6 +37,15 @@ export function useRoles() {
     [refresh],
   );
 
+  // Batch status change (bulk actions): write each through, then refresh once.
+  const setStatusMany = useCallback(
+    async (ids: string[], status: Status) => {
+      for (const id of ids) await setRoleStatus(id, status);
+      await refresh();
+    },
+    [refresh],
+  );
+
   const remove = useCallback(
     async (id: string) => {
       await softDeleteRole(id);
@@ -61,5 +70,5 @@ export function useRoles() {
     [refresh],
   );
 
-  return { roles, loading, setStatus, remove, update, add, refresh };
+  return { roles, loading, setStatus, setStatusMany, remove, update, add, refresh };
 }

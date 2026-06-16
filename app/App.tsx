@@ -43,7 +43,7 @@ function AppInner() {
     SplineSans: require('./assets/fonts/SplineSans.ttf'),
     Fraunces: require('./assets/fonts/Fraunces.ttf'),
   });
-  const { roles, loading, setStatus, update, remove, add, refresh } = useRoles();
+  const { roles, loading, setStatus, setStatusMany, update, remove, add, refresh } = useRoles();
   const [lane, setLane] = useState<Lane>('today');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
@@ -265,6 +265,7 @@ function AppInner() {
               sort={sort}
               filter={filter}
               onPressRole={(r) => setSelectedId(r.id)}
+              onBulkStatus={setStatusMany}
               refreshing={refreshing}
               onRefresh={onRefresh}
             />

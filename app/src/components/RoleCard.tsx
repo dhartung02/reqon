@@ -4,8 +4,8 @@ import { statusColor, type Role } from '../model';
 import { remoteBadge, type RationaleTone } from '../scout/explain';
 
 // Tier-scored pipeline card: left edge + badge in the tier color, score, title, company, and a
-// status pill. Tappable → row detail. Tier C is dimmed (suppressed noise) but still readable.
-export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }) {
+// status pill. Tappable → row detail (or toggles selection in bulk-select mode). Tier C is dimmed.
+export function RoleCard({ role, onPress, selectable = false, selected = false }: { role: Role; onPress?: () => void; selectable?: boolean; selected?: boolean }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
   const sc = statusColor(role.status, c);
@@ -21,11 +21,17 @@ export function RoleCard({ role, onPress }: { role: Role; onPress?: () => void }
         styles.card,
         { borderLeftColor: accent },
         suppressed && styles.cardSuppressed,
+        selected && styles.cardSelected,
         pressed && styles.pressed,
       ]}
     >
       <View style={styles.topRow}>
         <View style={styles.badgeRow}>
+          {selectable ? (
+            <View style={[styles.check, selected && styles.checkOn]}>
+              {selected ? <Text style={styles.checkMark}>✓</Text> : null}
+            </View>
+          ) : null}
           <Text style={[styles.tierBadge, { color: accent, backgroundColor: alpha(accent, 0.1) }]}>TIER {role.tier}</Text>
           <Text style={styles.scoreText}>Score: {role.score.toFixed(1)}/10</Text>
         </View>
@@ -68,7 +74,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 12,
   },
   cardSuppressed: { backgroundColor: alpha(c.element, 0.4), opacity: 0.6 },
+  cardSelected: { backgroundColor: alpha(c.emerald, 0.1) },
   pressed: { opacity: 0.85 },
+  check: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: c.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkOn: { borderColor: c.emerald, backgroundColor: c.emerald },
+  checkMark: { fontSize: 12, fontWeight: '700', color: c.canvas, lineHeight: 14 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tierBadge: {

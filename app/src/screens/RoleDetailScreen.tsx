@@ -69,6 +69,7 @@ export function RoleDetailScreen({
   onUpdate,
   onDelete,
   onOpenPosting,
+  onBuildCv,
 }: {
   role: Role;
   onBack: () => void;
@@ -76,6 +77,7 @@ export function RoleDetailScreen({
   onUpdate: (patch: EditablePatch) => void;
   onDelete: () => void;
   onOpenPosting: (url: string) => void;
+  onBuildCv: (role: Role) => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
@@ -153,6 +155,10 @@ export function RoleDetailScreen({
 
       <Pressable style={styles.draftBtn} onPress={() => setShowDraft(true)}>
         <Text style={styles.draftBtnText}>Draft application text · AI</Text>
+      </Pressable>
+
+      <Pressable style={styles.draftBtn} onPress={() => onBuildCv(role)}>
+        <Text style={styles.draftBtnText}>Build CV tailored to this role</Text>
       </Pressable>
 
       <Pressable style={styles.deleteBtn} onPress={onDelete}>

@@ -6,13 +6,13 @@ import { buildCv, cvDocxUrl, cvHtmlUrl, type CvResult } from '../sync/cv';
 // Build CV: generate a CV from your profile (work history, education, narratives) on the server —
 // AI writes the summary when a key is set, otherwise a deterministic one — preview it, then
 // download the .docx.
-export function BuildCvScreen({ onBack }: { onBack: () => void }) {
+export function BuildCvScreen({ onBack, initialTarget }: { onBack: () => void; initialTarget?: { role?: string; company?: string; jd?: string } }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const [result, setResult] = useState<CvResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [role, setRole] = useState('');
-  const [company, setCompany] = useState('');
-  const [jd, setJd] = useState('');
+  const [role, setRole] = useState(initialTarget?.role ?? '');
+  const [company, setCompany] = useState(initialTarget?.company ?? '');
+  const [jd, setJd] = useState(initialTarget?.jd ?? '');
 
   const generate = async () => {
     setBusy(true);

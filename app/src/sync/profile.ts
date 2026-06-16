@@ -11,6 +11,9 @@ export interface EduEntry { school?: string; degree?: string; field?: string; le
 export interface WorkEntry { company?: string; role?: string; start?: string; end?: string; description?: string }
 export interface Eeo { gender?: string; pronouns?: string; race?: string; ethnicity?: string; veteran?: string; disability?: string; orientation?: string }
 export interface Applicant { name?: string; email?: string; phone?: string; linkedin?: string; github?: string; website?: string; location?: string }
+// A reusable answer to a recurring application question (or a saved cover note). q = the question /
+// label, a = the answer, tags for filtering. Synced with the rest of the profile.
+export interface SavedAnswer { id: string; q: string; a: string; tags: string[] }
 export interface Profile {
   applicant: Applicant;
   education: EduEntry[];
@@ -19,10 +22,13 @@ export interface Profile {
   certs: string[];
   volunteer: string[];
   eeo: Eeo;
+  answers: SavedAnswer[];
 }
 
 const KEY = 'reqon.profile';
-export const EMPTY_PROFILE: Profile = { applicant: {}, education: [], workHistory: [], awards: [], certs: [], volunteer: [], eeo: {} };
+export const EMPTY_PROFILE: Profile = { applicant: {}, education: [], workHistory: [], awards: [], certs: [], volunteer: [], eeo: {}, answers: [] };
+
+export const newAnswerId = (): string => `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
 export async function getProfile(): Promise<Profile> {
   const v = await SecureStore.getItemAsync(KEY);
@@ -52,6 +58,12 @@ function fromServer(sp: Record<string, unknown>): Profile {
     certs: arr<string>(sp.certs),
     volunteer: arr<string>(sp.volunteer),
     eeo: (sp.eeo as Eeo) || {},
+    answers: arr<Partial<SavedAnswer>>(sp.answers).map((x) => ({
+      id: x.id || newAnswerId(),
+      q: String(x.q || ''),
+      a: String(x.a || ''),
+      tags: Array.isArray(x.tags) ? x.tags.map(String) : [],
+    })),
   };
 }
 
@@ -82,7 +94,7 @@ export async function pushProfile(p: Profile): Promise<{ ok: boolean; error?: st
     const r = await fetch(`${normalize(url)}/api/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-CRM-Token': token },
-      body: JSON.stringify({ applicant: p.applicant, education: p.education, workHistory: p.workHistory, awards: p.awards, certs: p.certs, volunteer: p.volunteer, eeo: p.eeo }),
+      body: JSON.stringify({ applicant: p.applicant, education: p.education, workHistory: p.workHistory, awards: p.awards, certs: p.certs, volunteer: p.volunteer, eeo: p.eeo, answers: p.answers }),
     });
     const j = await r.json();
     if (!r.ok || !j.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
@@ -90,6 +102,13 @@ export async function pushProfile(p: Profile): Promise<{ ok: boolean; error?: st
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
   }
+}
+
+/** Append one saved answer to the profile and persist (local + server). Used by "save this draft". */
+export async function appendAnswer(entry: { q: string; a: string; tags?: string[] }): Promise<{ ok: boolean; error?: string }> {
+  const p = await getProfile();
+  const answer: SavedAnswer = { id: newAnswerId(), q: entry.q.trim(), a: entry.a.trim(), tags: (entry.tags || []).map((t) => t.trim()).filter(Boolean) };
+  return pushProfile({ ...p, answers: [answer, ...p.answers] });
 }
 
 /** Upload a résumé to the server (parses via profile-from-resume.py), then pull the regenerated profile. */

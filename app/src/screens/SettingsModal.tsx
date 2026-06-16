@@ -12,6 +12,7 @@ export function SettingsModal({
   onEditProfile,
   onEditSearch,
   onEditRules,
+  onEditAnswers,
   onOpenGuide,
 }: {
   visible: boolean;
@@ -20,6 +21,7 @@ export function SettingsModal({
   onEditProfile: () => void;
   onEditSearch: () => void;
   onEditRules: () => void;
+  onEditAnswers: () => void;
   onOpenGuide: () => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
@@ -150,6 +152,14 @@ export function SettingsModal({
               <View style={styles.flex1}>
                 <Text style={styles.label}>Tiers & rules</Text>
                 <Text style={styles.help}>A/B/C thresholds, scout merge tier, follow-up days, AI drafts</Text>
+              </View>
+              <Text style={styles.profileChev}>›</Text>
+            </Pressable>
+
+            <Pressable style={styles.profileRow} onPress={onEditAnswers}>
+              <View style={styles.flex1}>
+                <Text style={styles.label}>Saved answers</Text>
+                <Text style={styles.help}>Reusable Q&A + saved AI drafts — searchable, tagged</Text>
               </View>
               <Text style={styles.profileChev}>›</Text>
             </Pressable>

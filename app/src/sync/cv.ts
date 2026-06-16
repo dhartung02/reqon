@@ -4,23 +4,34 @@ import { getConfig } from './config';
 // AI summary, and the .docx renderer). The app triggers a build and links out to download the file.
 const normalize = (u: string) => u.trim().replace(/\/+$/, '');
 
+export interface CvTailor {
+  role?: string;
+  company?: string;
+  jd?: string;
+}
 export interface CvResult {
   ok: boolean;
   markdown?: string;
   source?: 'ai' | 'template';
   name?: string;
+  tailoredFor?: string | null;
   error?: string;
 }
 
-/** Build (or rebuild) the CV content on the server; returns a Markdown preview + which path produced it. */
-export async function buildCv(): Promise<CvResult> {
+/** Build (or rebuild) the CV content on the server; pass `tailor` to bias the summary to a role. */
+export async function buildCv(tailor?: CvTailor): Promise<CvResult> {
   const { url, token } = await getConfig();
   if (!url) return { ok: false, error: 'Connect a sync server in Settings — CV generation runs on the server.' };
+  const hasTailor = tailor && (tailor.role || tailor.company || tailor.jd);
   try {
-    const r = await fetch(`${normalize(url)}/api/cv`, { method: 'POST', headers: { 'X-CRM-Token': token } });
+    const r = await fetch(`${normalize(url)}/api/cv`, {
+      method: 'POST',
+      headers: { 'X-CRM-Token': token, ...(hasTailor ? { 'Content-Type': 'application/json' } : {}) },
+      body: hasTailor ? JSON.stringify({ tailor }) : undefined,
+    });
     const j = await r.json();
     if (!r.ok || !j.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
-    return { ok: true, markdown: j.markdown, source: j.source, name: j.name };
+    return { ok: true, markdown: j.markdown, source: j.source, name: j.name, tailoredFor: j.tailoredFor };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
   }

@@ -756,7 +756,7 @@ function cvSections(p) {
   };
 }
 
-async function cvSummary(p) {
+async function cvSummary(p, tailor) {
   const a = p.applicant || {};
   const facts = [
     a.name ? `Name: ${a.name}` : '',
@@ -765,16 +765,24 @@ async function cvSummary(p) {
     (p.workHistory || []).map((w) => `${w.role || ''} at ${w.company || ''}: ${w.description || ''}`).filter((x) => x.trim() !== ' at : ').join('\n'),
     (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n'),
   ].filter(Boolean).join('\n').trim();
+  // Optional per-role tailoring: bias the summary's emphasis toward a target role/JD, still grounded.
+  const t = tailor && (tailor.role || tailor.company || tailor.jd) ? tailor : null;
+  const targetLine = t ? `Target role: ${[t.role, t.company].filter(Boolean).join(' at ')}`.trim() : '';
+  const jd = t && t.jd ? `\nTarget job description:\n${String(t.jd).slice(0, parseInt(process.env.OPENAI_JD_CHARS || '3500', 10))}` : '';
   if (facts && process.env.OPENAI_API_KEY && assistEnabled()) {
     try {
-      const system = 'Write a 2–3 sentence professional summary for the top of a CV, in a crisp résumé voice. Ground ONLY in the facts provided — never invent employers, titles, or metrics. No first-person pronouns, no flowery phrasing.';
-      const { content } = await openaiChat({ model: assistModel(), system, user: facts, maxTokens: 220 });
+      const system = t
+        ? 'Write a 2–3 sentence professional summary for the top of a CV, tailored to the target role — lead with the candidate\'s most relevant experience for it. Ground ONLY in the facts provided; never invent employers, titles, or metrics, and never claim skills not in the facts. No first-person pronouns, no flowery phrasing.'
+        : 'Write a 2–3 sentence professional summary for the top of a CV, in a crisp résumé voice. Ground ONLY in the facts provided — never invent employers, titles, or metrics. No first-person pronouns, no flowery phrasing.';
+      const user = t ? `${targetLine}${jd}\n\nCandidate facts (use ONLY these):\n${facts}` : facts;
+      const { content } = await openaiChat({ model: assistModel(), system, user, maxTokens: 220 });
       if (content && content.trim()) return { text: content.trim(), source: 'ai' };
     } catch (e) { /* fall through to deterministic */ }
   }
   const sen = (p.seniority || [])[0] || 'Product leader';
   const dom = (p.sectors || []).slice(0, 3).join(', ');
-  return { text: dom ? `${sen} focused on ${dom}.` : (facts ? `${sen}.` : ''), source: 'template' };
+  const base = dom ? `${sen} focused on ${dom}.` : (facts ? `${sen}.` : '');
+  return { text: t && base ? `${base} Targeting ${[t.role, t.company].filter(Boolean).join(' at ')}.` : base, source: 'template' };
 }
 
 function cvMarkdown(s, summary) {
@@ -819,12 +827,17 @@ function cvDocxBuffer(s, summary) {
 // Build CV content (AI summary if available) + cache it; returns the markdown preview + source.
 app.post('/api/cv', async (req, res) => {
   try {
+    const b = req.body || {};
+    const tailor = b.tailor && typeof b.tailor === 'object'
+      ? { role: String(b.tailor.role || ''), company: String(b.tailor.company || ''), jd: String(b.tailor.jd || '') }
+      : null;
     const p = readProfile();
     const s = cvSections(p);
-    const { text: summary, source } = await cvSummary(p);
+    const { text: summary, source } = await cvSummary(p, tailor);
     const markdown = cvMarkdown(s, summary);
-    try { writeJsonPretty(CV_CACHE, { sections: s, summary, source, builtAt: new Date().toISOString() }); } catch (e) {}
-    res.json({ ok: true, markdown, source, name: s.name });
+    const tailoredFor = tailor && (tailor.role || tailor.company) ? [tailor.role, tailor.company].filter(Boolean).join(' at ') : null;
+    try { writeJsonPretty(CV_CACHE, { sections: s, summary, source, tailoredFor, builtAt: new Date().toISOString() }); } catch (e) {}
+    res.json({ ok: true, markdown, source, name: s.name, tailoredFor });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 

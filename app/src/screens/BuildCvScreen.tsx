@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native';
 import { fonts, alpha, useThemedStyles, type Palette } from '../theme';
-import { buildCv, cvDocxUrl, type CvResult } from '../sync/cv';
+import { buildCv, cvDocxUrl, cvHtmlUrl, type CvResult } from '../sync/cv';
 
 // Build CV: generate a CV from your profile (work history, education, narratives) on the server —
 // AI writes the summary when a key is set, otherwise a deterministic one — preview it, then
@@ -19,6 +19,11 @@ export function BuildCvScreen({ onBack }: { onBack: () => void }) {
 
   const download = async () => {
     const url = await cvDocxUrl();
+    if (url) Linking.openURL(url);
+  };
+
+  const openPdf = async () => {
+    const url = await cvHtmlUrl();
     if (url) Linking.openURL(url);
   };
 
@@ -42,14 +47,19 @@ export function BuildCvScreen({ onBack }: { onBack: () => void }) {
         <>
           <View style={styles.metaRow}>
             <Text style={styles.meta}>Summary: {result.source === 'ai' ? 'AI-written' : 'template'}</Text>
-            <Pressable onPress={download} hitSlop={8}>
-              <Text style={styles.download}>Download .docx ↓</Text>
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable onPress={openPdf} hitSlop={8}>
+                <Text style={styles.download}>PDF ↗</Text>
+              </Pressable>
+              <Pressable onPress={download} hitSlop={8}>
+                <Text style={styles.download}>.docx ↓</Text>
+              </Pressable>
+            </View>
           </View>
           <View style={styles.preview}>
             <Text style={styles.previewText} selectable>{result.markdown}</Text>
           </View>
-          <Text style={styles.note}>Opens the .docx from your server in the browser. On the same machine as the server it downloads directly; over your LAN your browser may prompt for the app token.</Text>
+          <Text style={styles.note}>.docx downloads directly; PDF opens the print-styled page — use Share / Print → "Save as PDF". Both open from your server in the browser; over LAN it may prompt for the app token.</Text>
         </>
       ) : null}
     </ScrollView>
@@ -67,8 +77,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   genBusy: { opacity: 0.7 },
   genText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: c.canvas },
   err: { fontFamily: fonts.sans, fontSize: 13, color: c.danger, lineHeight: 19 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  meta: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  meta: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, flexShrink: 1 },
   download: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: c.emerald },
   preview: { backgroundColor: c.element, borderRadius: 12, padding: 14 },
   previewText: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, lineHeight: 21 },

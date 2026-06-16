@@ -17,6 +17,7 @@ export function TodayScreen({
   roles,
   onJump,
   onScout,
+  onServerScout,
   scouting,
   scoutMsg,
   scoutEnabled,
@@ -28,6 +29,7 @@ export function TodayScreen({
   roles: Role[];
   onJump: (l: Lane) => void;
   onScout: () => void;
+  onServerScout: () => void;
   scouting: boolean;
   scoutMsg: string | null;
   scoutEnabled: boolean;
@@ -65,9 +67,14 @@ export function TodayScreen({
             )}
           </Pressable>
         ) : serverConfigured ? (
-          <Text style={[styles.serverScout, syncState.error && styles.syncErr]}>
-            {syncState.error ? 'Sync failed' : syncState.at ? `Synced ${rel(syncState.at)}` : 'Server scout'}
-          </Text>
+          <View style={styles.serverCol}>
+            <Pressable style={styles.scoutBtn} onPress={onServerScout} disabled={scouting}>
+              {scouting ? <ActivityIndicator size="small" color={c.emerald} /> : <Text style={styles.scoutBtnText}>Run server scout</Text>}
+            </Pressable>
+            <Text style={[styles.serverScout, syncState.error && styles.syncErr]}>
+              {syncState.error ? 'Sync failed' : syncState.at ? `Synced ${rel(syncState.at)}` : 'Server connected'}
+            </Text>
+          </View>
         ) : (
           <Text style={styles.serverScout}>Scout off</Text>
         )}
@@ -119,6 +126,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     minWidth: 84,
   },
   scoutBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
+  serverCol: { alignItems: 'flex-end', gap: 4 },
   serverScout: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
   syncErr: { color: c.danger },
   scoutMsg: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },

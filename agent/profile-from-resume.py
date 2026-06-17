@@ -114,6 +114,148 @@ def detect_seniority(text):
     return [s for s in SENIORITY if s in t]
 
 
+# ---- structured work history + education ------------------------------------------------
+# Resume layouts vary wildly, so these are best-effort heuristics: find the section, split it
+# into entries on date-range lines, and capture role/company/dates + a short description. The app
+# shows "review below" — the candidate fixes anything we mis-split. Better to surface entries than
+# leave the sections blank (the prior behavior).
+
+_MONTH = (r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|"
+          r"april|june|july|august|september|october|november|december)\.?")
+_DATE = r"(?:%s\s*)?\d{4}" % _MONTH
+_RANGE = re.compile(r"(%s)\s*(?:to|[-–—−])\s*(present|current|now|%s)" % (_DATE, _DATE), re.I)
+_DEGREE = re.compile(r"\b(ph\.?d|doctorate|m\.?b\.?a|master'?s?|m\.?s\.?|m\.?a\.?|b\.?s\.?|"
+                     r"b\.?a\.?|bachelor'?s?|associate'?s?|b\.?eng|m\.?eng)\b", re.I)
+
+_SECTION_KEYS = {
+    "experience": ["work experience", "professional experience", "experience", "employment history",
+                   "employment", "work history", "career history", "relevant experience"],
+    "education": ["education", "academic background", "academics"],
+}
+_BOUND_KEYS = (["skills", "technical skills", "core competencies", "projects", "certifications",
+                "certification", "awards", "honors", "volunteer", "summary", "profile", "objective",
+                "publications", "interests", "languages", "references", "achievements", "contact"]
+               + [k for ks in _SECTION_KEYS.values() for k in ks])
+
+
+def _header_name(line):
+    s = line.strip()
+    if not s or len(s) > 46:
+        return None
+    norm = re.sub(r"[^a-z ]", "", s.lower()).strip()
+    if not norm:
+        return None
+    for name, keys in _SECTION_KEYS.items():
+        if any(norm == k or norm.startswith(k) for k in keys):
+            return name
+    if any(norm == k or norm.startswith(k) for k in _BOUND_KEYS):
+        return "_bound"
+    return None
+
+
+def _sections(text):
+    """Return {name: [lines]} for experience/education, each bounded by the next header."""
+    lines = text.splitlines()
+    heads = [(i, _header_name(l)) for i, l in enumerate(lines)]
+    heads = [(i, n) for i, n in heads if n]
+    out = {}
+    for idx, (i, name) in enumerate(heads):
+        if name in _SECTION_KEYS and name not in out:
+            end = heads[idx + 1][0] if idx + 1 < len(heads) else len(lines)
+            out[name] = lines[i + 1:end]
+    return out
+
+
+def _split_title(head):
+    head = head.strip(" \t,|·•–—-")
+    for sep in [" — ", " – ", " | ", " · ", " at ", " @ ", "—", "–", "|", "·"]:
+        if sep in head:
+            a, b = head.split(sep, 1)
+            return a.strip(" \t,"), b.strip(" \t,")
+    if "," in head:
+        a, b = head.split(",", 1)
+        return a.strip(), b.strip()
+    return head, ""
+
+
+def extract_experience(text):
+    secs = _sections(text)
+    lines = secs.get("experience")
+    if not lines:
+        return []
+    entries, cur, prev = [], None, ""
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        m = _RANGE.search(line)
+        if m:
+            if cur:
+                entries.append(cur)
+            head = (line[:m.start()] + " " + line[m.end():]).strip(" \t,|·•–—-")
+            role, company = _split_title(head) if head else (prev, "")
+            # "Role\nCompany 2019–2023" → head is the company, prev is the role
+            if head and not company and prev and prev != head:
+                role, company = prev, head
+            cur = {"role": role, "company": company, "start": m.group(1).strip(),
+                   "end": m.group(2).strip(), "desc": []}
+        elif cur is not None and len(cur["desc"]) < 6:
+            cur["desc"].append(re.sub(r"^[•\-–*•]\s*", "", line))
+        prev = line
+    if cur:
+        entries.append(cur)
+    return [{"role": e["role"], "company": e["company"], "start": e["start"], "end": e["end"],
+             "description": " ".join(e["desc"]).strip()[:600]} for e in entries[:12]]
+
+
+_SCHOOL_WORD = re.compile(r"\b(university|college|institute|polytechnic|academy|school of)\b", re.I)
+
+
+def _find_school(*candidates):
+    for c in candidates:
+        for seg in re.split(r"[—–|·,]| {2,}", c):
+            seg = seg.strip(" \t,|·•–—-")
+            if len(seg) >= 4 and _SCHOOL_WORD.search(seg):
+                return seg
+    return ""
+
+
+def extract_education(text):
+    secs = _sections(text)
+    lines = [l.strip() for l in secs.get("education", []) if l.strip()]
+    if not lines:
+        return []
+    out, prev = [], ""
+    for line in lines:
+        deg = _DEGREE.search(line)
+        yrs = re.findall(r"\b(?:19|20)\d{2}\b", line)
+        # A line with neither a degree nor a year isn't its own entry — keep it as the pending
+        # school for the next degree/year line (handles "School\nDegree, year" layouts).
+        if not deg and not yrs:
+            prev = line
+            continue
+        rng = _RANGE.search(line)
+        start = rng.group(1).strip() if rng else (yrs[0] if yrs else "")
+        end = rng.group(2).strip() if rng else ""
+        level = deg.group(0).strip().rstrip(".") if deg else ""
+        fm = re.search(r"\bin\s+([A-Z][A-Za-z& ]{2,40}?)(?:\s*[—–|·,]|\s+\d|$)", line)
+        field = fm.group(1).strip() if fm else ""
+        # School: prefer a segment with a school keyword (this line, then the previous line);
+        # else fall back to the line stripped of degree / field / dates.
+        school = _find_school(line, prev)
+        if not school:
+            s = _RANGE.sub("", line)
+            s = _DEGREE.sub("", s)
+            s = re.sub(r"\b(?:19|20)\d{2}\b", "", s)
+            if field:
+                s = s.replace(field, "")
+            s = re.sub(r"\b(?:in|of|the)\b", "", s, flags=re.I)
+            school = s.strip(" \t,|·•–—-.") or prev.strip(" \t,|·•–—-")
+        out.append({"school": school, "level": level, "field": field, "start": start, "end": end})
+        prev = line
+    return out[:8]
+
+
 def main():
     ap = argparse.ArgumentParser(description="Build a tailored search profile from a resume.")
     ap.add_argument("resume", help="path to resume (.docx/.txt/.md/.pdf)")
@@ -131,11 +273,14 @@ def main():
         "applicant": extract_applicant(text),
         "seniority": detect_seniority(text),
         "keywords": weighted_keywords(text),
+        "workHistory": extract_experience(text),
+        "education": extract_education(text),
         "remoteOnly": True,
     }
 
     print("Parsed %s" % os.path.basename(path))
     print("  applicant:", json.dumps(profile["applicant"]))
+    print("  work history:", len(profile["workHistory"]), "entries · education:", len(profile["education"]), "entries")
     print("  seniority:", ", ".join(profile["seniority"]) or "(none detected)")
     print("  top keywords:", ", ".join("%s(%d)" % (k["kw"], k["weight"])
                                         for k in profile["keywords"][:12]) or "(none)")

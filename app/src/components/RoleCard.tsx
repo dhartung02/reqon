@@ -5,7 +5,7 @@ import { remoteBadge, type RationaleTone } from '../scout/explain';
 
 // Tier-scored pipeline card: left edge + badge in the tier color, score, title, company, and a
 // status pill. Tappable → row detail (or toggles selection in bulk-select mode). Tier C is dimmed.
-export function RoleCard({ role, onPress, selectable = false, selected = false }: { role: Role; onPress?: () => void; selectable?: boolean; selected?: boolean }) {
+export function RoleCard({ role, onPress, selectable = false, selected = false, active = false }: { role: Role; onPress?: () => void; selectable?: boolean; selected?: boolean; active?: boolean }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
   const sc = statusColor(role.status, c);
@@ -21,6 +21,7 @@ export function RoleCard({ role, onPress, selectable = false, selected = false }
         styles.card,
         { borderLeftColor: accent },
         suppressed && styles.cardSuppressed,
+        active && styles.cardActive,
         selected && styles.cardSelected,
         pressed && styles.pressed,
       ]}
@@ -86,6 +87,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 12,
   },
   cardSuppressed: { backgroundColor: alpha(c.element, 0.4), opacity: 0.6 },
+  // master-detail: the row whose detail is currently open in the side pane (iPad)
+  cardActive: { backgroundColor: alpha(c.emerald, 0.16), opacity: 1 },
   cardSelected: { backgroundColor: alpha(c.emerald, 0.1) },
   pressed: { opacity: 0.85 },
   check: {

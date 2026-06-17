@@ -322,6 +322,7 @@ function AppInner() {
         onBulkStatus={setStatusMany}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        activeId={wide ? selectedId : null}
       />
     );
   const controlBar = <ControlBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} filter={filter} onFilter={setFilter} />;
@@ -335,6 +336,7 @@ function AppInner() {
       onDelete={() => { remove(selected.id); setSelectedId(null); }}
       onOpenPosting={(u) => setBrowserUrl(u)}
       onBuildCv={(r) => { setCvTarget({ role: r.role, company: r.company, jd: r.notes ?? '' }); setShowCv(true); }}
+      embedded
     />
   ) : (
     <View style={styles.detailEmpty}>

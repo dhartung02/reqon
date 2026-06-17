@@ -30,4 +30,23 @@ function matchRow(rows, pageUrl) {
   return rows.find(r => r.deleted !== true && norm(r.link) === target) || null;
 }
 
-if (typeof module !== 'undefined') module.exports = { postingId, reqKey, sameReq, matchRow };
+// Keyword-match a form question to a saved answer (apply-assist). Mirrors app/src/answers.ts —
+// conservative: needs >=2 shared meaningful tokens before claiming a match, so it leaves a field
+// blank rather than pasting the wrong answer.
+const _STOP = new Set(
+  'the a an to of for in on at and or your you our we us is are be do does did what why how when where which who please describe tell about this that these those role position company companies team teams with as it its their have has will would can could should i my me'.split(' '));
+const _tokenize = s => (String(s || '').toLowerCase().match(/[a-z0-9+#]+/g) || []).filter(w => w.length > 2 && !_STOP.has(w));
+function bestAnswerMatch(question, answers) {
+  const q = new Set(_tokenize(question));
+  if (!q.size) return null;
+  let best = null, bestScore = 0;
+  for (const a of (answers || [])) {
+    const at = new Set([..._tokenize(a.q), ...((a.tags || []).flatMap(_tokenize))]);
+    let score = 0;
+    at.forEach(w => { if (q.has(w)) score++; });
+    if (score > bestScore) { bestScore = score; best = a; }
+  }
+  return bestScore >= 2 ? best : null;
+}
+
+if (typeof module !== 'undefined') module.exports = { postingId, reqKey, sameReq, matchRow, bestAnswerMatch };

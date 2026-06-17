@@ -27,5 +27,15 @@ check('matchRow by posting-id (URL variant)', (ext.matchRow(rows, 'https://job-b
 check('matchRow excludes tombstones', ext.matchRow(rows, 'https://acme.com/careers/123'), null);
 check('matchRow miss → null', ext.matchRow(rows, 'https://other.com/x'), null);
 
+// bestAnswerMatch (apply-assist) — mirrors app/src/answers.ts behavior
+const ansLib = [
+  { id: 's', q: 'What are your salary expectations', a: '$220k+', tags: ['comp'] },
+  { id: 'b', q: 'Tell me about your background', a: 'Principal PM', tags: ['data', 'platform'] },
+];
+check('bestAnswerMatch: >=2 token overlap', (ext.bestAnswerMatch('Your salary expectations for this position?', ansLib) || {}).id, 's');
+check('bestAnswerMatch: tags count', (ext.bestAnswerMatch('data platform background', ansLib) || {}).id, 'b');
+check('bestAnswerMatch: below threshold → null', ext.bestAnswerMatch('When can you start?', ansLib), null);
+check('bestAnswerMatch: empty → null', ext.bestAnswerMatch('', ansLib), null);
+
 console.log(`\nextension vectors: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

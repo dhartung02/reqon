@@ -248,10 +248,6 @@ def short_note(title, desc, rmode):
 # ---------------------------------------------------------------------------
 # CRM dedupe + merge (parity with agent/merge-into-crm.js)
 # ---------------------------------------------------------------------------
-def req_key(x):
-    return (str(x.get("company", "")) + "|" + str(x.get("role", ""))).lower().strip()
-
-
 # Canonicalize a company|role string so abbreviated manual entries
 # ("Senior PM, CDP") match scraped official titles ("Senior Product Manager, CDP").
 _NORM = [
@@ -310,25 +306,35 @@ def http_merge(rows):
     return res
 
 
+def dedupe_new(rows, store):
+    """Entries in `rows` not already in `store`, deduped by norm_key — the near-dupe-aware key —
+    both against the store and within the batch. file_merge writes straight to data.json, so this
+    is where the embellished-vs-official gotcha must be caught; the scan uses the same key via
+    load_existing_keys(), so both paths now agree (previously file_merge used a weaker exact key)."""
+    existing = set(norm_key(r.get("company", ""), r.get("role", "")) for r in store)
+    out = []
+    for x in rows:
+        k = norm_key(x.get("company", ""), x.get("role", ""))
+        if not k or k == "|" or k in existing:
+            continue
+        existing.add(k)
+        out.append(x)
+    return out
+
+
 def file_merge(rows):
     store = []
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, encoding="utf-8") as f:
             store = json.load(f)
-    existing = set(req_key(r) for r in store)
-    added = 0
-    for x in rows:
-        k = req_key(x)
-        if not k or k == "|" or k in existing:
-            continue
+    new = dedupe_new(rows, store)
+    for x in new:
         store.append(with_defaults(x))
-        existing.add(k)
-        added += 1
     tmp = DATA_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(store, f, indent=2)
     os.replace(tmp, DATA_FILE)
-    return {"ok": True, "added": added, "skipped": len(rows) - added,
+    return {"ok": True, "added": len(new), "skipped": len(rows) - len(new),
             "total": len(store), "via": "file"}
 
 

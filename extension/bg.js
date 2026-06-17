@@ -26,6 +26,15 @@ async function getRows(force) {
   return rows;
 }
 
+// ---- profile cache (apply-assist fill: factual fields + saved answers) ----
+let profileCache = { profile: null, at: 0 };
+async function getProfile(force) {
+  if (!force && profileCache.profile && Date.now() - profileCache.at < 60000) return profileCache.profile;
+  const j = await api('/api/profile');
+  profileCache = { profile: (j && j.profile) || {}, at: Date.now() };
+  return profileCache.profile;
+}
+
 // ---- offline queue (FR-EXT-5) ----
 async function enqueue(action) {
   const { queue = [] } = await chrome.storage.local.get('queue');
@@ -97,6 +106,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(await clip(msg.url, msg.title));
       } else if (msg.type === 'markApplied') {
         sendResponse(await markApplied(msg.row));
+      } else if (msg.type === 'profile') {
+        sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
       } else if (msg.type === 'testConnection') {
         const j = await api('/api/health');
         sendResponse({ ok: true, msg: 'Connected — ' + j.count + ' rows on the board.' });

@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { alpha, fonts, useThemedStyles, useScheme, type Palette, type SchemePref } from '../theme';
+import { useLayout } from '../useLayout';
 import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
 import { testConnection, syncTwoWay } from '../sync/sync';
+import { ProfileScreen } from './ProfileScreen';
+import { SearchCriteriaScreen } from './SearchCriteriaScreen';
+import { TiersRulesScreen } from './TiersRulesScreen';
+import { SavedAnswersScreen } from './SavedAnswersScreen';
+import { BuildCvScreen } from './BuildCvScreen';
+import { ScoringGuideScreen } from './ScoringGuideScreen';
 
-// Sync settings: server URL + token (keychain), connection test, and a full pull.
+// Settings. Phone: a bottom sheet (sync config + nav rows that push full-screen sub-screens, wired
+// by App via the onEdit* callbacks). iPad (wide): a centered split panel — section list on the left,
+// the chosen section's content on the right (the onEdit* callbacks aren't used; the panel hosts the
+// sub-screens itself). The sync-config JSX is shared between both via local consts.
+type Section = 'sync' | 'profile' | 'search' | 'rules' | 'answers' | 'cv' | 'guide';
+const SECTIONS: { key: Section; label: string }[] = [
+  { key: 'sync', label: 'Sync & device' },
+  { key: 'profile', label: 'Profile' },
+  { key: 'search', label: 'Search criteria' },
+  { key: 'rules', label: 'Tiers & rules' },
+  { key: 'answers', label: 'Saved answers' },
+  { key: 'cv', label: 'Build CV' },
+  { key: 'guide', label: 'How scoring works' },
+];
+
 export function SettingsModal({
   visible,
   onClose,
@@ -27,7 +48,9 @@ export function SettingsModal({
   onOpenGuide: () => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
+  const { wide } = useLayout();
   const { pref, setScheme } = useScheme();
+  const [section, setSection] = useState<Section>('sync');
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,6 +61,7 @@ export function SettingsModal({
     if (visible) {
       getConfig().then((cfg) => { setUrl(cfg.url); setToken(cfg.token); setStatus(null); });
       getScoutMode().then(setScout);
+      setSection('sync');
     }
   }, [visible]);
 
@@ -71,10 +95,7 @@ export function SettingsModal({
     await persist();
     try {
       const { pushed, pulled, remaps } = await syncTwoWay();
-      setStatus({
-        kind: 'ok',
-        text: `Synced · pushed ${pushed}, pulled ${pulled}${remaps ? `, ${remaps} merged` : ''}`,
-      });
+      setStatus({ kind: 'ok', text: `Synced · pushed ${pushed}, pulled ${pulled}${remaps ? `, ${remaps} merged` : ''}` });
       onSynced();
     } catch (e) {
       setStatus({ kind: 'err', text: e instanceof Error ? e.message : 'sync failed' });
@@ -84,6 +105,120 @@ export function SettingsModal({
 
   const statusColorFor = (k: string) => (k === 'ok' ? c.emerald : k === 'err' ? c.danger : c.muted);
 
+  // Sync-config controls (shared by the phone sheet + the wide "Sync & device" pane).
+  const syncTop = (
+    <>
+      <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. When configured, sync runs automatically on launch and foreground (push local edits + pull server changes, last-writer-wins); the button below forces it now.</Text>
+      <View style={styles.labeled}>
+        <Text style={styles.label}>Server URL</Text>
+        <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={c.muted} style={styles.input} />
+      </View>
+      <View style={styles.labeled}>
+        <Text style={styles.label}>Token (X-CRM-Token)</Text>
+        <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="APP_TOKEN" placeholderTextColor={c.muted} style={styles.input} />
+      </View>
+      <View style={styles.labeled}>
+        <Text style={styles.label}>On-device scout</Text>
+        <View style={styles.seg}>
+          {(['auto', 'on', 'off'] as ScoutMode[]).map((m) => (
+            <Pressable key={m} style={[styles.segBtn, scout === m && styles.segBtnOn]} onPress={() => pickScout(m)}>
+              <Text style={[styles.segText, scout === m && styles.segTextOn]}>{m === 'auto' ? 'Auto' : m === 'on' ? 'On' : 'Off'}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.help}>{scoutHelp}</Text>
+      </View>
+      <View style={styles.labeled}>
+        <Text style={styles.label}>Appearance</Text>
+        <View style={styles.seg}>
+          {(['light', 'dark', 'system'] as SchemePref[]).map((m) => (
+            <Pressable key={m} style={[styles.segBtn, pref === m && styles.segBtnOn]} onPress={() => setScheme(m)}>
+              <Text style={[styles.segText, pref === m && styles.segTextOn]}>{m === 'light' ? 'Light' : m === 'dark' ? 'Dark' : 'System'}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
+      </View>
+    </>
+  );
+  const syncBottom = (
+    <>
+      <Text style={styles.serverOnly}>Server-only by design: morning digest + email/Slack (SMTP), push notifications (APNs), AI keys & enrichment budgets, scheduling, and access tokens are managed on the server.</Text>
+      {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
+      {busy ? <ActivityIndicator color={c.emerald} /> : null}
+      <View style={styles.actions}>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={test} disabled={busy}>
+          <Text style={styles.btnGhostText}>Test connection</Text>
+        </Pressable>
+        <Pressable style={[styles.btn, styles.btnPrimary]} onPress={sync} disabled={busy}>
+          <Text style={styles.btnPrimaryText}>Sync now</Text>
+        </Pressable>
+      </View>
+    </>
+  );
+  const navRow = (label: string, help: string, onPress: () => void) => (
+    <Pressable style={styles.profileRow} onPress={onPress}>
+      <View style={styles.flex1}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.help}>{help}</Text>
+      </View>
+      <Text style={styles.profileChev}>›</Text>
+    </Pressable>
+  );
+  const navRows = (
+    <>
+      {navRow('Profile · apply-assist', 'Name, links, education, work history, EEO + résumé upload', onEditProfile)}
+      {navRow('Search criteria', 'Role titles, keywords, min-fit, salary floor + remote', onEditSearch)}
+      {navRow('Tiers & rules', 'A/B/C thresholds, scout merge tier, follow-up days, AI drafts', onEditRules)}
+      {navRow('Saved answers', 'Reusable Q&A + saved AI drafts — searchable, tagged', onEditAnswers)}
+      {navRow('Build CV', 'Generate a .docx / PDF CV from your profile + narratives', onBuildCv)}
+      {navRow('How scoring works', 'What Fit, Interview probability, EV, and tiers mean', onOpenGuide)}
+    </>
+  );
+
+  // iPad: centered split panel — section list + content pane (hosts the sub-screens directly).
+  if (wide) {
+    const back = () => setSection('sync');
+    const pane =
+      section === 'profile' ? <ProfileScreen onBack={back} />
+        : section === 'search' ? <SearchCriteriaScreen onBack={back} />
+        : section === 'rules' ? <TiersRulesScreen onBack={back} />
+        : section === 'answers' ? <SavedAnswersScreen onBack={back} />
+        : section === 'cv' ? <BuildCvScreen onBack={back} />
+        : section === 'guide' ? <ScoringGuideScreen onBack={back} />
+        : (
+          <ScrollView contentContainerStyle={styles.synPane} keyboardShouldPersistTaps="handled">
+            {syncTop}
+            {syncBottom}
+          </ScrollView>
+        );
+    return (
+      <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+        <View style={styles.wideBackdrop}>
+          <View style={styles.panel}>
+            <View style={styles.panelHead}>
+              <Text style={styles.title}>Settings</Text>
+              <Pressable onPress={onClose} hitSlop={8}>
+                <Text style={styles.cancel}>Done</Text>
+              </Pressable>
+            </View>
+            <View style={styles.split}>
+              <View style={styles.sectionList}>
+                {SECTIONS.map((s) => (
+                  <Pressable key={s.key} style={[styles.sectionItem, section === s.key && styles.sectionItemOn]} onPress={() => setSection(s.key)}>
+                    <Text style={[styles.sectionItemText, section === s.key && styles.sectionItemTextOn]}>{s.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.pane}>{pane}</View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Phone: bottom sheet (unchanged) — sync config, then the nav rows that push full-screen.
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -94,107 +229,10 @@ export function SettingsModal({
               <Text style={styles.cancel}>Done</Text>
             </Pressable>
           </View>
-
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. When configured, sync runs automatically on launch and foreground (push local edits + pull server changes, last-writer-wins); the button below forces it now.</Text>
-            <View style={styles.labeled}>
-              <Text style={styles.label}>Server URL</Text>
-              <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={c.muted} style={styles.input} />
-            </View>
-            <View style={styles.labeled}>
-              <Text style={styles.label}>Token (X-CRM-Token)</Text>
-              <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="APP_TOKEN" placeholderTextColor={c.muted} style={styles.input} />
-            </View>
-
-            <View style={styles.labeled}>
-              <Text style={styles.label}>On-device scout</Text>
-              <View style={styles.seg}>
-                {(['auto', 'on', 'off'] as ScoutMode[]).map((m) => (
-                  <Pressable key={m} style={[styles.segBtn, scout === m && styles.segBtnOn]} onPress={() => pickScout(m)}>
-                    <Text style={[styles.segText, scout === m && styles.segTextOn]}>
-                      {m === 'auto' ? 'Auto' : m === 'on' ? 'On' : 'Off'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.help}>{scoutHelp}</Text>
-            </View>
-
-            <View style={styles.labeled}>
-              <Text style={styles.label}>Appearance</Text>
-              <View style={styles.seg}>
-                {(['light', 'dark', 'system'] as SchemePref[]).map((m) => (
-                  <Pressable key={m} style={[styles.segBtn, pref === m && styles.segBtnOn]} onPress={() => setScheme(m)}>
-                    <Text style={[styles.segText, pref === m && styles.segTextOn]}>
-                      {m === 'light' ? 'Light' : m === 'dark' ? 'Dark' : 'System'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
-            </View>
-
-            <Pressable style={styles.profileRow} onPress={onEditProfile}>
-              <View style={styles.flex1}>
-                <Text style={styles.label}>Profile · apply-assist</Text>
-                <Text style={styles.help}>Name, links, education, work history, EEO + résumé upload</Text>
-              </View>
-              <Text style={styles.profileChev}>›</Text>
-            </Pressable>
-
-            <Pressable style={styles.profileRow} onPress={onEditSearch}>
-              <View style={styles.flex1}>
-                <Text style={styles.label}>Search criteria</Text>
-                <Text style={styles.help}>Role titles, keywords, min-fit, salary floor + remote</Text>
-              </View>
-              <Text style={styles.profileChev}>›</Text>
-            </Pressable>
-
-            <Pressable style={styles.profileRow} onPress={onEditRules}>
-              <View style={styles.flex1}>
-                <Text style={styles.label}>Tiers & rules</Text>
-                <Text style={styles.help}>A/B/C thresholds, scout merge tier, follow-up days, AI drafts</Text>
-              </View>
-              <Text style={styles.profileChev}>›</Text>
-            </Pressable>
-
-            <Pressable style={styles.profileRow} onPress={onEditAnswers}>
-              <View style={styles.flex1}>
-                <Text style={styles.label}>Saved answers</Text>
-                <Text style={styles.help}>Reusable Q&A + saved AI drafts — searchable, tagged</Text>
-              </View>
-              <Text style={styles.profileChev}>›</Text>
-            </Pressable>
-
-            <Pressable style={styles.profileRow} onPress={onBuildCv}>
-              <View style={styles.flex1}>
-                <Text style={styles.label}>Build CV</Text>
-                <Text style={styles.help}>Generate a .docx CV from your profile + narratives</Text>
-              </View>
-              <Text style={styles.profileChev}>›</Text>
-            </Pressable>
-
-            <Pressable style={styles.profileRow} onPress={onOpenGuide}>
-              <View style={styles.flex1}>
-                <Text style={styles.label}>How scoring works</Text>
-                <Text style={styles.help}>What Fit, Interview probability, EV, and tiers mean</Text>
-              </View>
-              <Text style={styles.profileChev}>›</Text>
-            </Pressable>
-
-            <Text style={styles.serverOnly}>Server-only by design: morning digest + email/Slack (SMTP), push notifications (APNs), AI keys & enrichment budgets, scheduling, and access tokens are managed on the server.</Text>
-
-            {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
-            {busy ? <ActivityIndicator color={c.emerald} /> : null}
-
-            <View style={styles.actions}>
-              <Pressable style={[styles.btn, styles.btnGhost]} onPress={test} disabled={busy}>
-                <Text style={styles.btnGhostText}>Test connection</Text>
-              </Pressable>
-              <Pressable style={[styles.btn, styles.btnPrimary]} onPress={sync} disabled={busy}>
-                <Text style={styles.btnPrimaryText}>Sync now</Text>
-              </Pressable>
-            </View>
+            {syncTop}
+            {navRows}
+            {syncBottom}
           </ScrollView>
         </View>
       </View>
@@ -223,41 +261,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   labeled: { gap: 6 },
   label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.muted },
   seg: { flexDirection: 'row', gap: 8 },
-  segBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 9,
-    backgroundColor: c.element,
-    borderWidth: 1,
-    borderColor: c.element,
-    alignItems: 'center',
-  },
+  segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, backgroundColor: c.element, borderWidth: 1, borderColor: c.element, alignItems: 'center' },
   segBtnOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.1) },
   segText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500', color: c.textBase },
   segTextOn: { color: c.emerald },
   flex1: { flex: 1 },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: c.element,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.element, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   profileChev: { fontSize: 22, color: c.muted, lineHeight: 22 },
   serverOnly: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, lineHeight: 16, fontStyle: 'italic' },
-  input: {
-    backgroundColor: c.element,
-    borderWidth: 1,
-    borderColor: c.element,
-    borderRadius: 10,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    color: c.textHigh,
-    fontFamily: fonts.sans,
-    fontSize: 15,
-  },
+  input: { backgroundColor: c.element, borderWidth: 1, borderColor: c.element, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, color: c.textHigh, fontFamily: fonts.sans, fontSize: 15 },
   status: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
   btn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
@@ -265,4 +277,16 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   btnGhostText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '500', color: c.textHigh },
   btnPrimary: { backgroundColor: c.emerald },
   btnPrimaryText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: c.canvas },
+  // ---- wide split panel ----
+  wideBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  panel: { width: '94%', maxWidth: 880, height: '88%', backgroundColor: c.canvas, borderRadius: 18, borderWidth: 1, borderColor: c.element, overflow: 'hidden' },
+  panelHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.element },
+  split: { flex: 1, flexDirection: 'row' },
+  sectionList: { width: 200, backgroundColor: c.element, paddingVertical: 8, paddingHorizontal: 8, gap: 2 },
+  sectionItem: { paddingHorizontal: 12, paddingVertical: 11, borderRadius: 9 },
+  sectionItemOn: { backgroundColor: alpha(c.emerald, 0.12) },
+  sectionItemText: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase },
+  sectionItemTextOn: { color: c.emerald, fontWeight: '600' },
+  pane: { flex: 1, minWidth: 0 },
+  synPane: { gap: 14, padding: 20, paddingBottom: 32 },
 });

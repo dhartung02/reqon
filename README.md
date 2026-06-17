@@ -28,6 +28,12 @@ Everything is configured from the **Settings** panel in the web UI — no file e
 - **Data safety** — every save snapshots first, a corruption guard rejects destructive saves,
   and Settings has snapshot/restore + retention.
 - **Apply-mode** — each row is tagged fillable / gated / simplify / manual to plan the apply step.
+- **iOS / iPad app** (`app/`) — a React Native / Expo companion: pipeline, Today command
+  center, analytics, candidate profile, and an in-app apply-assist browser. Lays out as a
+  master-detail command center on iPad. Runs in **Expo Go** — no Apple Developer account needed.
+- **Chrome extension** (`extension/`) — clip any posting to the board, a fit overlay on known
+  job pages, one-click "Mark Applied" write-back, and apply-assist autofill of *factual* fields
+  on Greenhouse / Ashby / Lever (never EEO, consent, or submit).
 
 ## Quick start
 
@@ -65,12 +71,37 @@ bash tests/run.sh                        # unit tests (stdlib, no deps)
 Add a company without editing JSON: **Settings → Add company by careers URL** (paste a board
 URL; it detects the ATS + slug). Per-source run health is shown in Settings.
 
+## Mobile app & Chrome extension
+
+**iOS / iPad app** (`app/`, Expo SDK 56) — runs in **Expo Go**, so no Apple Developer account
+or Xcode is needed to use it on your own device:
+
+```bash
+cd app && npm install
+npx expo start          # then open the link in Expo Go (device on the same network)
+```
+
+iPad lays out as a master-detail command center (3-pane in landscape, 2-pane in portrait);
+phone is single-column. Point it at your server in **Settings → Sync** (server URL + optional
+token). The native **Share Extension** (Safari → Add to CRM) and **push notifications** require
+an EAS/Xcode dev build — they are not available in Expo Go.
+
+**Chrome extension** (`extension/`) — load unpacked: `chrome://extensions` → enable *Developer
+mode* → *Load unpacked* → select `extension/`. Set your server origin + token in the extension's
+options. Then the toolbar button clips the current tab, a fit overlay appears on tracked/known
+job pages, "Mark Applied" writes the status back, and apply-assist fills factual fields on
+Greenhouse / Ashby / Lever (it never touches EEO, consent, or the submit button).
+
 ## Data & privacy
 
-`data.json` (your pipeline), `agent/profile.json` (your résumé-derived profile), `seed.json`,
-`agent/found-log.md`, `.env`, and `backups/` are **gitignored** — no personal data is committed.
-Generic `*.example.json` files ship for fresh clones. The board is LAN-only by default; set
-`APP_TOKEN` to require a passphrase before exposing it.
+`data.json` (your pipeline), `agent/profile.json` (your résumé-derived profile), résumé source
+files, `seed.json`, `agent/found-log.md`, `.env`, and `backups/` are **gitignored** — no personal
+data is committed. Generic `*.example.json` files ship for fresh clones. The board is LAN-only by
+default; set `APP_TOKEN` to require a passphrase before exposing it.
+
+Edits sync across the board, the app, and the extension through the server (`/api/sync`), and
+deletes are **soft (tombstones)** — removing a row on one surface won't have it resurrected by
+another device that hadn't seen the delete yet.
 
 ## License
 

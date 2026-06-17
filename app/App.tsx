@@ -9,7 +9,9 @@ import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
 import { SettingsIcon } from './src/components/SettingsIcon';
 import { TabBar } from './src/components/TabBar';
+import { NavRail } from './src/components/NavRail';
 import { ControlBar } from './src/components/ControlBar';
+import { useLayout } from './src/useLayout';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { PipelineScreen } from './src/screens/PipelineScreen';
 import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
@@ -42,6 +44,7 @@ const VIEW_TITLE: Record<Lane, string> = {
 function AppInner() {
   const { c, styles } = useThemedStyles(makeStyles);
   const { scheme } = useScheme();
+  const { wide } = useLayout(); // iPad/landscape → nav rail + master-detail; phone → push nav
   const statusBar = scheme === 'light' ? 'dark' : 'light';
   const [fontsLoaded] = useFonts({
     SplineSans: require('./assets/fonts/SplineSans.ttf'),
@@ -263,7 +266,8 @@ function AppInner() {
   }
 
   const selected = selectedId ? roles.find((r) => r.id === selectedId) ?? null : null;
-  if (selected) {
+  // Phone: tapping a role pushes a full-screen detail. Wide (iPad): it fills the detail pane instead.
+  if (selected && !wide) {
     return (
       <SafeAreaView style={styles.safe}>
         <RoleDetailScreen
@@ -287,65 +291,104 @@ function AppInner() {
     );
   }
 
+  const isPipeline = lane !== 'today' && lane !== 'analytics';
+  // The lane body (ternary preserves the StatusLane narrowing for PipelineScreen). Shared by both
+  // layouts; on wide the pipeline list sits in the master column with the detail pane beside it.
+  const laneBody =
+    lane === 'today' ? (
+      <TodayScreen
+        roles={roles}
+        onJump={setLane}
+        onScout={onScout}
+        onServerScout={onServerScout}
+        scouting={scouting}
+        scoutMsg={scoutMsg}
+        scoutEnabled={scoutOn}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        serverConfigured={!!serverUrl}
+        syncState={syncState}
+      />
+    ) : lane === 'analytics' ? (
+      <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
+    ) : (
+      <PipelineScreen
+        lane={lane}
+        roles={roles}
+        query={query}
+        sort={sort}
+        filter={filter}
+        onPressRole={(r) => setSelectedId(r.id)}
+        onBulkStatus={setStatusMany}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+    );
+  const controlBar = <ControlBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} filter={filter} onFilter={setFilter} />;
+  const detailPane = selected ? (
+    <RoleDetailScreen
+      key={selected.id}
+      role={selected}
+      onBack={() => setSelectedId(null)}
+      onStatusChange={(s: Status) => setStatus(selected.id, s)}
+      onUpdate={(patch) => update(selected.id, patch)}
+      onDelete={() => { remove(selected.id); setSelectedId(null); }}
+      onOpenPosting={(u) => setBrowserUrl(u)}
+      onBuildCv={(r) => { setCvTarget({ role: r.role, company: r.company, jd: r.notes ?? '' }); setShowCv(true); }}
+    />
+  ) : (
+    <View style={styles.detailEmpty}>
+      <Text style={styles.detailEmptyText}>Select a role to view details, apply, or change its status.</Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.shell}>
-        <View style={styles.brandbar}>
-          <View style={styles.brandLeft}>
-            <ReqonGlyph size={26} />
-            <View>
-              <Text style={styles.brand}>REQON</Text>
-              <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
+      {wide ? (
+        <View style={styles.wideShell}>
+          <NavRail active={lane} counts={counts} onChange={setLane} onAdd={() => setShowAdd(true)} onSettings={() => setShowSettings(true)} />
+          <View style={styles.wideContent}>
+            <Text style={styles.wideTitle}>{VIEW_TITLE[lane]}</Text>
+            {isPipeline ? (
+              <View style={styles.masterDetail}>
+                <View style={styles.master}>
+                  {controlBar}
+                  <View style={styles.masterList}>{laneBody}</View>
+                </View>
+                <View style={styles.detail}>{detailPane}</View>
+              </View>
+            ) : (
+              <View style={styles.body}>{laneBody}</View>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.shell}>
+          <View style={styles.brandbar}>
+            <View style={styles.brandLeft}>
+              <ReqonGlyph size={26} />
+              <View>
+                <Text style={styles.brand}>REQON</Text>
+                <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
+              </View>
+            </View>
+            <View style={styles.brandRight}>
+              <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={22} accessibilityLabel="Settings & sync">
+                <SettingsIcon size={18} color={c.textBase} />
+              </Pressable>
+              <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add role">
+                <Text style={styles.addBtnText}>+</Text>
+              </Pressable>
             </View>
           </View>
-          <View style={styles.brandRight}>
-            <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={22} accessibilityLabel="Settings & sync">
-              <SettingsIcon size={18} color={c.textBase} />
-            </Pressable>
-            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add role">
-              <Text style={styles.addBtnText}>+</Text>
-            </Pressable>
-          </View>
+
+          <TabBar active={lane} counts={counts} onChange={setLane} />
+
+          {isPipeline ? controlBar : null}
+
+          <View style={styles.body}>{laneBody}</View>
         </View>
-
-        <TabBar active={lane} counts={counts} onChange={setLane} />
-
-        {lane !== 'today' && lane !== 'analytics' ? (
-          <ControlBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} filter={filter} onFilter={setFilter} />
-        ) : null}
-
-        <View style={styles.body}>
-          {lane === 'today' ? (
-            <TodayScreen
-              roles={roles}
-              onJump={setLane}
-              onScout={onScout}
-              onServerScout={onServerScout}
-              scouting={scouting}
-              scoutMsg={scoutMsg}
-              scoutEnabled={scoutOn}
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              serverConfigured={!!serverUrl}
-              syncState={syncState}
-            />
-          ) : lane === 'analytics' ? (
-            <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
-          ) : (
-            <PipelineScreen
-              lane={lane}
-              roles={roles}
-              query={query}
-              sort={sort}
-              filter={filter}
-              onPressRole={(r) => setSelectedId(r.id)}
-              onBulkStatus={setStatusMany}
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-            />
-          )}
-        </View>
-      </View>
+      )}
       <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
       <SettingsModal
         visible={showSettings}
@@ -425,4 +468,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   brand: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '600', letterSpacing: 2.6, color: c.emerald },
   title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh, letterSpacing: -0.2 },
   body: { flex: 1 },
+  // ---- wide (iPad) layout ----
+  wideShell: { flex: 1, flexDirection: 'row' },
+  wideContent: { flex: 1, paddingHorizontal: 20, paddingTop: 10, minWidth: 0 },
+  wideTitle: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh, marginBottom: 6 },
+  masterDetail: { flex: 1, flexDirection: 'row', gap: 16 },
+  master: { flex: 1, minWidth: 0 },
+  masterList: { flex: 1 },
+  detail: { flex: 1, minWidth: 0, borderLeftWidth: 1, borderLeftColor: c.element, paddingLeft: 16 },
+  detailEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  detailEmptyText: { fontFamily: fonts.sans, fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 },
 });

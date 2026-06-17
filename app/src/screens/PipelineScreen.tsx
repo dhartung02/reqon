@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, SectionList, Pressable, RefreshControl } from 'react-native';
 import { fonts, useThemedStyles, type Palette } from '../theme';
 import { RoleCard } from '../components/RoleCard';
 import { BulkActionBar } from '../components/BulkActionBar';
@@ -63,6 +63,8 @@ export function PipelineScreen({
 
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
   const allIds = useMemo(() => groups.flatMap((g) => g.rows.map((r) => r.id)), [groups]);
+  // SectionList sections (one per tier) — virtualizes the list so ~150+ cards don't all mount.
+  const sections = useMemo(() => groups.map((g) => ({ tier: g.tier, count: g.rows.length, data: g.rows })), [groups]);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.includes(id));
 
   const exitSelect = () => {
@@ -113,31 +115,30 @@ export function PipelineScreen({
           <Text style={styles.tool}>{selecting ? 'Cancel' : 'Select'}</Text>
         </Pressable>
       </View>
-      <ScrollView
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
-      >
-        {groups.map((g) => (
-          <View key={g.tier} style={styles.group}>
-            <View style={styles.groupHead}>
-              <Text style={styles.groupTitle}>{TIER_LABEL[g.tier]}</Text>
-              <Text style={styles.groupCount}>{g.rows.length}</Text>
-            </View>
-            <View style={styles.list}>
-              {g.rows.map((r) => (
-                <RoleCard
-                  key={r.id}
-                  role={r}
-                  selectable={selecting}
-                  selected={selected.includes(r.id)}
-                  active={!selecting && r.id === activeId}
-                  onPress={() => (selecting ? toggle(r.id) : onPressRole(r))}
-                />
-              ))}
-            </View>
+        renderSectionHeader={({ section }) => (
+          <View style={styles.groupHead}>
+            <Text style={styles.groupTitle}>{TIER_LABEL[section.tier]}</Text>
+            <Text style={styles.groupCount}>{section.count}</Text>
           </View>
-        ))}
-      </ScrollView>
+        )}
+        ItemSeparatorComponent={() => <View style={styles.itemSep} />}
+        renderItem={({ item }) => (
+          <RoleCard
+            role={item}
+            selectable={selecting}
+            selected={selected.includes(item.id)}
+            active={!selecting && item.id === activeId}
+            onPress={() => (selecting ? toggle(item.id) : onPressRole(item))}
+          />
+        )}
+      />
       {selecting ? <BulkActionBar count={selected.length} onStatus={applyBulk} /> : null}
     </View>
   );
@@ -147,9 +148,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   wrap: { flex: 1 },
   toolRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, minHeight: 20 },
   tool: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
-  scroll: { paddingTop: 12, paddingBottom: 32, gap: 18 },
-  group: { gap: 10 },
-  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scroll: { paddingTop: 12, paddingBottom: 32 },
+  // gap doesn't apply across virtualized rows — spacing is via header margins + ItemSeparator.
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, marginBottom: 10 },
   groupTitle: {
     fontFamily: fonts.sans,
     fontSize: 12,
@@ -159,7 +160,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.muted,
   },
   groupCount: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
-  list: { gap: 12 },
+  itemSep: { height: 12 },
   empty: { paddingTop: 64, alignItems: 'center' },
   emptyText: { fontFamily: fonts.sans, fontSize: 14, color: c.muted },
 });

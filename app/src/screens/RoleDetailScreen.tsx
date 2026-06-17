@@ -70,6 +70,7 @@ export function RoleDetailScreen({
   onDelete,
   onOpenPosting,
   onBuildCv,
+  embedded = false,
 }: {
   role: Role;
   onBack: () => void;
@@ -78,6 +79,7 @@ export function RoleDetailScreen({
   onDelete: () => void;
   onOpenPosting: (url: string) => void;
   onBuildCv: (role: Role) => void;
+  embedded?: boolean;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
@@ -85,9 +87,11 @@ export function RoleDetailScreen({
   const toneColor: Record<RationaleTone, string> = { good: c.emerald, bad: c.danger, neutral: c.muted };
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-      <Pressable onPress={onBack} hitSlop={8} style={styles.back}>
-        <Text style={styles.backText}>‹ Back</Text>
-      </Pressable>
+      {embedded ? null : (
+        <Pressable onPress={onBack} hitSlop={8} style={styles.back}>
+          <Text style={styles.backText}>‹ Back</Text>
+        </Pressable>
+      )}
 
       <View style={styles.head}>
         <View style={styles.badgeRow}>

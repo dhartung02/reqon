@@ -33,6 +33,7 @@ export function PipelineScreen({
   onBulkStatus,
   refreshing,
   onRefresh,
+  activeId = null,
 }: {
   lane: StatusLane;
   roles: Role[];
@@ -43,6 +44,7 @@ export function PipelineScreen({
   onBulkStatus: (ids: string[], status: Status) => void;
   refreshing: boolean;
   onRefresh: () => void;
+  activeId?: string | null;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const [selecting, setSelecting] = useState(false);
@@ -118,6 +120,7 @@ export function PipelineScreen({
                   role={r}
                   selectable={selecting}
                   selected={selected.includes(r.id)}
+                  active={!selecting && r.id === activeId}
                   onPress={() => (selecting ? toggle(r.id) : onPressRole(r))}
                 />
               ))}

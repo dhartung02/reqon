@@ -118,6 +118,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
           <EntryCard key={i} onRemove={() => setP((s) => ({ ...s, workHistory: s.workHistory.filter((_, idx) => idx !== i) }))}>
             <Field label="Company" value={w.company} onChange={(v) => setWork(i, 'company', v)} />
             <Field label="Role" value={w.role} onChange={(v) => setWork(i, 'role', v)} />
+            <Field label="Location" value={w.location} onChange={(v) => setWork(i, 'location', v)} />
             <View style={styles.row2}>
               <Field label="Start" value={w.start} onChange={(v) => setWork(i, 'start', v)} />
               <Field label="End" value={w.end} onChange={(v) => setWork(i, 'end', v)} />

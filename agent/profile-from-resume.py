@@ -48,6 +48,11 @@ def read_resume(path):
     if p.endswith(".docx"):
         with zipfile.ZipFile(path) as z:
             xml = z.read("word/document.xml").decode("utf-8", "ignore")
+        # Preserve tab stops + soft breaks BEFORE stripping tags — résumés put
+        # "Title<TAB>Dates" and "Company<TAB>Location" on one paragraph, and the
+        # generic tag-strip would otherwise glue them together (e.g. "CorporationLittle Rock").
+        xml = re.sub(r"<w:tab\s*/>", "\t", xml)
+        xml = re.sub(r"<w:br\s*/>", "\n", xml)
         xml = re.sub(r"</w:p>", "\n", xml)
         xml = re.sub(r"<[^>]+>", "", xml)
         import html
@@ -166,46 +171,60 @@ def _sections(text):
     return out
 
 
-def _split_title(head):
-    head = head.strip(" \t,|·•–—-")
-    for sep in [" — ", " – ", " | ", " · ", " at ", " @ ", "—", "–", "|", "·"]:
-        if sep in head:
-            a, b = head.split(sep, 1)
-            return a.strip(" \t,"), b.strip(" \t,")
-    if "," in head:
-        a, b = head.split(",", 1)
-        return a.strip(), b.strip()
-    return head, ""
+STRIP = " \t,|·•–—-"
+
+
+def _company_location(line):
+    """A résumé's company line is usually 'Company<TAB>Location' (or 'Company  Location').
+    Return (company, location); location may be blank."""
+    parts = [p.strip() for p in re.split(r"\t| {2,}", line) if p.strip()]
+    if len(parts) >= 2:
+        return parts[0].strip(STRIP), parts[1].strip(STRIP)
+    s = line.strip()
+    m = re.search(r"\s+(Remote|Hybrid|On-?site|[A-Z][a-z]+(?: [A-Z][a-z]+)?,\s*[A-Z]{2})\s*$", s)
+    if m:
+        return s[:m.start()].strip(STRIP), m.group(1).strip()
+    return s.strip(STRIP), ""
 
 
 def extract_experience(text):
+    # Layout per entry (the common résumé shape): a header line carrying the title + a date
+    # range, the company/location on the very next line, then description paragraphs until the
+    # next header. We key entries off the date-range line and read the company from the line
+    # below it — descriptions never contain a YYYY–YYYY range, so headers are unambiguous.
     secs = _sections(text)
-    lines = secs.get("experience")
-    if not lines:
+    raw = secs.get("experience")
+    if not raw:
         return []
-    entries, cur, prev = [], None, ""
-    for raw in lines:
-        line = raw.strip()
-        if not line:
+    items = [l.strip() for l in raw if l.strip()]
+    entries = []
+    i, n = 0, len(items)
+    while i < n:
+        m = _RANGE.search(items[i])
+        if not m:
+            i += 1
             continue
-        m = _RANGE.search(line)
-        if m:
-            if cur:
-                entries.append(cur)
-            head = (line[:m.start()] + " " + line[m.end():]).strip(" \t,|·•–—-")
-            role, company = _split_title(head) if head else (prev, "")
-            # "Role\nCompany 2019–2023" → head is the company, prev is the role
-            if head and not company and prev and prev != head:
-                role, company = prev, head
-            cur = {"role": role, "company": company, "start": m.group(1).strip(),
-                   "end": m.group(2).strip(), "desc": []}
-        elif cur is not None and len(cur["desc"]) < 6:
-            cur["desc"].append(re.sub(r"^[•\-–*•]\s*", "", line))
-        prev = line
-    if cur:
-        entries.append(cur)
-    return [{"role": e["role"], "company": e["company"], "start": e["start"], "end": e["end"],
-             "description": " ".join(e["desc"]).strip()[:600]} for e in entries[:12]]
+        head = items[i]
+        role = (head[:m.start()] + " " + head[m.end():]).strip(STRIP)
+        start, end = m.group(1).strip(), m.group(2).strip()
+        company, location = "", ""
+        j = i + 1
+        # the line immediately after a header is the company/location — unless it's already the
+        # next entry's header (an entry with no company line).
+        if j < n and not _RANGE.search(items[j]):
+            company, location = _company_location(items[j])
+            j += 1
+        desc = []
+        while j < n and not _RANGE.search(items[j]):
+            desc.append(re.sub(r"^[•\-–*·]\s*", "", items[j]).strip())
+            j += 1
+        body = "\n".join(d for d in desc[:15] if d)
+        if len(body) > 8000:                       # generous cap; trim on a line boundary, never mid-word
+            body = body[:8000].rsplit("\n", 1)[0]
+        entries.append({"role": role, "company": company, "location": location,
+                        "start": start, "end": end, "description": body})
+        i = j
+    return entries[:12]
 
 
 _SCHOOL_WORD = re.compile(r"\b(university|college|institute|polytechnic|academy|school of)\b", re.I)
@@ -220,6 +239,38 @@ def _find_school(*candidates):
     return ""
 
 
+def _education_entry(seg, prev):
+    deg = _DEGREE.search(seg)
+    yrs = re.findall(r"\b(?:19|20)\d{2}\b", seg)
+    if not deg and not yrs:
+        return None
+    rng = _RANGE.search(seg)
+    start = rng.group(1).strip() if rng else (yrs[0] if yrs else "")
+    end = rng.group(2).strip() if rng else (yrs[1] if len(yrs) > 1 else "")
+    level = deg.group(0).strip().rstrip(".") if deg else ""
+    # Field = the words right after the degree token ("B.S. <Field>, School"), but only if that
+    # text isn't itself the school name (e.g. "MBA, University of …" has no field).
+    field = ""
+    if deg:
+        after = seg[deg.end():].lstrip(" .,-")
+        fm = re.match(r"([A-Z][A-Za-z&/ ]{2,50}?)(?:\s*[,(]|$)", after)
+        if fm and not _SCHOOL_WORD.search(fm.group(1)):
+            field = fm.group(1).strip()
+    # School: prefer a segment carrying a school keyword (this segment, then the previous line);
+    # else fall back to the segment stripped of degree / field / dates. Drop trailing "(GPA …)".
+    school = _find_school(seg, prev)
+    if not school:
+        s = _RANGE.sub("", seg)
+        s = _DEGREE.sub("", s)
+        s = re.sub(r"\b(?:19|20)\d{2}\b", "", s)
+        if field:
+            s = s.replace(field, "")
+        s = re.sub(r"\b(?:in|of|the)\b", "", s, flags=re.I)
+        school = s.strip(STRIP + ".") or prev.strip(STRIP)
+    school = re.split(r"\s*\(", school)[0].strip(STRIP)
+    return {"school": school, "level": level, "field": field, "start": start, "end": end}
+
+
 def extract_education(text):
     secs = _sections(text)
     lines = [l.strip() for l in secs.get("education", []) if l.strip()]
@@ -227,32 +278,22 @@ def extract_education(text):
         return []
     out, prev = [], ""
     for line in lines:
-        deg = _DEGREE.search(line)
-        yrs = re.findall(r"\b(?:19|20)\d{2}\b", line)
-        # A line with neither a degree nor a year isn't its own entry — keep it as the pending
-        # school for the next degree/year line (handles "School\nDegree, year" layouts).
-        if not deg and not yrs:
+        # A single line often lists multiple degrees separated by bullets
+        # ("MBA, … • B.S. …, …") — split so each degree becomes its own entry.
+        segments = re.split(r"\s*[•·]\s*", line) if ("•" in line or "·" in line) else [line]
+        matched = False
+        for seg in segments:
+            seg = seg.strip()
+            if not seg:
+                continue
+            entry = _education_entry(seg, prev)
+            if entry:
+                matched = True
+                out.append(entry)
+        # A line with no degree/year isn't its own entry — hold it as the pending school for the
+        # next degree line (handles "School\nDegree, year" layouts).
+        if not matched:
             prev = line
-            continue
-        rng = _RANGE.search(line)
-        start = rng.group(1).strip() if rng else (yrs[0] if yrs else "")
-        end = rng.group(2).strip() if rng else ""
-        level = deg.group(0).strip().rstrip(".") if deg else ""
-        fm = re.search(r"\bin\s+([A-Z][A-Za-z& ]{2,40}?)(?:\s*[—–|·,]|\s+\d|$)", line)
-        field = fm.group(1).strip() if fm else ""
-        # School: prefer a segment with a school keyword (this line, then the previous line);
-        # else fall back to the line stripped of degree / field / dates.
-        school = _find_school(line, prev)
-        if not school:
-            s = _RANGE.sub("", line)
-            s = _DEGREE.sub("", s)
-            s = re.sub(r"\b(?:19|20)\d{2}\b", "", s)
-            if field:
-                s = s.replace(field, "")
-            s = re.sub(r"\b(?:in|of|the)\b", "", s, flags=re.I)
-            school = s.strip(" \t,|·•–—-.") or prev.strip(" \t,|·•–—-")
-        out.append({"school": school, "level": level, "field": field, "start": start, "end": end})
-        prev = line
     return out[:8]
 
 

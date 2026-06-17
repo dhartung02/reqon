@@ -646,8 +646,11 @@ app.post('/api/profile/resume', (req, res) => {
     if (code !== 0) return finish(500, { ok: false, error: 'resume parse failed: ' + (err.trim() || ('exit ' + code)) });
     const regen = readProfile();   // profile-from-resume.py rewrote applicant/seniority/keywords
     // Keep manually-curated sections the parser doesn't produce (incl. the Reqon CV + answers library).
+    // NOTE: workHistory + education are intentionally NOT preserved — the parser now extracts them,
+    // so a résumé re-upload must refresh those sections rather than re-apply the prior (stale) parse.
+    // Manual edits to those sections persist between uploads via PUT /api/profile.
     for (const k of ['roleTerms', 'industries', 'sectors', 'priorityKeywords', 'secondaryKeywords', 'narratives',
-      'education', 'workHistory', 'awards', 'certs', 'volunteer', 'answers']) {
+      'awards', 'certs', 'volunteer', 'answers']) {
       if (Array.isArray(preserved[k]) && preserved[k].length) regen[k] = preserved[k];
     }
     if (preserved.eeo && typeof preserved.eeo === 'object') regen.eeo = preserved.eeo;

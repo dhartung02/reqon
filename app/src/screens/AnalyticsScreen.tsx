@@ -70,7 +70,11 @@ export function AnalyticsScreen({
       )}
 
       <Text style={styles.sectionTitle}>TIER DISTRIBUTION</Text>
-      <View style={styles.bar}>
+      <View
+        style={styles.bar}
+        accessibilityRole="image"
+        accessibilityLabel={`Tier distribution: ${m.tiers.A} tier A, ${m.tiers.B} tier B, ${m.tiers.C} tier C`}
+      >
         {(['A', 'B', 'C'] as Tier[]).map((t) =>
           m.tiers[t] ? (
             <View

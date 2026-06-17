@@ -86,10 +86,10 @@ class ExtractEducation(unittest.TestCase):
 
     def test_degree_fields(self):
         ms, ba = self.ed
-        self.assertEqual(ms["level"], "M.S")
+        self.assertEqual(ms["level"], "M.S.")                 # canonical period preserved
         self.assertEqual(ms["field"], "Data Science")
         self.assertEqual(ms["school"], "State University")    # "(GPA 4.0)" stripped
-        self.assertEqual(ba["level"], "B.A")
+        self.assertEqual(ba["level"], "B.A.")
         self.assertEqual(ba["field"], "Economics")
         self.assertEqual(ba["school"], "Liberal Arts College")
 

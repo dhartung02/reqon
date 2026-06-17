@@ -24,7 +24,14 @@ export function TabBar({
       {LANES.map(({ key, label }) => {
         const on = key === active;
         return (
-          <Pressable key={key} onPress={() => onChange(key)} style={[styles.pill, on && styles.pillOn]}>
+          <Pressable
+            key={key}
+            onPress={() => onChange(key)}
+            style={[styles.pill, on && styles.pillOn]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={`${label}, ${counts[key] ?? 0} roles`}
+          >
             <Text style={[styles.label, on && styles.labelOn]}>{label}</Text>
             <Text style={[styles.count, on && styles.countOn]}>{counts[key] ?? 0}</Text>
           </Pressable>

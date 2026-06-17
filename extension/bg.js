@@ -12,9 +12,18 @@ async function api(path, opts = {}) {
   const cfg = await getCfg();
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
   if (cfg.token) headers['X-CRM-Token'] = cfg.token;
-  const res = await fetch(cfg.origin.replace(/\/$/, '') + path, Object.assign({}, opts, { headers }));
+  let res;
+  try {
+    res = await fetch(cfg.origin.replace(/\/$/, '') + path, Object.assign({}, opts, { headers }));
+  } catch (e) {
+    throw new Error('Network error reaching CRM (' + (e && e.message ? e.message : e) + ')');
+  }
   if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+  try {
+    return await res.json();
+  } catch (e) {
+    throw new Error('CRM returned a non-JSON response');
+  }
 }
 
 // ---- row cache (overlay lookups shouldn't hammer the server) ----

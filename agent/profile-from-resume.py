@@ -247,7 +247,12 @@ def _education_entry(seg, prev):
     rng = _RANGE.search(seg)
     start = rng.group(1).strip() if rng else (yrs[0] if yrs else "")
     end = rng.group(2).strip() if rng else (yrs[1] if len(yrs) > 1 else "")
-    level = deg.group(0).strip().rstrip(".") if deg else ""
+    level = ""
+    if deg:
+        level = deg.group(0).strip()
+        # the degree regex ends on a \b, so a trailing period ("B.S.") is left off — re-attach it.
+        if deg.end() < len(seg) and seg[deg.end()] == ".":
+            level += "."
     # Field = the words right after the degree token ("B.S. <Field>, School"), but only if that
     # text isn't itself the school name (e.g. "MBA, University of …" has no field).
     field = ""

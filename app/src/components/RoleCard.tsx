@@ -17,6 +17,8 @@ export function RoleCard({ role, onPress, selectable = false, selected = false, 
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${role.role} at ${role.company}. Tier ${role.tier}, score ${role.score.toFixed(1)}, status ${role.status}.`}
       style={({ pressed }) => [
         styles.card,
         { borderLeftColor: accent },

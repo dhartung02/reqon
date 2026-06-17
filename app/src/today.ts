@@ -60,9 +60,17 @@ export interface TodayLane {
   jump?: Lane; // tab to open when tapped
 }
 
-/** Action items needing attention — matches the web's Today tab count. */
-export const todayActionCount = (roles: Role[]) =>
-  roles.filter(needsVerify).length + roles.filter(followUpDue).length + roles.filter(closedReq).length;
+/** Action items needing attention — matches the web's Today tab count. A role can count toward
+ *  more than one bucket (same as the web), so this sums per-predicate in a single pass. */
+export const todayActionCount = (roles: Role[]) => {
+  let n = 0;
+  for (const r of roles) {
+    if (needsVerify(r)) n++;
+    if (followUpDue(r)) n++;
+    if (closedReq(r)) n++;
+  }
+  return n;
+};
 
 /** The daily-loop action cards (counts), in the web's order. */
 export function todayLanes(roles: Role[]): TodayLane[] {

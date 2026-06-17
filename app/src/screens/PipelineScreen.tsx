@@ -93,13 +93,23 @@ export function PipelineScreen({
     <View style={styles.wrap}>
       <View style={styles.toolRow}>
         {selecting ? (
-          <Pressable onPress={() => setSelected(allSelected ? [] : allIds)} hitSlop={8}>
+          <Pressable
+            onPress={() => setSelected(allSelected ? [] : allIds)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={allSelected ? 'Clear selection' : 'Select all roles'}
+          >
             <Text style={styles.tool}>{allSelected ? 'Clear' : 'Select all'}</Text>
           </Pressable>
         ) : (
           <View />
         )}
-        <Pressable onPress={() => (selecting ? exitSelect() : setSelecting(true))} hitSlop={8}>
+        <Pressable
+          onPress={() => (selecting ? exitSelect() : setSelecting(true))}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={selecting ? 'Cancel selection mode' : 'Enter selection mode'}
+        >
           <Text style={styles.tool}>{selecting ? 'Cancel' : 'Select'}</Text>
         </Pressable>
       </View>

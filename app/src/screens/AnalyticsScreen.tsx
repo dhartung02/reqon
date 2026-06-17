@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { type Role, type Tier } from '../model';
 import { pipelineMetrics } from '../analytics';
+import { useLayout } from '../useLayout';
 
 // Pipeline analytics: headline KPIs, application funnel + conversion, and tier distribution.
 // All metrics come from the pure pipelineMetrics() helper.
@@ -16,6 +17,7 @@ export function AnalyticsScreen({
   onRefresh: () => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
+  const { wide } = useLayout();
 
   const m = useMemo(() => pipelineMetrics(roles), [roles]);
 
@@ -35,12 +37,12 @@ export function AnalyticsScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={styles.scroll}
+      contentContainerStyle={[styles.scroll, wide && styles.scrollWide]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
     >
       <View style={styles.grid}>
         {kpis.map((k) => (
-          <View key={k.label} style={styles.kpi}>
+          <View key={k.label} style={[styles.kpi, wide && styles.kpiWide]}>
             <Text style={styles.kpiLabel}>{k.label}</Text>
             <Text style={[styles.kpiValue, k.accent ? { color: k.accent } : null]}>{k.value}</Text>
           </View>
@@ -94,7 +96,9 @@ export function AnalyticsScreen({
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { paddingTop: 16, paddingBottom: 32, gap: 18 },
+  scrollWide: { maxWidth: 1040, width: '100%', alignSelf: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  kpiWide: { flexBasis: '23%', minWidth: 150 },
   kpi: {
     flexBasis: '47%',
     flexGrow: 1,

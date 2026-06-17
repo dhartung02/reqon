@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Refre
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import type { Role, Lane } from '../model';
 import { todayLanes, isApplyNext, type Tone } from '../today';
+import { useLayout } from '../useLayout';
 
 const toneColor = (c: Palette): Record<Tone, string> => ({
   accent: c.emerald,
@@ -39,6 +40,7 @@ export function TodayScreen({
   syncState: { at?: number; error?: boolean };
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
+  const { wide } = useLayout();
   const tone = toneColor(c);
   const rel = (t: number) => {
     const s = (Date.now() - t) / 1000;
@@ -50,7 +52,7 @@ export function TodayScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={styles.scroll}
+      contentContainerStyle={[styles.scroll, wide && styles.scrollWide]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
     >
       <View style={styles.scoutStrip}>
@@ -89,7 +91,7 @@ export function TodayScreen({
           return (
             <Pressable
               key={l.key}
-              style={[styles.card, empty && styles.cardEmpty]}
+              style={[styles.card, wide && styles.cardWide, empty && styles.cardEmpty]}
               disabled={empty || !l.jump}
               onPress={() => l.jump && onJump(l.jump)}
             >
@@ -110,6 +112,7 @@ export function TodayScreen({
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { paddingTop: 16, paddingBottom: 32, gap: 16 },
+  scrollWide: { maxWidth: 1040, width: '100%', alignSelf: 'center' },
   scoutStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   scoutLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pulse: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.emerald },
@@ -140,6 +143,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     padding: 14,
     gap: 2,
   },
+  cardWide: { flexBasis: '23%', minWidth: 150 },
   cardEmpty: { opacity: 0.45 },
   cardNum: { fontFamily: fonts.serif, fontSize: 30, fontWeight: '700', lineHeight: 34 },
   cardTitle: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.textHigh, marginTop: 2 },

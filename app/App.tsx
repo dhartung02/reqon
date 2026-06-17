@@ -27,6 +27,7 @@ import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { getCriteria } from './src/sync/searchCriteria';
 import { pullRules, getRules } from './src/sync/rules';
+import { runServerScout, scoutStatus } from './src/sync/serverScout';
 import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
@@ -138,6 +139,32 @@ function AppInner() {
     } catch {
       setScoutMsg('Scout failed — check connection');
     }
+    setScouting(false);
+  };
+
+  // Trigger the SERVER scout (fuller multi-source search + enrichment), poll to done, then sync.
+  const onServerScout = async () => {
+    setScouting(true);
+    setScoutMsg('Starting server scout…');
+    const start = await runServerScout();
+    if (!start.ok && !start.running) {
+      setScoutMsg(start.error || 'Could not start server scout');
+      setScouting(false);
+      return;
+    }
+    // Poll status (~2.5 min cap; server hard-kills at 6). Sync as we go so results appear early.
+    let st = null;
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      st = await scoutStatus();
+      if (st && !st.running) break;
+      if (st?.phase) setScoutMsg(`Server scout… ${st.phase}`);
+    }
+    await autoSync();
+    await refresh();
+    if (st && st.running) setScoutMsg('Server scout still running — pull to refresh shortly.');
+    else if (st?.error) setScoutMsg(`Server scout error: ${st.error}`);
+    else setScoutMsg(`Server scout done · +${st?.added ?? 0} new · ${st?.refreshed ?? 0} refreshed`);
     setScouting(false);
   };
 
@@ -293,6 +320,7 @@ function AppInner() {
               roles={roles}
               onJump={setLane}
               onScout={onScout}
+              onServerScout={onServerScout}
               scouting={scouting}
               scoutMsg={scoutMsg}
               scoutEnabled={scoutOn}

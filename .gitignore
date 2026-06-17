@@ -25,6 +25,11 @@ node_modules/
 # Personal data — never committed; generic *.example versions ship for fresh clones
 seed.json
 agent/profile.json
+# Résumé source files (PII) — dropped in for parsing, never published
+*.docx
+*.pdf
+agent/*resume*
+agent/*Resume*
 agent/found-log.md
 agent/boards.json
 agent/watchlist.json

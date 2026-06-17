@@ -8,7 +8,7 @@ import { getConfig } from './config';
 // PII/EEO is stored in the keychain for the candidate's reference; it is NEVER auto-filled or
 // submitted by the apply-assist (the browser fill deliberately skips demographic fields).
 export interface EduEntry { school?: string; degree?: string; field?: string; level?: string; start?: string; end?: string }
-export interface WorkEntry { company?: string; role?: string; start?: string; end?: string; description?: string }
+export interface WorkEntry { company?: string; role?: string; location?: string; start?: string; end?: string; description?: string }
 export interface Eeo { gender?: string; pronouns?: string; race?: string; ethnicity?: string; veteran?: string; disability?: string; orientation?: string }
 export interface Applicant { name?: string; email?: string; phone?: string; linkedin?: string; github?: string; website?: string; location?: string }
 // A reusable answer to a recurring application question (or a saved cover note). q = the question /

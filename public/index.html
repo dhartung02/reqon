@@ -290,6 +290,8 @@
   .crow-role{color:var(--text-2);font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .crow-tail{display:flex;align-items:center;gap:9px;justify-content:flex-end;white-space:nowrap}
   .crow-src{font-family:"Spline Sans Mono",monospace;font-size:.66rem;letter-spacing:.02em;color:var(--ai);text-transform:lowercase;white-space:nowrap}
+  .crow-open{font-family:"Spline Sans Mono",monospace;font-size:.62rem;letter-spacing:.02em;color:var(--gold);text-decoration:none;border:1px solid #5c4d28;border-radius:5px;padding:1px 6px;white-space:nowrap;opacity:.85}
+  .crow-open:hover{opacity:1;background:rgba(214,178,90,.08)}
   .crow-caret{color:var(--dim);font-size:.7rem;transition:transform .15s;text-align:center}
   .crow.open .crow-caret{transform:rotate(180deg)}
   .crow.open{border-color:var(--line-2);background:var(--panel-2)}
@@ -1097,7 +1099,7 @@ function compactRowHTML(x, reason, showArchive){
     <input type="checkbox" class="crow-chk" ${selected.has(i)?"checked":""} onclick="event.stopPropagation();toggleSel(${i},this.checked)" title="Select for Open-in-tabs">
     <span class="crow-ev" title="Expected value = fit × probability · ${bandLabel(x._ev)}">${x._ev.toFixed(1)}</span>
     <span class="crow-main"><span class="crow-co">${esc(x.company)}</span><span class="crow-role">${esc(x.role||'')}</span></span>
-    <span class="crow-tail"><span class="crow-src">${esc(rowSource(x))}</span>${applyModeBadge(x)}${reasonHtml}${badge}${archiveHtml}</span>
+    <span class="crow-tail"><span class="crow-src">${esc(rowSource(x))}</span>${applyModeBadge(x)}${reasonHtml}${badge}${archiveHtml}${x.link?`<a class="crow-open" href="${esc(x.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open the original listing in a new tab">Open ↗</a>`:''}</span>
     <span class="crow-caret">▾</span>
   </div>`;
 }

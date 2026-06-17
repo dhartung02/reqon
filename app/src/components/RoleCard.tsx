@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, type Role } from '../model';
 import { remoteBadge, type RationaleTone } from '../scout/explain';
@@ -58,7 +58,19 @@ export function RoleCard({ role, onPress, selectable = false, selected = false }
           <View style={[styles.dot, { backgroundColor: sc }]} />
           <Text style={[styles.statusText, { color: sc }]}>{role.status}</Text>
         </View>
-        <Text style={styles.chev}>›</Text>
+        <View style={styles.footerRight}>
+          {role.link ? (
+            <Pressable
+              onPress={() => Linking.openURL(role.link as string)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.openBtn, pressed && styles.pressed]}
+              accessibilityLabel="Open the original listing"
+            >
+              <Text style={styles.openText}>Open ↗</Text>
+            </Pressable>
+          ) : null}
+          <Text style={styles.chev}>›</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -127,6 +139,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderTopColor: alpha(c.canvas, 0.5),
   },
   statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  footerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  openBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: alpha(c.muted, 0.5),
+  },
+  openText: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '600', color: c.textBase },
   dot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500' },
   chev: { fontSize: 20, color: c.muted, lineHeight: 20 },

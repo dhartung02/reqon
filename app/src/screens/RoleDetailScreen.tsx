@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, type Role, type Status } from '../model';
 import { explainScore, type RationaleTone } from '../scout/explain';
@@ -148,9 +148,14 @@ export function RoleDetailScreen({
       </View>
 
       {role.link ? (
-        <Pressable style={styles.linkBtn} onPress={() => onOpenPosting(role.link as string)}>
-          <Text style={styles.linkBtnText}>Open posting · apply-assist</Text>
-        </Pressable>
+        <>
+          <Pressable style={styles.linkBtn} onPress={() => onOpenPosting(role.link as string)}>
+            <Text style={styles.linkBtnText}>Open posting · apply-assist</Text>
+          </Pressable>
+          <Pressable style={styles.draftBtn} onPress={() => Linking.openURL(role.link as string)}>
+            <Text style={styles.draftBtnText}>Open in browser ↗</Text>
+          </Pressable>
+        </>
       ) : null}
 
       <Pressable style={styles.draftBtn} onPress={() => setShowDraft(true)}>

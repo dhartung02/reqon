@@ -31,5 +31,31 @@ class Dedupe(unittest.TestCase):
         self.assertNotEqual(scout.norm_key("Acme", "PM"), scout.norm_key("Beta", "PM"))
 
 
+class MergeDedupe(unittest.TestCase):
+    """file_merge's dedup must use the near-dupe-aware norm_key (it previously used a weak
+    exact key, so an embellished scout title re-added a row already in the store)."""
+
+    def test_near_dupe_against_store_is_skipped(self):
+        store = [{"company": "Stripe", "role": "Senior Product Manager, CDP"}]
+        new = scout.dedupe_new([{"company": "Stripe", "role": "Senior PM, CDP"}], store)
+        self.assertEqual(new, [])
+
+    def test_intra_batch_near_dupes_collapse(self):
+        rows = [
+            {"company": "Okta", "role": "Platform PM - Identity and Access"},
+            {"company": "Okta", "role": "Platform Product Manager, Identity & Access"},
+        ]
+        self.assertEqual(len(scout.dedupe_new(rows, [])), 1)
+
+    def test_distinct_roles_both_added(self):
+        new = scout.dedupe_new(
+            [{"company": "Acme", "role": "Principal PM, CDP"},
+             {"company": "Acme", "role": "Principal PM, Billing"}], [])
+        self.assertEqual(len(new), 2)
+
+    def test_empty_company_role_skipped(self):
+        self.assertEqual(scout.dedupe_new([{"company": "", "role": ""}], []), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -115,8 +115,8 @@ def main():
                     continue
                 rmode = scout.remote_mode(loc)
                 if (not args.include_onsite) and rmode == "onsite" and "remote" not in loc.lower():
-                    # location often missing in emails; only drop if explicitly onsite
-                    pass
+                    # location often missing in emails, so only drop when it's *explicitly* onsite
+                    continue
                 fit = scout.score_fit(title, "")
                 if fit < args.min_fit:
                     continue

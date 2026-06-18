@@ -114,8 +114,9 @@ export function SettingsModal({
         <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={c.muted} style={styles.input} />
       </View>
       <View style={styles.labeled}>
-        <Text style={styles.label}>Token (X-CRM-Token)</Text>
-        <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="APP_TOKEN" placeholderTextColor={c.muted} style={styles.input} />
+        <Text style={styles.label}>Passphrase</Text>
+        <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="your server passphrase (APP_TOKEN)" placeholderTextColor={c.muted} style={styles.input} />
+        <Text style={styles.fieldHint}>Same passphrase you set as APP_TOKEN on the server — the one the web board's login asks for. Stored in your device keychain. Leave blank if the server has no passphrase.</Text>
       </View>
       <View style={styles.labeled}>
         <Text style={styles.label}>On-device scout</Text>
@@ -260,6 +261,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   help: { fontFamily: fonts.sans, fontSize: 13, color: c.muted, lineHeight: 19 },
   labeled: { gap: 6 },
   label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.muted },
+  fieldHint: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, lineHeight: 15 },
   seg: { flexDirection: 'row', gap: 8 },
   segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, backgroundColor: c.element, borderWidth: 1, borderColor: c.element, alignItems: 'center' },
   segBtnOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.1) },

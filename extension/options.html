@@ -20,9 +20,9 @@ self-hosted CRM. <b>No form autofill</b> (that stays with Simplify); this just k
 <label>Server origin</label>
 <input id="origin" placeholder="http://localhost:8787">
 <p style="font-size:.8rem">Local board: <code>http://localhost:8787</code>. For another machine, use your tunnel's HTTPS URL.</p>
-<label>Access token (X-CRM-Token)</label>
-<input id="token" type="password" placeholder="your APP_TOKEN (full access)" autocomplete="off">
-<p style="font-size:.8rem">Status write-back uses <code>PATCH</code>, so this needs the full <b>APP_TOKEN</b>, not the scoped ingest token.</p>
+<label>Passphrase</label>
+<input id="token" type="password" placeholder="your server passphrase (APP_TOKEN)" autocomplete="off">
+<p style="font-size:.8rem">The same passphrase you set as <b>APP_TOKEN</b> on the server — the one the web board's login asks for. Leave blank if the server has no passphrase set.</p>
 <div class="row">
   <button id="save">Save</button>
   <button id="test" class="ghost">Test connection</button>

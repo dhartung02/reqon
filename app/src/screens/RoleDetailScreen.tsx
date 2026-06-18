@@ -108,8 +108,8 @@ export function RoleDetailScreen({
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>WHY THIS SCORE</Text>
-        {explainScore(role).map((line, i) => (
-          <View key={i} style={styles.whyRow}>
+        {explainScore(role).map((line) => (
+          <View key={line.text} style={styles.whyRow}>
             <View style={[styles.whyDot, { backgroundColor: toneColor[line.tone] }]} />
             <Text style={styles.whyText}>{line.text}</Text>
           </View>

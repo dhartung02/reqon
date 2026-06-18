@@ -40,7 +40,14 @@ export function ControlBar({
         {SORTS.map(({ key, label }) => {
           const on = key === sort;
           return (
-            <Pressable key={key} onPress={() => onSort(key)} style={[styles.pill, on && styles.pillOn]}>
+            <Pressable
+              key={key}
+              onPress={() => onSort(key)}
+              style={[styles.pill, on && styles.pillOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`Sort by ${label}`}
+            >
               <Text style={[styles.pillText, on && styles.pillTextOn]}>{label}</Text>
             </Pressable>
           );
@@ -54,6 +61,9 @@ export function ControlBar({
               key={key}
               onPress={() => onFilter({ ...filter, [key]: !on })}
               style={[styles.filterPill, on && styles.filterPillOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`Filter: ${label}${on ? ', on' : ''}`}
             >
               <Text style={[styles.pillText, on && styles.filterTextOn]}>{on ? '✓ ' : ''}{label}</Text>
             </Pressable>

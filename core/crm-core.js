@@ -9,6 +9,50 @@
  * for the RN/Expo bundler.
  */
 
+// ---- device pairing (QR / paste code) ----
+// Pack {url, token} into one opaque string a phone can scan or paste to auto-configure sync,
+// instead of hand-typing the server URL + passphrase. Format: "REQON1:" + base64url(JSON).
+// base64url is hand-rolled (no Buffer/atob) so this stays dependency- and environment-free.
+const PAIR_PREFIX = 'REQON1:';
+const _B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+function _toB64url(str) {
+  const bytes = unescape(encodeURIComponent(str)); // UTF-8 → byte chars
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes.charCodeAt(i), b = bytes.charCodeAt(i + 1), c = bytes.charCodeAt(i + 2);
+    const has2 = i + 1 < bytes.length, has3 = i + 2 < bytes.length;
+    out += _B64[a >> 2] + _B64[((a & 3) << 4) | (has2 ? b >> 4 : 0)]
+      + (has2 ? _B64[((b & 15) << 2) | (has3 ? c >> 6 : 0)] : '') + (has3 ? _B64[c & 63] : '');
+  }
+  return out;
+}
+function _fromB64url(s) {
+  const bytes = [];
+  for (let i = 0; i < s.length;) {
+    const e = (ch) => _B64.indexOf(ch);
+    const a = e(s[i++]), b = e(s[i++]), c = i <= s.length ? e(s[i++]) : -1, d = i <= s.length ? e(s[i++]) : -1;
+    bytes.push((a << 2) | (b >> 4));
+    if (c !== -1) bytes.push(((b & 15) << 4) | (c >> 2));
+    if (d !== -1) bytes.push(((c & 3) << 6) | d);
+  }
+  return decodeURIComponent(escape(String.fromCharCode.apply(null, bytes)));
+}
+function encodePairing(url, token) {
+  return PAIR_PREFIX + _toB64url(JSON.stringify({ u: String(url || ''), t: String(token || '') }));
+}
+// Returns { url, token } or null if the string isn't a valid pairing code.
+function decodePairing(code) {
+  const s = String(code || '').trim();
+  if (!s.startsWith(PAIR_PREFIX)) return null;
+  try {
+    const obj = JSON.parse(_fromB64url(s.slice(PAIR_PREFIX.length)));
+    if (!obj || typeof obj.u !== 'string') return null;
+    return { url: obj.u, token: typeof obj.t === 'string' ? obj.t : '' };
+  } catch (e) {
+    return null;
+  }
+}
+
 // ---- requisition identity ----
 const reqKey = x => (String(x.company || '') + '|' + String(x.role || '')).toLowerCase().trim();
 
@@ -83,4 +127,4 @@ function reconcileSync(serverRows, clientRows, deps) {
   return { rows: out, applied, conflicts, idRemaps };
 }
 
-module.exports = { reqKey, postingId, sameReq, expectedValue, computeTier, reconcileSync, DEFAULT_TIER_THRESHOLDS };
+module.exports = { reqKey, postingId, sameReq, expectedValue, computeTier, reconcileSync, DEFAULT_TIER_THRESHOLDS, encodePairing, decodePairing };

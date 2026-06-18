@@ -55,6 +55,15 @@ declare module '@reqon/core' {
   export function computeTier(fit?: number | null, prob?: number | null, thr?: TierThresholds): Tier;
   export function reconcileSync(serverRows: Req[], clientRows: Req[], deps?: SyncDeps): SyncResult;
 
+  /** Decoded device-pairing payload (server URL + passphrase). */
+  export interface PairingInfo {
+    url: string;
+    token: string;
+  }
+  export function encodePairing(url: string, token: string): string;
+  /** Parse a pairing code/QR string; returns null if it isn't a valid Reqon pairing code. */
+  export function decodePairing(code: string): PairingInfo | null;
+
   const core: {
     reqKey: typeof reqKey;
     postingId: typeof postingId;
@@ -62,6 +71,8 @@ declare module '@reqon/core' {
     expectedValue: typeof expectedValue;
     computeTier: typeof computeTier;
     reconcileSync: typeof reconcileSync;
+    encodePairing: typeof encodePairing;
+    decodePairing: typeof decodePairing;
     DEFAULT_TIER_THRESHOLDS: Required<TierThresholds>;
   };
   export default core;

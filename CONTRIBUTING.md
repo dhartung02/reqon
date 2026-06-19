@@ -39,7 +39,7 @@ Settings, including uploading a résumé to generate the candidate profile.
 This project began as a personal deployment. The **current tree** is scrubbed of personal
 data, but **git history is not** — earlier commits contain a real seed/profile. Before pushing
 to a public remote: squash or re-init history (e.g. `git checkout --orphan`), and review the
-launchd label in `install.sh` (`com.jobcrm.server`) and any owner-specific notes.
+launchd label in `install.sh` (`com.reqon.server`) and any owner-specific notes.
 
 ## Adding an ATS source
 

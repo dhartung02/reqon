@@ -3,19 +3,19 @@
 # One-command setup for the Job Pipeline CRM + daily Scout on macOS.
 # Installs deps, seeds data (first run only), optionally builds a resume-tailored
 # search profile, and registers TWO launchd agents:
-#   - com.jobcrm.server : the board server (auto-start + auto-restart)
-#   - com.jobcrm.scout  : the daily job scout (weekday 7am)
+#   - com.reqon.server : the board server (auto-start + auto-restart)
+#   - com.reqon.scout  : the daily job scout (weekday 7am)
 #
 # Usage:
-#   cd ~/job-pipeline-crm && ./install.sh
+#   cd ~/reqon && ./install.sh
 #   ./install.sh --resume "/path/to/Resume.docx"    # tailor the search to a resume
 #   LI_DIR="$HOME/Downloads/li-alerts" ./install.sh  # also ingest LinkedIn alert emails daily
 #
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LABEL="com.jobcrm.server"
-SCOUT_LABEL="com.jobcrm.scout"
+LABEL="com.reqon.server"
+SCOUT_LABEL="com.reqon.scout"
 PORT="${PORT:-8787}"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
 SCOUT_PLIST="$HOME/Library/LaunchAgents/${SCOUT_LABEL}.plist"

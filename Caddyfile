@@ -1,0 +1,27 @@
+# Caddyfile — HTTPS front for the Reqon server.
+# Reverse-proxies https://dhartung02.dynet.com  ->  local Node server on 127.0.0.1:8787,
+# with an automatic Let's Encrypt certificate (HTTP-01 challenge over port 80).
+#
+# Install location:
+#   Apple Silicon: /opt/homebrew/etc/Caddyfile
+#   Intel:         /usr/local/etc/Caddyfile
+# (or run from anywhere with:  caddy run --config /path/to/Caddyfile)
+#
+# Prereqs the USER must do (Caddy can't): forward router TCP 80 AND 443 to this Mac,
+# keep the afraid.org dynamic-DNS record pointed at the current public IP, and run the
+# Node server bound to localhost (HOST=127.0.0.1 ... npm start).
+
+dhartung02.dynet.com {
+	encode zstd gzip
+
+	# Proxy everything to the local app. Caddy automatically adds X-Forwarded-Proto (https)
+	# and X-Forwarded-Host (dhartung02.dynet.com); the server's /api/pair uses those to bake
+	# the public https URL into the pairing QR/code, so the iOS app pairs to 443 (no port).
+	reverse_proxy 127.0.0.1:8787
+
+	# Let's Encrypt is the default issuer; this email gets expiry/renewal notices.
+	# (optional — replace or delete)
+	# tls dustin.hartung@acoustic.co
+}
+
+# Caddy auto-redirects http://dhartung02.dynet.com (port 80) to https — no extra block needed.

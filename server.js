@@ -236,9 +236,11 @@ app.use(express.urlencoded({ extended: false }));
 // ---------- auth (opt-in via APP_TOKEN; protects remote/tunnel exposure) ----------
 // If APP_TOKEN is unset the server behaves exactly as before (open) — fine for a
 // localhost-only box. Set APP_TOKEN before exposing it through a tunnel/port-forward.
-const APP_TOKEN = process.env.APP_TOKEN || '';
+// Mutable so the passphrase can be changed live from the board (POST /api/auth/passphrase) without
+// a server restart — auth checks, the login cookie, and the pairing QR all read these.
+let APP_TOKEN = process.env.APP_TOKEN || '';
 const COOKIE = 'crm_auth';
-const TOKEN_HASH = APP_TOKEN ? crypto.createHash('sha256').update(APP_TOKEN).digest('hex') : '';
+let TOKEN_HASH = APP_TOKEN ? crypto.createHash('sha256').update(APP_TOKEN).digest('hex') : '';
 // Scoped, least-privilege token for automated ingestion (e.g. a ChatGPT Action). It authorizes
 // ONLY append-only writes (POST /api/reqs/merge + /api/reqs/quickadd) — never reads, the profile
 // (PII), settings, restore, or a full PUT. Leak blast radius = appending rows, nothing destructive.
@@ -379,12 +381,37 @@ function lanBase() {
   const lan = Object.values(nets).flat().find(n => n && n.family === 'IPv4' && !n.internal);
   return `http://${(lan && lan.address) || 'localhost'}:${PORT}`;
 }
-app.get('/api/pair', (req, res) => {
-  const url = lanBase();
-  const code = core.encodePairing(url, APP_TOKEN);
-  QRCode.toString(code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' })
-    .then(qrSvg => res.json({ ok: true, url, hasToken: !!APP_TOKEN, code, qrSvg }))
-    .catch(e => res.status(500).json({ ok: false, error: e.message }));
+// The URL to bake into the pairing QR/code. Prefer (1) an explicit PUBLIC_URL env (e.g.
+// https://dhartung02.dynet.com once Caddy fronts TLS), then (2) the proxy's forwarded host/proto
+// when the board is reached through Caddy (so the app pairs to the public https origin, no port),
+// else (3) the LAN http URL for same-network pairing. iOS ATS needs the https form.
+function pairBase(req) {
+  const explicit = (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (explicit) return explicit;
+  const fHost = req && (req.headers['x-forwarded-host'] || '');
+  if (fHost) {
+    const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+    return `${proto}://${String(fHost).split(',')[0].trim()}`;
+  }
+  return lanBase();
+}
+app.get('/api/pair', async (req, res) => {
+  // Fully guarded: the synchronous prep (lanBase + encodePairing) used to sit OUTSIDE the
+  // promise's .catch, so any sync throw (e.g. an older core/crm-core.js missing encodePairing)
+  // escaped to Express's default handler, which replies with an HTML error page — the board then
+  // tried to JSON.parse "<!DOCTYPE…>" and surfaced "Unexpected token '<'". Wrapping everything in
+  // try/catch guarantees this endpoint ALWAYS returns JSON.
+  try {
+    const url = pairBase(req);
+    if (typeof core.encodePairing !== 'function') {
+      throw new Error('core.encodePairing unavailable — server is running a stale build; restart it.');
+    }
+    const code = core.encodePairing(url, APP_TOKEN);
+    const qrSvg = await QRCode.toString(code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    res.json({ ok: true, url, hasToken: !!APP_TOKEN, code, qrSvg });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e && e.message ? e.message : String(e) });
+  }
 });
 
 app.get('/api/reqs', (req, res) => {
@@ -595,6 +622,26 @@ function snapshotProfile() {
 }
 const PROFILE_ARRAY_FIELDS = ['seniority', 'roleTerms', 'industries', 'sectors', 'priorityKeywords', 'secondaryKeywords'];
 
+// Fold the user's keyword-weight overrides onto a parsed baseline. weight<=0 suppresses a term;
+// a kw not in the baseline is added (default weight 3 = "emphasized" for the scout). The result is
+// written to profile.keywords, which the server scout (scout.py) consumes — so overrides change
+// what scores high. Durable across résumé re-parse (parsedKeywords holds the untouched baseline).
+function applyKeywordOverrides(baseline, overrides) {
+  const base = Array.isArray(baseline) ? baseline.filter(k => k && k.kw).map(k => ({ kw: String(k.kw), weight: +k.weight || 1 })) : [];
+  const map = new Map(base.map(k => [k.kw.toLowerCase(), { kw: k.kw, weight: k.weight }]));
+  for (const o of (Array.isArray(overrides) ? overrides : [])) {
+    if (!o || !o.kw) continue;
+    const kw = String(o.kw).trim(); if (!kw) continue;
+    const key = kw.toLowerCase();
+    const w = +o.weight;
+    if (!isNaN(w) && w <= 0) { map.delete(key); continue; }       // suppress
+    const cur = map.get(key);
+    if (cur) cur.weight = isNaN(w) ? cur.weight : w;              // re-weight existing
+    else map.set(key, { kw, weight: isNaN(w) ? 3 : w });         // add new emphasized term
+  }
+  return Array.from(map.values()).sort((a, b) => b.weight - a.weight);
+}
+
 app.get('/api/profile', (req, res) => res.json({ ok: true, profile: readProfile() }));
 
 app.put('/api/profile', (req, res) => {
@@ -606,6 +653,16 @@ app.put('/api/profile', (req, res) => {
     if (Array.isArray(b[k])) next[k] = b[k].map(String).map(s => s.trim()).filter(Boolean);
   }
   if (Array.isArray(b.keywords)) next.keywords = b.keywords.filter(x => x && x.kw).map(x => ({ kw: String(x.kw), weight: +x.weight || 1 }));
+  // Editable keyword-weight overrides (durable preference layer). Stored, then folded onto the
+  // parsed baseline so profile.keywords (what the scout scores on) reflects the user's tuning.
+  if (Array.isArray(b.keywordOverrides)) {
+    next.keywordOverrides = b.keywordOverrides
+      .filter(x => x && x.kw)
+      .map(x => ({ kw: String(x.kw).trim(), weight: +x.weight || 0 }))
+      .filter(x => x.kw);
+    const baseline = (Array.isArray(cur.parsedKeywords) && cur.parsedKeywords.length) ? cur.parsedKeywords : cur.keywords;
+    next.keywords = applyKeywordOverrides(baseline, next.keywordOverrides);
+  }
   if (Array.isArray(b.narratives)) {
     next.narratives = b.narratives.filter(n => n && (n.title || n.body)).map(n => ({
       id: n.id || ('n' + crypto.randomBytes(4).toString('hex')),
@@ -672,6 +729,14 @@ app.post('/api/profile/resume', (req, res) => {
       if (Array.isArray(preserved[k]) && preserved[k].length) regen[k] = preserved[k];
     }
     if (preserved.eeo && typeof preserved.eeo === 'object') regen.eeo = preserved.eeo;
+    // Keyword-weight overrides are a durable preference layer: keep the fresh parse as the baseline
+    // (parsedKeywords), re-apply the user's overrides on top, and write the folded result to
+    // keywords so the scout keeps honoring the tuning after a re-upload.
+    regen.parsedKeywords = Array.isArray(regen.keywords) ? regen.keywords : [];
+    if (Array.isArray(preserved.keywordOverrides) && preserved.keywordOverrides.length) {
+      regen.keywordOverrides = preserved.keywordOverrides;
+      regen.keywords = applyKeywordOverrides(regen.parsedKeywords, preserved.keywordOverrides);
+    }
     try { writeJsonPretty(PROFILE_FILE, regen); } catch (e) { return finish(500, { ok: false, error: e.message }); }
     finish(200, { ok: true, profile: regen });
   });
@@ -1137,7 +1202,16 @@ app.post('/api/sync', (req, res) => {
       writeStore(merged);
       logChange({ ts: nowIso(), action: 'sync', clientSent: clientRows.length, applied, conflicts, idRemaps: idRemaps.length, after: merged.length });
     }
-    const back = since ? merged.filter(r => (r.syncedAt || r.updatedAt || '') > since) : merged;
+    // Delta feed: when the client sends a `since` cursor we normally return only rows changed
+    // since then — BUT a row the client doesn't have yet must ALWAYS be sent, even if its
+    // syncedAt predates the cursor (e.g. a freshly-paired or re-paired device with a stale
+    // cursor, or rows whose syncedAt was backfilled from old `added` dates). Otherwise the
+    // device can sit at 0 rows forever. So: always send rows the client is missing; for rows it
+    // already has, honor the cursor.
+    const clientIds = new Set(clientRows.map(r => r && r.id).filter(Boolean));
+    const back = since
+      ? merged.filter(r => !clientIds.has(r.id) || (r.syncedAt || r.updatedAt || '') > since)
+      : merged;
     res.json({ ok: true, rows: back, serverTime: nowIso(), applied, conflicts, idRemaps });
   } catch (e) {
     console.error('[POST /api/sync]', e.message);
@@ -1419,6 +1493,49 @@ app.post('/api/push/test', async (req, res) => {
   const r = await sendPush({ title: 'Job Pipeline CRM', body: (req.body || {}).message || 'Test push from the server.', eventKey: 'test-' + Date.now() });
   res.json(Object.assign({ ok: true }, r));
 });
+// APNs config (board-managed; mirrors the env-only setup). NEVER echoes the .p8 contents — only
+// whether each piece is set + non-secret IDs. The key can be a server path OR a pasted .p8 body
+// (written to a 0600 file under agent/, which is gitignored).
+const APNS_KEY_FILE = path.join(ROOT, 'agent', 'apns-AuthKey.p8');
+const pushConfigPayload = () => {
+  let keySet = false;
+  try { keySet = !!(process.env.APNS_KEY_P8_PATH && fs.existsSync(path.resolve(ROOT, process.env.APNS_KEY_P8_PATH))); } catch (e) {}
+  return {
+    ok: true,
+    configured: apnsConfigured(),
+    keyId: process.env.APNS_KEY_ID || '',
+    teamId: process.env.APNS_TEAM_ID || '',
+    bundleId: process.env.APNS_BUNDLE_ID || '',
+    env: process.env.APNS_ENV === 'production' ? 'production' : 'sandbox',
+    keyPath: process.env.APNS_KEY_P8_PATH || '',
+    keySet,
+    devices: pushDevices().length,
+  };
+};
+app.get('/api/push/config', (req, res) => res.json(pushConfigPayload()));
+app.post('/api/push/config', (req, res) => {
+  const b = req.body || {};
+  const upd = {};
+  if (b.clear === true) {
+    upd.APNS_KEY_ID = ''; upd.APNS_TEAM_ID = ''; upd.APNS_BUNDLE_ID = ''; upd.APNS_KEY_P8_PATH = '';
+  } else {
+    if (typeof b.keyId === 'string') upd.APNS_KEY_ID = b.keyId.trim();
+    if (typeof b.teamId === 'string') upd.APNS_TEAM_ID = b.teamId.trim();
+    if (typeof b.bundleId === 'string') upd.APNS_BUNDLE_ID = b.bundleId.trim();
+    if (typeof b.env === 'string') upd.APNS_ENV = b.env === 'production' ? 'production' : 'sandbox';
+    // Key: either a pasted .p8 body (written to a 0600 file) or an explicit server path. Blank = keep.
+    if (typeof b.keyP8 === 'string' && b.keyP8.includes('BEGIN PRIVATE KEY')) {
+      try { fs.writeFileSync(APNS_KEY_FILE, b.keyP8.trim() + '\n', { mode: 0o600 }); }
+      catch (e) { return res.status(500).json({ ok: false, error: 'could not save key: ' + e.message }); }
+      upd.APNS_KEY_P8_PATH = path.relative(ROOT, APNS_KEY_FILE);
+    } else if (typeof b.keyPath === 'string' && b.keyPath.trim()) {
+      upd.APNS_KEY_P8_PATH = b.keyPath.trim();
+    }
+  }
+  try { if (Object.keys(upd).length) setEnvVars(upd); }
+  catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  res.json(pushConfigPayload());
+});
 
 // ---------- scout trigger (deterministic core; optional OpenAI enrichment) ----------
 // POST /api/scout/run {mode:'find'|'validate'|'both'}  -> spawns agent/scout_run.py detached,
@@ -1476,6 +1593,10 @@ app.post('/api/mail/config', (req, res) => {
     if (typeof b.password === 'string' && b.password) upd.GMAIL_APP_PASSWORD = b.password.trim(); // blank = keep current
     if (typeof b.label === 'string') upd.GMAIL_LABEL = b.label.trim() || 'INBOX';
     if (typeof b.ai === 'boolean') upd.MAIL_AI = b.ai ? 'true' : 'false';
+    if (b.sinceDays != null && b.sinceDays !== '') {
+      const d = Math.max(1, Math.min(90, parseInt(b.sinceDays, 10) || 14));
+      upd.MAIL_SINCE_DAYS = String(d);
+    }
   }
   try { if (Object.keys(upd).length) setEnvVars(upd); }
   catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
@@ -1705,12 +1826,13 @@ function settingsPayload() {
     applyModes: APPLY_MODES,
     applyModeMap: applyModeMapMerged(boards),
     auth: {
-      appTokenSet: !!process.env.APP_TOKEN,
+      appTokenSet: !!APP_TOKEN,
       apnsSet: apnsConfigured(),
       pushDevices: pushDevices().length,
       ingestTokenSet: !!process.env.INGEST_TOKEN,
       ingestTokenLast4: last4(process.env.INGEST_TOKEN || '')
     },
+    mail: { configured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD), user: process.env.GMAIL_USER || '' },
     llm: {
       keySet: !!process.env.OPENAI_API_KEY,
       keyLast4: last4(process.env.OPENAI_API_KEY || ''),
@@ -1737,6 +1859,10 @@ function settingsPayload() {
     backup: {
       retention: backupRetention(),
       guardPct: putGuardPct()
+    },
+    remote: {
+      publicUrl: (process.env.PUBLIC_URL || '').trim(),
+      lanUrl: lanBase()
     }
   };
 }
@@ -1844,6 +1970,9 @@ app.put('/api/settings', (req, res) => {
     if (typeof b.smtpPort === 'string' || typeof b.smtpPort === 'number') envUpd.SMTP_PORT = String(b.smtpPort).trim();
     if (typeof b.smtpUser === 'string') envUpd.SMTP_USER = b.smtpUser.trim();
     if (typeof b.smtpPass === 'string' && b.smtpPass) envUpd.SMTP_PASS = b.smtpPass;   // only set when provided
+    // Remote access: the HTTPS origin baked into the pairing QR (Tailscale Funnel / Caddy).
+    // Blank clears it (falls back to forwarded-host, then LAN http).
+    if (typeof b.publicUrl === 'string') envUpd.PUBLIC_URL = b.publicUrl.trim().replace(/\/+$/, '');
     // Data-safety knobs
     if (b.backupRetention != null && !isNaN(+b.backupRetention)) envUpd.BACKUP_RETENTION = String(Math.max(1, Math.min(1000, Math.round(+b.backupRetention))));
     if (b.putGuardPct != null && !isNaN(+b.putGuardPct)) envUpd.PUT_GUARD_PCT = String(Math.max(0, Math.min(100, Math.round(+b.putGuardPct))));
@@ -1913,6 +2042,33 @@ app.post('/api/ingest-token/regenerate', (req, res) => {
   const token = crypto.randomBytes(24).toString('base64url');
   setEnvVars({ INGEST_TOKEN: token });
   res.json({ ok: true, token });
+});
+
+// Set/change the full-access app passphrase (APP_TOKEN) live — no restart needed. Auth checks,
+// the login cookie, and the pairing QR all read the in-memory APP_TOKEN/TOKEN_HASH, which this
+// updates. Guard: when a passphrase is already set AND the caller isn't trusted-local (loopback,
+// no proxy), they must supply the correct current one. Re-issues the session cookie so the caller
+// isn't logged out. NOTE: changing it invalidates already-paired devices until they re-pair.
+app.post('/api/auth/passphrase', (req, res) => {
+  const b = req.body || {};
+  if (typeof b.passphrase !== 'string') return res.status(400).json({ ok: false, error: 'passphrase required' });
+  if (APP_TOKEN && !trustedLocal(req) && !safeEq(sha(b.current || ''), TOKEN_HASH)) {
+    return res.status(403).json({ ok: false, error: 'current passphrase required or incorrect' });
+  }
+  const next = b.passphrase.trim();
+  if (next && next.length < 6) return res.status(400).json({ ok: false, error: 'use at least 6 characters' });
+  APP_TOKEN = next;
+  TOKEN_HASH = next ? sha(next) : '';
+  try { setEnvVars({ APP_TOKEN: next }); }
+  catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  if (TOKEN_HASH) {
+    const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000'];
+    if (secureReq(req)) flags.push('Secure');
+    res.setHeader('Set-Cookie', `${COOKIE}=${TOKEN_HASH}; ${flags.join('; ')}`);
+  } else {
+    res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; Path=/; Max-Age=0`);
+  }
+  res.json({ ok: true, appTokenSet: !!APP_TOKEN });
 });
 
 // Timestamped, keep-forever snapshot of the current store ("Snapshot now").

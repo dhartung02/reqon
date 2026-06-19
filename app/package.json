@@ -13,7 +13,7 @@
     "expo-sqlite": "~56.0.4",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
-    "react-native": "^0.84.1",
+    "react-native": "0.85.3",
     "react-native-svg": "15.15.4",
     "react-native-webview": "13.16.1"
   },

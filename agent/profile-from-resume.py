@@ -61,13 +61,42 @@ def read_resume(path):
         with open(path, encoding="utf-8", errors="replace") as f:
             return f.read()
     if p.endswith(".pdf"):
-        try:
-            return subprocess.check_output(["pdftotext", "-layout", path, "-"],
-                                           stderr=subprocess.DEVNULL).decode("utf-8", "replace")
-        except Exception:
-            raise SystemExit("PDF support needs `pdftotext` (brew install poppler), "
-                             "or export your resume to .docx / .txt and retry.")
+        return _read_pdf(path)
     raise SystemExit("Unsupported file type. Use .docx, .txt, .md, or .pdf.")
+
+
+def _read_pdf(path):
+    """Extract PDF text. Tries the `pdftotext` CLI (poppler) first for best layout
+    fidelity, then falls back to pure-Python libraries so a missing Homebrew binary
+    doesn't break PDF upload. docx/txt/md never reach here (stdlib-only)."""
+    # 1) pdftotext CLI — best layout (keeps Title<TAB>Dates columns aligned).
+    try:
+        out = subprocess.check_output(["pdftotext", "-layout", path, "-"],
+                                      stderr=subprocess.DEVNULL).decode("utf-8", "replace")
+        if out.strip():
+            return out
+    except Exception:
+        pass
+    # 2) pypdf — pure Python, commonly installed.
+    try:
+        from pypdf import PdfReader
+        text = "\n".join((pg.extract_text() or "") for pg in PdfReader(path).pages)
+        if text.strip():
+            return text
+    except Exception:
+        pass
+    # 3) pdfminer.six — heavier but robust on awkward PDFs.
+    try:
+        from pdfminer.high_level import extract_text
+        text = extract_text(path) or ""
+        if text.strip():
+            return text
+    except Exception:
+        pass
+    raise SystemExit(
+        "Couldn't read text from this PDF. Install one of: `pdftotext` (brew install "
+        "poppler), `pip install pypdf`, or `pip install pdfminer.six` — or export your "
+        "resume to .docx / .txt and retry. (Scanned/image-only PDFs have no extractable text.)")
 
 
 def extract_applicant(text):

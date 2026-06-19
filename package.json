@@ -1,5 +1,5 @@
 {
-  "name": "job-pipeline-crm",
+  "name": "reqon",
   "version": "1.0.0",
   "description": "Self-hosted, config-driven job-search requisition CRM with a deterministic multi-ATS scout and optional AI assist. Server-backed JSON persistence.",
   "license": "MIT",
@@ -13,8 +13,13 @@
   },
   "dependencies": {
     "docx": "^9.7.1",
-    "exceljs": "^4.4.0",
+    "exceljs": "^3.4.0",
+    "expo": "^56.0.12",
     "express": "^4.19.2",
     "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.14",
+    "typescript": "~6.0.3"
   }
 }

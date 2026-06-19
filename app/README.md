@@ -2,7 +2,7 @@
 
 The mobile command center for the Reqon job-search pipeline. Local-first; works with no
 backend, syncs with the optional self-hosted server (Reqon Sync) when configured. Part of the
-`job-pipeline-crm` monorepo — see the repo-root [ROADMAP.md](../ROADMAP.md) (Phase 2) and
+`reqon` monorepo — see the repo-root [ROADMAP.md](../ROADMAP.md) (Phase 2) and
 [WORKPLAN.md](../WORKPLAN.md) (WP-2) for scope and milestones.
 
 ## Architecture: one shared core, never re-ported

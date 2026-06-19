@@ -397,6 +397,11 @@
   .settings-nav button{text-align:left;background:transparent;border:0;color:var(--text-2);padding:9px 12px;border-radius:8px;font-family:inherit;font-size:.86rem;cursor:pointer}
   .settings-nav button:hover{background:var(--panel-2);color:var(--text)}
   .settings-nav button.active{background:var(--panel-2);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+  .pairbox{margin-top:10px}
+  .pairqr{width:180px;height:180px;background:#fff;border-radius:10px;padding:8px;box-sizing:border-box}
+  .pairqr svg{width:100%;height:100%;display:block}
+  .pairrow{display:flex;gap:8px;margin-top:6px;align-items:center}
+  .pairrow input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);color:var(--text-2);border-radius:7px;padding:7px 9px;font-family:"Spline Sans Mono",monospace;font-size:.72rem}
   .settings-content{flex:1;min-width:0;overflow:auto;padding:20px 22px}
   .sset[hidden]{display:none}
   .sset .ssh{font-size:1.05rem;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
@@ -825,6 +830,11 @@
             <div class="tokrow"><span class="tokname">ChatGPT ingest token</span><span id="ingestTokState" class="tokstate">—</span><button class="mini" id="regenIngestBtn" type="button">Regenerate</button></div>
             <div id="ingestTokNew" class="toknew" style="display:none"></div>
             <p class="hint" style="margin:8px 0 0">The <b>ingest token</b> is scoped to <code>POST /api/reqs/merge</code> + <code>/quickadd</code> only — safe to hand an automation (ChatGPT Action). The <b>app passphrase</b> grants full access and is managed in <code>.env</code> (not editable here by design). Send either as the <code>X-CRM-Token</code> header.</p>
+          </div>
+          <div class="field"><label>Pair a device</label>
+            <p class="ssd" style="margin:0 0 8px">Scan from the iOS app (<b>Settings → Sync → Scan QR</b>) to set the server URL + passphrase automatically — no typing. The QR carries full access, so only show it on your own screen.</p>
+            <button class="mini" id="pairBtn" type="button">Show pairing QR</button>
+            <div id="pairBox" class="pairbox" style="display:none"></div>
           </div>
           <div class="field"><label>OpenAI API key <span id="setKeyState" class="setmuted"></span></label>
             <input id="setKey" type="password" placeholder="leave blank to keep current" autocomplete="off">
@@ -2009,6 +2019,22 @@ SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()
   SET("settingsContent").scrollTop=0;
 });
 SET("settingsOverlay").onclick=e=>{if(e.target.id==="settingsOverlay")SET("settingsOverlay").classList.remove("open");};
+// device pairing: fetch a QR + paste-code that encodes this server's URL + passphrase
+(function(){
+  const btn=SET("pairBtn"); if(!btn) return;
+  btn.onclick=async()=>{
+    const box=SET("pairBox"); box.style.display="block"; box.innerHTML='<div class="setmuted">Generating…</div>';
+    try{
+      const r=await fetch('/api/pair'); const j=await r.json();
+      if(!r.ok||!j.ok) throw new Error(j.error||('HTTP '+r.status));
+      box.innerHTML='<div class="pairqr">'+j.qrSvg+'</div>'
+        +'<div class="setmuted" style="margin:8px 0 4px">'+(j.hasToken?'Includes your passphrase — ':'')+'URL: '+esc(j.url)+'</div>'
+        +'<div class="pairrow"><input id="pairCode" readonly value="'+esc(j.code)+'"><button class="mini" id="pairCopy" type="button">Copy</button></div>'
+        +'<p class="hint" style="margin:6px 0 0">Can’t scan? Paste this code into the app’s “Paste pairing code” field.</p>';
+      const cp=SET("pairCopy"); if(cp) cp.onclick=()=>{const i=SET("pairCode");i.select();try{navigator.clipboard.writeText(i.value);}catch(e){}cp.textContent='Copied';setTimeout(()=>cp.textContent='Copy',1500);};
+    }catch(e){ box.innerHTML='<div class="setmuted" style="color:var(--warn,#e0a23c)">Pairing failed: '+esc(e.message)+'</div>'; }
+  };
+})();
 // populate the Run-Scout source checklist + AI footer on load
 fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
 

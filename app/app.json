@@ -28,7 +28,13 @@
     "plugins": [
       "expo-sqlite",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Reqon uses the camera to scan the pairing QR from your board, so it can connect to your server without typing the URL and passphrase."
+        }
+      ]
     ]
   }
 }

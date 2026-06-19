@@ -18,6 +18,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const ExcelJS = require('exceljs');
+const QRCode = require('qrcode');
 const docx = require('docx');
 
 // --- minimal .env loader (no dependency) ---------------------------------------
@@ -367,6 +368,23 @@ app.use(express.static(path.join(ROOT, 'public')));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, count: readStore().length, port: PORT, dataFile: DATA_FILE });
+});
+
+// Device pairing: package this server's LAN URL + passphrase into one QR/code the app can
+// scan or paste, instead of hand-typing both. Auth-gated like every /api route (when APP_TOKEN
+// is set, only an authed board session — i.e. someone who already knows the passphrase — can
+// fetch it), so the QR never exposes anything the requester hasn't already proven they have.
+function lanBase() {
+  const nets = os.networkInterfaces();
+  const lan = Object.values(nets).flat().find(n => n && n.family === 'IPv4' && !n.internal);
+  return `http://${(lan && lan.address) || 'localhost'}:${PORT}`;
+}
+app.get('/api/pair', (req, res) => {
+  const url = lanBase();
+  const code = core.encodePairing(url, APP_TOKEN);
+  QRCode.toString(code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' })
+    .then(qrSvg => res.json({ ok: true, url, hasToken: !!APP_TOKEN, code, qrSvg }))
+    .catch(e => res.status(500).json({ ok: false, error: e.message }));
 });
 
 app.get('/api/reqs', (req, res) => {

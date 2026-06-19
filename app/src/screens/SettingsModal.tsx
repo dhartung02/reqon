@@ -4,6 +4,8 @@ import { alpha, fonts, useThemedStyles, useScheme, type Palette, type SchemePref
 import { useLayout } from '../useLayout';
 import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
 import { testConnection, syncTwoWay } from '../sync/sync';
+import { decodePairing } from '@reqon/core';
+import { PairScanModal } from './PairScanModal';
 import { ProfileScreen } from './ProfileScreen';
 import { SearchCriteriaScreen } from './SearchCriteriaScreen';
 import { TiersRulesScreen } from './TiersRulesScreen';
@@ -56,6 +58,7 @@ export function SettingsModal({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null);
   const [scout, setScout] = useState<ScoutMode>('auto');
+  const [scanOpen, setScanOpen] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -78,6 +81,19 @@ export function SettingsModal({
 
   const persist = () => {
     setConfig({ url, token });
+  };
+
+  // Apply a scanned/pasted pairing payload: fill + save the URL + passphrase in one step.
+  const applyPairing = (u: string, t: string) => {
+    setUrl(u);
+    setToken(t);
+    setConfig({ url: u, token: t });
+    setStatus({ kind: 'ok', text: 'Paired — server URL + passphrase set. Tap “Sync now”.' });
+  };
+  const onPasteCode = (text: string) => {
+    const parsed = decodePairing(text.trim());
+    if (parsed) applyPairing(parsed.url, parsed.token);
+    else if (text.trim()) setStatus({ kind: 'err', text: 'That doesn’t look like a Reqon pairing code.' });
   };
 
   const test = async () => {
@@ -117,6 +133,21 @@ export function SettingsModal({
         <Text style={styles.label}>Passphrase</Text>
         <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="your server passphrase (APP_TOKEN)" placeholderTextColor={c.muted} style={styles.input} />
         <Text style={styles.fieldHint}>Same passphrase you set as APP_TOKEN on the server — the one the web board's login asks for. Stored in your device keychain. Leave blank if the server has no passphrase.</Text>
+      </View>
+      <View style={styles.labeled}>
+        <Text style={styles.label}>Pair from the board</Text>
+        <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setScanOpen(true)}>
+          <Text style={styles.btnGhostText}>Scan QR to connect</Text>
+        </Pressable>
+        <TextInput
+          onChangeText={onPasteCode}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="…or paste pairing code (REQON1:…)"
+          placeholderTextColor={c.muted}
+          style={styles.input}
+        />
+        <Text style={styles.fieldHint}>On the board: Settings → Advanced → Pair a device. Scanning or pasting fills the URL + passphrase above automatically.</Text>
       </View>
       <View style={styles.labeled}>
         <Text style={styles.label}>On-device scout</Text>
@@ -215,6 +246,7 @@ export function SettingsModal({
             </View>
           </View>
         </View>
+        <PairScanModal visible={scanOpen} onClose={() => setScanOpen(false)} onPaired={applyPairing} />
       </Modal>
     );
   }
@@ -237,6 +269,7 @@ export function SettingsModal({
           </ScrollView>
         </View>
       </View>
+      <PairScanModal visible={scanOpen} onClose={() => setScanOpen(false)} onPaired={applyPairing} />
     </Modal>
   );
 }

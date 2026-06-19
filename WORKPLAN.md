@@ -1,7 +1,7 @@
 # WORKPLAN — Executing Roadmap v2
 
 *Handoff doc for Claude Code sessions. Read [ROADMAP.md](ROADMAP.md) first for the why;
-this file is the how. Last updated: 2026-06-16. **Status: WP-0 through WP-6 are all shipped
+this file is the how. Last updated: 2026-06-18. **Status: WP-0 through WP-6 are all shipped
 and merged to `main`** (status table at the bottom). The app then grew well past the original
 roadmap — see "Beyond the roadmap (shipped)" below. The only roadmap work still open is
 **dev-build-gated** (native Share Extension, on-device push registration, local
@@ -267,9 +267,9 @@ WP-2's M3 (native Share Extension) and M5 (local notifications) remain — both 
 ## Beyond the roadmap (shipped after WP-0…6)
 
 The app grew past the original plan. All of the following are merged to `main`, `tsc` clean,
-with jest coverage on the pure logic (60 tests across core vectors, scout scoring + criteria
-wiring + salary parse, Today lanes, tier thresholds, analytics, score rationale, answers
-search/match):
+with broad test coverage on the pure logic (app jest + Python `unittest` + core/extension vector
+runners — core vectors, scout scoring/dedupe, résumé + mail classifiers, Today lanes, tier
+thresholds, analytics, score rationale, answers search/match, pairing codec):
 
 - **Full Settings parity** — Profile (multi-entry education / work history / awards / certs /
   volunteer / EEO + résumé upload→parse), Search criteria (titles / keywords / negative
@@ -290,6 +290,21 @@ search/match):
   optional **per-role tailoring** (incl. one-tap "tailored to this role" from a role).
 - **Apply-assist** (in-app browser) — factual-field fill (never EEO/consent/submit) + the
   answers fill above.
+- **iPad command center** — adaptive layout (`useLayout`): NavRail + master-detail (open-row
+  highlight, no stray Back) in wide mode, byte-identical phone path; Today/Analytics grids;
+  Settings split view; **all-orientation** (landscape). Pipeline list **virtualized** (SectionList).
+- **Open the original listing** from any req (board compact row + app card + detail), applied or not.
+- **Accessibility** — labels/roles on cards, tabs, sort/filter pills, the tier-distribution bar.
+- **QR / pairing-code device setup** — board (Settings → Advanced → Pair a device) shows a QR of
+  `{url, token}`; the app scans or pastes it to auto-configure sync (no typing). Secret stays in
+  the keychain; the sync field is labeled "Passphrase" across board/app/extension.
+- **Gmail response ingest** (`agent/mail_ingest.py`) — IMAP App-Password read; classifies
+  rejection/interview/offer (deterministic + optional AI), conservative company match,
+  **auto-sets rejections / flags positives** via the audited PATCH path. Configurable **from the
+  app** (`/api/mail/config` + `/api/mail/run`, password write-only/masked) or `.env`; scheduled
+  via `run-mail.sh` (piggybacks the scout). Notifies positives on the digest webhook.
+- **Résumé parser fix** — correct company/role segmentation, DOCX tabs, multi-degree, no
+  truncation; **scout dedup** unified on the near-dupe-aware key.
 
 ## Open work (all dev-build-gated — needs EAS/Xcode)
 

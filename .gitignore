@@ -10,6 +10,8 @@ agent/**/__pycache__/
 
 # Scout runtime state
 agent/scout-status.json
+# Mail-ingest runtime state (processed message-ids)
+agent/mail-state.json
 
 # Append-only runtime ledgers (personal edit/enrichment history)
 agent/change-log.jsonl

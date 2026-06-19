@@ -1452,6 +1452,61 @@ app.get('/api/scout/status', (req, res) => {
   });
 });
 
+// ---------- Gmail response ingest: app-managed config + server-run ----------
+// Credentials live in .env (written via setEnvVars, picked up without a restart). The config
+// endpoints NEVER return the app password — only whether it's set + its last 4. The run endpoint
+// spawns agent/mail_ingest.py and returns its report (the user's own pipeline data, not secrets).
+const mailConfigPayload = () => ({
+  ok: true,
+  configured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD),
+  user: process.env.GMAIL_USER || '',
+  passSet: !!process.env.GMAIL_APP_PASSWORD,
+  passLast4: last4(process.env.GMAIL_APP_PASSWORD || ''),
+  label: process.env.GMAIL_LABEL || 'INBOX',
+  ai: process.env.MAIL_AI === 'true',
+  sinceDays: parseInt(process.env.MAIL_SINCE_DAYS || '14', 10) || 14,
+});
+app.get('/api/mail/config', (req, res) => res.json(mailConfigPayload()));
+app.post('/api/mail/config', (req, res) => {
+  const b = req.body || {};
+  const upd = {};
+  if (b.clear === true) { upd.GMAIL_USER = ''; upd.GMAIL_APP_PASSWORD = ''; }
+  else {
+    if (typeof b.user === 'string') upd.GMAIL_USER = b.user.trim();
+    if (typeof b.password === 'string' && b.password) upd.GMAIL_APP_PASSWORD = b.password.trim(); // blank = keep current
+    if (typeof b.label === 'string') upd.GMAIL_LABEL = b.label.trim() || 'INBOX';
+    if (typeof b.ai === 'boolean') upd.MAIL_AI = b.ai ? 'true' : 'false';
+  }
+  try { if (Object.keys(upd).length) setEnvVars(upd); }
+  catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  res.json(mailConfigPayload());
+});
+let mailChild = null;
+app.post('/api/mail/run', (req, res) => {
+  if (mailChild) return res.status(409).json({ ok: false, error: 'A mail run is already in progress.' });
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
+  }
+  const apply = (req.body || {}).apply === true;   // default: dry-run (writes nothing)
+  const argv = [path.join(ROOT, 'agent', 'mail_ingest.py')];
+  if (apply) argv.push('--apply');
+  if (process.env.MAIL_AI === 'true') argv.push('--ai');
+  let child, out = '', err = '', done = false;
+  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; res.status(status).json(payload); };
+  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: process.env }); }
+  catch (e) { return finish(500, { ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
+  mailChild = child;
+  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 90000);
+  child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
+  child.stderr && child.stderr.on('data', d => { err += d; });
+  child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
+  child.once('exit', code => {
+    clearTimeout(killer);
+    if (code !== 0) return finish(500, { ok: false, error: (err.trim() || ('exit ' + code)).slice(0, 800), report: out });
+    finish(200, { ok: true, applied: apply, report: out });
+  });
+});
+
 app.post('/api/scout/run', (req, res) => {
   if (scoutChild) return res.status(409).json({ ok: false, running: true, error: 'A scout run is already in progress.' });
   const body = req.body || {};

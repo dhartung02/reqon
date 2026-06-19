@@ -224,6 +224,23 @@
   .profkw{display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:120px;overflow:auto}
   .profkw .kw{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:2px 8px}
   .profkw .kw b{color:var(--gold)}
+  .profkw .kw.kwedit{display:inline-flex;align-items:center;gap:5px;padding:2px 5px 2px 9px}
+  .profkw .kw.kwedit input{width:38px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--gold);font-family:"Spline Sans Mono",monospace;font-size:.7rem;padding:1px 3px;text-align:center}
+  .profkw .kw .kwrm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.82rem;line-height:1;padding:0 2px}
+  .profhist{display:flex;flex-direction:column;gap:8px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:260px;overflow:auto}
+  .histitem{border-bottom:1px solid var(--line);padding-bottom:7px}
+  .histitem:last-child{border-bottom:0;padding-bottom:0}
+  .histhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:.82rem}
+  .histdate{color:var(--dim);font-size:.7rem;white-space:nowrap}
+  .histmeta{color:var(--text-2);font-size:.74rem;margin-top:2px}
+  .histdesc{margin:5px 0 0;padding-left:16px;color:var(--text-2);font-size:.73rem;line-height:1.4}
+  .histdesc li{margin-bottom:2px}
+  .mailreport{margin-top:10px;padding:10px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:200px;overflow:auto;font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);white-space:pre-wrap;line-height:1.45}
+  .histedit{border:1px solid var(--line-2);border-radius:9px;padding:10px;margin-bottom:8px;background:var(--bg)}
+  .histedit .grid2{margin-bottom:6px}
+  .histedit input,.histedit textarea{margin-bottom:6px}
+  .histedit textarea{width:100%;resize:vertical}
+  .histedit .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
   /* analytics */
   .an-wrap{display:flex;flex-direction:column;gap:14px}
   .an-bartop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--dim);font-size:.8rem}
@@ -417,6 +434,12 @@
   .connrow .cname{font-weight:600}
   .connrow .cval{color:var(--dim);margin-left:auto;font-family:"Spline Sans Mono",monospace;font-size:.76rem}
   .connrow.on .cval{color:var(--positive)}
+  .connrow.clickable{cursor:pointer;transition:border-color .12s,background .12s}
+  .connrow.clickable:hover,.connrow.clickable:focus{border-color:var(--green);background:var(--panel-2);outline:none}
+  .connrow .cgear{color:var(--dim);font-size:.85rem;margin-left:10px;opacity:.6}
+  .connrow.clickable:hover .cgear,.connrow.clickable:focus .cgear{opacity:1;color:var(--green)}
+  @keyframes flashfield{0%,100%{box-shadow:0 0 0 0 transparent}30%{box-shadow:0 0 0 3px var(--green)}}
+  .flashfield{animation:flashfield 1.5s ease;border-color:var(--green)!important}
   .safetynote{background:rgba(121,166,224,.08);border:1px solid #2f4360;border-radius:9px;padding:11px 14px;color:var(--text-2);font-size:.82rem;margin-bottom:16px;line-height:1.5}
   .tokrow{display:flex;align-items:center;gap:11px;padding:9px 13px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;font-size:.85rem;margin-bottom:6px}
   .tokrow .tokname{font-weight:600;min-width:160px}
@@ -710,7 +733,23 @@
             <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
             <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
           </div>
-          <div class="field"><label>Resume keywords (weighted — read-only; refresh via re-parse)</label><div id="profKeywords" class="profkw"></div></div>
+          <div class="field"><label>Resume keywords (weighted — editable; tune what the scout favors)</label>
+            <div id="profKeywords" class="profkw"></div>
+            <div class="ahintrow" style="margin-top:8px">
+              <input id="kwAddName" type="text" placeholder="add a keyword (e.g. agentic)" style="flex:1;min-width:120px">
+              <input id="kwAddWeight" type="number" min="1" max="20" step="1" value="5" title="weight" style="width:64px">
+              <button class="mini" id="kwAddBtn" type="button">+ Add</button>
+            </div>
+            <p class="hint" style="margin:6px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a scout fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server scout. <span class="setmuted">The on-device app scout uses Search criteria keywords; it only runs when no server is connected.</span></p>
+          </div>
+          <div class="field"><label>Work history (editable; parsed from your résumé, synced to the app)</label>
+            <div id="profWorkHistory"></div>
+            <div class="ahintrow"><button class="mini" id="addWorkBtn" type="button">+ Add role</button></div>
+          </div>
+          <div class="field"><label>Education (editable; parsed from your résumé, synced to the app)</label>
+            <div id="profEducation"></div>
+            <div class="ahintrow"><button class="mini" id="addEduBtn" type="button">+ Add education</button></div>
+          </div>
           <div class="field"><label>Narrative library (reusable story blurbs for cover notes / screening answers)</label>
             <div id="narrativeBox"></div>
             <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
@@ -793,7 +832,19 @@
             </div>
           </div>
           <div class="ahintrow"><button class="mini" id="sendDigestBtn" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
-          <p class="hint" style="margin:8px 0 0">Save settings before sending a test.</p>
+          <p class="hint" style="margin:8px 0 0">Save settings before sending a test. Gmail with 2-Step Verification needs an <b>App Password</b> (Google Account → Security → App passwords), not your account password.</p>
+
+          <div style="font-weight:600;font-size:.9rem;margin:16px 0 8px;padding-top:14px;border-top:1px solid var(--line)">Gmail response ingest (IMAP)</div>
+          <p class="hint" style="margin:0 0 10px">Reads recruiter emails on the server and updates the board — auto-sets rejections, flags interviews/offers for review. Same credential model as the iOS app; this is the server-side equivalent. Needs a Gmail <b>App Password</b>.</p>
+          <div class="grid2">
+            <div class="field"><label>Gmail address</label><input id="mailUser" type="text" placeholder="you@gmail.com" autocomplete="off"></div>
+            <div class="field"><label>App password <span id="mailState" class="setmuted"></span></label><input id="mailPass" type="password" placeholder="16-char app password (blank = keep)" autocomplete="off"></div>
+            <div class="field"><label>Mailbox / label</label><input id="mailLabel" type="text" placeholder="INBOX"></div>
+            <div class="field"><label>Look-back (days)</label><input id="mailSince" type="number" min="1" max="90" step="1" placeholder="14"></div>
+          </div>
+          <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="mailAi" type="checkbox" style="width:auto"> Use AI for ambiguous emails (server OpenAI key)</label></div>
+          <div class="ahintrow"><button class="mini" id="mailSaveBtn" type="button">Save</button> <button class="mini" id="mailTestBtn" type="button">Test (dry run)</button> <button class="mini" id="mailRunBtn" type="button">▶ Run now</button> <button class="mini danger" id="mailClearBtn" type="button">Clear credentials</button> <span id="mailStatus" class="setmuted"></span></div>
+          <pre id="mailReport" class="mailreport" style="display:none"></pre>
         </section>
 
         <section class="sset" data-sect="data" hidden>
@@ -826,10 +877,22 @@
             <div id="connStatus" class="connstat"><div class="setmuted">loading…</div></div>
           </div>
           <div class="field"><label>Access tokens (remote access)</label>
-            <div class="tokrow"><span class="tokname">App passphrase</span><span id="appTokState" class="tokstate">—</span><span class="tokhint">.env only · full access</span></div>
+            <div class="tokrow"><span class="tokname">App passphrase</span><span id="appTokState" class="tokstate">—</span><span class="tokhint">full access</span></div>
+            <div class="field" style="margin:6px 0 10px">
+              <div class="ahintrow">
+                <input id="setPassphrase" type="password" placeholder="new passphrase (≥6 chars)" autocomplete="new-password" style="flex:1;min-width:140px">
+                <button class="mini" id="savePassphraseBtn" type="button">Set / Change</button>
+                <span id="passMsg" class="setmuted"></span>
+              </div>
+              <p class="hint" style="margin:6px 0 0">Full-access passphrase for remote/app sign-in (the one the login page + app Sync ask for). Takes effect immediately — no restart. <b>Changing it logs out paired devices until they re-pair</b> (re-scan the QR or re-enter). Leave blank and click to disable remote auth (not recommended).</p>
+            </div>
             <div class="tokrow"><span class="tokname">ChatGPT ingest token</span><span id="ingestTokState" class="tokstate">—</span><button class="mini" id="regenIngestBtn" type="button">Regenerate</button></div>
             <div id="ingestTokNew" class="toknew" style="display:none"></div>
-            <p class="hint" style="margin:8px 0 0">The <b>ingest token</b> is scoped to <code>POST /api/reqs/merge</code> + <code>/quickadd</code> only — safe to hand an automation (ChatGPT Action). The <b>app passphrase</b> grants full access and is managed in <code>.env</code> (not editable here by design). Send either as the <code>X-CRM-Token</code> header.</p>
+            <p class="hint" style="margin:8px 0 0">The <b>ingest token</b> is scoped to <code>POST /api/reqs/merge</code> + <code>/quickadd</code> only — safe to hand an automation (ChatGPT Action). Send either it or the app passphrase as the <code>X-CRM-Token</code> header.</p>
+          </div>
+          <div class="field"><label>Remote access URL (HTTPS) <span id="remoteLanHint" class="setmuted"></span></label>
+            <input id="setPublicUrl" type="text" placeholder="https://your-machine.tailnet.ts.net (blank = LAN only)" autocomplete="off">
+            <p class="hint" style="margin:6px 0 0">iOS blocks plaintext HTTP, so connecting from outside your LAN needs HTTPS. Set this to your <b>Tailscale Funnel</b> or <b>Caddy</b> hostname and the pairing QR below will bake that origin (no port). Leave blank for same-network LAN pairing. See <code>agent/run-tunnel.sh</code> and MOBILE-SETUP.md.</p>
           </div>
           <div class="field"><label>Pair a device</label>
             <p class="ssd" style="margin:0 0 8px">Scan from the iOS app (<b>Settings → Sync → Scan QR</b>) to set the server URL + passphrase automatically — no typing. The QR carries full access, so only show it on your own screen.</p>
@@ -846,6 +909,18 @@
               <input id="setApify" type="password" placeholder="APIFY_TOKEN (blank=keep)" autocomplete="off">
             </div>
             <div class="ahintrow"><button class="mini danger" id="clearTheirstackBtn" type="button">Clear TheirStack</button> <button class="mini danger" id="clearApifyBtn" type="button">Clear Apify</button></div>
+          </div>
+          <div class="field"><label>APNs push (iOS) <span id="apnsState" class="setmuted"></span></label>
+            <p class="hint" style="margin:0 0 8px">Token-based APNs (.p8 key). From the Apple Developer portal: Keys → an APNs key (.p8) + its Key ID, your Team ID, and the app's Bundle ID (<code>com.reqon.app</code>). Paste the .p8 contents or give a server file path — the key is written 0600 and never sent back to the browser.</p>
+            <div class="grid2">
+              <div class="field"><label>Key ID</label><input id="apnsKeyId" type="text" placeholder="ABC123DEFG" autocomplete="off"></div>
+              <div class="field"><label>Team ID</label><input id="apnsTeamId" type="text" placeholder="DEF456GHIJ" autocomplete="off"></div>
+              <div class="field"><label>Bundle ID</label><input id="apnsBundleId" type="text" placeholder="com.reqon.app"></div>
+              <div class="field"><label>Environment</label><select id="apnsEnv"><option value="sandbox">Sandbox (Expo Go / dev)</option><option value="production">Production</option></select></div>
+            </div>
+            <div class="field"><label>.p8 key (paste contents, blank = keep) — or path below</label><textarea id="apnsKeyP8" rows="3" placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----" autocomplete="off" style="font-family:'Spline Sans Mono',monospace;font-size:.72rem"></textarea></div>
+            <div class="field"><label>…or server path to the .p8</label><input id="apnsKeyPath" type="text" placeholder="agent/AuthKey_ABC123.p8 (relative to project root)"></div>
+            <div class="ahintrow"><button class="mini" id="apnsSaveBtn" type="button">Save</button> <button class="mini" id="apnsTestBtn" type="button">Send test push</button> <button class="mini danger" id="apnsClearBtn" type="button">Clear APNs</button> <span id="apnsStatus" class="setmuted"></span></div>
           </div>
         </section>
 
@@ -1792,6 +1867,7 @@ function fillSettings(j){
   SET("setSmtpHost").value=dg.smtpHost||""; SET("setSmtpPort").value=dg.smtpPort||""; SET("setSmtpUser").value=dg.smtpUser||"";
   SET("setSmtpPass").value=""; SET("smtpState").textContent=dg.smtpSet?"(set)":"(not set)";
   SET("digestStatus").textContent=dg.lastSent?`Last sent ${new Date(dg.lastSent).toLocaleString()} via ${dg.lastChannel||"?"}`+(dg.lastCounts?` (${dg.lastCounts.newFinds} new / ${dg.lastCounts.followUps} follow / ${dg.lastCounts.closed} closed)`:""):"Never sent.";
+  const rm=j.remote||{}; SET("setPublicUrl").value=rm.publicUrl||""; SET("remoteLanHint").textContent=rm.lanUrl?`LAN: ${rm.lanUrl}`:"";
   const bk=j.backup||{}; const ret=bk.retention!=null?bk.retention:50;
   SET("setRetention").value=ret; SET("setGuardPct").value=bk.guardPct!=null?bk.guardPct:20; SET("setRetentionEcho").textContent=ret;
   const tm=j.tabStatusMap||{};
@@ -1826,14 +1902,32 @@ function buildConnStatus(j){
   const box=SET("connStatus"); if(!box)return;
   const srcCfg=(name)=>{const s=(j.sources||[]).find(x=>x.name===name);return s?!!s.configured:false;};
   const rows=[
-    {name:"OpenAI",on:!!(j.llm&&j.llm.keySet),on_t:"Connected",off_t:"Not configured"},
-    {name:"SMTP (email)",on:!!(j.digest&&j.digest.smtpSet),on_t:"Connected",off_t:"Not configured"},
-    {name:"Slack webhook",on:!!(j.digest&&j.digest.webhookSet),on_t:"Connected",off_t:"Not configured"},
-    {name:"TheirStack",on:srcCfg("theirstack"),on_t:"Connected",off_t:"Not configured"},
-    {name:"Apify (Fantastic.jobs)",on:srcCfg("fantastic"),on_t:"Connected",off_t:"Not configured"},
-    {name:"APNs push (iOS)",on:!!(j.auth&&j.auth.apnsSet),on_t:((j.auth&&j.auth.pushDevices)||0)+" device(s)",off_t:"Not configured"},
+    {name:"OpenAI",on:!!(j.llm&&j.llm.keySet),on_t:"Connected",off_t:"Not configured",sect:"advanced",focus:"setKey"},
+    {name:"SMTP (email — outbound digest)",on:!!(j.digest&&j.digest.smtpSet),on_t:"Connected",off_t:"Not configured",sect:"digest",focus:"setSmtpHost"},
+    {name:"IMAP (Gmail — inbound ingest)",on:!!(j.mail&&j.mail.configured),on_t:"Connected",off_t:"Not configured",sect:"digest",focus:"mailUser"},
+    {name:"Slack webhook",on:!!(j.digest&&j.digest.webhookSet),on_t:"Connected",off_t:"Not configured",sect:"digest",focus:"setDigestWebhook"},
+    {name:"TheirStack",on:srcCfg("theirstack"),on_t:"Connected",off_t:"Not configured",sect:"advanced",focus:"setTheirstack"},
+    {name:"Apify (Fantastic.jobs)",on:srcCfg("fantastic"),on_t:"Connected",off_t:"Not configured",sect:"advanced",focus:"setApify"},
+    {name:"APNs push (iOS)",on:!!(j.auth&&j.auth.apnsSet),on_t:((j.auth&&j.auth.pushDevices)||0)+" device(s)",off_t:"Not configured",sect:"advanced",focus:"apnsKeyId"},
   ];
-  box.innerHTML=rows.map(r=>`<div class="connrow ${r.on?'on':''}"><span class="cdot"></span><span class="cname">${r.name}</span><span class="cval">${r.on?r.on_t:r.off_t}</span></div>`).join("");
+  box.innerHTML=rows.map((r,i)=>`<div class="connrow clickable ${r.on?'on':''}" data-go="${i}" role="button" tabindex="0" title="Configure ${esc(r.name)}"><span class="cdot"></span><span class="cname">${esc(r.name)}</span><span class="cval">${r.on?esc(r.on_t):esc(r.off_t)}</span><span class="cgear">⚙</span></div>`).join("");
+  box.querySelectorAll(".connrow[data-go]").forEach(el=>{
+    const r=rows[+el.dataset.go];
+    const go=()=>gotoSetting(r.sect,r.focus);
+    el.onclick=go;
+    el.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}};
+  });
+}
+// Jump to a settings sub-tab and highlight/focus a specific field (used by Connection Status rows).
+function gotoSetting(sect,focusId){
+  const navBtn=SET("settingsNav").querySelector(`button[data-sect="${sect}"]`);
+  if(navBtn)navBtn.click();
+  if(!focusId)return;
+  setTimeout(()=>{const el=SET(focusId);if(!el)return;
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+    try{el.focus({preventScroll:true});}catch(e){}
+    el.classList.add("flashfield");setTimeout(()=>el.classList.remove("flashfield"),1600);
+  },70);
 }
 function applyTabMap(tm){
   if(tm&&typeof tm==="object"){TAB_MAP={...TAB_MAP_DEFAULT,...tm};}
@@ -1842,7 +1936,7 @@ function applyTabMap(tm){
 async function fetchSettings(){return (await fetch("/api/settings",{cache:"no-store"})).json();}
 function openSettings(){
   F("scoutMenu").classList.remove("open");
-  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();})
+  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();loadMailConfig();loadPushConfig();})
     .catch(()=>{SET("setMsg").className="setmsg err";SET("setMsg").textContent="Could not load settings.";SET("settingsOverlay").classList.add("open");});
 }
 
@@ -1966,6 +2060,7 @@ async function saveSettings(){
   if(ts||ap){body.envKeys={}; if(ts)body.envKeys.THEIRSTACK_API_KEY=ts; if(ap)body.envKeys.APIFY_TOKEN=ap;}
   const wh=SET("setDigestWebhook").value.trim(); if(wh)body.digestSlackWebhook=wh;
   const sp=SET("setSmtpPass").value; if(sp)body.smtpPass=sp;
+  body.publicUrl=SET("setPublicUrl").value.trim();   // blank clears → LAN-only pairing
   SET("setMsg").className="setmsg";SET("setMsg").textContent="Saving…";
   try{
     const j=await (await fetch("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
@@ -2010,6 +2105,19 @@ SET("regenIngestBtn").onclick=async()=>{
     SET("ingestTokState").textContent="Set ••••"+j.token.slice(-4); SET("ingestTokState").className="tokstate on";
   }catch(e){box.innerHTML='<span style="color:var(--coral)">Regenerate failed: '+esc(e.message)+'</span>';}
 };
+SET("savePassphraseBtn").onclick=async()=>{
+  const v=SET("setPassphrase").value;
+  if(v&&v.trim().length<6){SET("passMsg").textContent="Use at least 6 characters.";return;}
+  if(!v.trim()&&!confirm("Set an EMPTY passphrase? This disables remote/app authentication — anyone who can reach the server gets full access. Continue?"))return;
+  if(!confirm("Change the app passphrase now? Paired devices will be signed out until they re-pair."))return;
+  SET("passMsg").textContent="Saving…";
+  try{
+    const j=await (await fetch("/api/auth/passphrase",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({passphrase:v})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("setPassphrase").value=""; SET("passMsg").textContent=j.appTokenSet?"Updated — re-pair your devices.":"Cleared (auth disabled).";
+    SET("appTokState").textContent=j.appTokenSet?"Set":"Not set — remote API is OPEN";
+  }catch(e){SET("passMsg").textContent="Failed: "+e.message;}
+};
 SET("settingsSave").onclick=saveSettings;
 // settings left-nav section switching
 SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()=>{
@@ -2040,11 +2148,108 @@ fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); appl
 
 // ---------- candidate profile + narrative library (Phase 5) ----------
 let PROFILE_NARRATIVES=[];
+let PROFILE_KEYWORDS=[]; let KW_REMOVED=new Set();
+let PROFILE_WORK=[]; let PROFILE_EDU=[];
+function renderKeywords(){
+  const box=SET("profKeywords");
+  if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No keywords yet — upload a resume or add one below.</span>';return;}
+  box.innerHTML=PROFILE_KEYWORDS.slice(0,80).map((k,i)=>
+    `<span class="kw kwedit">${esc(k.kw)} <input type="number" min="0" max="20" step="1" value="${k.weight}" data-kwi="${i}" title="weight"><button class="kwrm" type="button" data-kwx="${i}" title="remove">✕</button></span>`
+  ).join("");
+  box.querySelectorAll("input[data-kwi]").forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.kwi;if(PROFILE_KEYWORDS[i])PROFILE_KEYWORDS[i].weight=Math.max(0,Math.min(20,parseInt(inp.value,10)||0));});
+  box.querySelectorAll("button[data-kwx]").forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.kwx;const k=PROFILE_KEYWORDS[i];if(k)KW_REMOVED.add(k.kw.toLowerCase());PROFILE_KEYWORDS.splice(i,1);renderKeywords();});
+}
+function kwOverrides(){
+  const out=PROFILE_KEYWORDS.filter(k=>k.kw).map(k=>({kw:k.kw,weight:+k.weight||0}));
+  const present=new Set(out.map(k=>k.kw.toLowerCase()));
+  KW_REMOVED.forEach(kw=>{if(!present.has(kw))out.push({kw,weight:0});});
+  return out;
+}
 const csvList=v=>String(v||"").split(",").map(s=>s.trim()).filter(Boolean);
 async function loadProfile(){ try{const j=await (await fetch("/api/profile",{cache:"no-store"})).json(); if(j.ok){fillProfile(j.profile); brandFromProfile(j.profile);} }catch(e){} }
 // personalize the title from the profile (no hardcoded name in markup)
 function brandFromProfile(p){ const n=(p&&p.applicant&&p.applicant.name||"").trim(); if(n)document.title="Reqon — "+n; }
 loadProfile();   // sets the title at startup; re-runs when Settings opens
+
+// ---------- Gmail response ingest (IMAP) — server-side config, mirrors the iOS app ----------
+async function loadMailConfig(){
+  try{const m=await (await fetch("/api/mail/config",{cache:"no-store"})).json();
+    if(!m||!m.ok)return;
+    SET("mailUser").value=m.user||""; SET("mailLabel").value=m.label||"INBOX";
+    SET("mailSince").value=m.sinceDays||14; SET("mailAi").checked=!!m.ai; SET("mailPass").value="";
+    SET("mailState").textContent=m.passSet?`(set ····${m.passLast4||""})`:"(not set)";
+  }catch(e){}
+}
+function mailBody(){return {user:SET("mailUser").value.trim(),password:SET("mailPass").value,label:SET("mailLabel").value.trim()||"INBOX",ai:SET("mailAi").checked,sinceDays:SET("mailSince").value};}
+async function mailSave(){
+  SET("mailStatus").textContent="Saving…";
+  try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())})).json();
+    if(!m.ok)throw new Error(m.error||"save failed");
+    SET("mailPass").value=""; SET("mailState").textContent=m.passSet?`(set ····${m.passLast4||""})`:"(not set)";
+    SET("mailStatus").textContent="Saved on the server.";
+  }catch(e){SET("mailStatus").textContent="Failed: "+e.message;}
+}
+async function mailRun(apply){
+  SET("mailStatus").textContent=apply?"Running…":"Dry run…"; SET("mailReport").style.display="none";
+  try{
+    await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
+    SET("mailPass").value="";
+    const j=await (await fetch("/api/mail/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})})).json();
+    if(j.report){SET("mailReport").textContent=j.report;SET("mailReport").style.display="block";}
+    if(!j.ok)throw new Error(j.error||"run failed");
+    SET("mailStatus").textContent=apply?"Ran on the server.":"Dry run complete — nothing changed.";
+    loadMailConfig();
+  }catch(e){SET("mailStatus").textContent="Failed: "+e.message;}
+}
+SET("mailSaveBtn").onclick=mailSave;
+SET("mailTestBtn").onclick=()=>mailRun(false);
+SET("mailRunBtn").onclick=()=>mailRun(true);
+SET("mailClearBtn").onclick=async()=>{
+  if(!confirm("Clear the saved Gmail address + app password on the server?"))return;
+  SET("mailStatus").textContent="Clearing…";
+  try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clear:true})})).json();
+    if(!m.ok)throw new Error(m.error||"failed");
+    SET("mailUser").value="";SET("mailPass").value="";SET("mailState").textContent="(not set)";SET("mailStatus").textContent="Cleared.";
+  }catch(e){SET("mailStatus").textContent="Failed: "+e.message;}
+};
+
+// ---------- APNs push config (board-managed, server-side) ----------
+async function loadPushConfig(){
+  try{const p=await (await fetch("/api/push/config",{cache:"no-store"})).json();
+    if(!p||!p.ok)return;
+    SET("apnsKeyId").value=p.keyId||""; SET("apnsTeamId").value=p.teamId||""; SET("apnsBundleId").value=p.bundleId||"";
+    SET("apnsEnv").value=p.env||"sandbox"; SET("apnsKeyPath").value=p.keyPath||""; SET("apnsKeyP8").value="";
+    SET("apnsState").textContent=p.configured?`(configured · ${p.devices} device(s))`:(p.keySet?"(key set · IDs incomplete)":"(not configured)");
+  }catch(e){}
+}
+function pushBody(){const b={keyId:SET("apnsKeyId").value.trim(),teamId:SET("apnsTeamId").value.trim(),bundleId:SET("apnsBundleId").value.trim(),env:SET("apnsEnv").value};
+  const k=SET("apnsKeyP8").value.trim(); if(k)b.keyP8=k; const pth=SET("apnsKeyPath").value.trim(); if(pth)b.keyPath=pth; return b;}
+SET("apnsSaveBtn").onclick=async()=>{
+  SET("apnsStatus").textContent="Saving…";
+  try{const p=await (await fetch("/api/push/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pushBody())})).json();
+    if(!p.ok)throw new Error(p.error||"save failed");
+    SET("apnsKeyP8").value=""; SET("apnsKeyPath").value=p.keyPath||"";
+    SET("apnsState").textContent=p.configured?`(configured · ${p.devices} device(s))`:(p.keySet?"(key set · IDs incomplete)":"(not configured)");
+    SET("apnsStatus").textContent="Saved on the server.";
+  }catch(e){SET("apnsStatus").textContent="Failed: "+e.message;}
+};
+SET("apnsTestBtn").onclick=async()=>{
+  SET("apnsStatus").textContent="Sending test push…";
+  try{const j=await (await fetch("/api/push/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:"Test push from Reqon settings."})})).json();
+    if(j.skipped)SET("apnsStatus").textContent="Not sent: "+j.skipped+(j.skipped==="apns-not-configured"?" (save APNs config first)":"");
+    else SET("apnsStatus").textContent="Test push sent.";
+  }catch(e){SET("apnsStatus").textContent="Failed: "+e.message;}
+};
+SET("apnsClearBtn").onclick=async()=>{
+  if(!confirm("Clear APNs key + IDs on the server?"))return;
+  SET("apnsStatus").textContent="Clearing…";
+  try{const p=await (await fetch("/api/push/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clear:true})})).json();
+    if(!p.ok)throw new Error(p.error||"failed");
+    SET("apnsKeyId").value="";SET("apnsTeamId").value="";SET("apnsBundleId").value="";SET("apnsKeyP8").value="";SET("apnsKeyPath").value="";
+    SET("apnsState").textContent="(not configured)";SET("apnsStatus").textContent="Cleared.";
+  }catch(e){SET("apnsStatus").textContent="Failed: "+e.message;}
+};
+
 function fillProfile(p){
   p=p||{}; const a=p.applicant||{};
   SET("profName").value=a.name||""; SET("profEmail").value=a.email||""; SET("profPhone").value=a.phone||"";
@@ -2053,11 +2258,47 @@ function fillProfile(p){
   SET("profRoleTerms").value=(p.roleTerms||[]).join(", ");
   SET("profIndustries").value=(p.industries||[]).join(", ");
   SET("profSectors").value=(p.sectors||[]).join(", ");
-  SET("profKeywords").innerHTML=(p.keywords||[]).slice(0,60).map(k=>`<span class="kw">${esc(k.kw)} <b>${k.weight}</b></span>`).join("")||'<span class="setmuted">No keywords yet — upload a resume.</span>';
+  PROFILE_KEYWORDS=(p.keywords||[]).map(k=>({kw:String(k.kw),weight:+k.weight||1})); KW_REMOVED=new Set(); renderKeywords();
   SET("profMeta").textContent=p.generatedFrom?`From ${p.generatedFrom} (${p.generatedAt||"?"}) · ${(p.keywords||[]).length} keywords`:"No resume parsed yet.";
+  PROFILE_WORK=(p.workHistory||[]).map(w=>({...w})); renderWorkHistory();
+  PROFILE_EDU=(p.education||[]).map(e=>({...e})); renderEducation();
   PROFILE_NARRATIVES=(p.narratives||[]).map(n=>({id:n.id,title:n.title||"",body:n.body||"",tags:(n.tags||[]).join(", ")}));
   renderNarratives();
 }
+const qa=(s)=>String(s==null?"":s).replace(/"/g,"&quot;");
+function renderWorkHistory(){
+  SET("profWorkHistory").innerHTML=PROFILE_WORK.map((w,i)=>
+    `<div class="histedit" data-i="${i}"><button class="narr-rm" type="button" onclick="removeWork(${i})">remove</button>`+
+    `<div class="grid2"><input class="wh-role" type="text" placeholder="Role / title" value="${qa(w.role)}">`+
+    `<input class="wh-company" type="text" placeholder="Company" value="${qa(w.company)}">`+
+    `<input class="wh-location" type="text" placeholder="Location" value="${qa(w.location)}">`+
+    `<input class="wh-start" type="text" placeholder="Start (e.g. Aug 2022)" value="${qa(w.start)}">`+
+    `<input class="wh-end" type="text" placeholder="End (e.g. Present)" value="${qa(w.end)}"></div>`+
+    `<textarea class="wh-desc" rows="3" placeholder="Description (one bullet per line)">${esc(w.description||"")}</textarea></div>`
+  ).join("")||'<div class="setmuted">No work history yet — upload a résumé or add a role.</div>';
+}
+function renderEducation(){
+  SET("profEducation").innerHTML=PROFILE_EDU.map((e,i)=>
+    `<div class="histedit" data-i="${i}"><button class="narr-rm" type="button" onclick="removeEdu(${i})">remove</button>`+
+    `<div class="grid2"><input class="ed-school" type="text" placeholder="School" value="${qa(e.school)}">`+
+    `<input class="ed-level" type="text" placeholder="Degree / level (e.g. MBA)" value="${qa(e.level||e.degree)}">`+
+    `<input class="ed-field" type="text" placeholder="Field of study" value="${qa(e.field)}">`+
+    `<input class="ed-start" type="text" placeholder="Start" value="${qa(e.start)}">`+
+    `<input class="ed-end" type="text" placeholder="End" value="${qa(e.end)}"></div></div>`
+  ).join("")||'<div class="setmuted">No education yet — upload a résumé or add an entry.</div>';
+}
+function syncWorkFromDOM(){
+  const out=[];SET("profWorkHistory").querySelectorAll(".histedit").forEach(el=>{
+    out.push({role:el.querySelector(".wh-role").value.trim(),company:el.querySelector(".wh-company").value.trim(),location:el.querySelector(".wh-location").value.trim(),start:el.querySelector(".wh-start").value.trim(),end:el.querySelector(".wh-end").value.trim(),description:el.querySelector(".wh-desc").value.trim()});
+  });PROFILE_WORK=out;
+}
+function syncEduFromDOM(){
+  const out=[];SET("profEducation").querySelectorAll(".histedit").forEach(el=>{
+    out.push({school:el.querySelector(".ed-school").value.trim(),level:el.querySelector(".ed-level").value.trim(),field:el.querySelector(".ed-field").value.trim(),start:el.querySelector(".ed-start").value.trim(),end:el.querySelector(".ed-end").value.trim()});
+  });PROFILE_EDU=out;
+}
+window.removeWork=function(i){syncWorkFromDOM();PROFILE_WORK.splice(i,1);renderWorkHistory();};
+window.removeEdu=function(i){syncEduFromDOM();PROFILE_EDU.splice(i,1);renderEducation();};
 function renderNarratives(){
   SET("narrativeBox").innerHTML=PROFILE_NARRATIVES.map((n,i)=>
     `<div class="narr" data-i="${i}"><button class="narr-rm" type="button" onclick="removeNarrative(${i})">remove</button>`+
@@ -2075,12 +2316,15 @@ function syncNarrativesFromDOM(){
 window.removeNarrative=function(i){syncNarrativesFromDOM();PROFILE_NARRATIVES.splice(i,1);renderNarratives();};
 SET("addNarrativeBtn").onclick=()=>{syncNarrativesFromDOM();PROFILE_NARRATIVES.push({title:"",body:"",tags:""});renderNarratives();};
 async function saveProfile(){
-  syncNarrativesFromDOM();
+  syncNarrativesFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
   const body={
     applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim()},
     seniority:csvList(SET("profSeniority").value), roleTerms:csvList(SET("profRoleTerms").value),
     industries:csvList(SET("profIndustries").value), sectors:csvList(SET("profSectors").value),
-    narratives:PROFILE_NARRATIVES.map(n=>({id:n.id,title:n.title,body:n.body,tags:csvList(n.tags)}))
+    narratives:PROFILE_NARRATIVES.map(n=>({id:n.id,title:n.title,body:n.body,tags:csvList(n.tags)})),
+    keywordOverrides:kwOverrides(),
+    workHistory:PROFILE_WORK.filter(w=>w.role||w.company),
+    education:PROFILE_EDU.filter(e=>e.school||e.level||e.field)
   };
   SET("profMsg").className="setmsg";SET("profMsg").textContent="Saving…";
   try{const j=await (await fetch("/api/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
@@ -2088,6 +2332,15 @@ async function saveProfile(){
     SET("profMsg").className="setmsg ok";SET("profMsg").textContent="Profile saved.";
   }catch(e){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Save failed: "+e.message;}
 }
+SET("addWorkBtn").onclick=()=>{syncWorkFromDOM();PROFILE_WORK.push({role:"",company:"",location:"",start:"",end:"",description:""});renderWorkHistory();};
+SET("addEduBtn").onclick=()=>{syncEduFromDOM();PROFILE_EDU.push({school:"",level:"",field:"",start:"",end:""});renderEducation();};
+SET("kwAddBtn").onclick=()=>{
+  const name=SET("kwAddName").value.trim(); if(!name)return;
+  const w=Math.max(0,Math.min(20,parseInt(SET("kwAddWeight").value,10)||5));
+  const i=PROFILE_KEYWORDS.findIndex(k=>k.kw.toLowerCase()===name.toLowerCase());
+  if(i>=0)PROFILE_KEYWORDS[i].weight=w; else PROFILE_KEYWORDS.unshift({kw:name,weight:w});
+  KW_REMOVED.delete(name.toLowerCase()); SET("kwAddName").value=""; renderKeywords();
+};
 SET("saveProfileBtn").onclick=saveProfile;
 SET("uploadResumeBtn").onclick=async()=>{
   const f=SET("resumeFile").files[0];

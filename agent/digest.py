@@ -52,17 +52,39 @@ def send(payload):
     if payload.get("html"):
         msg.attach(MIMEText(payload["html"], "html", "utf-8"))
 
-    if port == 465:
-        with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context(), timeout=30) as s:
-            s.login(user, pwd)
-            s.sendmail(sender, recipients, msg.as_string())
-    else:
-        with smtplib.SMTP(host, port, timeout=30) as s:
-            s.ehlo()
-            s.starttls(context=ssl.create_default_context())
-            s.login(user, pwd)
-            s.sendmail(sender, recipients, msg.as_string())
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context(), timeout=30) as s:
+                s.login(user, pwd)
+                s.sendmail(sender, recipients, msg.as_string())
+        else:
+            with smtplib.SMTP(host, port, timeout=30) as s:
+                s.ehlo()
+                s.starttls(context=ssl.create_default_context())
+                s.login(user, pwd)
+                s.sendmail(sender, recipients, msg.as_string())
+    except smtplib.SMTPAuthenticationError as e:
+        raise SystemExit(_auth_hint(host, e))
+    except (smtplib.SMTPException, OSError) as e:
+        raise SystemExit("SMTP error talking to %s:%d — %s" % (host, port, e))
     return len(recipients)
+
+
+def _auth_hint(host, e):
+    """Turn an opaque SMTPAuthenticationError into one actionable line."""
+    raw = ""
+    try:
+        raw = (e.smtp_error or b"").decode("utf-8", "replace") if isinstance(e.smtp_error, bytes) else str(e.smtp_error)
+    except Exception:
+        raw = str(e)
+    h = (host or "").lower()
+    if "gmail" in h or "google" in h or "application-specific password" in raw.lower() or "5.7.9" in raw:
+        return ("SMTP login was rejected by Gmail. Gmail with 2-Step Verification requires a "
+                "16-character App Password — not your Google account password. Create one at "
+                "Google Account → Security → 2-Step Verification → App passwords, then paste it as "
+                "the SMTP password. (Server said: %s)" % raw.strip())
+    return ("SMTP login was rejected by %s. Check SMTP user/password (many providers require an "
+            "app-specific password, not your normal login). (Server said: %s)" % (host, raw.strip()))
 
 
 def main():

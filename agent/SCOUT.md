@@ -25,12 +25,12 @@ New roles land in `data.json` (so the board at localhost:8787 shows them) with
 `status: "Not Applied"`. Your tracking edits are never overwritten.
 
 ## Schedule it (macOS launchd, weekday 7am)
-Create `~/Library/LaunchAgents/com.jobcrm.scout.plist`:
+Create `~/Library/LaunchAgents/com.reqon.scout.plist`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>com.jobcrm.scout</string>
+  <key>Label</key><string>com.reqon.scout</string>
   <key>ProgramArguments</key>
   <array><string>/bin/bash</string><string>/Users/you/Documents/reqon/agent/run-scout.sh</string></array>
   <key>StartCalendarInterval</key>
@@ -43,7 +43,7 @@ Create `~/Library/LaunchAgents/com.jobcrm.scout.plist`:
   </array>
 </dict></plist>
 ```
-Then: `launchctl load ~/Library/LaunchAgents/com.jobcrm.scout.plist`
+Then: `launchctl load ~/Library/LaunchAgents/com.reqon.scout.plist`
 (Unlike the Claude task, this runs even when the desktop app is closed.)
 
 Or cron: `0 7 * * 1-5 /Users/you/Documents/reqon/agent/run-scout.sh`

@@ -22,7 +22,7 @@ notifications) and needs an EAS/Xcode dev build — not buildable in Expo Go.*
 4. **Deterministic core works with AI off.** OpenAI/APNs/etc. are optional and gated on
    their keys being present (the SMTP/Slack pattern).
 5. **Verify every WP before done:** `node --check server.js`; restart via
-   `launchctl kickstart -k gui/$(id -u)/com.jobcrm.server`; live-check on
+   `launchctl kickstart -k gui/$(id -u)/com.reqon.server`; live-check on
    http://localhost:8787; UI verification via the preview server on **port 8788**
    (`.claude/launch.json` → name `board`; never occupy 8787). Confirm `data.json` row
    count unchanged unless the WP intentionally migrates (snapshot first).
@@ -35,7 +35,7 @@ notifications) and needs an EAS/Xcode dev build — not buildable in Expo Go.*
 ## Environment facts (so a fresh session can act)
 
 - Project: `/Users/plex/Documents/reqon` · server `server.js` (Express, port
-  8787, launchd `com.jobcrm.server`, own `.env` loader) · board `public/index.html`
+  8787, launchd `com.reqon.server`, own `.env` loader) · board `public/index.html`
   (single file, vanilla JS) · mobile `mobile.html` (`/m`) · scout under `agent/` (Python,
   stdlib) · store `data.json`.
 - Auth today: `APP_TOKEN` (full, loopback bypasses), `INGEST_TOKEN` (scoped:

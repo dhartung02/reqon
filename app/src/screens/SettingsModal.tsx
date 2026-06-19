@@ -221,7 +221,12 @@ export function SettingsModal({
         : section === 'cv' ? <BuildCvScreen onBack={back} />
         : section === 'guide' ? <ScoringGuideScreen onBack={back} />
         : (
-          <ScrollView contentContainerStyle={styles.synPane} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.synPane}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets
+          >
             {syncTop}
             {syncBottom}
           </ScrollView>
@@ -264,7 +269,12 @@ export function SettingsModal({
               <Text style={styles.cancel}>Done</Text>
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.form}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets
+          >
             {syncTop}
             {navRows}
             {syncBottom}

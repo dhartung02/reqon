@@ -68,3 +68,10 @@ MOBILE-SETUP.md
 
 # runtime push device registry (WP-0)
 agent/push-tokens.json
+
+# APNs key written by the board push-config endpoint
+agent/apns-AuthKey.p8
+
+# Expo build cache / logs
+.expo/
+app/.expo/

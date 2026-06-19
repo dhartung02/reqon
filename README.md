@@ -30,10 +30,14 @@ Everything is configured from the **Settings** panel in the web UI — no file e
 - **Apply-mode** — each row is tagged fillable / gated / simplify / manual to plan the apply step.
 - **iOS / iPad app** (`app/`) — a React Native / Expo companion: pipeline, Today command
   center, analytics, candidate profile, and an in-app apply-assist browser. Lays out as a
-  master-detail command center on iPad. Runs in **Expo Go** — no Apple Developer account needed.
+  master-detail command center on iPad (landscape or portrait). Runs in **Expo Go** — no Apple
+  Developer account needed; connect it to your server by **scanning a QR** from the board.
 - **Chrome extension** (`extension/`) — clip any posting to the board, a fit overlay on known
   job pages, one-click "Mark Applied" write-back, and apply-assist autofill of *factual* fields
   on Greenhouse / Ashby / Lever (never EEO, consent, or submit).
+- **Email response ingest** (Gmail) — reads recruiter replies on the server and updates the
+  board: **auto-sets confident rejections, flags interviews/offers** for review. Deterministic
+  by default, optional AI; configurable from the app or `.env`. See `agent/MAIL.md`.
 
 ## Quick start
 
@@ -82,15 +86,33 @@ npx expo start          # then open the link in Expo Go (device on the same netw
 ```
 
 iPad lays out as a master-detail command center (3-pane in landscape, 2-pane in portrait);
-phone is single-column. Point it at your server in **Settings → Sync** (server URL + optional
-token). The native **Share Extension** (Safari → Add to CRM) and **push notifications** require
-an EAS/Xcode dev build — they are not available in Expo Go.
+phone is single-column. **Connect it without typing:** on the board, **Settings → Advanced →
+Pair a device** shows a QR; in the app, **Settings → Sync → Scan QR** (or paste the code) fills
+the server URL + passphrase (stored in the device keychain). The native **Share Extension**
+(Safari → Add to CRM) and **push notifications** require an EAS/Xcode dev build — not in Expo Go.
 
 **Chrome extension** (`extension/`) — load unpacked: `chrome://extensions` → enable *Developer
 mode* → *Load unpacked* → select `extension/`. Set your server origin + token in the extension's
 options. Then the toolbar button clips the current tab, a fit overlay appears on tracked/known
 job pages, "Mark Applied" writes the status back, and apply-assist fills factual fields on
 Greenhouse / Ashby / Lever (it never touches EEO, consent, or the submit button).
+
+## Gmail response ingest
+
+Keeps the board current as recruiters reply — **auto-sets confident rejections** and **flags
+interviews/offers** for review (it never auto-advances a positive; a misread shouldn't move your
+pipeline). Reads Gmail over IMAP with an **App Password** (2-Step Verification → App passwords),
+matches conservatively (the company name must appear *and* there must be exactly one active
+applied row), and writes through the audited update path. Deterministic keyword rules by default;
+optional AI for the ambiguous ones.
+
+Set it up two ways — both store credentials on the server and run there:
+- **From the app:** Settings → Sync → *Gmail response ingest* (address, App Password, label) →
+  **Test (dry-run)** → **Run now**.
+- **From `.env` / CLI:** `GMAIL_USER` + `GMAIL_APP_PASSWORD`, then `python3 agent/mail_ingest.py`
+  (dry-run) → `--apply`. The daily scout runner (`run-mail.sh`) also runs it automatically.
+
+Full guide: [`agent/MAIL.md`](agent/MAIL.md).
 
 ## Data & privacy
 

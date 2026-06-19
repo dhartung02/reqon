@@ -38,7 +38,7 @@ Everything is configured from the **Settings** panel in the web UI — no file e
 ## Quick start
 
 ```bash
-git clone <this-repo> job-pipeline-crm && cd job-pipeline-crm
+git clone <this-repo> reqon && cd reqon
 npm install
 npm start        # http://localhost:8787  (board)  ·  /m  (mobile)
 ```

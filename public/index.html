@@ -1024,7 +1024,7 @@ async function load(){
     rows=Array.isArray(data)?data:[];
     setSave("saved");
   }catch(e){
-    document.getElementById("board").innerHTML='<div class="loading">⚠ Could not reach the server ('+e.message+'). Is it running? Try: <b>npm start</b> in ~/job-pipeline-crm</div>';
+    document.getElementById("board").innerHTML='<div class="loading">⚠ Could not reach the server ('+e.message+'). Is it running? Try: <b>npm start</b> in ~/reqon</div>';
     updEl().textContent="⚠ offline"; updEl().style.color="var(--coral)";
     return;
   }
@@ -2215,7 +2215,7 @@ F("exportBtn").onclick=()=>{
   const cols=["company","sector","role","salary","location","remote","fit","prob","expectedVal","tier","conf","status","applied","interview","recruiter","referral","resume","cover","followup","lastcontact","next","added","link","notes"];
   const lines=[cols.join(",")];
   rows.filter(x=>x.deleted!==true).forEach(x=>{const ev=expected(x);const cells=cols.map(c=>{let v=c==="expectedVal"?ev:x[c];return `"${String(v==null?"":v).replace(/"/g,'""')}"`;});lines.push(cells.join(","));});
-  const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-crm.csv";a.click();
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="reqon.csv";a.click();
 };
 
 // About popover (app bar)

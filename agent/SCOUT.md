@@ -32,7 +32,7 @@ Create `~/Library/LaunchAgents/com.jobcrm.scout.plist`:
 <plist version="1.0"><dict>
   <key>Label</key><string>com.jobcrm.scout</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/bash</string><string>/Users/you/Documents/job-pipeline-crm/agent/run-scout.sh</string></array>
+  <array><string>/bin/bash</string><string>/Users/you/Documents/reqon/agent/run-scout.sh</string></array>
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
@@ -46,7 +46,7 @@ Create `~/Library/LaunchAgents/com.jobcrm.scout.plist`:
 Then: `launchctl load ~/Library/LaunchAgents/com.jobcrm.scout.plist`
 (Unlike the Claude task, this runs even when the desktop app is closed.)
 
-Or cron: `0 7 * * 1-5 /Users/you/Documents/job-pipeline-crm/agent/run-scout.sh`
+Or cron: `0 7 * * 1-5 /Users/you/Documents/reqon/agent/run-scout.sh`
 
 ## LinkedIn recommended jobs
 There is **no public LinkedIn jobs API**, and scraping the site violates their

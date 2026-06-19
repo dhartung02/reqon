@@ -34,7 +34,7 @@ notifications) and needs an EAS/Xcode dev build — not buildable in Expo Go.*
 
 ## Environment facts (so a fresh session can act)
 
-- Project: `/Users/plex/Documents/job-pipeline-crm` · server `server.js` (Express, port
+- Project: `/Users/plex/Documents/reqon` · server `server.js` (Express, port
   8787, launchd `com.jobcrm.server`, own `.env` loader) · board `public/index.html`
   (single file, vanilla JS) · mobile `mobile.html` (`/m`) · scout under `agent/` (Python,
   stdlib) · store `data.json`.

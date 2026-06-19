@@ -44,7 +44,7 @@ ingest mail. To check responses **more often**, add your own schedule, e.g. an h
 or cron entry pointing at `agent/run-mail.sh`:
 
 ```cron
-0 * * * *  /bin/bash /path/to/job-pipeline-crm/agent/run-mail.sh
+0 * * * *  /bin/bash /path/to/reqon/agent/run-mail.sh
 ```
 
 `tail -f logs/mail.log` to watch it.

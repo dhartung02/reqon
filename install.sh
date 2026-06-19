@@ -7,7 +7,7 @@
 #   - com.jobcrm.scout  : the daily job scout (weekday 7am)
 #
 # Usage:
-#   cd ~/job-pipeline-crm && ./install.sh
+#   cd ~/reqon && ./install.sh
 #   ./install.sh --resume "/path/to/Resume.docx"    # tailor the search to a resume
 #   LI_DIR="$HOME/Downloads/li-alerts" ./install.sh  # also ingest LinkedIn alert emails daily
 #

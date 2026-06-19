@@ -30,8 +30,24 @@ python3 agent/mail_ingest.py --ai            # AI-classify the keyword-ambiguous
 python3 agent/mail_ingest.py --since-days 30 --label "Job Search"
 ```
 
-Always run the **dry-run first** and read the report before `--apply`. Once it looks right, schedule
-`--apply` (e.g. via launchd, like the scout).
+Always run the **dry-run first** and read the report before `--apply`.
+
+## Run it automatically
+
+`agent/run-mail.sh` is the scheduled runner. It loads `.env` (scoped to its own process), no-ops
+silently if Gmail isn't configured, and runs `mail_ingest.py --apply` — logging to `logs/mail.log`.
+Set `MAIL_AI=true` in `.env` to also AI-classify the ambiguous ones.
+
+You don't have to wire anything up: the **daily scout already calls it** (`run-scout.sh` step 3),
+so once `GMAIL_USER` / `GMAIL_APP_PASSWORD` are in `.env`, your weekday-morning scout run will also
+ingest mail. To check responses **more often**, add your own schedule, e.g. an hourly launchd agent
+or cron entry pointing at `agent/run-mail.sh`:
+
+```cron
+0 * * * *  /bin/bash /path/to/job-pipeline-crm/agent/run-mail.sh
+```
+
+`tail -f logs/mail.log` to watch it.
 
 ## How it decides (conservative by design)
 

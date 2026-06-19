@@ -21,7 +21,11 @@ if [ -n "${LI_DIR:-}" ] && [ -d "${LI_DIR}" ]; then
     echo "[$STAMP] scout_linkedin.py failed" >> "$DIR/logs/scout.log"
 fi
 
-# 3) refresh the Excel export if the server is up (optional, ignored if down)
+# 3) (optional) Gmail response ingest — auto-sets rejections, flags positives. No-ops unless
+#    GMAIL_USER/GMAIL_APP_PASSWORD are set in .env (run-mail.sh self-guards + sources .env).
+bash "$DIR/agent/run-mail.sh" || echo "[$STAMP] run-mail.sh failed" >> "$DIR/logs/scout.log"
+
+# 4) refresh the Excel export if the server is up (optional, ignored if down)
 curl -fs "http://localhost:8787/api/export.xlsx" -o "$DIR/Job Search Pipeline.xlsx" 2>/dev/null || true
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] scout done" >> "$DIR/logs/scout.log"

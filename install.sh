@@ -59,7 +59,8 @@ fi
 mkdir -p "$DIR/logs" "$DIR/backups"
 
 # 4. Make scout scripts executable
-chmod +x "$DIR/agent/run-scout.sh" "$DIR/agent/scout.py" "$DIR/agent/scout_linkedin.py" \
+chmod +x "$DIR/agent/run-scout.sh" "$DIR/agent/run-mail.sh" "$DIR/agent/scout.py" \
+         "$DIR/agent/scout_linkedin.py" "$DIR/agent/mail_ingest.py" \
          "$DIR/agent/profile-from-resume.py" 2>/dev/null || true
 
 # 5. Optional: build resume-tailored search profile

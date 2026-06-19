@@ -6,6 +6,7 @@ import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from
 import { testConnection, syncTwoWay } from '../sync/sync';
 import { decodePairing } from '@reqon/core';
 import { PairScanModal } from './PairScanModal';
+import { MailIngestPanel } from './MailIngestPanel';
 import { ProfileScreen } from './ProfileScreen';
 import { SearchCriteriaScreen } from './SearchCriteriaScreen';
 import { TiersRulesScreen } from './TiersRulesScreen';
@@ -171,6 +172,7 @@ export function SettingsModal({
         </View>
         <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
       </View>
+      {url ? <MailIngestPanel /> : null}
     </>
   );
   const syncBottom = (

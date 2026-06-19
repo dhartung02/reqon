@@ -19,9 +19,12 @@ config.resolver.nodeModulesPaths = [
 ];
 
 // 3. The shared core — imported verbatim, never re-ported (mirrors jest moduleNameMapper +
-//    the @reqon/core ambient types in types/reqon-core.d.ts).
+//    the @reqon/core ambient types in types/reqon-core.d.ts). Point at the core/ DIRECTORY (it has
+//    its own package.json with "main": "crm-core.js"), NOT the file — extraNodeModules entries must
+//    be directories, or the production/Release bundler (expo export:embed, used by `expo run:ios
+//    --configuration Release`) fails to resolve them even though the dev server tolerates a file.
 config.resolver.extraNodeModules = {
-  '@reqon/core': path.resolve(monorepoRoot, 'core', 'crm-core.js'),
+  '@reqon/core': path.resolve(monorepoRoot, 'core'),
 };
 
 module.exports = config;

@@ -1,7 +1,11 @@
 const $ = id => document.getElementById(id);
-const DEFAULTS = { origin: 'http://localhost:8787', token: '' };
+const DEFAULTS = { origin: 'http://localhost:8787', token: '', overlayEnabled: true };
 
-chrome.storage.sync.get(DEFAULTS, c => { $('origin').value = c.origin; $('token').value = c.token; });
+chrome.storage.sync.get(DEFAULTS, c => {
+  $('origin').value = c.origin;
+  $('token').value = c.token;
+  $('overlay').checked = c.overlayEnabled !== false;
+});
 
 async function ensureHostPermission(origin) {
   // request host permission for non-default origins (e.g. a tunnel HTTPS host)
@@ -15,7 +19,7 @@ async function ensureHostPermission(origin) {
 $('save').onclick = async () => {
   const origin = $('origin').value.trim() || DEFAULTS.origin;
   await ensureHostPermission(origin);
-  chrome.storage.sync.set({ origin, token: $('token').value.trim() }, () => {
+  chrome.storage.sync.set({ origin, token: $('token').value.trim(), overlayEnabled: $('overlay').checked }, () => {
     $('msg').textContent = 'Saved.'; $('msg').className = 'ok';
   });
 };

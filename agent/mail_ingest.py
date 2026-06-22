@@ -11,8 +11,11 @@ WHAT IT DOES
   4. Acts, safely:
        - REJECTION + one active match  -> sets that row's status to "Rejected" (via the audited
          PATCH /api/reqs/:key path; never downgrades an Offer, never touches a non-applied row).
-       - INTERVIEW / OFFER             -> never changes status (a misread shouldn't advance your
-         pipeline). It flags + notifies you to review and advance it yourself.
+       - INTERVIEW (single confident match still at "Applied") -> advances that row to
+         "Recruiter Screen", which triggers the interview-prep-guide build server-side. Disable with
+         --no-advance-interviews. Lower-confidence / multi-match interviews are only flagged.
+       - OFFER                         -> never auto-advanced (a misread shouldn't move you to Offer);
+         flagged + notified for you to confirm.
        - ambiguous / no clean match    -> flagged in the report, nothing written.
   5. Notifies (optional) on positives via the Slack webhook the digest already uses.
 
@@ -253,6 +256,8 @@ def main():
     ap = argparse.ArgumentParser(description="Reflect Gmail application responses onto the board.")
     ap.add_argument("--apply", action="store_true", help="act (auto-set rejections, notify); default is dry-run")
     ap.add_argument("--ai", action="store_true", help="use OpenAI to classify keyword-ambiguous emails")
+    ap.add_argument("--no-advance-interviews", action="store_true",
+                    help="don't auto-advance Applied->Recruiter Screen on a confident interview email")
     ap.add_argument("--label", default=os.environ.get("GMAIL_LABEL", "INBOX"))
     ap.add_argument("--since-days", type=int, default=int(os.environ.get("MAIL_SINCE_DAYS", "14")))
     args = ap.parse_args()
@@ -271,7 +276,7 @@ def main():
     except imaplib.IMAP4.error as e:
         raise SystemExit("Gmail login/IMAP failed: %s (check the App Password + that IMAP is on)." % e)
 
-    rejected, positives, ambiguous, acted = [], [], [], 0
+    rejected, positives, advanced, ambiguous, acted = [], [], [], [], 0
     for m in msgs:
         if m["id"] in seen:
             continue
@@ -292,6 +297,19 @@ def main():
                     acted += 1
                 except Exception as e:
                     print("  ! could not update %s: %s" % (req_key(r), e))
+        elif (cls["kind"] == "interview" and len(matches) == 1 and cls["confidence"] >= 0.7
+              and matches[0].get("status") == "Applied" and not args.no_advance_interviews):
+            # Confident, unambiguous interview email on an Applied row -> advance it. The server,
+            # seeing the move into an interview stage, auto-builds the interview prep guide.
+            r = matches[0]
+            advanced.append((r, label))
+            positives.append(("interview", matches, label))
+            if args.apply:
+                try:
+                    patch_status(r, "Recruiter Screen", "auto: interview email %s (%s)" % (TODAY, ", ".join(cls["signals"][:2])))
+                    acted += 1
+                except Exception as e:
+                    print("  ! could not advance %s: %s" % (req_key(r), e))
         elif cls["kind"] in ("interview", "offer") and matches:
             positives.append((cls["kind"], matches, label))
         else:
@@ -303,7 +321,10 @@ def main():
     print("REJECTIONS (auto-set %s):" % ("applied" if args.apply else "dry-run"))
     for r, label in rejected:
         print("  – %s — %s" % (r.get("company"), label))
-    print("\nPOSITIVES (review — never auto-advanced):")
+    print("\nINTERVIEWS (auto-advanced to Recruiter Screen %s — triggers guide):" % ("applied" if args.apply else "dry-run"))
+    for r, label in advanced:
+        print("  → %s — %s" % (r.get("company"), label))
+    print("\nPOSITIVES (review — offers/low-confidence never auto-advanced):")
     pos_lines = []
     for kind, matches, label in positives:
         for r in matches:

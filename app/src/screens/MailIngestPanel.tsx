@@ -6,7 +6,7 @@ import { getMailConfig, saveMailConfig, runMailIngest, type MailConfig } from '.
 // App-managed, server-run Gmail response ingest. Credentials are saved to the server's .env (the
 // password is write-only here — the server only ever reports that it's set + its last 4). Test runs
 // a dry-run; Run now applies (auto-sets rejections, flags positives) on the server.
-export function MailIngestPanel() {
+export function MailIngestPanel({ reloadSignal = 0 }: { reloadSignal?: number }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const [cfg, setCfg] = useState<MailConfig | null>(null);
   const [user, setUser] = useState('');
@@ -18,13 +18,14 @@ export function MailIngestPanel() {
   const [report, setReport] = useState('');
 
   useEffect(() => {
+    setBusy('load');
     getMailConfig()
       .then((m) => {
         if (m) { setCfg(m); setUser(m.user); setLabel(m.label); setAi(m.ai); }
       })
       .catch((e) => setStatus({ kind: 'err', text: e instanceof Error ? e.message : 'load failed' }))
       .finally(() => setBusy(null));
-  }, []);
+  }, [reloadSignal]);
 
   const save = async () => {
     setBusy('save'); setStatus(null);

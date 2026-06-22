@@ -12,6 +12,30 @@
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   const ev = r => (((+r.fit || 0) * (+r.prob || 0)) / 10).toFixed(1);
 
+  // ---- JD keyword extraction (Phase 2) — the side panel asks the page for its salient terms ----
+  const JD_SELECTORS = ['.jobs-description', '.show-more-less-html', '.posting-page', '.section-wrapper',
+    '#content .job__description', '[class*="job-description" i]', '[class*="description" i]', 'main', 'article'];
+  function jdText() {
+    let best = '';
+    for (const sel of JD_SELECTORS) {
+      document.querySelectorAll(sel).forEach((n) => { const t = (n.innerText || '').trim(); if (t.length > best.length) best = t; });
+    }
+    if (best.length < 200) best = (document.body && document.body.innerText || '').trim();
+    return best.slice(0, 20000);
+  }
+  function jdKeywords() {
+    const toks = (typeof _tokenize === 'function' ? _tokenize : (s) => (String(s || '').toLowerCase().match(/[a-z0-9+#]+/g) || []))(jdText());
+    const freq = new Map();
+    for (const t of toks) { if (/^\d+$/.test(t)) continue; freq.set(t, (freq.get(t) || 0) + 1); }
+    return [...freq.entries()].sort((a, b) => b[1] - a[1]).map((e) => e[0]).slice(0, 24);
+  }
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg) return;
+    if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords() }); } catch (e) { sendResponse({ ok: false }); } return; }
+    if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
+    if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
+  });
+
   // ---- apply-assist fill (mirrors the iOS in-app browser; runs in the real page) ----
   const factualFields = (p) => {
     const a = (p && p.applicant) || {};
@@ -44,9 +68,13 @@
     e.style.outlineOffset = '1px';
   };
   const SKIP_TYPES = ['password', 'file', 'hidden', 'submit', 'button', 'checkbox', 'radio', 'range', 'color'];
+  // Fills standard/factual fields from the profile + inserts matching saved answers for simple
+  // questions. Returns a result; callers (overlay button or side-panel message) surface the message.
+  // NEVER touches passwords/EEO/consent and NEVER submits. Open-ended questions are left for the
+  // human (and, later, AI assist).
   async function fillForm() {
     const r = await send({ type: 'profile' });
-    if (!r || !r.ok) { toast('Could not load profile — check connection.', false); return; }
+    if (!r || !r.ok) return { ok: false, factual: 0, answered: 0, msg: 'Could not load profile — check connection.' };
     const p = r.profile || {};
     const fields = factualFields(p);
     const answers = p.answers || [];
@@ -66,16 +94,20 @@
         if (a) { setVal(e, a.a); answered++; }
       }
     });
-    toast(`Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '') + ' — review, never auto-submitted.', factual + answered > 0);
+    return {
+      ok: factual + answered > 0,
+      factual, answered,
+      msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '') + ' — review, never auto-submitted.',
+    };
   }
-  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '✎ Fill'); b.onclick = fillForm; return b; };
+  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '✎ Fill'); b.onclick = async () => { const res = await fillForm(); toast(res.msg, res.ok); }; return b; };
 
   let box;
   function mount() {
     box = el('div', 'jpcrm-box');
-    box.innerHTML = '<div class="jpcrm-row"><span class="jpcrm-logo">JPCRM</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide">×</button></div><div class="jpcrm-body"></div>';
+    box.innerHTML = '<div class="jpcrm-row"><span class="jpcrm-logo">Reqon</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide on this page">×</button></div><div class="jpcrm-body"></div>';
     document.documentElement.appendChild(box);
-    box.querySelector('.jpcrm-x').onclick = () => box.remove();
+    box.querySelector('.jpcrm-x').onclick = () => { box.remove(); box = null; };
   }
 
   function renderTracked(row) {
@@ -116,9 +148,15 @@
     r.row ? renderTracked(r.row) : renderUntracked();
   }
 
-  mount();
-  refresh(false);
+  // The overlay is opt-out: respect the user's setting (default on) and react if they toggle it live.
+  function start() { if (box) return; mount(); refresh(false); }
+  chrome.storage.sync.get({ overlayEnabled: true }, (cfg) => { if (cfg.overlayEnabled !== false) start(); });
+  chrome.storage.onChanged.addListener((ch, area) => {
+    if (area !== 'sync' || !ch.overlayEnabled) return;
+    if (ch.overlayEnabled.newValue === false) { if (box) { box.remove(); box = null; } }
+    else start();
+  });
   // SPA boards (Ashby/LinkedIn) swap postings without a full load — re-check on URL change
   let last = location.href;
-  setInterval(() => { if (location.href !== last) { last = location.href; refresh(false); } }, 1500);
+  setInterval(() => { if (box && location.href !== last) { last = location.href; refresh(false); } }, 1500);
 })();

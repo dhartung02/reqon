@@ -1,28 +1,37 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Job Pipeline CRM Companion — Settings</title>
+<title>Reqon Clip — Settings</title>
 <style>
   body{background:#0d1117;color:#e8eef5;font:14px/1.5 -apple-system,system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 20px}
   h1{font-size:1.2rem}p{color:#aab6c2}
+  .logo{font-weight:700;font-size:.66rem;letter-spacing:.26em;text-transform:uppercase;color:#00df8f;margin-bottom:6px}
   label{display:block;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;color:#aab6c2;margin:16px 0 5px}
   input{width:100%;box-sizing:border-box;background:#151b23;border:1px solid #333c47;color:#e8eef5;border-radius:9px;padding:10px 12px;font:inherit}
-  input:focus{outline:none;border-color:#e3b95a}
+  input:focus{outline:none;border-color:#00df8f}
+  .toggle{display:flex;align-items:center;gap:9px;margin-top:18px}
+  .toggle input{width:auto}
+  .toggle label{margin:0;text-transform:none;letter-spacing:0;font-size:.9rem;color:#e8eef5}
   .row{display:flex;gap:10px;margin-top:18px}
-  button{background:#e3b95a;color:#15110a;border:0;border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;font:inherit}
+  button{background:#00df8f;color:#08130d;border:0;border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;font:inherit}
   button.ghost{background:transparent;color:#aab6c2;border:1px solid #333c47}
   #msg{margin-top:14px;font-size:.85rem;min-height:1.2em}
   .ok{color:#69c57e}.err{color:#e8755f}
   code{background:#151b23;padding:1px 5px;border-radius:4px}
 </style>
-<h1>Job Pipeline CRM Companion</h1>
-<p>Clip postings, see your fit/EV overlay on the page, and mark Applied — writing back to your
-self-hosted CRM. <b>No form autofill</b> (that stays with Simplify); this just keeps the CRM current.</p>
+<div class="logo">Reqon</div>
+<h1>Reqon Clip</h1>
+<p>Clip postings, see your fit / EV overlay on the page, fill applications from your Reqon profile +
+saved answers, and mark Applied — writing back to your self-hosted pipeline. <b>Never submits.</b></p>
 <label>Server origin</label>
 <input id="origin" placeholder="http://localhost:8787">
 <p style="font-size:.8rem">Local board: <code>http://localhost:8787</code>. For another machine, use your tunnel's HTTPS URL.</p>
 <label>Passphrase</label>
 <input id="token" type="password" placeholder="your server passphrase (APP_TOKEN)" autocomplete="off">
 <p style="font-size:.8rem">The same passphrase you set as <b>APP_TOKEN</b> on the server — the one the web board's login asks for. Leave blank if the server has no passphrase set.</p>
+<div class="toggle">
+  <input id="overlay" type="checkbox">
+  <label for="overlay">Show the on-page overlay on job postings</label>
+</div>
 <div class="row">
   <button id="save">Save</button>
   <button id="test" class="ghost">Test connection</button>

@@ -29,7 +29,15 @@ import { runScout } from './src/scout/scout';
 import { getConfig, getScoutMode, scoutEnabled, type ScoutMode } from './src/sync/config';
 import { getCriteria } from './src/sync/searchCriteria';
 import { pullRules, getRules } from './src/sync/rules';
-import { runServerScout, scoutStatus } from './src/sync/serverScout';
+import {
+  runServerScout,
+  scoutStatus,
+  queueServerScout,
+  getQueuedScout,
+  clearQueuedScout,
+  type ScoutRunMode,
+} from './src/sync/serverScout';
+import { ScoutRunModal } from './src/screens/ScoutRunModal';
 import { syncTwoWay } from './src/sync/sync';
 
 const VIEW_TITLE: Record<Lane, string> = {
@@ -68,6 +76,8 @@ function AppInner() {
   const [cvTarget, setCvTarget] = useState<{ role: string; company: string; jd: string } | null>(null);
   const [scouting, setScouting] = useState(false);
   const [scoutMsg, setScoutMsg] = useState<string | null>(null);
+  const [scoutMenu, setScoutMenu] = useState(false);
+  const [queuedScout, setQueuedScout] = useState<ScoutRunMode | null>(null);
   const [serverUrl, setServerUrl] = useState('');
   const [scoutMode, setScoutMode] = useState<ScoutMode>('auto');
 
@@ -81,15 +91,26 @@ function AppInner() {
       await syncTwoWay();
       await refresh();
       setSyncState({ at: Date.now() });
+      // Flush any scout request queued while offline — now that the server is reachable, send it.
+      const pending = await getQueuedScout();
+      if (pending) {
+        const r = await runServerScout(pending);
+        if (r.ok || r.running) {
+          await clearQueuedScout();
+          setQueuedScout(null);
+          setScoutMsg(`Queued scout (${pending}) sent to server — pull to refresh shortly.`);
+        }
+      }
     } catch {
       setSyncState((s) => ({ ...s, error: true })); // offline / unreachable — retry next foreground
     }
   }, [refresh]);
 
   const loadConfig = useCallback(async () => {
-    const [{ url }, mode] = await Promise.all([getConfig(), getScoutMode()]);
+    const [{ url }, mode, queued] = await Promise.all([getConfig(), getScoutMode(), getQueuedScout()]);
     setServerUrl(url);
     setScoutMode(mode);
+    setQueuedScout(queued);
   }, []);
 
   // On launch: load config, apply scoring rules (tier thresholds + follow-up days), then sync.
@@ -146,10 +167,20 @@ function AppInner() {
   };
 
   // Trigger the SERVER scout (fuller multi-source search + enrichment), poll to done, then sync.
-  const onServerScout = async () => {
+  // When the server is unreachable we DON'T fake a local run — we queue the request and the next
+  // successful sync sends it (see autoSync). `mode` mirrors the web board's Run-Scout menu.
+  const onServerScout = async (mode: ScoutRunMode) => {
+    setScoutMenu(false);
     setScouting(true);
     setScoutMsg('Starting server scout…');
-    const start = await runServerScout();
+    const start = await runServerScout(mode);
+    if (start.offline) {
+      await queueServerScout(mode);
+      setQueuedScout(mode);
+      setScoutMsg(`Offline — scout (${mode}) queued, will run when reconnected.`);
+      setScouting(false);
+      return;
+    }
     if (!start.ok && !start.running) {
       setScoutMsg(start.error || 'Could not start server scout');
       setScouting(false);
@@ -300,7 +331,7 @@ function AppInner() {
         roles={roles}
         onJump={setLane}
         onScout={onScout}
-        onServerScout={onServerScout}
+        onServerScout={() => setScoutMenu(true)}
         scouting={scouting}
         scoutMsg={scoutMsg}
         scoutEnabled={scoutOn}
@@ -392,6 +423,16 @@ function AppInner() {
         </View>
       )}
       <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
+      <ScoutRunModal
+        visible={scoutMenu}
+        onClose={() => setScoutMenu(false)}
+        onPick={onServerScout}
+        queued={queuedScout}
+        onCancelQueue={() => {
+          clearQueuedScout();
+          setQueuedScout(null);
+        }}
+      />
       <SettingsModal
         visible={showSettings}
         onClose={() => {

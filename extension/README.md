@@ -1,4 +1,4 @@
-# Job Pipeline CRM — Chrome Companion (WP-1)
+# Reqon Clip — Chrome Companion (WP-1)
 
 A desktop companion: **clip** a posting, see a **fit/EV overlay** on the page, **fill the
 application** from your Reqon profile + saved answers, and **write Applied status back** to your

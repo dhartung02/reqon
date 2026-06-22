@@ -7,7 +7,6 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.reqon.app"
@@ -34,7 +33,9 @@
         {
           "cameraPermission": "Reqon uses the camera to scan the pairing QR from your board, so it can connect to your server without typing the URL and passphrase."
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-web-browser"
     ]
   }
 }

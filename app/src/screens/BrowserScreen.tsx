@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Linking, Modal, ScrollView, TextInput } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as WebBrowser from 'expo-web-browser';
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { getProfile, profileHasData, type Profile, type SavedAnswer } from '../sync/profile';
 import { bestAnswerMatch, filterAnswers } from '../answers';
@@ -46,6 +47,26 @@ const buildAutoFillJs = (matches: { i: number; value: string }[]) => `(function(
     el.style.outline='2px solid #00E5A3';el.style.outlineOffset='1px';n++;});
   window.ReactNativeWebView.postMessage(JSON.stringify({type:'autofill',filled:n}));
 }catch(e){window.ReactNativeWebView.postMessage(JSON.stringify({type:'autofill',filled:0,error:String(e)}));}})();true;`;
+
+// After load, probe the page: if the body is effectively empty (no text, almost no elements) the
+// posting refused to render in the embedded WebView (frame-busting, UA sniffing, dead link). Delayed
+// so JS-rendered (SPA) pages get a chance to paint before we call it blank.
+const BLANK_PROBE_JS = `(function(){try{
+  setTimeout(function(){try{
+    var b=document.body;
+    var txt=b?((b.innerText||b.textContent||'').trim()):'';
+    var els=b?b.querySelectorAll('*').length:0;
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:'probe',len:txt.length,els:els}));
+  }catch(e){}},800);
+}catch(e){}})();true;`;
+
+// Stock desktop Safari UA — a real, current Safari string with NO app identifier appended (we don't
+// announce ourselves the way `applicationNameForUserAgent` would). Some portals serve a stripped or
+// blank page to in-app/mobile UAs, so presenting as desktop Safari renders the real form reliably.
+// Note: this is a desktop UA on a tablet, which is itself a minor inconsistency — chasing perfect
+// fingerprint consistency is an arms race we deliberately don't pursue; this is just for rendering.
+const DESKTOP_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15';
 
 // In-app browser + apply-assist. Opens a posting in a WKWebView; "Fill" injects JS that fuzzy-
 // matches form fields to the saved profile and fills the factual ones — highlighting its work and
@@ -109,10 +130,79 @@ export function BrowserScreen({ url, onBack }: { url: string; onBack: () => void
   const [answers, setAnswers] = useState<SavedAnswer[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState('');
+  // Why the WebView body is blank, if it is — drives the fallback overlay. null = page is fine.
+  const [failure, setFailure] = useState<{ title: string; detail: string } | null>(null);
+  // Tracks the main-frame URL so HTTP errors from sub-resources don't trip the error state.
+  const mainUrl = useRef(url);
+  // Bump to force-remount the WebView on retry (clears stuck internal state).
+  const [reloadKey, setReloadKey] = useState(0);
+  // Browser-chrome state: history availability, the page being shown, load progress, and the
+  // editable address bar. `uri` is the WebView source; typing a new address updates it.
+  const [uri, setUri] = useState(url);
+  const [canBack, setCanBack] = useState(false);
+  const [canFwd, setCanFwd] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentUrl, setCurrentUrl] = useState(url);
+  const [addr, setAddr] = useState(url);
+  const addrFocused = useRef(false);
+  // The apply-assist scripts are NOT injected at page load — the page runs untouched while you just
+  // browse. The focus-tracker is installed only the first time you invoke a fill/answer action, and
+  // is reset on every navigation (a new document wipes injected state anyway).
+  const trackerInstalled = useRef(false);
 
   useEffect(() => {
     getProfile().then((p) => setAnswers(p.answers || []));
   }, []);
+
+  const ensureTracker = () => {
+    if (trackerInstalled.current) return;
+    ref.current?.injectJavaScript(FOCUS_TRACKER_JS);
+    trackerInstalled.current = true;
+  };
+
+  // Open in an in-app Safari view (SFSafariViewController): real Safari, shares its cookies/logins,
+  // looks like Safari to the site — far higher compat than the embedded WebView for sites that block
+  // it. Apply-assist can't run there (it's a sealed view), so this is the fallback path only. Always
+  // acts on where the user actually is, not just the seed URL. Falls back to the system browser if
+  // the in-app view can't open for any reason.
+  const openExternal = async () => {
+    const target = currentUrl || url;
+    try {
+      await WebBrowser.openBrowserAsync(target, { showInRecents: true });
+    } catch {
+      Linking.openURL(target);
+    }
+  };
+
+  const retry = () => {
+    setFailure(null);
+    setMsg(null);
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
+
+  const goBack = () => canBack && ref.current?.goBack();
+  const goForward = () => canFwd && ref.current?.goForward();
+  const reloadOrStop = () => {
+    if (loading) ref.current?.stopLoading();
+    else { setFailure(null); ref.current?.reload(); }
+  };
+
+  // Turn whatever the user typed into a navigable URL: keep explicit schemes, https-prefix bare
+  // domains, and fall back to a web search for free text — i.e. behave like a normal address bar.
+  const submitAddress = () => {
+    addrFocused.current = false;
+    const raw = addr.trim();
+    if (!raw) return;
+    let next: string;
+    if (/^https?:\/\//i.test(raw)) next = raw;
+    else if (/^[^\s.]+\.[^\s]+$/.test(raw) && !raw.includes(' ')) next = 'https://' + raw;
+    else next = 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+    setFailure(null);
+    setLoading(true);
+    setUri(next);
+    setCurrentUrl(next);
+  };
 
   const fill = async () => {
     const p = await getProfile();
@@ -120,6 +210,7 @@ export function BrowserScreen({ url, onBack }: { url: string; onBack: () => void
       setMsg('Add your profile in Settings → Profile first.');
       return;
     }
+    ensureTracker();
     ref.current?.injectJavaScript(buildFillJs(p));
   };
 
@@ -146,6 +237,17 @@ export function BrowserScreen({ url, onBack }: { url: string; onBack: () => void
         .filter(Boolean) as { i: number; value: string }[];
       if (!matches.length) { setMsg('No confident answer matches — tap a field, then “Insert answer” to choose one.'); return; }
       ref.current?.injectJavaScript(buildAutoFillJs(matches));
+    } else if (type === 'probe') {
+      // Empty body after load = the posting refused to render embedded. Offer the external browser.
+      const len = (d.len as number) ?? 0;
+      const els = (d.els as number) ?? 0;
+      if (!failure && len < 2 && els < 4) {
+        setFailure({
+          title: 'This page didn’t render here',
+          detail:
+            'The posting wouldn’t load inside the app — some application sites block embedded browsers. Open it in your browser to apply.',
+        });
+      }
     } else if (type === 'autofill') {
       setMsg(`Auto-filled ${d.filled} answer field(s) — review every one before submitting.`);
     } else if (type === 'insert') {
@@ -167,28 +269,127 @@ export function BrowserScreen({ url, onBack }: { url: string; onBack: () => void
           <Pressable onPress={fill} style={styles.fillBtn}>
             <Text style={styles.fillText}>Fill form</Text>
           </Pressable>
-          <Pressable onPress={() => { setQuery(''); setPickerOpen(true); }} style={styles.fillBtn}>
+          <Pressable onPress={() => { ensureTracker(); setQuery(''); setPickerOpen(true); }} style={styles.fillBtn}>
             <Text style={styles.fillText}>Answers</Text>
           </Pressable>
-          <Pressable onPress={() => Linking.openURL(url)} hitSlop={8}>
+          <Pressable onPress={openExternal} hitSlop={8}>
             <Text style={styles.ext}>↗</Text>
           </Pressable>
         </View>
       </View>
+      <View style={styles.navBar}>
+        <Pressable onPress={goBack} disabled={!canBack} hitSlop={6} style={styles.navBtn}>
+          <Text style={[styles.navIcon, !canBack && styles.navIconOff]}>‹</Text>
+        </Pressable>
+        <Pressable onPress={goForward} disabled={!canFwd} hitSlop={6} style={styles.navBtn}>
+          <Text style={[styles.navIcon, !canFwd && styles.navIconOff]}>›</Text>
+        </Pressable>
+        <TextInput
+          value={addr}
+          onChangeText={setAddr}
+          onFocus={() => { addrFocused.current = true; }}
+          onBlur={() => { addrFocused.current = false; setAddr(currentUrl); }}
+          onSubmitEditing={submitAddress}
+          placeholder="Search or enter address"
+          placeholderTextColor={c.muted}
+          style={styles.addr}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          returnKeyType="go"
+          selectTextOnFocus
+          numberOfLines={1}
+        />
+        <Pressable onPress={reloadOrStop} hitSlop={6} style={styles.navBtn}>
+          <Text style={styles.navIcon}>{loading ? '✕' : '⟳'}</Text>
+        </Pressable>
+      </View>
+      <View style={styles.progressTrack}>
+        {loading && progress < 1 ? (
+          <View style={[styles.progressBar, { width: `${Math.max(4, progress * 100)}%` }]} />
+        ) : null}
+      </View>
       {msg ? <Text style={styles.msg}>{msg}</Text> : null}
-      <WebView
-        ref={ref}
-        source={{ uri: url }}
-        injectedJavaScript={FOCUS_TRACKER_JS}
-        onLoadEnd={() => setLoading(false)}
-        onMessage={(e) => onMessage(e.nativeEvent.data)}
-        style={styles.web}
-      />
-      {loading ? (
-        <View style={styles.loader} pointerEvents="none">
-          <ActivityIndicator color={c.emerald} />
-        </View>
-      ) : null}
+      <View style={styles.webWrap}>
+        <WebView
+          key={reloadKey}
+          ref={ref}
+          source={{ uri }}
+          // No scripts injected at load — the page runs untouched until you tap Fill/Answers.
+          userAgent={DESKTOP_UA}
+          // Persistent, shared cookie jar so a login survives across pages and app launches.
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          domStorageEnabled
+          cacheEnabled
+          incognito={false}
+          javaScriptEnabled
+          originWhitelist={['*']}
+          // Apply pages that open the form in a new window would otherwise blank the view.
+          setSupportMultipleWindows={false}
+          allowsBackForwardNavigationGestures
+          startInLoadingState
+          onLoadStart={(e) => {
+            mainUrl.current = e.nativeEvent.url;
+            trackerInstalled.current = false; // new document — assist state is gone, re-arm on demand
+            setFailure(null);
+            setLoading(true);
+            setProgress(0);
+          }}
+          onLoadProgress={(e) => setProgress(e.nativeEvent.progress)}
+          onNavigationStateChange={(nav) => {
+            setCanBack(nav.canGoBack);
+            setCanFwd(nav.canGoForward);
+            setCurrentUrl(nav.url);
+            if (!addrFocused.current) setAddr(nav.url);
+          }}
+          onLoadEnd={() => {
+            setLoading(false);
+            setProgress(1);
+            ref.current?.injectJavaScript(BLANK_PROBE_JS);
+          }}
+          onError={(e) => {
+            const { description } = e.nativeEvent;
+            setLoading(false);
+            setFailure({
+              title: 'Couldn’t load this page',
+              detail: (description || 'The page failed to load.') + ' Check your connection or open it in your browser.',
+            });
+          }}
+          onHttpError={(e) => {
+            const { statusCode, url: failedUrl } = e.nativeEvent;
+            // Only main-document failures — ignore sub-resource 4xx/5xx noise.
+            if (statusCode < 400 || (failedUrl && failedUrl !== mainUrl.current)) return;
+            setLoading(false);
+            setFailure({
+              title: `This posting returned ${statusCode}`,
+              detail:
+                statusCode === 404
+                  ? 'The job link looks dead (404) — the req may have been filled or pulled. Open it in your browser to confirm.'
+                  : 'The site returned an error. Open it in your browser to apply.',
+            });
+          }}
+          onMessage={(e) => onMessage(e.nativeEvent.data)}
+          style={styles.web}
+        />
+        {loading && !failure ? (
+          <View style={styles.loader} pointerEvents="none">
+            <ActivityIndicator color={c.emerald} />
+          </View>
+        ) : null}
+        {failure ? (
+          <View style={styles.errorOverlay}>
+            <Text style={styles.errorTitle}>{failure.title}</Text>
+            <Text style={styles.errorDetail}>{failure.detail}</Text>
+            <Pressable style={styles.primaryBtn} onPress={openExternal}>
+              <Text style={styles.primaryBtnText}>Open in browser ↗</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryBtn} onPress={retry}>
+              <Text style={styles.secondaryBtnText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
 
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
         <View style={styles.backdrop}>
@@ -255,9 +456,60 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   fillText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   ext: { fontFamily: fonts.sans, fontSize: 13, color: c.muted },
+  navBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: c.element,
+  },
+  navBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  navIcon: { fontFamily: fonts.sans, fontSize: 22, lineHeight: 24, color: c.emerald },
+  navIconOff: { color: alpha(c.muted, 0.4) },
+  addr: {
+    flex: 1,
+    backgroundColor: c.element,
+    borderRadius: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    color: c.textHigh,
+    fontFamily: fonts.sans,
+    fontSize: 13,
+  },
+  progressTrack: { height: 2, backgroundColor: 'transparent' },
+  progressBar: { height: 2, backgroundColor: c.emerald },
   msg: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase, paddingHorizontal: 16, paddingVertical: 8 },
+  webWrap: { flex: 1, position: 'relative' },
   web: { flex: 1, backgroundColor: '#fff' },
   loader: { position: 'absolute', top: 80, left: 0, right: 0, alignItems: 'center' },
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: c.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 14,
+  },
+  errorTitle: { fontFamily: fonts.serif, fontSize: 20, fontWeight: '600', color: c.textHigh, textAlign: 'center' },
+  errorDetail: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, textAlign: 'center', lineHeight: 20 },
+  primaryBtn: {
+    marginTop: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: alpha(c.emerald, 0.12),
+    borderWidth: 1,
+    borderColor: alpha(c.emerald, 0.5),
+  },
+  primaryBtnText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '700', color: c.emerald },
+  secondaryBtn: { paddingHorizontal: 16, paddingVertical: 8 },
+  secondaryBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.muted },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: c.canvas,

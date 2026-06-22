@@ -22,6 +22,8 @@ data.json
 data.json.tmp
 backups/
 logs/
+# Generated interview prep guides (personal; grounded in your narratives — bundled into backups)
+agent/interview-guides/
 node_modules/
 
 # Personal data — never committed; generic *.example versions ship for fresh clones

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { alpha, fonts, useThemedStyles, useScheme, type Palette, type SchemePref } from '../theme';
 import { useLayout } from '../useLayout';
 import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
@@ -60,6 +60,7 @@ export function SettingsModal({
   const [status, setStatus] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null);
   const [scout, setScout] = useState<ScoutMode>('auto');
   const [scanOpen, setScanOpen] = useState(false);
+  const [mailReload, setMailReload] = useState(0);   // bumped on "Sync now" to re-pull server settings
 
   useEffect(() => {
     if (visible) {
@@ -114,6 +115,7 @@ export function SettingsModal({
       const { pushed, pulled, remaps } = await syncTwoWay();
       setStatus({ kind: 'ok', text: `Synced · pushed ${pushed}, pulled ${pulled}${remaps ? `, ${remaps} merged` : ''}` });
       onSynced();
+      setMailReload((n) => n + 1);   // re-pull server-side settings (Gmail ingest config, etc.)
     } catch (e) {
       setStatus({ kind: 'err', text: e instanceof Error ? e.message : 'sync failed' });
     }
@@ -128,11 +130,11 @@ export function SettingsModal({
       <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. When configured, sync runs automatically on launch and foreground (push local edits + pull server changes, last-writer-wins); the button below forces it now.</Text>
       <View style={styles.labeled}>
         <Text style={styles.label}>Server URL</Text>
-        <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={c.muted} style={styles.input} />
+        <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="http://localhost:8787" placeholderTextColor={c.muted} style={styles.input} returnKeyType="done" onSubmitEditing={() => Keyboard.dismiss()} />
       </View>
       <View style={styles.labeled}>
         <Text style={styles.label}>Passphrase</Text>
-        <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="your server passphrase (APP_TOKEN)" placeholderTextColor={c.muted} style={styles.input} />
+        <TextInput value={token} onChangeText={setToken} autoCapitalize="none" secureTextEntry placeholder="your server passphrase (APP_TOKEN)" placeholderTextColor={c.muted} style={styles.input} returnKeyType="done" onSubmitEditing={() => Keyboard.dismiss()} />
         <Text style={styles.fieldHint}>Same passphrase you set as APP_TOKEN on the server — the one the web board's login asks for. Stored in your device keychain. Leave blank if the server has no passphrase.</Text>
       </View>
       <View style={styles.labeled}>
@@ -172,7 +174,7 @@ export function SettingsModal({
         </View>
         <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
       </View>
-      {url ? <MailIngestPanel /> : null}
+      {url ? <MailIngestPanel reloadSignal={mailReload} /> : null}
     </>
   );
   const syncBottom = (
@@ -225,7 +227,6 @@ export function SettingsModal({
             contentContainerStyle={styles.synPane}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets
           >
             {syncTop}
             {syncBottom}
@@ -233,7 +234,7 @@ export function SettingsModal({
         );
     return (
       <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-        <View style={styles.wideBackdrop}>
+        <KeyboardAvoidingView style={styles.wideBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.panel}>
             <View style={styles.panelHead}>
               <Text style={styles.title}>Settings</Text>
@@ -252,7 +253,7 @@ export function SettingsModal({
               <View style={styles.pane}>{pane}</View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
         <PairScanModal visible={scanOpen} onClose={() => setScanOpen(false)} onPaired={applyPairing} />
       </Modal>
     );
@@ -261,7 +262,7 @@ export function SettingsModal({
   // Phone: bottom sheet (unchanged) — sync config, then the nav rows that push full-screen.
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.sheet}>
           <View style={styles.headRow}>
             <Text style={styles.title}>Sync</Text>
@@ -273,14 +274,13 @@ export function SettingsModal({
             contentContainerStyle={styles.form}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets
           >
             {syncTop}
             {navRows}
             {syncBottom}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
       <PairScanModal visible={scanOpen} onClose={() => setScanOpen(false)} onPaired={applyPairing} />
     </Modal>
   );
@@ -302,7 +302,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   title: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh },
   cancel: { fontFamily: fonts.sans, fontSize: 15, color: c.emerald, fontWeight: '500' },
-  form: { gap: 14, paddingBottom: 8 },
+  form: { gap: 14, paddingBottom: 32 },
   help: { fontFamily: fonts.sans, fontSize: 13, color: c.muted, lineHeight: 19 },
   labeled: { gap: 6 },
   label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.muted },

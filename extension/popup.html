@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Reqon Clip</title>
+<style>
+  :root { color-scheme: dark; }
+  body { width: 320px; margin: 0; background: #0d1117; color: #e8eef5;
+         font: 14px/1.45 -apple-system, system-ui, sans-serif; }
+  .wrap { padding: 14px 14px 12px; }
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .head h1 { font-size: 1rem; margin: 0; font-weight: 700; }
+  .gear { background: none; border: 0; color: #aab6c2; cursor: pointer; font-size: 1rem; padding: 2px 4px; }
+  .card { background: #151b23; border: 1px solid #28323d; border-radius: 11px; padding: 12px; }
+  .muted { color: #8b97a4; }
+  .role { font-weight: 700; font-size: .95rem; }
+  .company { color: #aab6c2; font-size: .85rem; margin-top: 1px; }
+  .metrics { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }
+  .chip { font: 600 .72rem/1 "SF Mono", ui-monospace, monospace; background: #0d1117; border: 1px solid #28323d;
+          border-radius: 20px; padding: 4px 8px; color: #cdd7e1; }
+  .chip b { color: #c8ff49; }
+  .status { font-size: .8rem; font-weight: 600; margin-top: 2px; }
+  .s-open { color: #69c57e; } .s-applied { color: #706cff; } .s-rejected { color: #e8755f; } .s-none { color: #8b97a4; }
+  .btn { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; border: 0; border-radius: 9px;
+         padding: 11px; font: 700 .9rem inherit; cursor: pointer; }
+  .btn-primary { background: #00df8f; color: #08130d; }
+  .btn-ghost { background: transparent; color: #e8eef5; border: 1px solid #3a4550; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  a.link { color: #706cff; font-size: .8rem; text-decoration: none; display: inline-block; margin-top: 9px; }
+  #msg { font-size: .82rem; min-height: 1.1em; margin-top: 9px; }
+  .ok { color: #69c57e; } .err { color: #e8755f; }
+  .settings { margin-top: 12px; border-top: 1px solid #28323d; padding-top: 11px; display: none; }
+  .settings.open { display: block; }
+  label { display: block; font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; color: #8b97a4; margin: 9px 0 4px; }
+  input[type=text], input[type=password] { width: 100%; box-sizing: border-box; background: #0d1117; border: 1px solid #333c47;
+         color: #e8eef5; border-radius: 8px; padding: 8px 10px; font: inherit; }
+  input:focus { outline: none; border-color: #00df8f; }
+  .togrow { display: flex; align-items: center; gap: 8px; margin-top: 11px; }
+  .togrow label { margin: 0; text-transform: none; letter-spacing: 0; font-size: .8rem; color: #cdd7e1; }
+  .setrow { display: flex; gap: 8px; margin-top: 11px; }
+  .setrow .btn { margin-top: 0; }
+  .hint { font-size: .72rem; color: #8b97a4; margin: 5px 0 0; }
+</style>
+<div class="wrap">
+  <div class="head">
+    <h1>Reqon Clip</h1>
+    <button id="gear" class="gear" title="Settings">⚙</button>
+  </div>
+
+  <div id="card" class="card">
+    <div class="muted">Loading…</div>
+  </div>
+  <button id="panel" class="btn btn-ghost" style="margin-top:10px">📊 Open analytics sidebar</button>
+  <div id="msg"></div>
+
+  <div id="settings" class="settings">
+    <label>Server origin</label>
+    <input id="origin" type="text" placeholder="http://localhost:8787">
+    <label>Passphrase (APP_TOKEN)</label>
+    <input id="token" type="password" placeholder="your server passphrase" autocomplete="off">
+    <p class="hint">Local: <code>http://localhost:8787</code>. Off-network: your HTTPS tunnel URL.</p>
+    <div class="togrow"><input id="overlay" type="checkbox"><label for="overlay">Show the on-page overlay on job postings</label></div>
+    <div class="togrow"><input id="notify" type="checkbox"><label for="notify">Show a notification on clip / mark-applied</label></div>
+    <div class="setrow">
+      <button id="save" class="btn btn-primary" style="flex:1">Save</button>
+      <button id="test" class="btn btn-ghost" style="flex:1">Test</button>
+    </div>
+  </div>
+</div>
+<script src="popup.js"></script>

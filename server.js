@@ -177,10 +177,43 @@ function snapshotData(kind) {
   try {
     if (!fs.existsSync(DATA_FILE)) return null;
     ensureBackupDir();
-    const name = `data.${kind}-${backupStamp()}.json`;
+    const stamp = backupStamp();
+    const name = `data.${kind}-${stamp}.json`;
     fs.copyFileSync(DATA_FILE, path.join(BACKUP_DIR, name));
+    snapshotGuides(kind, stamp);   // bundle the attached interview guides alongside this snapshot
     return name;
   } catch (e) { console.error('[snapshot]', e.message); return null; }
+}
+// Interview guides live as files outside data.json, so a data snapshot alone would lose them.
+// Bundle them (keyed by reqKey, so it's restorable) into a sibling guides.<kind>-<stamp>.json.
+function snapshotGuides(kind, stamp) {
+  try {
+    const rows = readStore();
+    const bundle = {};
+    for (const r of rows) {
+      if (!r.guideAt) continue;
+      const k = reqKey(r);
+      try { bundle[k] = { guideAt: r.guideAt, markdown: fs.readFileSync(guidePath(k), 'utf8') }; } catch (e) { /* file gone */ }
+    }
+    if (Object.keys(bundle).length) {
+      fs.writeFileSync(path.join(BACKUP_DIR, `guides.${kind}-${stamp}.json`), JSON.stringify(bundle, null, 2));
+    }
+  } catch (e) { console.error('[snapshot-guides]', e.message); }
+}
+// Restore the guide files from a guides bundle that sits beside a data snapshot (best-effort).
+function restoreGuides(dataFileName) {
+  try {
+    const guidesName = dataFileName.replace(/^data\./, 'guides.');
+    const fp = path.join(BACKUP_DIR, guidesName);
+    if (guidesName === dataFileName || !fs.existsSync(fp)) return 0;
+    const bundle = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    fs.mkdirSync(GUIDE_DIR, { recursive: true });
+    let n = 0;
+    for (const [k, v] of Object.entries(bundle)) {
+      if (v && typeof v.markdown === 'string') { fs.writeFileSync(guidePath(k), v.markdown, 'utf8'); n++; }
+    }
+    return n;
+  } catch (e) { console.error('[restore-guides]', e.message); return 0; }
 }
 // Prune only auto snapshots down to the retention count (newest kept). Manual/phase/labeled
 // backups are never touched.
@@ -188,11 +221,13 @@ function pruneAutoBackups() {
   try {
     ensureBackupDir();
     const keep = backupRetention();
-    const autos = fs.readdirSync(BACKUP_DIR)
-      .filter(f => /^data\.auto-.*\.json$/.test(f))
+    const byNewest = (re) => fs.readdirSync(BACKUP_DIR)
+      .filter(f => re.test(f))
       .map(f => ({ f, t: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs }))
       .sort((a, b) => b.t - a.t);
-    for (const x of autos.slice(keep)) { try { fs.unlinkSync(path.join(BACKUP_DIR, x.f)); } catch (e) {} }
+    for (const x of byNewest(/^data\.auto-.*\.json$/).slice(keep)) { try { fs.unlinkSync(path.join(BACKUP_DIR, x.f)); } catch (e) {} }
+    // Prune the paired guide bundles to the same retention so they don't accumulate.
+    for (const x of byNewest(/^guides\.auto-.*\.json$/).slice(keep)) { try { fs.unlinkSync(path.join(BACKUP_DIR, x.f)); } catch (e) {} }
   } catch (e) { console.error('[prune]', e.message); }
 }
 // Diff two stores by reqKey -> { added:[keys], removed:[keys], changed:[{key, fields}] }.
@@ -460,6 +495,18 @@ app.put('/api/reqs', (req, res) => {
     pruneAutoBackups();
     const d = diffStores(current, rows);
     logChange({ ts: new Date().toISOString(), action: 'put', before: current.length, after: rows.length, added: d.added, removed: d.removed, changed: d.changed });
+    // Auto-build interview guides for rows that just entered an interview stage via the board's
+    // whole-state save (the per-row PATCH path triggers separately). Background; bounded to genuine
+    // transitions (prev status not already an interview stage).
+    if (process.env.OPENAI_API_KEY && assistEnabled()) {
+      const beforeStatus = new Map(current.map((r) => [reqKey(r), r.status]));
+      for (const r of rows) {
+        const k = reqKey(r);
+        if (INTERVIEW_STAGES.has(r.status) && !r.guideAt && !INTERVIEW_STAGES.has(beforeStatus.get(k))) {
+          buildAndStoreGuide(k).catch((e) => console.error('[interview-guide]', e.message));
+        }
+      }
+    }
     res.json({ ok: true, count: rows.length });
   } catch (e) {
     console.error('[PUT /api/reqs]', e.message);
@@ -761,35 +808,85 @@ function assistUsage() {
 function logAssist(entry) {
   try { fs.mkdirSync(path.dirname(ASSIST_LOG), { recursive: true }); fs.appendFileSync(ASSIST_LOG, JSON.stringify(entry) + '\n'); } catch (e) {}
 }
-async function openaiChat({ model, system, user, maxTokens }) {
+// Pull the assistant text out of a Responses-API result (raw HTTP — no SDK output_text helper
+// guaranteed, so handle both the convenience field and the structured output array).
+function extractResponsesText(j) {
+  if (typeof j.output_text === 'string' && j.output_text) return j.output_text;
+  let text = '';
+  for (const item of (j.output || [])) {
+    if (item.type === 'message' && Array.isArray(item.content)) {
+      for (const c of item.content) if ((c.type === 'output_text' || c.type === 'text') && c.text) text += c.text;
+    }
+  }
+  return text;
+}
+function responsesTokens(j) {
+  const u = j.usage || {};
+  return u.total_tokens || ((u.input_tokens || 0) + (u.output_tokens || 0)) || 0;
+}
+
+// Unified OpenAI call. Uses the Responses API (/v1/responses) by default — this is what unlocks the
+// high-value built-in tools (web_search, file_search) and structured function calling. Pass `tools`
+// to enable them; the result carries any `toolCalls`. Set OPENAI_USE_CHAT=true to fall back to the
+// legacy /chat/completions path. Signature is backward-compatible: {content, tokens} for callers
+// that don't use tools.
+async function chatCompletions(base, key, { model, system, user, maxTokens, temperature }) {
+  const payload = { model, temperature, max_completion_tokens: maxTokens,
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+  const r = await fetch(base + '/chat/completions', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify(payload) });
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('OpenAI HTTP ' + r.status + ' ' + t.slice(0, 200)); }
+  const j = await r.json();
+  return { content: (((j.choices || [])[0] || {}).message || {}).content || '', tokens: (j.usage || {}).total_tokens || 0, toolCalls: [] };
+}
+
+async function openaiChat({ model, system, user, maxTokens, tools, toolChoice, temperature }) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('no OPENAI_API_KEY');
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
-  const payload = {
-    model, temperature: 0.4, max_completion_tokens: maxTokens,
-    messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
-  };
-  const r = await fetch(base + '/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
-    body: JSON.stringify(payload)
-  });
-  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('OpenAI HTTP ' + r.status + ' ' + t.slice(0, 200)); }
+  const temp = temperature != null ? temperature : 0.4;
+  const usingTools = Array.isArray(tools) && tools.length;
+
+  // Explicit opt-out, or no tools needed and Responses is unavailable -> legacy chat path.
+  if (process.env.OPENAI_USE_CHAT === 'true') return chatCompletions(base, key, { model, system, user, maxTokens, temperature: temp });
+
+  const payload = { model, temperature: temp, max_output_tokens: maxTokens, input: user };
+  if (system) payload.instructions = system;
+  if (usingTools) { payload.tools = tools; if (toolChoice) payload.tool_choice = toolChoice; }
+  let r;
+  try {
+    r = await fetch(base + '/responses', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify(payload) });
+  } catch (e) {
+    if (usingTools) throw e;
+    return chatCompletions(base, key, { model, system, user, maxTokens, temperature: temp });   // network issue → fall back
+  }
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    // If the Responses endpoint/params aren't supported for this account/model, transparently fall
+    // back to chat/completions (unless tools were required — those only exist on Responses).
+    if (!usingTools) { try { return await chatCompletions(base, key, { model, system, user, maxTokens, temperature: temp }); } catch (e2) { /* report the original */ } }
+    throw new Error('OpenAI HTTP ' + r.status + ' ' + t.slice(0, 200));
+  }
   const j = await r.json();
-  const content = (((j.choices || [])[0] || {}).message || {}).content || '';
-  return { content, tokens: (j.usage || {}).total_tokens || 0 };
+  const toolCalls = (j.output || []).filter((i) => i.type === 'function_call')
+    .map((i) => ({ name: i.name, arguments: i.arguments, call_id: i.call_id }));
+  return { content: extractResponsesText(j), tokens: responsesTokens(j), toolCalls };
 }
 
 app.post('/api/assist', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
-  const kind = ['cover', 'screening'].includes(b.kind) ? b.kind : 'cover';
+  // 'answer' = a Saved-Answers draft (reusable Q&A): grounded in the profile + the question + the
+  // candidate's keywords/thoughts, and NOT tied to any req (no company/role required).
+  const kind = ['cover', 'screening', 'answer'].includes(b.kind) ? b.kind : 'cover';
   const rows = readStore();
   const row = rows.find(r => reqKey(r) === String(b.key || '').toLowerCase().trim());
   const company = (row && row.company) || b.company || '';
   const role = (row && row.role) || b.role || '';
-  if (!company && !role) return res.status(404).json({ ok: false, error: 'Req not found and no company/role provided.' });
+  if (kind !== 'answer' && !company && !role) return res.status(404).json({ ok: false, error: 'Req not found and no company/role provided.' });
+  if (kind === 'answer' && !String(b.question || '').trim()) return res.status(400).json({ ok: false, error: 'A question is required to write an answer.' });
   const cap = assistDailyCalls();
   const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}). Raise it in Settings or wait.` });
@@ -798,9 +895,13 @@ app.post('/api/assist', async (req, res) => {
   const a = p.applicant || {};
   const narr = (p.narratives || []).map(n => `- ${n.title}: ${n.body}`).join('\n');
   const jd = String(b.jd || (row && row.notes) || '').slice(0, parseInt(process.env.OPENAI_JD_CHARS || '3500', 10));
+  const keywords = String(b.keywords || '').slice(0, 1500);
   const system = 'You help a job candidate draft application materials. Write in first person, plain and PM-level, honest — no overclaiming, no flowery "ChatGPT" phrasing. Ground every claim ONLY in the candidate\'s narrative library; never invent employers, metrics, or titles. Be concise.';
   let user;
-  if (kind === 'screening') {
+  if (kind === 'answer') {
+    const targetLine = (company || role) ? `Target: ${role}${company ? ` at ${company}` : ''}\n` : '';
+    user = `Candidate: ${a.name || ''}\n${targetLine}\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n${jd ? `\nJob context:\n${jd}\n` : ''}\nApplication question:\n${b.question || ''}\n\nThe candidate's own keywords / thoughts to build from (incorporate these honestly; do not invent beyond the narratives):\n${keywords || '(none provided)'}\n\nWrite a clear, honest answer (120-180 words) the candidate can reuse, grounded in the narratives and shaped by their keywords. First person, plain.`;
+  } else if (kind === 'screening') {
     user = `Candidate: ${a.name || ''}\nTarget: ${role} at ${company}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nScreening question:\n${b.question || ''}\n\nWrite a tight, honest answer (120-180 words) grounded in the narratives.`;
   } else {
     user = `Candidate: ${a.name || ''}\nTarget: ${role} at ${company}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nDraft a short cover note (150-220 words): why this role fits, 1-2 concrete proof points from the narratives, and a confident close. First person, plain.`;
@@ -808,8 +909,156 @@ app.post('/api/assist', async (req, res) => {
   try {
     const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: assistMaxTokens() });
     u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(ASSIST_USAGE, u);
-    logAssist({ ts: new Date().toISOString(), key: reqKey({ company, role }), kind, model: assistModel(), tokens, question: kind === 'screening' ? String(b.question || '').slice(0, 200) : undefined });
+    logAssist({ ts: new Date().toISOString(), key: reqKey({ company, role }), kind, model: assistModel(), tokens, question: (kind === 'screening' || kind === 'answer') ? String(b.question || '').slice(0, 200) : undefined });
     res.json({ ok: true, draft: content, kind, tokens, usage: { calls: u.calls, tokens: u.tokens, cap } });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ---------- assist consumption monitor ----------
+// OpenAI does NOT expose remaining credit balance via the API key (the old dashboard/billing
+// endpoints are locked to browser sessions). So we report what we can measure exactly — the tokens
+// we log on every call — plus an OPTIONAL user-set $/1M-token rate and monthly budget for cost
+// estimation. Authoritative billing lives at platform.openai.com/usage.
+function assistWindowStats(days) {
+  const cutoff = Date.now() - days * 86400000;
+  let calls = 0, tokens = 0;
+  try {
+    const txt = fs.readFileSync(ASSIST_LOG, 'utf8');
+    for (const line of txt.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      let e; try { e = JSON.parse(line); } catch (_) { continue; }
+      const t = Date.parse(e.ts); if (isNaN(t) || t < cutoff) continue;
+      calls += 1; tokens += (+e.tokens || 0);
+    }
+  } catch (_) { /* no log yet */ }
+  return { calls, tokens };
+}
+// Price is user-supplied — we never hardcode a model price (it would go stale / be wrong).
+const assistRatePer1M = () => { const v = parseFloat(process.env.OPENAI_PRICE_PER_1M || ''); return isFinite(v) && v > 0 ? v : null; };
+const assistMonthlyBudget = () => { const v = parseFloat(process.env.ASSIST_MONTHLY_BUDGET || ''); return isFinite(v) && v > 0 ? v : null; };
+const estCost = (tokens, rate) => rate == null ? null : Math.round((tokens / 1e6) * rate * 100) / 100;
+
+app.get('/api/assist/usage', (req, res) => {
+  const u = assistUsage();
+  const cap = assistDailyCalls();
+  const w7 = assistWindowStats(7);
+  const w30 = assistWindowStats(30);
+  const rate = assistRatePer1M();
+  const budget = assistMonthlyBudget();
+  const cost30 = estCost(w30.tokens, rate);
+  res.json({
+    ok: true,
+    enabled: assistEnabled(), keySet: !!process.env.OPENAI_API_KEY, model: assistModel(),
+    today: { calls: u.calls, tokens: u.tokens, cap },
+    last7d: { calls: w7.calls, tokens: w7.tokens, estCost: estCost(w7.tokens, rate) },
+    last30d: { calls: w30.calls, tokens: w30.tokens, estCost: cost30 },
+    ratePer1M: rate, monthlyBudget: budget,
+    budgetUsedPct: (budget && cost30 != null) ? Math.min(100, Math.round((cost30 / budget) * 100)) : null,
+    note: 'OpenAI does not expose remaining balance via API; see the dashboard for authoritative billing.',
+    dashboard: 'https://platform.openai.com/usage'
+  });
+});
+
+// ---------- interview prep guide (auto-generated when a role reaches an interview stage) ----------
+// Stored as Markdown in agent/interview-guides/<sha1(key)>.md and "attached" to the row via
+// row.guideAt. Generated from the candidate's narratives + the role's JD; grounded, never invented.
+const INTERVIEW_STAGES = new Set(['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer']);
+const GUIDE_DIR = path.join(ROOT, 'agent', 'interview-guides');
+const guidePath = (key) => path.join(GUIDE_DIR, crypto.createHash('sha1').update(key).digest('hex') + '.md');
+const guideMaxTokens = () => Math.max(800, parseInt(process.env.GUIDE_MAX_TOKENS || '1800', 10) || 1800);
+
+async function generateInterviewGuide(row) {
+  const p = readProfile();
+  const a = p.applicant || {};
+  const narr = (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n');
+  const jd = String(row.notes || '').slice(0, parseInt(process.env.OPENAI_JD_CHARS || '3500', 10));
+  const company = row.company || '', role = row.role || '';
+  const system = 'You are an expert interview coach preparing a candidate for a specific role. Produce a concise, practical interview prep guide in Markdown. Ground every candidate-specific claim ONLY in their narrative library — never invent employers, metrics, or titles. Be specific and actionable, not generic.';
+  const user = `Candidate: ${a.name || ''}\nTarget role: ${role}${company ? ` at ${company}` : ''}\n\nCandidate narrative library (use ONLY these facts for "your story" parts):\n${narr || '(none provided)'}\n\nJob context:\n${jd || '(none provided)'}\n\nWrite an interview prep guide with exactly these sections:\n## Role snapshot\n## Why you fit (from your narratives)\n## Likely questions & how to answer (8–10, mixing behavioral + role-specific; one or two lines of guidance each)\n## Your stories to lead with (map specific narratives to STAR)\n## Smart questions to ask them\n## Things to clarify / possible red flags\n## 48-hour prep checklist\nKeep it tight and skimmable.`;
+  const tools = (process.env.ASSIST_WEB_SEARCH === 'true') ? [{ type: 'web_search' }] : undefined;
+  const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: guideMaxTokens(), tools, temperature: 0.5 });
+  return { markdown: content, tokens };
+}
+
+// Generate + persist + attach to the row. Re-reads the store before stamping guideAt so it never
+// clobbers a concurrent edit. Used by the manual POST and the PATCH status-change trigger.
+async function buildAndStoreGuide(key) {
+  const rows = readStore();
+  const row = rows.find((r) => reqKey(r) === key);
+  if (!row) throw new Error('no row for key');
+  const { markdown, tokens } = await generateInterviewGuide(row);
+  if (!markdown || !markdown.trim()) throw new Error('empty guide from model');
+  fs.mkdirSync(GUIDE_DIR, { recursive: true });
+  fs.writeFileSync(guidePath(key), markdown, 'utf8');
+  const rows2 = readStore();
+  const r2 = rows2.find((r) => reqKey(r) === key);
+  if (r2) { r2.guideAt = new Date().toISOString(); touchRow(r2); writeStore(rows2); }
+  logChange({ ts: nowIso(), action: 'interview-guide', key, tokens: tokens || 0 });
+  return markdown;
+}
+
+// Tiny Markdown -> HTML (headings, lists, bold/italic/code) — enough for the guide; no deps.
+function mdToHtml(md) {
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>').replace(/`(.+?)`/g, '<code>$1</code>');
+  let html = '', inList = false;
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  for (const line of String(md || '').split(/\r?\n/)) {
+    let m;
+    if ((m = line.match(/^###\s+(.*)/))) { closeList(); html += '<h3>' + inline(m[1]) + '</h3>'; }
+    else if ((m = line.match(/^##\s+(.*)/))) { closeList(); html += '<h2>' + inline(m[1]) + '</h2>'; }
+    else if ((m = line.match(/^#\s+(.*)/))) { closeList(); html += '<h1>' + inline(m[1]) + '</h1>'; }
+    else if ((m = line.match(/^\s*[-*]\s+(.*)/))) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(m[1]) + '</li>'; }
+    else if (line.trim() === '') { closeList(); }
+    else { closeList(); html += '<p>' + inline(line) + '</p>'; }
+  }
+  closeList();
+  return html;
+}
+function guideHtmlPage(title, bodyHtml, guideAt) {
+  const esc = (s) => String(s || '').replace(/</g, '&lt;');
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interview guide — ${esc(title)}</title><style>
+:root{color-scheme:dark}
+body{margin:0;background:#0B0C0E;color:#E2E8F0;font:16px/1.6 -apple-system,system-ui,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:40px 22px 80px}
+.brand{font:700 .7rem/1 "Spline Sans",system-ui;letter-spacing:.26em;text-transform:uppercase;color:#00E5A3;margin-bottom:6px}
+h1{font-size:1.6rem;margin:.2em 0} h2{font-size:1.15rem;margin:1.6em 0 .4em;color:#00E5A3;border-bottom:1px solid #1d2630;padding-bottom:.2em}
+h3{font-size:1rem;margin:1.1em 0 .3em;color:#C8FF49}
+ul{padding-left:1.2em} li{margin:.25em 0} code{background:#16181C;padding:1px 5px;border-radius:4px;font-size:.9em}
+.meta{color:#64748B;font-size:.8rem;margin-bottom:1.5em}
+.print{position:fixed;top:16px;right:16px;background:#00E5A3;color:#08130d;border:0;border-radius:8px;padding:8px 14px;font:700 .85rem inherit;cursor:pointer}
+@media print{.print{display:none}}
+</style></head><body><button class="print" onclick="window.print()">Print / PDF</button>
+<div class="wrap"><div class="brand">Reqon · Interview prep</div><h1>${esc(title)}</h1>
+<div class="meta">${guideAt ? 'Generated ' + esc(String(guideAt).slice(0, 10)) : ''}</div>
+${bodyHtml}</div></body></html>`;
+}
+
+// Open the guide (styled HTML page — what the board card links to).
+app.get('/api/reqs/:key/guide', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const fp = guidePath(key);
+  if (!fs.existsSync(fp)) {
+    return res.status(404).set('Content-Type', 'text/html; charset=utf-8')
+      .send('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;background:#0B0C0E;color:#E2E8F0;padding:40px">No interview guide yet for this role — generate it from the board card.</body>');
+  }
+  const md = fs.readFileSync(fp, 'utf8');
+  const row = readStore().find((r) => reqKey(r) === key) || {};
+  const title = [row.role, row.company].filter(Boolean).join(' · ') || 'Interview guide';
+  res.set('Content-Type', 'text/html; charset=utf-8').send(guideHtmlPage(title, mdToHtml(md), row.guideAt));
+});
+
+// Force (re)generate a guide (board "Generate guide" button). Awaits so the card can open it after.
+app.post('/api/reqs/:key/guide', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  try {
+    await buildAndStoreGuide(key);
+    res.json({ ok: true, key, url: '/api/reqs/' + encodeURIComponent(key) + '/guide' });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message });
   }
@@ -1184,7 +1433,13 @@ app.patch('/api/reqs/:key', (req, res) => {
   if (before.conf !== after.conf) entry.conf = { old: before.conf === undefined ? null : before.conf, new: after.conf };
   logEnrichment(entry);
 
-  res.json({ ok: true, key, changes, tier: after.tier, conf: after.conf, needsEnrichment: after.needsEnrichment === true, logged: true });
+  // Auto-create the interview prep guide the first time a role enters an interview stage (manual
+  // move OR mail-ingest advance both land here). Fire-and-forget so the PATCH stays fast.
+  if (changes.status && INTERVIEW_STAGES.has(after.status) && !after.guideAt && process.env.OPENAI_API_KEY && assistEnabled()) {
+    buildAndStoreGuide(key).catch((e) => console.error('[interview-guide]', e.message));
+  }
+
+  res.json({ ok: true, key, changes, tier: after.tier, conf: after.conf, needsEnrichment: after.needsEnrichment === true, guidePending: !!(changes.status && INTERVIEW_STAGES.has(after.status) && !after.guideAt), logged: true });
 });
 
 // ---------- sync (WP-0): device↔server reconcile ----------
@@ -2107,8 +2362,9 @@ app.post('/api/restore', (req, res) => {
     const pre = snapshotData('auto');           // safety snapshot of the about-to-be-replaced state
     writeStore(restored);
     pruneAutoBackups();
-    logChange({ ts: new Date().toISOString(), action: 'restore', file: path.basename(fp), before, after: restored.length, preSnapshot: pre });
-    res.json({ ok: true, restored: restored.length, from: path.basename(fp), preSnapshot: pre });
+    const guidesRestored = restoreGuides(path.basename(fp));   // bring back attached guides, if bundled
+    logChange({ ts: new Date().toISOString(), action: 'restore', file: path.basename(fp), before, after: restored.length, guidesRestored, preSnapshot: pre });
+    res.json({ ok: true, restored: restored.length, from: path.basename(fp), guidesRestored, preSnapshot: pre });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }

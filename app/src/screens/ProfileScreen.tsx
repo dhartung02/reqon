@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, Modal } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import {
@@ -7,10 +7,42 @@ import {
   pushProfile,
   uploadResume,
   EMPTY_PROFILE,
+  EEO_OPTIONS,
   type Profile,
   type EduEntry,
   type WorkEntry,
 } from '../sync/profile';
+
+// Dropdown select (Modal-based; no extra deps). Used for the standard EEO self-ID answer sets.
+function SelectField({ label, value, options, onChange }: { label: string; value?: string; options: readonly string[]; onChange: (v: string) => void }) {
+  const { styles } = useThemedStyles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const cur = value || '';
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Pressable style={styles.select} onPress={() => setOpen(true)}>
+        <Text style={[styles.selectText, !cur && styles.selectPlaceholder]} numberOfLines={1}>{cur || 'Select…'}</Text>
+        <Text style={styles.selectChev}>▾</Text>
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.optBackdrop} onPress={() => setOpen(false)}>
+          <View style={styles.optSheet}>
+            <Text style={styles.optTitle}>{label}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {['', ...options].map((opt) => (
+                <Pressable key={opt || '(clear)'} style={styles.optRow} onPress={() => { onChange(opt); setOpen(false); }}>
+                  <Text style={[styles.optText, opt === cur && styles.optTextOn]}>{opt || '— clear'}</Text>
+                  {opt === cur ? <Text style={styles.optCheck}>✓</Text> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
 
 // Field input helper.
 function Field({ label, value, onChange, ...rest }: { label: string; value?: string; onChange: (v: string) => void } & Omit<Partial<React.ComponentProps<typeof TextInput>>, 'onChange' | 'value'>) {
@@ -134,13 +166,13 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
 
       <Section title="DEMOGRAPHICS (EEO)">
         <Text style={styles.note}>Stored privately for your reference. The apply-assist never auto-fills or submits these — you answer them yourself.</Text>
-        <Field label="Pronouns" value={p.eeo.pronouns} onChange={(v) => setEeo('pronouns', v)} />
-        <Field label="Gender" value={p.eeo.gender} onChange={(v) => setEeo('gender', v)} />
-        <Field label="Race" value={p.eeo.race} onChange={(v) => setEeo('race', v)} />
-        <Field label="Ethnicity" value={p.eeo.ethnicity} onChange={(v) => setEeo('ethnicity', v)} />
-        <Field label="Veteran status" value={p.eeo.veteran} onChange={(v) => setEeo('veteran', v)} />
-        <Field label="Disability status" value={p.eeo.disability} onChange={(v) => setEeo('disability', v)} />
-        <Field label="Sexual orientation" value={p.eeo.orientation} onChange={(v) => setEeo('orientation', v)} />
+        <SelectField label="Pronouns" value={p.eeo.pronouns} options={EEO_OPTIONS.pronouns} onChange={(v) => setEeo('pronouns', v)} />
+        <SelectField label="Gender" value={p.eeo.gender} options={EEO_OPTIONS.gender} onChange={(v) => setEeo('gender', v)} />
+        <SelectField label="Race" value={p.eeo.race} options={EEO_OPTIONS.race} onChange={(v) => setEeo('race', v)} />
+        <SelectField label="Ethnicity" value={p.eeo.ethnicity} options={EEO_OPTIONS.ethnicity} onChange={(v) => setEeo('ethnicity', v)} />
+        <SelectField label="Veteran status" value={p.eeo.veteran} options={EEO_OPTIONS.veteran} onChange={(v) => setEeo('veteran', v)} />
+        <SelectField label="Disability status" value={p.eeo.disability} options={EEO_OPTIONS.disability} onChange={(v) => setEeo('disability', v)} />
+        <SelectField label="Sexual orientation" value={p.eeo.orientation} options={EEO_OPTIONS.orientation} onChange={(v) => setEeo('orientation', v)} />
       </Section>
     </ScrollView>
   );
@@ -218,4 +250,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   remove: { alignSelf: 'flex-start' },
   removeText: { fontFamily: fonts.sans, fontSize: 12, color: c.danger },
   note: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, lineHeight: 17 },
+  select: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.element, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 11 },
+  selectText: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: c.textHigh },
+  selectPlaceholder: { color: c.muted },
+  selectChev: { fontFamily: fonts.sans, fontSize: 13, color: c.muted, marginLeft: 8 },
+  optBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 28 },
+  optSheet: { backgroundColor: c.canvas, borderRadius: 16, borderWidth: 1, borderColor: c.element, paddingVertical: 10, maxHeight: '70%' },
+  optTitle: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '600', letterSpacing: 1, color: c.muted, paddingHorizontal: 16, paddingVertical: 8, textTransform: 'uppercase' },
+  optRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
+  optText: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: c.textBase },
+  optTextOn: { color: c.emerald, fontWeight: '600' },
+  optCheck: { fontFamily: fonts.sans, fontSize: 15, color: c.emerald, fontWeight: '700' },
 });

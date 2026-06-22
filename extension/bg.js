@@ -8,6 +8,19 @@ importScripts('lib.js');
 const DEFAULTS = { origin: 'http://localhost:8787', token: '' };
 const getCfg = () => new Promise(r => chrome.storage.sync.get(DEFAULTS, r));
 
+// Optional desktop notification (toggle lives in the popup; default on).
+async function notify(message) {
+  try {
+    const { notifyEnabled = true } = await chrome.storage.sync.get({ notifyEnabled: true });
+    if (!notifyEnabled) return;
+    chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icons/icon128.png'), title: 'Reqon Clip', message });
+  } catch (e) { /* notifications optional */ }
+}
+// Re-badge the active tab (after a clip/mark-applied changes its tracked state).
+async function badgeActiveTab() {
+  try { const [t] = await chrome.tabs.query({ active: true, currentWindow: true }); if (t) refreshBadge(t.id, t.url); } catch (e) {}
+}
+
 async function api(path, opts = {}) {
   const cfg = await getCfg();
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -79,26 +92,51 @@ async function runAction(a) {
 }
 
 async function clip(url, title) {
+  let out;
   try {
     const j = await runAction({ kind: 'clip', url, title });
     rowCache.at = 0;   // invalidate — the new row (and its auto-enrichment) should show up
-    return j.duplicate ? { ok: true, msg: 'Already tracked: ' + j.company + ' — ' + j.role }
-                       : { ok: true, msg: 'Added: ' + j.company + ' — ' + j.role + ' (enriching…)' };
+    out = j.duplicate ? { ok: true, msg: 'Already tracked: ' + j.company + ' — ' + j.role }
+                      : { ok: true, msg: 'Added: ' + j.company + ' — ' + j.role + ' (enriching…)' };
   } catch (e) {
     await enqueue({ kind: 'clip', url, title });
-    return { ok: false, msg: 'Server unreachable — clip queued, will retry. (' + e.message + ')' };
+    out = { ok: false, msg: 'Server unreachable — clip queued, will retry. (' + e.message + ')' };
   }
+  notify(out.msg);
+  badgeActiveTab();
+  return out;
 }
 
 async function markApplied(row) {
   const action = { kind: 'markApplied', key: reqKey(row), applied: row.applied || '', hasNext: !!row.next };
+  let out;
   try {
     await runAction(action);
     rowCache.at = 0;
-    return { ok: true, msg: 'Marked Applied (today): ' + row.company + ' — ' + row.role };
+    out = { ok: true, msg: 'Marked Applied (today): ' + row.company + ' — ' + row.role };
   } catch (e) {
     await enqueue(action);
-    return { ok: false, msg: 'Server unreachable — status update queued. (' + e.message + ')' };
+    out = { ok: false, msg: 'Server unreachable — status update queued. (' + e.message + ')' };
+  }
+  notify(out.msg);
+  badgeActiveTab();
+  return out;
+}
+
+// AI draft (Phase 3) — POSTs to /api/assist. Captures the server's JSON error body (daily-cap,
+// no-key, etc.) so the panel can show a real message instead of a bare HTTP code. The server holds
+// the OpenAI key + grounds every draft in the candidate's narratives; never auto-submits.
+async function assist(payload) {
+  const cfg = await getCfg();
+  const headers = { 'Content-Type': 'application/json' };
+  if (cfg.token) headers['X-CRM-Token'] = cfg.token;
+  try {
+    const r = await fetch(cfg.origin.replace(/\/$/, '') + '/api/assist', { method: 'POST', headers, body: JSON.stringify(payload || {}) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || ('HTTP ' + r.status) };
+    return j;
+  } catch (e) {
+    return { ok: false, error: 'Network error reaching CRM (' + (e && e.message ? e.message : e) + ')' };
   }
 }
 
@@ -115,6 +153,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(await clip(msg.url, msg.title));
       } else if (msg.type === 'markApplied') {
         sendResponse(await markApplied(msg.row));
+      } else if (msg.type === 'reqs') {
+        // All rows for the side-panel analytics view (reuses the 60s cache).
+        sendResponse({ ok: true, rows: await getRows(!!msg.force) });
+      } else if (msg.type === 'assist') {
+        sendResponse(await assist(msg.payload));
+      } else if (msg.type === 'assistUsage') {
+        try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'profile') {
         sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
       } else if (msg.type === 'testConnection') {
@@ -128,11 +173,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;   // async sendResponse
 });
 
-// ---- toolbar click = clip the current tab (works on ANY site via activeTab) ----
-chrome.action.onClicked.addListener(async tab => {
-  if (!tab || !tab.url || !/^https?:/.test(tab.url)) return;
-  const r = await clip(tab.url, tab.title || '');
-  chrome.action.setBadgeText({ tabId: tab.id, text: r.ok ? '✓' : '…' });
-  chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: r.ok ? '#69c57e' : '#e0a23c' });
-  setTimeout(() => chrome.action.setBadgeText({ tabId: tab.id, text: '' }), 4000);
-});
+// ---- passive badge: flag whether the page you're on is already tracked ----
+// ✓ green = tracked, not yet applied · ● periwinkle = applied/in-process · × grey = closed · blank = untracked.
+// (Clicking the icon opens the popup — see manifest default_popup — which handles clip / mark-applied.)
+async function refreshBadge(tabId, url) {
+  if (!tabId || !url || !/^https?:/.test(url)) { try { chrome.action.setBadgeText({ tabId, text: '' }); } catch (e) {} return; }
+  try {
+    const rows = await getRows();
+    const row = matchRow(rows, url);
+    let text = '', color = '#00df8f';
+    if (row) {
+      const s = row.status || '';
+      if (/^(Rejected|Archived)$/.test(s)) { text = '×'; color = '#5a6470'; }
+      else if (/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(s)) { text = '●'; color = '#706cff'; }
+      else { text = '✓'; color = '#00df8f'; }
+    }
+    chrome.action.setBadgeText({ tabId, text });
+    if (text) chrome.action.setBadgeBackgroundColor({ tabId, color });
+  } catch (e) {
+    try { chrome.action.setBadgeText({ tabId, text: '' }); } catch (_) {}
+  }
+}
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' && tab && tab.url) refreshBadge(tabId, tab.url); });
+chrome.tabs.onActivated.addListener(async ({ tabId }) => { try { const t = await chrome.tabs.get(tabId); refreshBadge(tabId, t.url); } catch (e) {} });

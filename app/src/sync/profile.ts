@@ -30,6 +30,19 @@ export const EMPTY_PROFILE: Profile = { applicant: {}, education: [], workHistor
 
 export const newAnswerId = (): string => `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
+// Standard EEO / voluntary self-identification answer sets (US, common-ATS phrasing). Drives the
+// app's demographics dropdowns and is mirrored on the board. Race and ethnicity are separate
+// fields per OFCCP convention. Stored for the candidate's reference only — never auto-submitted.
+export const EEO_OPTIONS: Record<keyof Eeo, string[]> = {
+  pronouns: ['He/Him', 'She/Her', 'They/Them', 'Prefer to self-describe', 'Decline to answer'],
+  gender: ['Male', 'Female', 'Non-binary', 'Prefer to self-describe', 'Decline to answer'],
+  race: ['American Indian or Alaska Native', 'Asian', 'Black or African American', 'Native Hawaiian or Other Pacific Islander', 'White', 'Two or More Races', 'Decline to answer'],
+  ethnicity: ['Hispanic or Latino', 'Not Hispanic or Latino', 'Decline to answer'],
+  veteran: ['I am not a protected veteran', 'I identify as one or more of the classifications of a protected veteran', 'Decline to answer'],
+  disability: ['Yes, I have a disability (or previously had one)', 'No, I do not have a disability', 'Decline to answer'],
+  orientation: ['Heterosexual/Straight', 'Gay or Lesbian', 'Bisexual', 'Queer', 'Prefer to self-describe', 'Decline to answer'],
+};
+
 export async function getProfile(): Promise<Profile> {
   const v = await SecureStore.getItemAsync(KEY);
   if (!v) return { ...EMPTY_PROFILE };

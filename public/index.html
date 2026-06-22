@@ -120,6 +120,24 @@
   .scoutsources label{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--text-2);padding:3px 2px;cursor:pointer}
   .scoutsources input{width:14px;height:14px;accent-color:var(--teal)}
   .scoutsources .agg{color:var(--violet)}
+  /* mobile: clamp toolbar menus to the viewport so they never spill off an edge.
+     On phones the absolutely-positioned (right:0 / left:0) menus could render off-screen
+     when the toolbar wraps and the button lands near a screen edge. Below this breakpoint
+     any OPEN menu becomes a full-width bottom sheet (fixed → escapes overflow/transform
+     ancestors, clamped by left/right gutters). Desktop layout is unaffected. */
+  @media (max-width:600px){
+    .scoutmenu.open,
+    .pop.open,
+    .pop.right.open,
+    .pop.menu.open,
+    .pop.filterspop.open,
+    .about-pop.open{
+      position:fixed;left:8px;right:8px;top:auto;bottom:8px;
+      width:auto;min-width:0;max-width:none;
+      max-height:78vh;overflow:auto;z-index:120;
+    }
+    .scoutsources{max-height:32vh}
+  }
   /* source pill on rows */
   .pill.source{color:var(--violet);border-color:#3b3160;background:#1b1730}
   .crow-src{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.04em;color:var(--violet);text-transform:lowercase;white-space:nowrap}
@@ -754,6 +772,18 @@
             <div id="narrativeBox"></div>
             <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
           </div>
+          <div class="field"><label>Demographics (EEO) — voluntary self-identification</label>
+            <p class="hint" style="margin:0 0 8px">Standard self-ID answer sets, synced to the app. Stored privately for your reference — the apply-assist never auto-fills or submits these.</p>
+            <div class="grid2">
+              <div class="field"><label>Pronouns</label><select id="eeoPronouns"></select></div>
+              <div class="field"><label>Gender</label><select id="eeoGender"></select></div>
+              <div class="field"><label>Race</label><select id="eeoRace"></select></div>
+              <div class="field"><label>Ethnicity</label><select id="eeoEthnicity"></select></div>
+              <div class="field"><label>Veteran status</label><select id="eeoVeteran"></select></div>
+              <div class="field"><label>Disability status</label><select id="eeoDisability"></select></div>
+              <div class="field"><label>Sexual orientation</label><select id="eeoOrientation"></select></div>
+            </div>
+          </div>
           <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
         </section>
 
@@ -1166,9 +1196,31 @@ function reqCardHTML(x,i){
       <button class="mini" onclick="editRow(${i})">Edit details</button>
       ${x.link?`<button class="mini" onclick="enrichRow(${i})" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
       <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
+      ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
   </div>`;
+}
+
+// Interview prep guide (auto-built when a role reaches an interview stage; also generatable here).
+const INTERVIEW_STATUSES=["Recruiter Screen","Hiring Manager","Panel","Offer"];
+const guideKey=x=>encodeURIComponent(((x.company||'')+'|'+(x.role||'')).toLowerCase().trim());
+function guideBtnHTML(x,i){
+  if(x.guideAt) return `<button class="mini" onclick="openGuide(${i})" title="Open the AI interview prep guide">📋 Interview guide</button>`;
+  if(INTERVIEW_STATUSES.includes(x.status)) return `<button class="mini" onclick="genGuide(${i})" title="Generate an AI interview prep guide for this role">📋 Generate guide</button>`;
+  return '';
+}
+function openGuide(i){ const x=rows[i]; if(x) window.open('/api/reqs/'+guideKey(x)+'/guide','_blank','noopener'); }
+async function genGuide(i){
+  const x=rows[i]; if(!x) return;
+  const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
+  try{
+    const j=await (await fetch('/api/reqs/'+guideKey(x)+'/guide',{method:'POST'})).json();
+    if(!j.ok) throw new Error(j.error||'failed');
+    x.guideAt=new Date().toISOString();
+    window.open('/api/reqs/'+guideKey(x)+'/guide','_blank','noopener');
+    render();
+  }catch(e){ alert('Could not generate guide: '+e.message); if(btn){ btn.disabled=false; btn.textContent='📋 Generate guide'; } }
 }
 
 // Compact row — EV · company · role · status badge, with a checkbox + expand caret.
@@ -2150,6 +2202,27 @@ fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); appl
 let PROFILE_NARRATIVES=[];
 let PROFILE_KEYWORDS=[]; let KW_REMOVED=new Set();
 let PROFILE_WORK=[]; let PROFILE_EDU=[];
+// Standard EEO self-ID answer sets (must match app/src/sync/profile.ts EEO_OPTIONS).
+const EEO_OPTIONS={
+  pronouns:["He/Him","She/Her","They/Them","Prefer to self-describe","Decline to answer"],
+  gender:["Male","Female","Non-binary","Prefer to self-describe","Decline to answer"],
+  race:["American Indian or Alaska Native","Asian","Black or African American","Native Hawaiian or Other Pacific Islander","White","Two or More Races","Decline to answer"],
+  ethnicity:["Hispanic or Latino","Not Hispanic or Latino","Decline to answer"],
+  veteran:["I am not a protected veteran","I identify as one or more of the classifications of a protected veteran","Decline to answer"],
+  disability:["Yes, I have a disability (or previously had one)","No, I do not have a disability","Decline to answer"],
+  orientation:["Heterosexual/Straight","Gay or Lesbian","Bisexual","Queer","Prefer to self-describe","Decline to answer"],
+};
+const EEO_FIELDS=[["eeoPronouns","pronouns"],["eeoGender","gender"],["eeoRace","race"],["eeoEthnicity","ethnicity"],["eeoVeteran","veteran"],["eeoDisability","disability"],["eeoOrientation","orientation"]];
+function fillEeo(e){
+  e=e||{};
+  EEO_FIELDS.forEach(([id,key])=>{
+    const opts=EEO_OPTIONS[key], val=e[key]||"";
+    const list=["",...opts]; if(val&&!opts.includes(val))list.push(val);   // preserve any legacy/free-text value
+    SET(id).innerHTML=list.map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o?esc(o):"—"}</option>`).join("");
+    SET(id).value=val;
+  });
+}
+function readEeo(){const e={};EEO_FIELDS.forEach(([id,key])=>{e[key]=SET(id).value;});return e;}
 function renderKeywords(){
   const box=SET("profKeywords");
   if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No keywords yet — upload a resume or add one below.</span>';return;}
@@ -2262,6 +2335,7 @@ function fillProfile(p){
   SET("profMeta").textContent=p.generatedFrom?`From ${p.generatedFrom} (${p.generatedAt||"?"}) · ${(p.keywords||[]).length} keywords`:"No resume parsed yet.";
   PROFILE_WORK=(p.workHistory||[]).map(w=>({...w})); renderWorkHistory();
   PROFILE_EDU=(p.education||[]).map(e=>({...e})); renderEducation();
+  fillEeo(p.eeo);
   PROFILE_NARRATIVES=(p.narratives||[]).map(n=>({id:n.id,title:n.title||"",body:n.body||"",tags:(n.tags||[]).join(", ")}));
   renderNarratives();
 }
@@ -2324,7 +2398,8 @@ async function saveProfile(){
     narratives:PROFILE_NARRATIVES.map(n=>({id:n.id,title:n.title,body:n.body,tags:csvList(n.tags)})),
     keywordOverrides:kwOverrides(),
     workHistory:PROFILE_WORK.filter(w=>w.role||w.company),
-    education:PROFILE_EDU.filter(e=>e.school||e.level||e.field)
+    education:PROFILE_EDU.filter(e=>e.school||e.level||e.field),
+    eeo:readEeo()
   };
   SET("profMsg").className="setmsg";SET("profMsg").textContent="Saving…";
   try{const j=await (await fetch("/api/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();

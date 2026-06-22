@@ -1,13 +1,64 @@
-# Job Pipeline CRM
+**Reqon — AI-Assisted Job Search CRM**
 
-A **self-hosted, config-driven job-search CRM** with a deterministic multi-ATS scout and
-optional AI assist. A small Node/Express server serves a dark "command-center" board (plus a
-phone view) and persists every edit to a JSON file on disk — server-backed, survives refreshes
-and reboots. Excel is an on-demand export, never the live database.
+Reqon is a self-hosted, config-driven job-search CRM for managing role discovery, application tracking, recruiter follow-up, screening preparation, and decision support.
 
-Everything is configured from the **Settings** panel in the web UI — no file editing required.
+It combines a deterministic multi-ATS scout, structured pipeline workflows, optional AI assistance, Gmail response ingest, analytics, and companion surfaces across web, iOS/iPad, and Chrome.
 
-## Features
+The product is designed around one core principle: AI should assist the workflow without taking control from the user. Scoring, recommendations, cover notes, and screening answers are reviewable, editable, budget-capped, and never auto-submitted.
+
+**Why I Built This**
+
+Most job searches become scattered across spreadsheets, browser tabs, email threads, saved postings, LinkedIn messages, and personal notes. That creates three problems:
+
+* Good-fit roles are easy to miss.
+* Follow-ups and recruiter responses are easy to drop.
+* Application decisions become inconsistent and hard to prioritize.
+
+Reqon turns that messy workflow into a structured product system: roles are captured, scored, grouped, researched, tracked, and reviewed through a repeatable pipeline.
+
+**Product Preview**
+
+The main command-center board groups opportunities by lifecycle stage, fit, priority, hygiene status, and apply-next queue.
+
+Opportunity detail view with role metadata, scoring, notes, status, follow-up tracking, and decision support.
+
+AI assistance is grounded in the candidate profile and narrative library, with editable outputs and human-in-the-loop review.
+
+**Core Workflows**
+
+* Pipeline management — requisitions grouped into lifecycle tabs: Open, Applied, Interviewing, and Rejected/Archived.
+* Apply-next prioritization — EV-sorted queue based on fit, probability, tier, remote status, and domain alignment.
+* Hygiene lanes — needs-verify, follow-up-due, and closed-req lanes to reduce wasted applications and missed follow-ups.
+* Deterministic scout — polls public ATS board APIs including Greenhouse, Ashby, Lever, Workable, SmartRecruiters, Recruitee, Personio, Teamtailor, and Workday. Works with no API key.
+* Candidate profile — résumé upload extracts weighted keywords, applicant info, role preferences, sector preferences, and reusable narrative content.
+* Optional AI assist — résumé-aware rescoring, cover-note drafting, screening-answer support, and research synthesis. Budget-capped, editable, and never auto-submitted.
+* Analytics — conversion funnel, response rates, offer rates, source performance, and pipeline health.
+* Morning digest — scheduled summary of new finds, follow-ups, and closed roles via Slack, email, or file fallback.
+* Data safety — every save snapshots first, destructive saves are rejected, and Settings supports snapshot/restore and retention.
+* iOS/iPad companion app — React Native / Expo companion for pipeline, Today command center, analytics, candidate profile, and apply-assist workflows.
+* Chrome extension — clips postings, overlays fit signals on job pages, marks roles applied, and fills factual application fields on supported ATS pages.
+* Gmail response ingest — reads recruiter replies, auto-sets confident rejections, and flags interviews/offers for review.
+
+**Product Decisions**
+
+* Built around structured opportunity records instead of freeform notes or a spreadsheet.
+* Used deterministic workflows for discovery, scoring, dedupe, merge, status changes, and safety checks.
+* Kept AI assistance optional, reviewable, and human-controlled.
+* Treated privacy as a product requirement: personal data, résumé files, credentials, and live pipeline data are gitignored.
+* Designed companion surfaces for different jobs: web for command-center management, mobile for quick review, Chrome for capture, and Gmail ingest for pipeline freshness.
+* Prioritized workflow reliability over flashy automation: the system should help make better decisions, not silently act on the user’s behalf.
+
+**What This Demonstrates**
+
+**Reqon reflects how I think about product systems:**
+
+* Turn messy real-world workflows into structured, repeatable processes.
+* Combine product strategy, data modeling, automation, AI assistance, and user control.
+* Use AI to improve decision quality while preserving trust and reviewability.
+* Design for multiple surfaces without simply copying the same experience everywhere.
+* Build practical tools that solve real user problems end-to-end.
+
+## Architecture
 
 - **Pipeline board** — requisitions grouped into lifecycle tabs (Open / Applied / Interviewing /
   Rejected+Archived), a tier accordion, and an EV-sorted "apply-next" queue.
@@ -64,7 +115,7 @@ On macOS you can register auto-start (launchd) with `./install.sh`.
 
 See `.env.example` for every optional variable. The scout details live in `agent/SCOUT.md`.
 
-## The scout
+## Scout
 
 ```bash
 python3 agent/scout.py --dry-run        # preview; writes nothing
@@ -75,7 +126,7 @@ bash tests/run.sh                        # unit tests (stdlib, no deps)
 Add a company without editing JSON: **Settings → Add company by careers URL** (paste a board
 URL; it detects the ATS + slug). Per-source run health is shown in Settings.
 
-## Mobile app & Chrome extension
+## Mobile App & Chrome Extension
 
 **iOS / iPad app** (`app/`, Expo SDK 56) — runs in **Expo Go**, so no Apple Developer account
 or Xcode is needed to use it on your own device:
@@ -97,7 +148,7 @@ options. Then the toolbar button clips the current tab, a fit overlay appears on
 job pages, "Mark Applied" writes the status back, and apply-assist fills factual fields on
 Greenhouse / Ashby / Lever (it never touches EEO, consent, or the submit button).
 
-## Gmail response ingest
+## Gmail Response Ingest
 
 Keeps the board current as recruiters reply — **auto-sets confident rejections** and **flags
 interviews/offers** for review (it never auto-advances a positive; a misread shouldn't move your
@@ -114,7 +165,7 @@ Set it up two ways — both store credentials on the server and run there:
 
 Full guide: [`agent/MAIL.md`](agent/MAIL.md).
 
-## Data & privacy
+## Data & Privacy
 
 `data.json` (your pipeline), `agent/profile.json` (your résumé-derived profile), résumé source
 files, `seed.json`, `agent/found-log.md`, `.env`, and `backups/` are **gitignored** — no personal

@@ -67,7 +67,7 @@ _The mobile companion app — your pipeline on the go, synced to the same self-h
 * Prioritized workflow reliability over flashy automation: the system should help make better decisions, not silently act on the user’s behalf.
 * Made Excel an export path rather than the system of record, preserving structured state, workflow integrity, and auditability.
 
-## What This Demonstrates**
+## What This Demonstrates
 
 **Reqon reflects how I think about product systems:**
 

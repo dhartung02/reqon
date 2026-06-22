@@ -30,6 +30,18 @@ _Opportunity detail view with role metadata, scoring, notes, status, follow-up t
 
 _AI assistance is grounded in the candidate profile and narrative library, with editable outputs and human-in-the-loop review._
 
+![Analytics](docs/images/analytics.png)
+
+_Pipeline analytics — tier mix, status breakdown, applications over time, and expected-value-ranked opportunities to act on next._
+
+![Chrome Extension](docs/images/chrome-extension.png)
+
+_Reqon Clip browser extension — clip postings, see fit/EV inline, autofill standard fields, draft answers, and a board-synced side panel, all writing back to your self-hosted pipeline._
+
+![Mobile Companion](docs/images/mobile-companion.png)
+
+_The mobile companion app — your pipeline on the go, synced to the same self-hosted board._
+
 ## Core Workflows
 
 * Pipeline management — requisitions grouped into lifecycle tabs: Open, Applied, Interviewing, and Rejected/Archived.

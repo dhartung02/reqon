@@ -18,17 +18,29 @@ Reqon turns that messy workflow into a structured product system: roles are capt
 
 ## Product Preview
 
-![Reqon Dashboard](docs/images/dashboard-overview.png)
+<img src="docs/images/dashboard-overview.png" alt="Reqon Dashboard" width="720">
 
 _The main command-center board groups opportunities by lifecycle stage, fit, priority, hygiene status, and apply-next queue._
 
-![Opportunity Detail](docs/images/opportunity-detail.png)
+<img src="docs/images/opportunity-detail.png" alt="Opportunity Detail" width="720">
 
 _Opportunity detail view with role metadata, scoring, notes, status, follow-up tracking, and decision support._
 
-![AI Assist](docs/images/ai-assist.png)
+<img src="docs/images/ai-assist.png" alt="AI Assist" width="720">
 
 _AI assistance is grounded in the candidate profile and narrative library, with editable outputs and human-in-the-loop review._
+
+<img src="docs/images/analytics.png" alt="Analytics" width="720">
+
+_Pipeline analytics — tier mix, status breakdown, applications over time, and expected-value-ranked opportunities to act on next._
+
+<img src="docs/images/chrome-extension.png" alt="Chrome Extension" width="720">
+
+_Reqon Clip browser extension — clip postings, see fit/EV inline, autofill standard fields, draft answers, and a board-synced side panel, all writing back to your self-hosted pipeline._
+
+<img src="docs/images/mobile-companion.png" alt="Mobile Companion" width="300">
+
+_The mobile companion app — your pipeline on the go, synced to the same self-hosted board._
 
 ## Core Workflows
 

@@ -71,6 +71,7 @@ const P = {
   get settings() { return store.paths().settings; },
   get assistUsage() { return store.paths().assistUsage; },
   get assistLog() { return store.paths().assistLog; },
+  get cvCache() { return store.paths().cvCache; },
 };
 // Per-user settings (ROADMAP-V3 PR0): these config keys live in the user's namespace, not shared
 // .env — so each user has their own digest schedule/channels, AI caps/model, Gmail ingest, SMS, etc.
@@ -1467,7 +1468,7 @@ app.post('/api/reqs/:key/guide', async (req, res) => {
 // Assembles a downloadable .docx CV from the candidate's profile. The summary is AI-written when a
 // key is available (grounded in the same facts), else deterministic. Body sections are ALWAYS the
 // real structured fields (work history / education / narratives / awards) — never invented.
-const CV_CACHE = path.join(ROOT, 'agent', 'cv-latest.json');
+// CV cache is tenant-scoped (P.cvCache) so one user's last-built CV never leaks to another.
 
 function cvSections(p) {
   const a = p.applicant || {};
@@ -1570,7 +1571,7 @@ app.post('/api/cv', async (req, res) => {
     const { text: summary, source } = await cvSummary(p, tailor);
     const markdown = cvMarkdown(s, summary);
     const tailoredFor = tailor && (tailor.role || tailor.company) ? [tailor.role, tailor.company].filter(Boolean).join(' at ') : null;
-    try { writeJsonPretty(CV_CACHE, { sections: s, summary, source, tailoredFor, builtAt: new Date().toISOString() }); } catch (e) {}
+    try { writeJsonPretty(P.cvCache, { sections: s, summary, source, tailoredFor, builtAt: new Date().toISOString() }); } catch (e) {}
     res.json({ ok: true, markdown, source, name: s.name, tailoredFor });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
@@ -1614,7 +1615,7 @@ ${s.volunteer.length ? sec('Volunteer', ul(s.volunteer)) : ''}
 
 app.get('/api/cv.html', async (req, res) => {
   try {
-    let cache = readJsonSafe(CV_CACHE, null);
+    let cache = readJsonSafe(P.cvCache, null);
     if (!cache || !cache.sections) { const p = readProfile(); cache = { sections: cvSections(p), summary: (await cvSummary(p)).text }; }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(cvHtml(cache.sections, cache.summary || ''));
@@ -1624,7 +1625,7 @@ app.get('/api/cv.html', async (req, res) => {
 // Stream the CV as a .docx (uses the last POST /api/cv content, else builds fresh).
 app.get('/api/cv.docx', async (req, res) => {
   try {
-    let cache = readJsonSafe(CV_CACHE, null);
+    let cache = readJsonSafe(P.cvCache, null);
     if (!cache || !cache.sections) { const p = readProfile(); cache = { sections: cvSections(p), summary: (await cvSummary(p)).text }; }
     const buf = await cvDocxBuffer(cache.sections, cache.summary || '');
     const safe = (String(cache.sections.name || 'CV').replace(/[^\w .-]/g, '').trim() || 'CV') + ' CV.docx';

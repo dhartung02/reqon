@@ -707,6 +707,8 @@
         <button id="importBtn">Import roles (JSON)…</button>
         <button id="enrichAllBtn">Enrich all leads…</button>
         <div class="pop-sep"></div>
+        <button id="cvBuilderBtn">CV builder…</button>
+        <div class="pop-sep"></div>
         <button id="exportXlsxBtn">Export Excel</button>
         <button id="exportBtn">Export CSV</button>
         <div class="pop-sep"></div>
@@ -849,6 +851,23 @@
     <div class="modalacts">
       <button class="btn ghost" id="assistClose">Close</button>
       <button class="btn" id="assistCopy">Copy draft</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="cvOverlay">
+  <div class="modal">
+    <h2>CV builder</h2>
+    <p class="hint" id="cvCtx">—</p>
+    <p class="setmuted" id="cvProfWarn" style="display:none;color:var(--warning)">No candidate profile yet — the CV will be sparse. Add work history, education, and a résumé in Settings → Candidate profile.</p>
+    <div class="field" id="cvJdWrap" style="display:none"><label>Job description (optional — tailors the summary to this role)</label><textarea id="cvJd" rows="3" placeholder="Paste the JD to tailor the summary; leave blank to use the role title only…"></textarea></div>
+    <div class="ahintrow"><button class="btn" id="cvGenBtn" type="button">Generate CV</button> <span id="cvSrc" class="setmuted"></span></div>
+    <div class="field" style="margin-top:10px"><label>Preview (Markdown — edit-and-export comes from the download buttons)</label><textarea id="cvPreview" rows="13" placeholder="Your CV appears here after Generate…" readonly></textarea></div>
+    <div id="cvMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="cvClose">Close</button>
+      <a id="cvHtmlBtn" class="btn ghost" href="/api/cv.html" target="_blank" rel="noopener" style="display:none">Open print view (PDF)</a>
+      <a id="cvDocxBtn" class="btn" href="/api/cv.docx" style="display:none">Download .docx</a>
     </div>
   </div>
 </div>
@@ -1460,6 +1479,7 @@ function reqCardHTML(x,i){
       <button class="mini" onclick="editRow(${i})">Edit details</button>
       ${x.link?`<button class="mini" onclick="enrichRow(${i})" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
       <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
+      <button class="mini" onclick="openCv(${i})" title="Build a CV tailored to this role (preloads company/role/JD)">📄 Tailored CV</button>
       ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
@@ -3036,6 +3056,41 @@ F("assistGenBtn").onclick=async()=>{
 F("assistCopy").onclick=()=>{const t=F("assistOut").value;if(!t)return;try{navigator.clipboard.writeText(t);}catch(e){}F("assistMsg").className="setmsg ok";F("assistMsg").textContent="Copied.";};
 F("assistClose").onclick=()=>F("assistOverlay").classList.remove("open");
 F("assistOverlay").onclick=e=>{if(e.target.id==="assistOverlay")F("assistOverlay").classList.remove("open");};
+
+// ---------- CV builder (P1.2) — wires the board to /api/cv (+ .docx/.html exports) ----------
+let cvRow=null, cvIdx=-1;
+function openCvModal(){
+  F("cvPreview").value=""; F("cvMsg").textContent=""; F("cvMsg").className="setmsg"; F("cvSrc").textContent="";
+  F("cvDocxBtn").style.display="none"; F("cvHtmlBtn").style.display="none";
+  fetchSettings().then(j=>{F("cvProfWarn").style.display=(j.profile&&(j.profile.hasResume||j.profile.applicantName))?"none":"";}).catch(()=>{});
+  F("cvOverlay").classList.add("open");
+}
+window.openCv=function(i){ const x=rows[i]; if(!x)return; cvRow=x; cvIdx=i;
+  F("cvCtx").textContent="Tailored CV — "+(x.company||"")+" — "+(x.role||"");
+  F("cvJdWrap").style.display=""; F("cvJd").value=(x.notes||"");
+  openCvModal();
+};
+function openCvGeneral(){ cvRow=null; cvIdx=-1; F("cvCtx").textContent="General CV — from your candidate profile"; F("cvJdWrap").style.display="none"; F("cvJd").value=""; openCvModal(); }
+if(F("cvBuilderBtn"))F("cvBuilderBtn").onclick=openCvGeneral;
+F("cvGenBtn").onclick=async()=>{
+  F("cvMsg").className="setmsg"; F("cvMsg").textContent="Generating…"; F("cvGenBtn").disabled=true;
+  try{
+    const body={};
+    if(cvRow)body.tailor={role:cvRow.role||"",company:cvRow.company||"",jd:F("cvJd").value||""};
+    const j=await (await fetch("/api/cv",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    F("cvPreview").value=j.markdown||"";
+    F("cvSrc").textContent=(j.source==="ai"?"summary: AI-written":"summary: from profile")+(j.tailoredFor?` · tailored for ${j.tailoredFor}`:"");
+    // cache-bust the downloads so they reflect THIS build
+    const v="?v="+Date.now(); F("cvDocxBtn").href="/api/cv.docx"+v; F("cvHtmlBtn").href="/api/cv.html"+v;
+    F("cvDocxBtn").style.display=""; F("cvHtmlBtn").style.display="";
+    F("cvMsg").className="setmsg ok"; F("cvMsg").textContent="Ready — download .docx or open the print view to save as PDF.";
+    if(cvRow&&cvIdx>=0){ rows[cvIdx].cvBuiltAt=new Date().toISOString(); rows[cvIdx].cvTailoredFor=j.tailoredFor||null; stampRow(cvIdx); persistNow(); }
+  }catch(e){F("cvMsg").className="setmsg err";F("cvMsg").textContent="Failed: "+e.message;}
+  finally{F("cvGenBtn").disabled=false;}
+};
+F("cvClose").onclick=()=>F("cvOverlay").classList.remove("open");
+F("cvOverlay").onclick=e=>{if(e.target.id==="cvOverlay")F("cvOverlay").classList.remove("open");};
 
 // ---------- morning digest test send (Phase 7) ----------
 if(SET("setSmsMethod"))SET("setSmsMethod").onchange=toggleSmsMethod;

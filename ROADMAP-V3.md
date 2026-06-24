@@ -850,7 +850,19 @@ Generate Screening Draft
 
 ---
 
-## P1.2 — Add CV Builder UI to Web Board
+## P1.2 — Add CV Builder UI to Web Board — ✅ DONE (2026-06-24)
+
+**Shipped.** Two entry points wire the board to the existing CV endpoints:
+- **Overflow menu → CV builder…** — general CV from the candidate profile.
+- **Per-row → 📄 Tailored CV** — preloads company/role and the row's notes as the JD; `POST /api/cv`
+  with a `tailor` object → AI-tailored summary. Stamps `cvBuiltAt`/`cvTailoredFor` on the row.
+- Markdown preview + **Download .docx** (`/api/cv.docx`) + **Open print view (PDF)** (`/api/cv.html`),
+  cache-busted to reflect the latest build. Profile-missing warning shown when sparse.
+- **Multi-user fix:** the CV cache (`cv-latest.json`) is now tenant-scoped (`P.cvCache`) — one user's
+  last-built CV can no longer leak into another user's `.docx`/print download.
+
+Verified e2e: general + tailored generation, real `.docx` stream (Word 2007+, 12.5KB), print-view
+HTML. `data.json` unaffected (row-stamp path tested with persist stubbed).
 
 ### Surface
 

@@ -1051,7 +1051,13 @@ In Role Detail and/or Apply Assist:
 
 ---
 
-## P1.6 — Expand App Analytics
+## P1.6 — Expand App Analytics — ✅ DONE (2026-06-24, pending device pass)
+
+**Shipped (code + jest; needs device pass).** Added a **Pipeline health** banner atop the app
+Analytics screen — band (Good/Fair/At risk) + score, main risk, metric chips (apply-ready · applied
+7d · response · interviewing · follow-ups due · aging 14d+), and recommendations — via a pure
+`src/pipelineHealth.ts` port (offline, reuses `today.ts` helpers; mirrors web P2.6). 3 new jest tests
+(74 total green), tsc clean. *Device pass:* confirm the banner renders above the KPIs.
 
 ### Surface
 

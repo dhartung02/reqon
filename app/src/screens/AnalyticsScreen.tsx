@@ -3,7 +3,10 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { type Role, type Tier } from '../model';
 import { pipelineMetrics } from '../analytics';
+import { pipelineHealth, type HealthBand } from '../pipelineHealth';
 import { useLayout } from '../useLayout';
+
+const bandColor = (b: HealthBand, c: Palette) => (b === 'Good' ? c.emerald : b === 'Fair' ? c.amber : c.danger);
 
 // Pipeline analytics: headline KPIs, application funnel + conversion, and tier distribution.
 // All metrics come from the pure pipelineMetrics() helper.
@@ -20,6 +23,13 @@ export function AnalyticsScreen({
   const { wide } = useLayout();
 
   const m = useMemo(() => pipelineMetrics(roles), [roles]);
+  const health = useMemo(() => pipelineHealth(roles), [roles]);
+  const hm = health.metrics;
+  const healthChips: [string, string | number][] = [
+    ['apply-ready', hm.applyReady], ['applied 7d', hm.appliedLast7],
+    ['response', hm.responseRate != null ? `${hm.responseRate}%` : '—'], ['interviewing', hm.interviewing],
+    ['follow-ups due', hm.followupsOverdue], ['aging 14d+', hm.agingApps],
+  ];
 
   const kpis: { label: string; value: string; accent?: string }[] = [
     { label: 'Total roles', value: String(m.total) },
@@ -40,6 +50,22 @@ export function AnalyticsScreen({
       contentContainerStyle={[styles.scroll, wide && styles.scrollWide]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
     >
+      <View style={styles.health}>
+        <View style={styles.healthTop}>
+          <Text style={[styles.healthBand, { color: bandColor(health.band, c) }]}>Pipeline health: {health.band}</Text>
+          <Text style={styles.healthScore}>{health.score}/100</Text>
+        </View>
+        <Text style={styles.healthRisk}>⚠ {health.mainRisk}</Text>
+        <View style={styles.healthChips}>
+          {healthChips.map(([k, v]) => (
+            <View key={k} style={styles.healthChip}><Text style={styles.healthChipK}>{k} </Text><Text style={styles.healthChipV}>{v}</Text></View>
+          ))}
+        </View>
+        {health.recommendations.slice(0, 3).map((r) => (
+          <Text key={r} style={styles.healthRec}>→ {r}</Text>
+        ))}
+      </View>
+
       <View style={styles.grid}>
         {kpis.map((k) => (
           <View key={k.label} style={[styles.kpi, wide && styles.kpiWide]}>
@@ -101,6 +127,16 @@ export function AnalyticsScreen({
 const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { paddingTop: 16, paddingBottom: 32, gap: 18 },
   scrollWide: { maxWidth: 1040, width: '100%', alignSelf: 'center' },
+  health: { backgroundColor: c.element, borderRadius: 12, padding: 14, gap: 8 },
+  healthTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  healthBand: { fontFamily: fonts.sans, fontSize: 16, fontWeight: '700' },
+  healthScore: { fontFamily: fonts.sans, fontSize: 13, color: c.muted },
+  healthRisk: { fontFamily: fonts.sans, fontSize: 13, color: c.textBase, lineHeight: 19 },
+  healthChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  healthChip: { flexDirection: 'row', backgroundColor: c.canvas, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  healthChipK: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
+  healthChipV: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '700', color: c.textHigh },
+  healthRec: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   kpiWide: { flexBasis: '23%', minWidth: 150 },
   kpi: {

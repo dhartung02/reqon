@@ -308,6 +308,18 @@
   .cc-empty{color:var(--dim);font-size:.82rem;padding:8px 0}
   .crow.cc-flash{animation:ccflash 1.4s ease-out}
   @keyframes ccflash{0%{background:rgba(0,229,163,.22)}100%{background:transparent}}
+  /* per-role timeline (P2.5) */
+  .tl-body{max-height:52vh;overflow:auto;margin:6px 0}
+  .tl-ev{display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  .tl-ev:last-child{border-bottom:0}
+  .tl-rail{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;padding-top:2px}
+  .tl-dot{width:10px;height:10px;border-radius:50%;background:var(--dim)}
+  .tl-dot.you{background:var(--accent)} .tl-dot.scout{background:var(--info)} .tl-dot.ai{background:var(--ai)} .tl-dot.auto{background:var(--text-2)}
+  .tl-main{flex:1;min-width:0}
+  .tl-when{font-size:.72rem;color:var(--dim);font-family:"Spline Sans Mono",ui-monospace,monospace}
+  .tl-label{font-size:.88rem;font-weight:600;margin-top:1px}
+  .tl-detail{font-size:.78rem;color:var(--text-2);margin-top:1px}
+  .tl-actor{font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px}
   .today-banner{background:rgba(105,197,126,.1);border:1px solid #2d5a3a;border-radius:10px;padding:11px 15px;color:var(--positive);font-weight:600;font-size:.9rem}
   .today-foot{color:var(--dim);font-size:.8rem}
   /* last scout run strip + all-clear */
@@ -904,6 +916,17 @@
       <button class="btn ghost" id="cvClose">Close</button>
       <a id="cvHtmlBtn" class="btn ghost" href="/api/cv.html" target="_blank" rel="noopener" style="display:none">Open print view (PDF)</a>
       <a id="cvDocxBtn" class="btn" href="/api/cv.docx" style="display:none">Download .docx</a>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="timelineOverlay">
+  <div class="modal">
+    <h2>Role timeline</h2>
+    <p class="hint" id="tlCtx">—</p>
+    <div id="tlBody" class="tl-body"><div class="setmuted">Loading…</div></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="tlClose">Close</button>
     </div>
   </div>
 </div>
@@ -1591,6 +1614,7 @@ function reqCardHTML(x,i){
       ${x.link?`<button class="mini" onclick="enrichRow(${i})" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
       <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
       <button class="mini" onclick="openCv(${i})" title="Build a CV tailored to this role (preloads company/role/JD)">📄 Tailored CV</button>
+      <button class="mini" onclick="openTimeline(${i})" title="See how this role got here — capture, scoring, status changes">📜 Timeline</button>
       ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
@@ -3221,6 +3245,30 @@ F("cvGenBtn").onclick=async()=>{
 };
 F("cvClose").onclick=()=>F("cvOverlay").classList.remove("open");
 F("cvOverlay").onclick=e=>{if(e.target.id==="cvOverlay")F("cvOverlay").classList.remove("open");};
+
+// ---------- Per-role timeline (P2.5) ----------
+const TL_ICON={captured:'📥',verified:'✅',applied:'📨',interview:'🗣️',guide:'📋',followup:'⏰',score:'📊',rejection:'❌',offer:'🎉',status:'🔄',enriched:'✨',enrich_failed:'⚠️',note:'📝'};
+window.openTimeline=async function(i){
+  const x=rows[i]; if(!x)return;
+  F("tlCtx").textContent=(x.company||"")+" — "+(x.role||"");
+  F("tlBody").innerHTML='<div class="setmuted">Loading…</div>';
+  F("timelineOverlay").classList.add("open");
+  try{
+    const key=((x.company||"")+"|"+(x.role||"")).toLowerCase().trim();
+    const j=await (await fetch("/api/reqs/"+encodeURIComponent(key)+"/timeline",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    if(!j.events.length){F("tlBody").innerHTML='<div class="setmuted" style="padding:10px 2px">No recorded history yet.</div>';return;}
+    F("tlBody").innerHTML=j.events.map(e=>{
+      const when=e.ts.length>10?e.ts.slice(0,16).replace("T"," "):e.ts;
+      return `<div class="tl-ev"><div class="tl-rail"><span class="tl-dot ${esc(e.actor)}"></span></div>`
+        +`<div class="tl-main"><div class="tl-when">${esc(when)}<span class="tl-actor">${esc(e.actor)}</span></div>`
+        +`<div class="tl-label">${TL_ICON[e.type]||'•'} ${esc(e.label)}</div>`
+        +(e.detail?`<div class="tl-detail">${esc(e.detail)}</div>`:'')+`</div></div>`;
+    }).join("");
+  }catch(err){F("tlBody").innerHTML='<div class="setmsg err" style="padding:8px">'+esc(err.message)+'</div>';}
+};
+F("tlClose").onclick=()=>F("timelineOverlay").classList.remove("open");
+F("timelineOverlay").onclick=e=>{if(e.target.id==="timelineOverlay")F("timelineOverlay").classList.remove("open");};
 
 // ---------- morning digest test send (Phase 7) ----------
 if(SET("setSmsMethod"))SET("setSmsMethod").onchange=toggleSmsMethod;

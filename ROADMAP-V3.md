@@ -1635,7 +1635,16 @@ After clipping:
 
 ---
 
-## P2.5 — Per-Role Timeline
+## P2.5 — Per-Role Timeline — ✅ DONE (2026-06-24)
+
+**Shipped.** `GET /api/reqs/:key/timeline` reconstructs a role's history deterministically from its
+own timestamped fields (captured/verified/applied/interview/guide/follow-up) + its enrichment-log
+entries (score / status / conf changes, enrichment pass-fail, notes) via pure `lib/timeline.js`
+(`buildTimeline`, 5 unit tests). Events are newest-first and tagged with an **actor** (you / scout /
+ai / auto) so user actions are distinguishable from automation. Web UI: a **📜 Timeline** button on
+each role card opens a modal with a rail of dated, icon-tagged events. The enrichment + change logs
+are now tenant-scoped (`P.enrichLog` / `P.changeLog`) so timelines never leak across users. Verified
+live (Klaviyo → captured / verified / applied) with no console errors.
 
 ### Surface
 

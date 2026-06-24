@@ -72,6 +72,8 @@ const P = {
   get assistUsage() { return store.paths().assistUsage; },
   get assistLog() { return store.paths().assistLog; },
   get cvCache() { return store.paths().cvCache; },
+  get enrichLog() { return store.paths().enrichLog; },
+  get changeLog() { return store.paths().changeLog; },
 };
 // Per-user settings (ROADMAP-V3 PR0): these config keys live in the user's namespace, not shared
 // .env — so each user has their own digest schedule/channels, AI caps/model, Gmail ingest, SMS, etc.
@@ -186,6 +188,7 @@ const liveRows = rows => rows.filter(r => r && r.deleted !== true);
 const core = require('./core/crm-core');
 const { reqKey, postingId, sameReq, expectedValue, computeTier, DEFAULT_TIER_THRESHOLDS } = core;
 const { computeActionItems } = require('./lib/action-items');   // P2.1 unified action model
+const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role timeline
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -217,11 +220,12 @@ function mergePolicyBlock(row, boards) {
 }
 
 // Append-only enrichment audit log — one JSON object per line. Every change reconstructable.
-const ENRICH_LOG = path.join(ROOT, 'agent', 'enrichment-log.jsonl');
+// Tenant-scoped (P.enrichLog) so one user's role history never bleeds into another's timeline.
 function logEnrichment(entry) {
   try {
-    fs.mkdirSync(path.dirname(ENRICH_LOG), { recursive: true });
-    fs.appendFileSync(ENRICH_LOG, JSON.stringify(entry) + '\n');
+    const f = P.enrichLog;
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.appendFileSync(f, JSON.stringify(entry) + '\n');
   } catch (e) { console.error('[enrich-log]', e.message); }
 }
 
@@ -229,11 +233,11 @@ function logEnrichment(entry) {
 // Append-only board change-log — one JSON object per accepted PUT/restore. Keys + changed
 // field names only (bounded; no full-row dumps), so any edit is reconstructable from the
 // snapshots + this ledger.
-const CHANGE_LOG = path.join(ROOT, 'agent', 'change-log.jsonl');
 function logChange(entry) {
   try {
-    fs.mkdirSync(path.dirname(CHANGE_LOG), { recursive: true });
-    fs.appendFileSync(CHANGE_LOG, JSON.stringify(entry) + '\n');
+    const f = P.changeLog;
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.appendFileSync(f, JSON.stringify(entry) + '\n');
   } catch (e) { console.error('[change-log]', e.message); }
 }
 function ensureBackupDir() { if (!fs.existsSync(P.backups)) fs.mkdirSync(P.backups, { recursive: true }); }
@@ -1953,6 +1957,28 @@ app.get('/api/reqs/needing-enrichment', (req, res) => {
 // diff, writes an append-only audit-log entry, and (if fit/prob changed without an explicit tier)
 // auto-derives tier. Pass result/sourceUrl/note for the log. conf=verified must be set explicitly
 // by the caller — and ONLY when the live posting was confirmed this run.
+// Per-role timeline (P2.5) — "how this role got here", reconstructed from the row's timestamped
+// fields + its enrichment-log entries (tenant-scoped). Read-only, deterministic.
+function enrichEntriesForKey(key) {
+  const out = [];
+  try {
+    const txt = fs.readFileSync(P.enrichLog, 'utf8');
+    for (const line of txt.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      let e; try { e = JSON.parse(line); } catch (_) { continue; }
+      if (e && String(e.key || '').toLowerCase().trim() === key) out.push(e);
+    }
+  } catch (_) { /* no log yet */ }
+  return out;
+}
+app.get('/api/reqs/:key/timeline', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const row = readStore().find(r => reqKey(r) === key);
+  if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
+  const events = buildTimeline(row, enrichEntriesForKey(key));
+  res.json({ ok: true, key, company: row.company, role: row.role, events, count: events.length });
+});
+
 app.patch('/api/reqs/:key', (req, res) => {
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
   const body = req.body || {};

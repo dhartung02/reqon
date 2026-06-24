@@ -709,7 +709,22 @@ User accounts + data separation is the **most cross-cutting change in this roadm
 
 ---
 
-## P0.7 — Admin Console (multi-user operations)
+## P0.7 — Admin Console (multi-user operations) — ✅ DONE (2026-06-24)
+
+**Shipped.** Settings → Admin (admin-only nav). `GET /api/admin/overview` returns server stats
+(uptime, user count, total rows, shared-key 30d tokens, SMTP/shared-key/Node) + per-user rows
+(roles, applied, AI tokens/cost 30d, disk, last scout, key mode, onboarded/disabled). Operations,
+all role-gated and audited to `agent/admin-audit.jsonl` (acting admin + target + action):
+- **Digest / Scout** — `POST /api/admin/users/:id/run {action}` runs in the target's tenant scope.
+- **Caps** — `action:'setCap'` writes `ASSIST_MONTHLY_TOKENS` / `ASSIST_DAILY_CALLS` to the user's
+  settings; `openaiChat()` enforces the rolling-30-day monthly token ceiling.
+- **Restore** — `GET /api/admin/users/:id/backups` lists their snapshots; `action:'restore'`
+  snapshots-first then restores (shared `restoreData()` helper, never blind-overwrites).
+- **Impersonate-for-support** — `POST /api/admin/impersonate/:id` swaps the session cookie to the
+  target + sets a signed `crm_imp` admin marker; `/api/me` exposes `impersonatedBy`; the board shows
+  a return-to-my-account banner; `POST /api/admin/stop-impersonate` restores the admin. Admin routes
+  refuse to act while impersonating (session is the non-admin target).
+- **Key grants / reset / disable / delete** — landed with P0.6's Users panel.
 
 ### Surface
 

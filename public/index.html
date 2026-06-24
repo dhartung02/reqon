@@ -168,6 +168,13 @@
   .chanchips .schip input{width:13px;height:13px;accent-color:var(--teal);flex:none}
   .chanchips .needsetup{color:var(--coral);font-size:.62rem;font-family:"Spline Sans Mono",monospace;margin-left:2px}
   /* in-app notification bell */
+  .adminstats{display:flex;flex-wrap:wrap;gap:8px}
+  .adminstats .astat{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:8px 12px;min-width:80px}
+  .adminstats .ak{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+  .adminstats .av{font-weight:700;font-size:1.05rem;margin-top:2px;color:var(--text)}
+  .userslist .ustat{display:block;font-size:.7rem;color:var(--dim);font-family:"Spline Sans Mono",monospace;margin-top:3px}
+  .userslist .ukey{font-size:.6rem;border-radius:4px;padding:1px 6px;text-transform:uppercase;font-weight:700}
+  .userslist .ukey.shared{background:var(--accent);color:var(--bg)} .userslist .ukey.own{color:var(--teal);border:1px solid var(--teal)} .userslist .ukey.none{color:var(--dim);border:1px solid var(--line-2)}
   .userslist{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;overflow:hidden}
   .userslist .urow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:.84rem;flex-wrap:wrap}
   .userslist .urow:last-child{border-bottom:none}
@@ -847,7 +854,7 @@
         <button data-sect="ai">AI assistant</button>
         <button data-sect="digest">Digest &amp; notifications</button>
         <button data-sect="data">Data safety</button>
-        <button data-sect="users" id="usersNavBtn" style="display:none">Users</button>
+        <button data-sect="users" id="usersNavBtn" style="display:none">Admin</button>
         <button data-sect="advanced">Advanced</button>
       </nav>
       <div class="settings-content" id="settingsContent">
@@ -1106,8 +1113,10 @@
         </section>
 
         <section class="sset" data-sect="users" hidden>
-          <div class="ssh">Users</div>
-          <p class="ssd">Manage who can sign in to this server. Each user gets a fully separate board, profile, settings, and scout. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own under Advanced.</p>
+          <div class="ssh">Admin console</div>
+          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and scout. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
+          <div id="adminServer" class="adminstats"><div class="setmuted" style="padding:8px">loading…</div></div>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px">Users &amp; usage</div>
           <div id="usersList" class="userslist"><div class="setmuted" style="padding:8px">loading…</div></div>
           <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Add a user</div>
           <div class="grid2">
@@ -3113,12 +3122,21 @@ async function checkMe(){
       const chip=F('userChip'); chip.style.display='';
       chip.innerHTML=`${esc(me.user.displayName||me.user.id)}${me.user.role==='admin'?' <span class="urole">admin</span>':''} · <a href="/logout">Log out</a>`;
       if(me.user.role==='admin'){const ub=F('usersNavBtn'); if(ub)ub.style.display='';}
+      if(me.impersonatedBy) showImpBanner(me.user.displayName||me.user.id, me.impersonatedBy);
       if(!me.onboarded){
         const ob=await (await fetch('/api/onboarding',{cache:'no-store'})).json();
         if(ob.needed) F('onboardOverlay').classList.add('open');
       }
     }
   }catch(e){}
+}
+function showImpBanner(who, admin){
+  if(F('impBanner'))return;
+  const b=document.createElement('div'); b.id='impBanner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--warning,#d98a00);color:#1a1a1a;font:600 .8rem "Spline Sans",sans-serif;padding:7px 14px;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+  b.innerHTML='Viewing as <strong style="margin:0 4px">'+esc(who)+'</strong> (impersonated by '+esc(admin)+') — board edits affect this user. <button id="impStop" style="border:1px solid #1a1a1a;background:transparent;border-radius:6px;padding:3px 10px;cursor:pointer;font:inherit">Return to my account</button>';
+  document.body.appendChild(b); document.body.style.paddingTop='34px';
+  F('impStop').onclick=async()=>{ try{await fetch('/api/admin/stop-impersonate',{method:'POST'});}catch(e){} location.reload(); };
 }
 F('obResumeBtn').onclick=async()=>{
   const f=F('obResume').files[0]; const msg=F('obResumeMsg');
@@ -3148,18 +3166,27 @@ F('obSkip').onclick=()=>completeOnboarding(false);
 checkMe();
 
 // ---- Settings → Users (admin) ----
-async function loadUsers(){
-  const box=SET('usersList'); if(!box)return;
+const _kfmt=n=>{n=+n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1)+'k':String(n);};
+async function loadUsers(){   // admin console: server stats + per-user usage + management
+  const box=SET('usersList'), srv=SET('adminServer'); if(!box)return;
   try{
-    const j=await (await fetch('/api/users',{cache:'no-store'})).json();
+    const j=await (await fetch('/api/admin/overview',{cache:'no-store'})).json();
     if(!j.ok){box.innerHTML='<div class="setmsg err" style="padding:8px">'+esc(j.error||'failed')+'</div>';return;}
-    box.innerHTML=(j.users||[]).map(u=>`<div class="urow" data-uid="${esc(u.id)}">`
-      +`<span class="uname">${esc(u.displayName||u.id)} <span class="uid">@${esc(u.id)}</span>${u.email?` <span class="uid">${esc(u.email)}</span>`:''} ${u.role==='admin'?'<span class="urole">admin</span>':''}${u.disabled?' <span class="udis">disabled</span>':''}</span>`
-      +`<span class="uacts"><label title="Use the server's shared AI key (you fund it)"><input type="checkbox" class="u-shared" ${u.useSharedKey?'checked':''}> shared key</label>`
-      +`<button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`).join('')
+    const s=j.server||{}; const up=s.uptimeSec||0; const upStr=up>86400?Math.floor(up/86400)+'d':up>3600?Math.floor(up/3600)+'h':Math.floor(up/60)+'m';
+    if(srv)srv.innerHTML=[['Users',s.userCount],['Total roles',(s.totalRows||0).toLocaleString()],['Uptime',upStr],
+      ['Shared-key 30d',_kfmt(s.shared30dTokens)+' tok'],['SMTP',s.smtpConfigured?'✓':'—'],['Shared key',s.sharedKeySet?'✓':'—'],['Node',esc(s.node||'')]]
+      .map(([k,v])=>`<div class="astat"><div class="ak">${k}</div><div class="av">${v}</div></div>`).join('');
+    box.innerHTML=(j.users||[]).map(u=>{
+      const key=u.useSharedKey?'<span class="ukey shared">shared</span>':(u.keyOwn?'<span class="ukey own">own key</span>':'<span class="ukey none">no key</span>');
+      const cost=u.ai30dCost!=null?'$'+u.ai30dCost:'—';
+      return `<div class="urow" data-uid="${esc(u.id)}">`
+      +`<span class="uname">${esc(u.displayName||u.id)} <span class="uid">@${esc(u.id)}</span>${u.email?` <span class="uid">${esc(u.email)}</span>`:''} ${u.role==='admin'?'<span class="urole">admin</span>':''}${u.disabled?' <span class="udis">disabled</span>':''}${u.onboarded?'':' <span class="udis" style="color:var(--warning);border-color:var(--warning)">onboarding</span>'}`
+      +`<span class="ustat">${u.rows} roles · ${u.applied} applied · AI ${_kfmt(u.ai30dTokens)} tok/30d (${cost}) · ${u.diskKB}KB · scout ${u.lastScout?relWhen(u.lastScout):'never'}</span></span>`
+      +`<span class="uacts">${key}<label title="Use the server's shared AI key (you fund it)"><input type="checkbox" class="u-shared" ${u.useSharedKey?'checked':''}> shared</label>`
+      +`<button class="mini" data-act="scout" title="Run a scout for this user now">Scout</button><button class="mini" data-act="digest" title="Send this user's digest now">Digest</button><button class="mini" data-act="cap" title="Set this user's AI usage caps">Caps</button><button class="mini" data-act="restore" title="Restore one of this user's snapshots">Restore</button><button class="mini" data-act="imp" title="Sign in as this user for support">Impersonate</button><button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`;}).join('')
       ||'<div class="setmuted" style="padding:8px">No users yet.</div>';
     box.querySelectorAll('.urow').forEach(row=>{const uid=row.dataset.uid;
-      row.querySelector('.u-shared').onchange=e=>patchUser(uid,{useSharedKey:e.target.checked});
+      row.querySelector('.u-shared').onchange=e=>{patchUser(uid,{useSharedKey:e.target.checked}).then(loadUsers);};
       row.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>userAct(uid,b.dataset.act,row));});
   }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">'+esc(e.message)+'</div>';}
 }
@@ -3167,7 +3194,20 @@ async function patchUser(uid,patch){ try{await fetch('/api/users/'+encodeURIComp
 async function userAct(uid,act,row){
   if(act==='del'){ if(!confirm('Delete user "'+uid+'"? Their data namespace stays on disk and can be removed manually.'))return; await fetch('/api/users/'+encodeURIComponent(uid),{method:'DELETE'}); loadUsers(); return; }
   if(act==='toggle'){ await patchUser(uid,{disabled:!row.querySelector('.udis')}); loadUsers(); return; }
-  if(act==='reset'){ const pw=prompt('New temporary password for "'+uid+'" (≥8 chars):'); if(!pw)return; await patchUser(uid,{password:pw}); SET('usersMsg').className='setmsg ok'; SET('usersMsg').textContent='Password reset for '+uid+'.'; }
+  if(act==='reset'){ const pw=prompt('New temporary password for "'+uid+'" (≥8 chars):'); if(!pw)return; await patchUser(uid,{password:pw}); SET('usersMsg').className='setmsg ok'; SET('usersMsg').textContent='Password reset for '+uid+'.'; return; }
+  const run=async(payload,verb)=>{ SET('usersMsg').className='setmsg'; SET('usersMsg').textContent=verb+' '+uid+'…'; try{const r=await (await fetch('/api/admin/users/'+encodeURIComponent(uid)+'/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json(); SET('usersMsg').className=r.ok?'setmsg ok':'setmsg err'; SET('usersMsg').textContent=r.ok?(verb+' done for '+uid+'.'):('Failed: '+(r.error||'?')); loadUsers(); return r;}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} };
+  if(act==='digest'){ await run({action:'digest'},'Sending digest for'); return; }
+  if(act==='scout'){ if(!confirm('Run a scout now for "'+uid+'"? It searches the boards and appends new matches to their pipeline.'))return; await run({action:'scout'},'Scouting for'); return; }
+  if(act==='cap'){ const mt=prompt('Monthly AI token cap for "'+uid+'" (0 = unlimited):','0'); if(mt===null)return; const dc=prompt('Daily AI call cap for "'+uid+'" (0 = use server default):','0'); if(dc===null)return; await run({action:'setCap',monthlyTokens:mt,dailyCalls:dc},'Setting caps for'); return; }
+  if(act==='imp'){ if(!confirm('Sign in as "'+uid+'" for support? Your admin session is preserved and you can return via the banner. This is audited.'))return; try{const r=await (await fetch('/api/admin/impersonate/'+encodeURIComponent(uid),{method:'POST'})).json(); if(r.ok)location.reload(); else{SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+(r.error||'?');}}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} return; }
+  if(act==='restore'){
+    let list; try{ list=(await (await fetch('/api/admin/users/'+encodeURIComponent(uid)+'/backups')).json()).backups||[]; }catch(e){ list=[]; }
+    if(!list.length){ alert('No snapshots found for '+uid+'.'); return; }
+    const menu=list.slice(0,12).map((b,i)=>i+1+') '+b.name+' ('+relWhen(b.mtime)+', '+b.kind+')').join('\n');
+    const pick=prompt('Restore which snapshot for "'+uid+'"? Their current board is snapshotted first.\n\n'+menu+'\n\nEnter a number:'); if(!pick)return;
+    const idx=parseInt(pick,10)-1; if(isNaN(idx)||!list[idx]){alert('Invalid choice.');return;}
+    await run({action:'restore',file:list[idx].name},'Restoring '+list[idx].name+' for'); return;
+  }
 }
 if(SET('nuAddBtn'))SET('nuAddBtn').onclick=async()=>{
   const body={username:SET('nuUser').value.trim(),displayName:SET('nuName').value.trim(),email:SET('nuEmail').value.trim(),password:SET('nuPass').value,role:SET('nuRole').value,useSharedKey:SET('nuShared').checked,sendWelcome:SET('nuWelcome').checked};

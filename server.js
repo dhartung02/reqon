@@ -78,7 +78,7 @@ const P = {
 // aggregator keys, APNs). Owner / single-user always read .env (unchanged).
 const PER_USER_CFG = new Set([
   'DIGEST_ENABLED', 'DIGEST_TIME', 'DIGEST_CHANNEL', 'DIGEST_CHANNELS', 'DIGEST_DAYS', 'DIGEST_AFTER_SCOUT', 'DIGEST_TO', 'DIGEST_SLACK_WEBHOOK',
-  'ASSIST_ENABLED', 'ASSIST_MODEL', 'ASSIST_DAILY_CALLS', 'ASSIST_MAX_TOKENS', 'ASSIST_MONTHLY_BUDGET',
+  'ASSIST_ENABLED', 'ASSIST_MODEL', 'ASSIST_DAILY_CALLS', 'ASSIST_MAX_TOKENS', 'ASSIST_MONTHLY_BUDGET', 'ASSIST_MONTHLY_TOKENS',
   'OPENAI_MODEL', 'OPENAI_JD_CHARS', 'OPENAI_MAX_TOKENS', 'OPENAI_PRICE_PER_1M', 'AI_ENRICH_MAX_PER_RUN', 'AI_ENRICH_TTL_DAYS',
   'GMAIL_USER', 'GMAIL_APP_PASSWORD', 'GMAIL_LABEL', 'MAIL_AI', 'MAIL_SINCE_DAYS',
   'MAIL_NOTIFY_REJECTION', 'MAIL_NOTIFY_INTERVIEW', 'MAIL_NOTIFY_OFFER', 'MAIL_NOTIFY_CHANNELS',
@@ -344,6 +344,7 @@ app.use((req, res, next) => { const uid = resolveUserId(req); if (MULTIUSER()) s
 // a server restart — auth checks, the login cookie, and the pairing QR all read these.
 let APP_TOKEN = process.env.APP_TOKEN || '';
 const COOKIE = 'crm_auth';
+const IMP_COOKIE = 'crm_imp';                 // admin marker cookie while impersonating a user
 let TOKEN_HASH = APP_TOKEN ? crypto.createHash('sha256').update(APP_TOKEN).digest('hex') : '';
 // Scoped, least-privilege token for automated ingestion (e.g. a ChatGPT Action). It authorizes
 // ONLY append-only writes (POST /api/reqs/merge + /api/reqs/quickadd) — never reads, the profile
@@ -519,7 +520,9 @@ function requireAdmin(req, res, next) {
 app.get('/api/me', (req, res) => {
   if (!MULTIUSER()) return res.json({ ok: true, multiUser: false, user: { id: store.OWNER, displayName: 'Owner', role: 'admin', useSharedKey: true } });
   const u = sessionUser(req); if (!u) return res.status(401).json({ ok: false, error: 'not signed in' });
-  res.json({ ok: true, multiUser: true, user: { id: u.id, username: u.username, displayName: u.displayName, role: u.role, useSharedKey: !!u.useSharedKey }, onboarded: readProfile().onboarded === true });
+  const impId = users.verifySession(parseCookies(req)[IMP_COOKIE]);
+  const imp = impId && users.getById(impId);
+  res.json({ ok: true, multiUser: true, user: { id: u.id, username: u.username, displayName: u.displayName, role: u.role, useSharedKey: !!u.useSharedKey }, onboarded: readProfile().onboarded === true, impersonatedBy: (imp && imp.role === 'admin') ? imp.displayName || imp.username : null });
 });
 app.post('/api/me/password', (req, res) => {
   if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Multi-user is disabled.' });
@@ -549,6 +552,74 @@ app.patch('/api/users/:id', requireAdmin, (req, res) => {
 app.delete('/api/users/:id', requireAdmin, (req, res) => {
   const me = sessionUser(req); if (me && me.id === req.params.id) return res.status(400).json({ ok: false, error: "can't delete yourself" });
   res.json({ ok: users.remove(req.params.id) });
+});
+// Admin console (P0.7): per-user usage + server stats. Each user's numbers are read inside their
+// own tenant context so the per-user namespaces stay the source of truth.
+function dirSizeBytes(d) { let n = 0; try { for (const f of fs.readdirSync(d)) { const fp = path.join(d, f); const st = fs.statSync(fp); n += st.isDirectory() ? dirSizeBytes(fp) : st.size; } } catch (e) {} return n; }
+app.get('/api/admin/overview', requireAdmin, (req, res) => {
+  const rows = users.list().map(u => store.runAs(u.id, () => {
+    const live = liveRows(readStore());
+    const today = assistUsage(); const w30 = assistWindowStats(30); const rate = assistRatePer1M();
+    const ss = readJsonSafe(P.scoutStatus, {}); const ds = readJsonSafe(P.digestState, {});
+    let backups = 0; try { backups = fs.readdirSync(P.backups).filter(f => /^data\./.test(f)).length; } catch (e) {}
+    return { id: u.id, displayName: u.displayName, email: u.email, role: u.role, disabled: u.disabled,
+      onboarded: readProfile().onboarded === true, useSharedKey: u.useSharedKey, keyOwn: !u.useSharedKey && !!(store.readJson(P.secrets, {}).OPENAI_API_KEY),
+      rows: live.length, applied: live.filter(r => r.status && r.status !== 'Not Applied').length,
+      aiToday: { calls: today.calls || 0, tokens: today.tokens || 0 }, ai30dTokens: w30.tokens, ai30dCost: estCost(w30.tokens, rate),
+      lastScout: ss.finishedAt || ss.startedAt || null, lastDigest: ds.lastSent || null,
+      diskKB: Math.round(dirSizeBytes(store.pathsFor(u.id).dir) / 1024), backups };
+  }));
+  const server = { uptimeSec: Math.round(process.uptime()), node: process.version, userCount: rows.length,
+    totalRows: rows.reduce((s, u) => s + u.rows, 0), shared30dTokens: rows.filter(u => u.useSharedKey).reduce((s, u) => s + u.ai30dTokens, 0),
+    sharedKeySet: !!process.env.OPENAI_API_KEY, smtpConfigured: emailConfigured(), publicUrl: (process.env.PUBLIC_URL || '').trim() || null };
+  res.json({ ok: true, server, users: rows });
+});
+// Append-only admin audit log (server-level): who did what to whom.
+const ADMIN_AUDIT = path.join(ROOT, 'agent', 'admin-audit.jsonl');
+function logAdminAudit(entry) { try { fs.mkdirSync(path.dirname(ADMIN_AUDIT), { recursive: true }); fs.appendFileSync(ADMIN_AUDIT, JSON.stringify({ ts: nowIso(), ...entry }) + '\n'); } catch (e) {} }
+// List a user's snapshots (admin restore picker).
+app.get('/api/admin/users/:id/backups', requireAdmin, (req, res) => {
+  const u = users.getById(req.params.id); if (!u) return res.status(404).json({ ok: false, error: 'no such user' });
+  const list = store.runAs(u.id, () => {
+    try { return fs.readdirSync(P.backups).filter(f => /^data\..*\.json$/.test(f)).map(f => { const st = fs.statSync(path.join(P.backups, f)); return { name: f, mtime: st.mtimeMs, kind: backupKind(f) }; }).sort((a, b) => b.mtime - a.mtime).slice(0, 50); } catch (e) { return []; }
+  });
+  res.json({ ok: true, backups: list });
+});
+// Admin-triggered per-user actions, all audited. Supports: digest, scout, restore, setCap.
+app.post('/api/admin/users/:id/run', requireAdmin, (req, res) => {
+  const u = users.getById(req.params.id); if (!u) return res.status(404).json({ ok: false, error: 'no such user' });
+  const b = req.body || {}; const action = b.action; const adminId = (sessionUser(req) || {}).id;
+  logAdminAudit({ admin: adminId, target: u.id, action });
+  if (action === 'digest') { store.runAs(u.id, () => composeDigestAndDeliver()); return res.json({ ok: true, started: 'digest', user: u.id }); }
+  if (action === 'scout') { const r = store.runAs(u.id, () => triggerScout('both', '')); return res.status(r.status || 200).json({ ...r, user: u.id }); }
+  if (action === 'restore') { const r = store.runAs(u.id, () => restoreData(b.file)); return res.status(r.status || 200).json({ ...r, user: u.id }); }
+  if (action === 'setCap') {
+    const upd = {};
+    if (b.monthlyTokens != null) upd.ASSIST_MONTHLY_TOKENS = String(Math.max(0, parseInt(b.monthlyTokens, 10) || 0));
+    if (b.dailyCalls != null) upd.ASSIST_DAILY_CALLS = String(Math.max(0, Math.min(1000, parseInt(b.dailyCalls, 10) || 0)));
+    store.runAs(u.id, () => setUserCfg(upd));
+    return res.json({ ok: true, user: u.id, caps: upd });
+  }
+  return res.status(400).json({ ok: false, error: 'unknown action (digest|scout|restore|setCap)' });
+});
+// Impersonate-for-support: an admin assumes a user's session (audited), with a marker cookie so they
+// can return to their own account. Signed sessions are stateless, so we re-derive both sides by id.
+app.post('/api/admin/impersonate/:id', requireAdmin, (req, res) => {
+  const target = users.getById(req.params.id); if (!target) return res.status(404).json({ ok: false, error: 'no such user' });
+  const admin = sessionUser(req);
+  logAdminAudit({ admin: admin.id, target: target.id, action: 'impersonate-start' });
+  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000']; if (secureReq(req)) flags.push('Secure');
+  res.setHeader('Set-Cookie', [`${COOKIE}=${users.makeSession(target.id)}; ${flags.join('; ')}`, `${IMP_COOKIE}=${users.makeSession(admin.id)}; ${flags.join('; ')}`]);
+  res.json({ ok: true, impersonating: target.id, asAdmin: admin.id });
+});
+app.post('/api/admin/stop-impersonate', (req, res) => {
+  const adminId = users.verifySession(parseCookies(req)[IMP_COOKIE]);
+  const admin = adminId && users.getById(adminId);
+  if (!admin || admin.role !== 'admin') return res.status(400).json({ ok: false, error: 'not impersonating' });
+  logAdminAudit({ admin: admin.id, target: store.currentUser(), action: 'impersonate-stop' });
+  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000']; if (secureReq(req)) flags.push('Secure');
+  res.setHeader('Set-Cookie', [`${COOKIE}=${users.makeSession(admin.id)}; ${flags.join('; ')}`, `${IMP_COOKIE}=; HttpOnly; Path=/; Max-Age=0`]);
+  res.json({ ok: true, restored: admin.id });
 });
 // Onboarding (Q2): brand-new users answer a couple of prompts; we save their search terms + mark
 // them onboarded so their first board view is relevant. Résumé upload reuses /api/profile/resume;
@@ -1024,6 +1095,9 @@ async function chatCompletions(base, key, { model, system, user, maxTokens, temp
 async function openaiChat({ model, system, user, maxTokens, tools, toolChoice, temperature }) {
   const key = aiKey();
   if (!key) throw new Error('no OPENAI_API_KEY');
+  // Per-user monthly token cap (admin-settable). 0/unset = no cap. Enforced at the single AI chokepoint.
+  const cap = parseInt(cfg('ASSIST_MONTHLY_TOKENS'), 10) || 0;
+  if (cap > 0 && assistWindowStats(30).tokens >= cap) throw new Error(`Monthly AI token cap reached (${cap.toLocaleString()}). Ask your admin to raise it.`);
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
   const temp = temperature != null ? temperature : 0.4;
   const usingTools = Array.isArray(tools) && tools.length;
@@ -2355,15 +2429,10 @@ app.post('/api/mail/run', (req, res) => {
   }));
 });
 
-app.post('/api/scout/run', (req, res) => {
-  if (scoutChild) return res.status(409).json({ ok: false, running: true, error: 'A scout run is already in progress.' });
-  const body = req.body || {};
-  const mode = ['find', 'validate', 'both', 'source-backfill'].includes(body.mode) ? body.mode : 'both';
-  // optional source scoping: array or comma string of source names
-  let sources = body.sources;
-  if (Array.isArray(sources)) sources = sources.filter(s => typeof s === 'string' && /^[a-z0-9_-]+$/i.test(s)).join(',');
-  else if (typeof sources === 'string') sources = sources.split(',').map(s => s.trim()).filter(s => /^[a-z0-9_-]+$/i.test(s)).join(',');
-  else sources = '';
+// Start a scout in the CURRENT tenant context (used by /api/scout/run and the admin force-scout op).
+// Returns a result object; the caller responds. Captures the uid so async handlers stay tenant-scoped.
+function triggerScout(mode, sources) {
+  if (scoutChild) return { ok: false, status: 409, running: true, error: 'A scout run is already in progress.' };
   const startedAt = new Date().toISOString();
   scoutMeta = { mode, startedAt, sources: sources || 'all' };
   writeScoutStatus({ state: 'running', phase: 'starting', mode, startedAt, sources: sources || 'all' });
@@ -2384,7 +2453,7 @@ app.post('/api/scout/run', (req, res) => {
   } catch (e) {
     scoutChild = null; scoutMeta = null;
     writeScoutStatus({ state: 'error', mode, error: 'spawn failed: ' + (e.message || e) });
-    return res.status(500).json({ ok: false, error: 'Could not start scout: ' + (e.message || e) });
+    return { ok: false, status: 500, error: 'Could not start scout: ' + (e.message || e) };
   }
   scoutChild = child;
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, SCOUT_TIMEOUT_MS);
@@ -2427,7 +2496,17 @@ app.post('/api/scout/run', (req, res) => {
       } catch (e) {}
     }
   }));
-  res.json({ ok: true, started: true, mode, sources: sources || 'all', llmEnabled: !!aiKey() });
+  return { ok: true, status: 200, started: true, mode, sources: sources || 'all', llmEnabled: !!aiKey() };
+}
+app.post('/api/scout/run', (req, res) => {
+  const body = req.body || {};
+  const mode = ['find', 'validate', 'both', 'source-backfill'].includes(body.mode) ? body.mode : 'both';
+  let sources = body.sources;
+  if (Array.isArray(sources)) sources = sources.filter(s => typeof s === 'string' && /^[a-z0-9_-]+$/i.test(s)).join(',');
+  else if (typeof sources === 'string') sources = sources.split(',').map(s => s.trim()).filter(s => /^[a-z0-9_-]+$/i.test(s)).join(',');
+  else sources = '';
+  const r = triggerScout(mode, sources);
+  res.status(r.status || 200).json(r);
 });
 
 // ---------- settings (sources on/off, keywords, OpenAI key/model) ----------
@@ -3067,13 +3146,14 @@ app.get('/api/backups', (req, res) => {
   }
 });
 
-// Restore a snapshot — snapshots the CURRENT store first, validates the backup, then replaces.
-app.post('/api/restore', (req, res) => {
-  const fp = resolveBackup((req.body || {}).file);
-  if (!fp) return res.status(400).json({ ok: false, error: 'Unknown or invalid backup file.' });
+// Restore a snapshot in the CURRENT tenant — snapshots first, validates, then replaces. Returns a
+// result object so both /api/restore and the admin restore-a-user op can use it.
+function restoreData(file) {
+  const fp = resolveBackup(file);
+  if (!fp) return { ok: false, status: 400, error: 'Unknown or invalid backup file.' };
   let restored;
-  try { restored = JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) { return res.status(400).json({ ok: false, error: 'Backup is not valid JSON.' }); }
-  if (!Array.isArray(restored)) return res.status(400).json({ ok: false, error: 'Backup is not a requisition array.' });
+  try { restored = JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) { return { ok: false, status: 400, error: 'Backup is not valid JSON.' }; }
+  if (!Array.isArray(restored)) return { ok: false, status: 400, error: 'Backup is not a requisition array.' };
   try {
     const before = readStore().length;
     const pre = snapshotData('auto');           // safety snapshot of the about-to-be-replaced state
@@ -3081,11 +3161,10 @@ app.post('/api/restore', (req, res) => {
     pruneAutoBackups();
     const guidesRestored = restoreGuides(path.basename(fp));   // bring back attached guides, if bundled
     logChange({ ts: new Date().toISOString(), action: 'restore', file: path.basename(fp), before, after: restored.length, guidesRestored, preSnapshot: pre });
-    res.json({ ok: true, restored: restored.length, from: path.basename(fp), guidesRestored, preSnapshot: pre });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
+    return { ok: true, status: 200, restored: restored.length, from: path.basename(fp), guidesRestored, preSnapshot: pre };
+  } catch (e) { return { ok: false, status: 500, error: e.message }; }
+}
+app.post('/api/restore', (req, res) => { const r = restoreData((req.body || {}).file); res.status(r.status || 200).json(r); });
 
 // Download a snapshot file (attachment).
 app.get('/api/backups/:file', (req, res) => {

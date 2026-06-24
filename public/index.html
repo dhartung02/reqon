@@ -281,6 +281,33 @@
   .today-card.danger .tc-n{color:var(--danger)} .today-card.active .tc-n{color:var(--active)} .today-card.muted .tc-n{color:var(--dim)}
   .today-card .tc-t{font-weight:600;font-size:.95rem;display:block}
   .today-card .tc-d{color:var(--dim);font-size:.79rem;margin-top:3px;display:block;line-height:1.35}
+  /* command center — "What needs action" (P2.2) */
+  .cmdcenter{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden}
+  .cc-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none}
+  .cc-title{font-weight:700;font-size:.95rem}
+  .cc-counts{display:flex;gap:6px;flex:1}
+  .cc-pill{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:20px}
+  .cc-pill.high{background:rgba(248,113,113,.16);color:var(--danger)}
+  .cc-pill.medium{background:rgba(255,184,0,.14);color:var(--warning)}
+  .cc-pill.low{background:rgba(148,163,184,.14);color:var(--text-2)}
+  .cc-toggle{background:none;border:0;color:var(--dim);font-size:1rem;cursor:pointer;transition:transform .15s}
+  .cmdcenter.collapsed .cc-toggle{transform:rotate(-90deg)}
+  .cmdcenter.collapsed .cc-body{display:none}
+  .cc-body{padding:2px 14px 12px}
+  .cc-sec{margin-top:10px}
+  .cc-sec-h{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 5px;font-weight:700}
+  .cc-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+  .cc-item:hover{background:var(--panel-2);border-color:var(--line)}
+  .cc-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--dim)}
+  .cc-dot.high{background:var(--danger)} .cc-dot.medium{background:var(--warning)} .cc-dot.low{background:var(--info)}
+  .cc-it-main{flex:1;min-width:0}
+  .cc-it-role{display:block;font-size:.84rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cc-it-reason{display:block;font-size:.76rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cc-x{background:none;border:0;color:var(--dim);cursor:pointer;font-size:.95rem;padding:0 4px;flex:0 0 auto}
+  .cc-x:hover{color:var(--danger)}
+  .cc-empty{color:var(--dim);font-size:.82rem;padding:8px 0}
+  .crow.cc-flash{animation:ccflash 1.4s ease-out}
+  @keyframes ccflash{0%{background:rgba(0,229,163,.22)}100%{background:transparent}}
   .today-banner{background:rgba(105,197,126,.1);border:1px solid #2d5a3a;border-radius:10px;padding:11px 15px;color:var(--positive);font-weight:600;font-size:.9rem}
   .today-foot{color:var(--dim);font-size:.8rem}
   /* last scout run strip + all-clear */
@@ -729,6 +756,15 @@
     <span class="selhint"><em>⌘/Ctrl-click</em> a row to toggle it · <em>Shift-click</em> for a range · <em>Select all</em> in a tier header. Opening several tabs needs pop-ups allowed for this site — if only one opens, allow pop-ups and retry.</span>
     <span class="selstatus" id="selStatus"></span>
   </div>
+
+  <section id="cmdCenter" class="cmdcenter" hidden>
+    <div class="cc-head" id="ccHead">
+      <span class="cc-title">⚡ What needs action</span>
+      <span class="cc-counts" id="ccCounts"></span>
+      <button class="cc-toggle" id="ccToggle" title="Collapse / expand">▾</button>
+    </div>
+    <div class="cc-body" id="ccBody"></div>
+  </section>
 
   <div id="board"><div class="loading">▚ loading from server…</div></div>
 
@@ -1420,7 +1456,77 @@ async function load(){
     return;
   }
   render();
+  loadCommandCenter();
 }
+
+// ---- Command center: "What needs action" (P2.2) — consumes GET /api/action-items ----
+const CC_SECTIONS = [
+  { title: 'Needs review', types: ['review_offer', 'review_interview'] },
+  { title: 'Follow-ups due', types: ['follow_up_due'] },
+  { title: 'Apply next', types: ['apply_next'] },
+  { title: 'Lead inbox', types: ['needs_scoring', 'verify_role', 'enrich_failed'] },
+  { title: 'Duplicates', types: ['duplicate_review'] },
+  { title: 'Rejections processed', types: ['review_rejection'] },
+  { title: 'Setup & system', types: ['profile_missing', 'gmail_setup_needed', 'ai_budget_warning', 'scout_error'] },
+];
+const ccDismissed = new Set();   // session-only (no localStorage per project rule); deterministic items recompute on reload
+let ccCollapsed = false;
+async function loadCommandCenter(){
+  const box=document.getElementById('cmdCenter'); if(!box) return;
+  let j; try{ j=await (await fetch('/api/action-items?surface=web',{cache:'no-store'})).json(); }catch(e){ box.hidden=true; return; }
+  if(!j||!j.ok){ box.hidden=true; return; }
+  const items=(j.items||[]).filter(it=>!ccDismissed.has(it.id));
+  if(!items.length){ box.hidden=true; return; }
+  box.hidden=false;
+  box.classList.toggle('collapsed', ccCollapsed);
+  const c=j.counts||{};
+  document.getElementById('ccCounts').innerHTML=['high','medium','low'].filter(k=>c[k]).map(k=>`<span class="cc-pill ${k}">${c[k]} ${k}</span>`).join('');
+  const byType=new Map(); items.forEach(it=>{ if(!byType.has(it.type))byType.set(it.type,[]); byType.get(it.type).push(it); });
+  let html='';
+  for(const sec of CC_SECTIONS){
+    const secItems=sec.types.flatMap(t=>byType.get(t)||[]);
+    if(!secItems.length) continue;
+    html+=`<div class="cc-sec"><p class="cc-sec-h">${esc(sec.title)} · ${secItems.length}</p>`;
+    secItems.slice(0,12).forEach(it=>{
+      const label=it.roleId||it.company?`${esc(it.company||'')}${it.role?' — '+esc(it.role):''}`:'System';
+      html+=`<div class="cc-item" data-id="${esc(it.id)}" data-role="${esc(it.roleId||'')}" data-target="${esc((it.cta&&it.cta.target)||'')}">`
+        +`<span class="cc-dot ${esc(it.severity)}"></span>`
+        +`<span class="cc-it-main"><span class="cc-it-role">${label}</span><span class="cc-it-reason">${esc(it.reason||'')}</span></span>`
+        +`<button class="cc-x" title="Dismiss for this session">✕</button></div>`;
+    });
+    html+='</div>';
+  }
+  const body=document.getElementById('ccBody'); body.innerHTML=html||'<div class="cc-empty">All clear.</div>';
+  body.querySelectorAll('.cc-item').forEach(el=>{
+    el.querySelector('.cc-x').onclick=(e)=>{ e.stopPropagation(); ccDismissed.add(el.dataset.id); loadCommandCenter(); };
+    el.onclick=()=>ccOpenTarget(el.dataset.role, el.dataset.target);
+  });
+}
+function ccOpenTarget(roleId, target){
+  if(roleId){
+    const i=rows.findIndex(r=>r.id===roleId && r.deleted!==true);
+    if(i>=0){
+      // clean slate so the target row is guaranteed visible: use the board's own status→tab mapping
+      // (respects custom tab config), drop all filters/lanes, open every tier.
+      activeTab=tabKeyForStatus(rows[i].status||"Not Applied"); activeLane="all"; recentOnly=false; applyNextOnly=false;
+      ["search","statusFilter","tierFilter","sourceFilter","applyModeFilter"].forEach(id=>{const e=F(id);if(e)e.value="";});
+      ["remoteOnly","activeOnly","notAppliedOnly","applyNextOnly"].forEach(id=>{const e=F(id);if(e)e.checked=false;});
+      tierOpen.A=tierOpen.B=tierOpen.C=true;
+      expanded.add(i); render();
+      setTimeout(()=>{ const el=document.querySelector('.crow[data-i="'+i+'"]'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('cc-flash'); setTimeout(()=>el.classList.remove('cc-flash'),1500); } },80);
+      return;
+    }
+  }
+  if(target&&target.indexOf('settings')===0){ const sect=target.split('/')[1]||'sources'; openSettingsTo(sect); }
+}
+function openSettingsTo(sect){
+  const sb=document.getElementById('settingsBtn'); if(sb)sb.click();
+  setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+sect+'"]'); if(nav)nav.click(); },120);
+}
+(function ccWire(){
+  const head=document.getElementById('ccHead'); if(!head) return;
+  head.onclick=()=>{ ccCollapsed=!ccCollapsed; document.getElementById('cmdCenter').classList.toggle('collapsed', ccCollapsed); };
+})();
 
 const SCLS={"Applied":"st-applied","Recruiter Screen":"st-active","Hiring Manager":"st-active","Panel":"st-active","Offer":"st-offer","Rejected":"st-rejected","Archived":"st-archived"};
 const BADGECLS={"Applied":"applied","Recruiter Screen":"active","Hiring Manager":"active","Panel":"active","Offer":"offer","Rejected":"rejected","Archived":"archived"};

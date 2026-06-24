@@ -1490,7 +1490,20 @@ GET /api/action-items?type=follow_up_due
 
 ---
 
-## P2.2 — Web “What Changed” Command Center
+## P2.2 — Web “What Changed” Command Center — ✅ DONE (2026-06-24)
+
+**Shipped.** A collapsible **⚡ What needs action** panel at the top of the board consumes
+`GET /api/action-items?surface=web` and groups items into sections (Needs review · Follow-ups due ·
+Apply next · Lead inbox · Duplicates · Rejections processed · Setup & system), sorted by priority
+with high/medium/low severity-count pills. Each item shows company — role + the action reason and a
+severity dot; clicking opens the role (uses the board's own `tabKeyForStatus` mapping so the right
+tab — incl. custom tabs — is selected, all tiers expanded, then scroll + flash). Global items
+deep-link into the matching Settings section. Per-item dismiss (session-only, honoring the no-
+localStorage rule — deterministic items recompute on reload) + collapse toggle. Verified live on the
+191-row board; no console errors.
+
+*Deferred:* "new roles / enriched roles" deltas (change-feed, not actionable items) and client-owned
+`queued_sync`/`queued_extension_action` sections — the panel focuses on actionable server-derived items.
 
 ### Surface
 

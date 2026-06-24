@@ -1746,7 +1746,15 @@ Recommended action: run scout and apply to 3 high-EV roles.
 
 ---
 
-## P2.7 — Source Quality Analytics
+## P2.7 — Source Quality Analytics — ✅ DONE (2026-06-24)
+
+**Shipped.** The existing Insights/Source-ATS tables already covered roles/applied/response/reject by
+source; this added a dedicated **Source quality** card on the Analytics tab with the missing
+decision metrics per source: **A/B rate, applied rate, response rate, interview rate, closed/
+unavailable rate, and duplicate count** (rows sharing a company+role). Plus a **manual-capture
+conversion** insight (how roles you clipped/added perform vs scouted). Interview/response use current
+status (a floor, consistent with the funnel caveat). Verified live on the 191-row board (linkedin
+41 roles · 76% A/B · 11% resp · 16 dups; manual: 12 roles, 0% conversion). No console errors.
 
 ### Surface
 

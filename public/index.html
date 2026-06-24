@@ -2135,6 +2135,32 @@ function anBreakdown(rs,keyFn,label){
   return `<div class="an-card"><h3>${label}</h3><table class="an-table"><tr><th>${label}</th><th>Roles</th><th>App</th><th>Resp</th><th>Rej</th><th>Off</th><th>Resp&nbsp;%</th><th>Rej&nbsp;%</th></tr>`+
     out.map(r=>`<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${r.applied}</td><td>${r.resp}</td><td class="${r.rej?'rejcell':''}">${r.rej}</td><td>${r.offer}</td><td>${r.rr}%</td><td class="${r.rjr?'rejcell':''}">${r.rjr}%</td></tr>`).join("")+`</table></div>`;
 }
+// Source quality analytics (P2.7) — per-source rates so the user can decide which sources to
+// enable/disable/prioritize: A/B rate, applied rate, response rate, interview rate, closed/
+// unavailable rate, and duplicate count. Interview/response use current status (a floor, since
+// rejected-after-interview history isn't stored — consistent with the funnel caveat).
+const INTERVIEW_NOW=new Set(["Recruiter Screen","Hiring Manager","Panel","Offer"]);
+function sourceQuality(rs){
+  // duplicate detection: rows sharing company+normalized-role with another live row
+  const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const keyCount={}; rs.forEach(x=>{const k=norm(x.company)+"||"+norm(x.role);keyCount[k]=(keyCount[k]||0)+1;});
+  const g={}; rs.forEach(x=>{const s=rowSource(x);(g[s]=g[s]||[]).push(x);});
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const out=Object.keys(g).map(s=>{
+    const arr=g[s], n=arr.length;
+    const ab=arr.filter(x=>x.tier==="A"||x.tier==="B").length;
+    const applied=arr.filter(x=>x.applied||INTERVIEW_NOW.has(x.status)||x.status==="Rejected").length;
+    const resp=arr.filter(x=>INTERVIEW_NOW.has(x.status)).length;   // reached a recruiter/interview stage (floor)
+    const interviewed=arr.filter(x=>INTERVIEW_NOW.has(x.status)).length;
+    const closed=arr.filter(x=>x.status==="Archived"||x.reqCheck==="closed").length;
+    const dup=arr.filter(x=>keyCount[norm(x.company)+"||"+norm(x.role)]>1).length;
+    return {s,n,abP:pct(ab,n),appP:pct(applied,n),respP:pct(resp,applied),intP:pct(interviewed,applied),closedP:pct(closed,n),dup};
+  }).sort((a,b)=>b.n-a.n);
+  if(!out.length)return "";
+  return `<div class="an-card"><h3>Source quality</h3><table class="an-table"><tr><th>Source</th><th>Roles</th><th>A/B&nbsp;%</th><th>App&nbsp;%</th><th>Resp&nbsp;%</th><th>Int&nbsp;%</th><th>Closed&nbsp;%</th><th>Dup</th></tr>`+
+    out.map(r=>`<tr><td>${esc(r.s)}</td><td>${r.n}</td><td>${r.abP}%</td><td>${r.appP}%</td><td>${r.respP}%</td><td>${r.intP}%</td><td class="${r.closedP?'rejcell':''}">${r.closedP}%</td><td class="${r.dup?'rejcell':''}">${r.dup||''}</td></tr>`).join("")+
+    `</table><p class="an-note" style="margin-top:8px">A/B% = share that scored Tier A/B · Resp/Int% are of applied (current status, a floor) · Closed% = archived or dead postings · Dup = rows sharing a company+role with another. Use this to enable/disable/prioritize sources.</p></div>`;
+}
 // Auto-generated decision-support insights for the Analytics tab (#12).
 function buildInsights(rs,m){
   const out=[];
@@ -2153,6 +2179,15 @@ function buildInsights(rs,m){
   // gated vs fillable mix among applications
   const gatedApplied=rs.filter(x=>m&&applyModeOf(x)==="gated"&&x.status!=="Not Applied").length;
   if(gatedApplied>0)out.push({tone:"",html:`${gatedApplied} of your applications went through <b>gated</b> (login-walled) ATSs — fillable sources are faster to apply through if quality is comparable.`});
+  // manual-capture conversion (P2.7): how the roles YOU clipped/added perform vs scouted
+  const manualSet=new Set(["manual","chrome-ext","mobile","quick-add"]);
+  const manual=rs.filter(x=>manualSet.has((rowSource(x)||"").toLowerCase()));
+  if(manual.length>=3){
+    const mApplied=manual.filter(x=>x.applied||INTERVIEW_NOW.has(x.status)||x.status==="Rejected").length;
+    const mResp=manual.filter(x=>INTERVIEW_NOW.has(x.status)).length;
+    const mAB=manual.filter(x=>x.tier==="A"||x.tier==="B").length;
+    out.push({tone:mResp?"good":"",html:`Manual captures (you clipped/added): <b>${manual.length}</b> roles, ${mAB} Tier A/B, ${mApplied} applied, ${mResp} reached a recruiter — ${mApplied?Math.round(mResp/mApplied*100):0}% conversion.`});
+  }
   // Tier A engagement
   const tierA=rs.filter(x=>x.tier==="A");
   const tierAApplied=tierA.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
@@ -2210,7 +2245,7 @@ function renderAnalytics(f){
   const outcomes=`<div class="an-card"><h3>Application outcomes</h3><div class="an-funnel">`+
     obar("Awaiting reply",oc.awaiting,"neu")+obar("In interview",oc.interview,"act")+obar("Offer",oc.offer,"ok")+obar("Rejected",oc.rejected,"rej")+`</div>`+
     `<p class="an-note" style="margin-top:10px">Current status of your ${ocTotal} application${ocTotal===1?'':'s'} (mutually exclusive). Reject rate: <b style="color:var(--coral)">${m.rejectRate}%</b> of applied · response rate ${m.responseRate}%. Window: ${win}.</p></div>`;
-  const breakdowns=`<div class="an-grid2">`+
+  const breakdowns=`${sourceQuality(rs)}<div class="an-grid2">`+
     anBreakdown(rs,x=>rowSource(x),"Source / ATS")+anBreakdown(rs,x=>x.sector,"Sector")+
     anBreakdown(rs,x=>"Tier "+(x.tier||"?"),"Tier")+anBreakdown(rs,x=>applyModeOf(x),"Apply mode")+`</div>`;
 

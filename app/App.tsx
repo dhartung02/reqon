@@ -143,6 +143,15 @@ function AppInner() {
     return () => { alive = false; };
   }, [serverUrl, syncState.at]);
 
+  // Open a role from a non-pipeline surface (Today action list). Phone: setSelectedId → full-screen
+  // detail. Wide: Today is full-width with no detail pane, so jump to the role's lane (which renders
+  // the master-detail) and select it there. Declared before any early return (Rules of Hooks).
+  const openRole = useCallback((id: string) => {
+    const r = roles.find((x) => x.id === id);
+    setSelectedId(id);
+    if (wide && r) setLane(laneOf(r.status));
+  }, [roles, wide]);
+
   const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
   // Pull-to-refresh: sync (if configured) + re-read the store.
@@ -309,14 +318,6 @@ function AppInner() {
   }
 
   const selected = selectedId ? roles.find((r) => r.id === selectedId) ?? null : null;
-  // Open a role from a non-pipeline surface (Today action list). Phone: setSelectedId → full-screen
-  // detail. Wide: Today is full-width with no detail pane, so jump to the role's lane (which renders
-  // the master-detail) and select it there.
-  const openRole = useCallback((id: string) => {
-    const r = roles.find((x) => x.id === id);
-    setSelectedId(id);
-    if (wide && r) setLane(laneOf(r.status));
-  }, [roles, wide]);
   // Phone: tapping a role pushes a full-screen detail. Wide (iPad): it fills the detail pane instead.
   if (selected && !wide) {
     return (

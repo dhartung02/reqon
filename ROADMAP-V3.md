@@ -1821,7 +1821,19 @@ For applied/interviewing roles, generate:
 
 ---
 
-## P2.9 — Unified Background Job System
+## P2.9 — Unified Background Job System — ✅ DONE (2026-06-24)
+
+**Shipped.** `lib/jobs.js` is a tenant-scoped job registry (`jobs.json` ring of the most recent 50)
+with `create / phase / progress / finish / fail / cancel / onCancel / list / get / counts`. The
+long-running operations now register jobs: **scout** (with a real cancel that kills the child),
+**enrichment** (auto-enrich on capture), **gmail_ingest**, **interview_guide**, **digest**, and
+**backup** — each goes running → succeeded/failed with a result/error, observable without logs. API:
+`GET /api/jobs` (`?type=` / `?active=1`), `GET /api/jobs/:id`, `POST /api/jobs/:id/cancel`, and
+`POST /api/jobs` to dispatch scout/digest/backup. Web: a **Background jobs** modal (overflow menu)
+lists running + recent jobs with status dots, phase/progress, result, and a Cancel button for running
+ones; auto-refreshes every 4s while open. Verified live (scout job → succeeded with added/matches/
+refreshed summary; backups; cancel endpoint). The existing scout-status display is unchanged
+(additive). Jobs isolate per user (tenant-scoped store).
 
 ### Surface
 

@@ -81,3 +81,4 @@ agent/apns-AuthKey.p8
 # Expo build cache / logs
 .expo/
 app/.expo/
+agent/jobs.json

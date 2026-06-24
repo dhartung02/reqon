@@ -191,6 +191,7 @@ const { computeActionItems } = require('./lib/action-items');   // P2.1 unified 
 const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role timeline
 const { computePipelineHealth } = require('./lib/pipeline-health'); // P2.6 pipeline health score
 const { computeFollowup } = require('./lib/followup');           // P2.8 follow-up recommendation
+const jobs = require('./lib/jobs');                              // P2.9 unified background-job registry
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -732,6 +733,32 @@ app.get('/api/action-items', (req, res) => {
     const counts = items.reduce((m, it) => { m[it.severity] = (m[it.severity] || 0) + 1; return m; }, {});
     res.json({ ok: true, items, total: items.length, counts, generatedAt: nowIso() });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// Unified background-job registry (P2.9) — observe scout/enrichment/gmail/guide/digest/backup
+// without reading logs. ?type= / ?active=1 filters.
+app.get('/api/jobs', (req, res) => {
+  const opts = {};
+  if (req.query.type) opts.type = String(req.query.type);
+  if (req.query.active === '1' || req.query.active === 'true') opts.active = true;
+  res.json({ ok: true, jobs: jobs.list(opts), counts: jobs.counts() });
+});
+app.get('/api/jobs/:id', (req, res) => {
+  const j = jobs.get(req.params.id);
+  if (!j) return res.status(404).json({ ok: false, error: 'no such job' });
+  res.json({ ok: true, job: j });
+});
+app.post('/api/jobs/:id/cancel', (req, res) => {
+  const r = jobs.cancel(req.params.id);
+  res.status(r.ok ? 200 : 400).json(r);
+});
+// Trigger a job by type for the dispatchable kinds (others have their own parameterized endpoints).
+app.post('/api/jobs', (req, res) => {
+  const type = String((req.body || {}).type || '');
+  if (type === 'scout') { const r = triggerScout('both', ''); return res.status(r.status || 200).json(r); }
+  if (type === 'digest') { composeDigestAndDeliver(); return res.json({ ok: true, started: 'digest' }); }
+  if (type === 'backup') { const job = jobs.create('backup', { label: 'Manual backup' }); try { const f = snapshotData('manual'); jobs.finish(job.id, { file: f }); return res.json({ ok: true, started: 'backup', file: f }); } catch (e) { jobs.fail(job.id, e.message); return res.status(500).json({ ok: false, error: e.message }); } }
+  return res.status(400).json({ ok: false, error: 'Type not dispatchable here (use the dedicated endpoint): ' + (type || '(none)') });
 });
 
 // Full replace — the board sends its whole state on every debounced save.
@@ -1498,10 +1525,13 @@ app.post('/api/reqs/:key/guide', async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const job = jobs.create('interview_guide', { label: 'Interview guide · ' + key });
   try {
     await buildAndStoreGuide(key);
+    jobs.finish(job.id, { key });
     res.json({ ok: true, key, url: '/api/reqs/' + encodeURIComponent(key) + '/guide' });
   } catch (e) {
+    jobs.fail(job.id, e.message);
     res.status(502).json({ ok: false, error: e.message });
   }
 });
@@ -1947,6 +1977,7 @@ function digestScheduler() {
   } catch (e) { console.error('[digest]', e.message); }
 }
 async function composeDigestAndDeliver() {
+  const job = jobs.create('digest', { label: 'Morning digest' });
   try {
     const payload = composeDigest();
     const r = await deliverDigest(digestChannels(), payload);   // push is now just another channel
@@ -1954,7 +1985,8 @@ async function composeDigestAndDeliver() {
     st.lastSent = new Date().toISOString(); st.lastChannel = r.delivered.join('+'); st.lastCounts = payload.counts;
     writeJsonPretty(P.digestState, st);
     console.log('[digest] delivered:', r.delivered.join(', ') || '(none)', r.errors.length ? 'errors:' + JSON.stringify(r.errors) : '', payload.counts);
-  } catch (e) { console.error('[digest] delivery failed:', e.message); }
+    jobs.finish(job.id, { delivered: r.delivered, counts: payload.counts });
+  } catch (e) { jobs.fail(job.id, e.message); console.error('[digest] delivery failed:', e.message); }
 }
 
 // ---------- enrichment queue (Tier 2 infra) ----------
@@ -2249,21 +2281,24 @@ function applyEnrichedRow(rows, idx, fields) {
 // scored row on its own. Re-reads the store after the (slow) fetch so a concurrent save isn't lost.
 // Never throws; logs to the enrichment audit log.
 async function backgroundEnrich(key) {
+  const job = jobs.create('enrichment', { label: 'Enrich · ' + key });
   try {
     let rows = readStore();
     let idx = rows.findIndex(r => reqKey(r) === key);
-    if (idx < 0) return;
+    if (idx < 0) { jobs.fail(job.id, 'row not found'); return; }
+    jobs.phase(job.id, 'fetching posting', 30);
     const ce = await computeEnrichFields(rows[idx], { score: true });
-    if (!ce) return;
+    if (!ce) { jobs.fail(job.id, 'could not fetch posting'); return; }
     rows = readStore();                                   // re-read post-fetch
     idx = rows.findIndex(r => reqKey(r) === key);
-    if (idx < 0) return;
+    if (idx < 0) { jobs.fail(job.id, 'row removed during enrich'); return; }
     const res = applyEnrichedRow(rows, idx, ce.fields);
     writeStore(rows);
     logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich',
       result: res.action === 'merged' ? 'merged' : 'pass', changes: res.changes,
       note: res.action === 'merged' ? ('resolved to already-tracked ' + res.into + '; duplicate lead removed') : ('auto-enrich on capture' + (ce.scored ? ' + AI score' : '')) });
-  } catch (e) { console.error('[auto-enrich]', e.message); }
+    jobs.finish(job.id, { action: res.action, scored: !!ce.scored });
+  } catch (e) { jobs.fail(job.id, e.message); console.error('[auto-enrich]', e.message); }
 }
 // POST /api/enrich/run  body: {key?: "company|role"} single, or {all:true}/none => all needsEnrichment leads.
 // Full-auth only. Fetches each posting, extracts real fields, optionally AI-scores, audits, snapshots first.
@@ -2474,10 +2509,12 @@ app.post('/api/mail/run', (req, res) => {
   if (cfg('MAIL_AI') === 'true') argv.push('--ai');
   let child, out = '', err = '', done = false;
   const uid = store.currentUser();   // capture tenant for the async exit handler (per-user notifications)
-  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; res.status(status).json(payload); };
+  const job = jobs.create('gmail_ingest', { label: 'Gmail ingest' + (apply ? ' (apply)' : ' (dry-run)') });
+  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
   try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
   catch (e) { return finish(500, { ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
   mailChild = child;
+  jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 90000);
   child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
   child.stderr && child.stderr.on('data', d => { err += d; });
@@ -2510,6 +2547,7 @@ function triggerScout(mode, sources) {
   const startedAt = new Date().toISOString();
   scoutMeta = { mode, startedAt, sources: sources || 'all' };
   writeScoutStatus({ state: 'running', phase: 'starting', mode, startedAt, sources: sources || 'all' });
+  const job = jobs.create('scout', { label: 'Scout · ' + mode + (sources ? ' (' + sources + ')' : ''), meta: { mode, sources: sources || 'all' } });
 
   const argv = [SCOUT_RUNNER, '--mode', mode, '--quiet'];
   if (sources) argv.push('--sources', sources);
@@ -2527,22 +2565,31 @@ function triggerScout(mode, sources) {
   } catch (e) {
     scoutChild = null; scoutMeta = null;
     writeScoutStatus({ state: 'error', mode, error: 'spawn failed: ' + (e.message || e) });
+    jobs.fail(job.id, 'spawn failed: ' + (e.message || e));
     return { ok: false, status: 500, error: 'Could not start scout: ' + (e.message || e) };
   }
   scoutChild = child;
+  jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
+  jobs.phase(job.id, 'searching boards', 10);
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, SCOUT_TIMEOUT_MS);
   if (child.stderr) child.stderr.on('data', d => console.error('[scout]', String(d).trim()));
   child.once('error', (err) => store.runAs(uid, () => {   // e.g. python not found
     clearTimeout(killer); scoutChild = null; scoutMeta = null;
     writeScoutStatus({ state: 'error', mode, error: 'python launch failed: ' + (err.message || err) });
+    jobs.fail(job.id, 'python launch failed: ' + (err.message || err));
     console.error('[scout] launch error:', err.message || err);
   }));
   child.once('exit', (code) => store.runAs(uid, () => {
     clearTimeout(killer); scoutChild = null; scoutMeta = null;
+    let summary = null;
     try {
       const s = JSON.parse(fs.readFileSync(P.scoutStatus, 'utf8'));
       if (s.state === 'running') { s.state = code === 0 ? 'done' : 'error'; if (code !== 0) s.error = 'exited ' + code; writeScoutStatus(s); }
+      summary = { added: (s.find && s.find.added) || 0, matches: (s.find && s.find.newMatches) || 0, refreshed: (s.validate && s.validate.refreshed) || 0 };
     } catch (e) {}
+    // close the job — unless it was already cancelled (kill triggers a non-zero exit)
+    const jb = jobs.get(job.id);
+    if (jb && jb.status === 'running') { code === 0 ? jobs.finish(job.id, summary) : jobs.fail(job.id, 'scout exited ' + code); }
     console.log('[scout] run finished (mode=' + mode + ', code=' + code + ')');
     // WP-0 push hook: notify registered devices when a successful run lands results
     if (code === 0) {
@@ -3201,8 +3248,10 @@ app.post('/api/auth/passphrase', (req, res) => {
 
 // Timestamped, keep-forever snapshot of the current store ("Snapshot now").
 app.post('/api/backup', (req, res) => {
+  const job = jobs.create('backup', { label: 'Manual backup' });
   const file = snapshotData('manual');
-  if (!file) return res.status(500).json({ ok: false, error: 'snapshot failed (no data file?)' });
+  if (!file) { jobs.fail(job.id, 'snapshot failed (no data file?)'); return res.status(500).json({ ok: false, error: 'snapshot failed (no data file?)' }); }
+  jobs.finish(job.id, { file });
   res.json({ ok: true, file });
 });
 

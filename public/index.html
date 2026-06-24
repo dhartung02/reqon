@@ -332,6 +332,20 @@
   .fu-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
   .fu-m{font-size:.72rem;color:var(--text-2);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
   .fu-m b{color:var(--text)}
+  /* background jobs (P2.9) */
+  .jobs-body{max-height:54vh;overflow:auto;margin:6px 0}
+  .job-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  .job-row:last-child{border-bottom:0}
+  .job-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--dim)}
+  .job-dot.running{background:var(--active);animation:jpulse 1.2s ease-in-out infinite}
+  .job-dot.succeeded{background:var(--positive)} .job-dot.failed{background:var(--danger)} .job-dot.cancelled{background:var(--dim)}
+  @keyframes jpulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .job-main{flex:1;min-width:0}
+  .job-label{font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .job-sub{font-size:.74rem;color:var(--text-2)}
+  .job-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .job-cancel{background:none;border:1px solid var(--line);color:var(--text-2);border-radius:6px;font-size:.72rem;padding:3px 8px;cursor:pointer}
+  .job-cancel:hover{border-color:var(--danger);color:var(--danger)}
   .today-banner{background:rgba(105,197,126,.1);border:1px solid #2d5a3a;border-radius:10px;padding:11px 15px;color:var(--positive);font-weight:600;font-size:.9rem}
   .today-foot{color:var(--dim);font-size:.8rem}
   /* last scout run strip + all-clear */
@@ -773,6 +787,7 @@
         <button id="enrichAllBtn">Enrich all leads…</button>
         <div class="pop-sep"></div>
         <button id="cvBuilderBtn">CV builder…</button>
+        <button id="jobsBtn">Background jobs…</button>
         <div class="pop-sep"></div>
         <button id="exportXlsxBtn">Export Excel</button>
         <button id="exportBtn">Export CSV</button>
@@ -953,6 +968,18 @@
     <div id="tlBody" class="tl-body"><div class="setmuted">Loading…</div></div>
     <div class="modalacts">
       <button class="btn ghost" id="tlClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="jobsOverlay">
+  <div class="modal">
+    <h2>Background jobs</h2>
+    <p class="hint">Scout, enrichment, Gmail ingest, guides, digest and backups — running and recent.</p>
+    <div id="jobsBody" class="jobs-body"><div class="setmuted">Loading…</div></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="jobsRefresh">Refresh</button>
+      <button class="btn" id="jobsClose">Close</button>
     </div>
   </div>
 </div>
@@ -3413,6 +3440,31 @@ F("fuSent").onclick=()=>{
 };
 F("fuClose").onclick=()=>F("followupOverlay").classList.remove("open");
 F("followupOverlay").onclick=e=>{if(e.target.id==="followupOverlay")F("followupOverlay").classList.remove("open");};
+
+// ---------- Background jobs (P2.9) ----------
+async function loadJobs(){
+  const box=F("jobsBody"); if(!box)return;
+  try{
+    const j=await (await fetch("/api/jobs",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    if(!j.jobs.length){box.innerHTML='<div class="setmuted" style="padding:10px 2px">No jobs yet. Run a scout, enrich a lead, or generate a guide.</div>';return;}
+    box.innerHTML=j.jobs.map(x=>{
+      const when=(x.finishedAt||x.startedAt||x.createdAt||"").slice(0,16).replace("T"," ");
+      const sub=x.status==="running"?(esc(x.phase||"running")+(x.progress?" · "+x.progress+"%":"")):(x.error?esc(x.error.slice(0,80)):(x.result?Object.entries(x.result).slice(0,3).map(([k,v])=>k+": "+(typeof v==="object"?JSON.stringify(v):v)).join(" · "):when));
+      return `<div class="job-row" data-id="${esc(x.id)}"><span class="job-dot ${esc(x.status)}"></span>`
+        +`<span class="job-main"><span class="job-label">${esc(x.label||x.type)}</span><span class="job-sub">${sub} · ${when}</span></span>`
+        +`<span class="job-status">${esc(x.status)}</span>`
+        +(x.status==="running"?`<button class="job-cancel" data-cancel="${esc(x.id)}">Cancel</button>`:'')+`</div>`;
+    }).join("");
+    box.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=async()=>{await fetch("/api/jobs/"+encodeURIComponent(b.dataset.cancel)+"/cancel",{method:"POST"});loadJobs();});
+  }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">'+esc(e.message)+'</div>';}
+}
+let jobsTimer=null;
+if(F("jobsBtn"))F("jobsBtn").onclick=()=>{F("jobsOverlay").classList.add("open");loadJobs();clearInterval(jobsTimer);jobsTimer=setInterval(loadJobs,4000);};
+F("jobsRefresh").onclick=loadJobs;
+function closeJobs(){F("jobsOverlay").classList.remove("open");clearInterval(jobsTimer);jobsTimer=null;}
+F("jobsClose").onclick=closeJobs;
+F("jobsOverlay").onclick=e=>{if(e.target.id==="jobsOverlay")closeJobs();};
 
 // ---------- morning digest test send (Phase 7) ----------
 if(SET("setSmsMethod"))SET("setSmsMethod").onchange=toggleSmsMethod;

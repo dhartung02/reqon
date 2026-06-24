@@ -1770,7 +1770,16 @@ Web Board, App Analytics
 
 ---
 
-## P2.8 — Follow-Up Recommendation Engine
+## P2.8 — Follow-Up Recommendation Engine — ✅ DONE (2026-06-24)
+
+**Shipped.** `GET /api/reqs/:key/followup` (pure `lib/followup.js`, 5 unit tests) returns a stage-aware
+recommendation for applied/interviewing/offer roles: due state (due/soon/scheduled), suggested
+channel, timing reason, known contact, and suggested date. The message itself is drafted on demand
+via `POST /api/assist {kind:'followup'}` — grounded in narratives, 60–110 words, copy-not-send. Board:
+a **💬 Follow-up** button on applicable role cards opens a modal with the recommendation, an AI
+**Draft message**, **Copy**, and **Mark sent** (sets last-contact = today, never auto-sends). Follow-up
+timing already feeds the unified action queue via P2.1's `follow_up_due`. Verified live (Klaviyo:
+Recruiter Screen, 21 days → Due now, real drafted message); no console errors.
 
 ### Surface
 

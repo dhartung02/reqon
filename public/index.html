@@ -320,6 +320,18 @@
   .tl-label{font-size:.88rem;font-weight:600;margin-top:1px}
   .tl-detail{font-size:.78rem;color:var(--text-2);margin-top:1px}
   .tl-actor{font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px}
+  /* follow-up recommendation (P2.8) */
+  .fu-rec{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+  .fu-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .fu-state{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:20px}
+  .fu-state.due{background:rgba(248,113,113,.16);color:var(--danger)}
+  .fu-state.soon{background:rgba(255,184,0,.14);color:var(--warning)}
+  .fu-state.scheduled{background:rgba(148,163,184,.14);color:var(--text-2)}
+  .fu-headline{font-weight:700;font-size:.95rem}
+  .fu-reason{font-size:.84rem;color:var(--text-2);margin-top:8px;line-height:1.45}
+  .fu-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .fu-m{font-size:.72rem;color:var(--text-2);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+  .fu-m b{color:var(--text)}
   .today-banner{background:rgba(105,197,126,.1);border:1px solid #2d5a3a;border-radius:10px;padding:11px 15px;color:var(--positive);font-weight:600;font-size:.9rem}
   .today-foot{color:var(--dim);font-size:.8rem}
   /* last scout run strip + all-clear */
@@ -941,6 +953,22 @@
     <div id="tlBody" class="tl-body"><div class="setmuted">Loading…</div></div>
     <div class="modalacts">
       <button class="btn ghost" id="tlClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="followupOverlay">
+  <div class="modal">
+    <h2>Follow-up</h2>
+    <p class="hint" id="fuCtx">—</p>
+    <div id="fuRec" class="fu-rec"><div class="setmuted">Loading…</div></div>
+    <div class="field" style="margin-top:10px"><label>Message (AI-drafted — edit before you send; nothing is sent for you)</label><textarea id="fuMsg" rows="7" placeholder="Click “Draft message” to generate a follow-up grounded in your profile…"></textarea></div>
+    <div id="fuStatus" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="fuClose">Close</button>
+      <button class="btn ghost" id="fuDraft">✍ Draft message</button>
+      <button class="btn ghost" id="fuCopy">Copy</button>
+      <button class="btn" id="fuSent">✓ Mark sent</button>
     </div>
   </div>
 </div>
@@ -1649,6 +1677,7 @@ function reqCardHTML(x,i){
       <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
       <button class="mini" onclick="openCv(${i})" title="Build a CV tailored to this role (preloads company/role/JD)">📄 Tailored CV</button>
       <button class="mini" onclick="openTimeline(${i})" title="See how this role got here — capture, scoring, status changes">📜 Timeline</button>
+      ${/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(x.status||'')?`<button class="mini" onclick="openFollowup(${i})" title="Follow-up recommendation + AI-drafted message">💬 Follow-up</button>`:''}
       ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
@@ -3304,6 +3333,51 @@ window.openTimeline=async function(i){
 };
 F("tlClose").onclick=()=>F("timelineOverlay").classList.remove("open");
 F("timelineOverlay").onclick=e=>{if(e.target.id==="timelineOverlay")F("timelineOverlay").classList.remove("open");};
+
+// ---------- Follow-up recommendation + AI message (P2.8) ----------
+let fuRow=null, fuIdx=-1, fuRec=null;
+window.openFollowup=async function(i){
+  const x=rows[i]; if(!x)return; fuRow=x; fuIdx=i; fuRec=null;
+  F("fuCtx").textContent=(x.company||"")+" — "+(x.role||"");
+  F("fuMsg").value=""; F("fuStatus").textContent=""; F("fuStatus").className="setmsg";
+  F("fuRec").innerHTML='<div class="setmuted">Loading…</div>';
+  F("followupOverlay").classList.add("open");
+  try{
+    const key=((x.company||"")+"|"+(x.role||"")).toLowerCase().trim();
+    const j=await (await fetch("/api/reqs/"+encodeURIComponent(key)+"/followup",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    fuRec=j;
+    if(!j.applicable){F("fuRec").innerHTML='<div class="setmuted">'+esc(j.reason||"No follow-up needed.")+'</div>';return;}
+    F("fuRec").innerHTML=`<div class="fu-head"><span class="fu-state ${esc(j.state)}">${j.state==='due'?'Due now':j.state==='soon'?'Due soon':'Scheduled'}</span><span class="fu-headline">${esc(j.headline)}</span></div>`
+      +`<div class="fu-reason">${esc(j.reason)}</div>`
+      +`<div class="fu-meta"><span class="fu-m">channel <b>${esc(j.channel)}</b></span>`
+      +(j.contact?`<span class="fu-m">contact <b>${esc(j.contact)}</b></span>`:'')
+      +`<span class="fu-m">suggested <b>${esc(j.suggestedDate||'—')}</b></span></div>`;
+  }catch(e){F("fuRec").innerHTML='<div class="setmsg err">'+esc(e.message)+'</div>';}
+};
+F("fuDraft").onclick=async()=>{
+  if(!fuRow||!fuRec)return;
+  F("fuStatus").className="setmsg"; F("fuStatus").textContent="Drafting…"; F("fuDraft").disabled=true;
+  try{
+    const key=((fuRow.company||"")+"|"+(fuRow.role||"")).toLowerCase().trim();
+    const j=await (await fetch("/api/assist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,kind:"followup",context:fuRec.reason||"",contact:fuRec.contact||""})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    F("fuMsg").value=j.draft||"";
+    F("fuStatus").className="setmsg ok"; F("fuStatus").textContent=`Draft ready (${j.tokens} tokens). Edit before sending — nothing is sent for you.`;
+  }catch(e){F("fuStatus").className="setmsg err";F("fuStatus").textContent="Failed: "+e.message;}
+  finally{F("fuDraft").disabled=false;}
+};
+F("fuCopy").onclick=()=>{const t=F("fuMsg").value;if(!t)return;try{navigator.clipboard.writeText(t);}catch(e){}F("fuStatus").className="setmsg ok";F("fuStatus").textContent="Copied.";};
+F("fuSent").onclick=()=>{
+  if(fuIdx<0)return;
+  const todayStr=new Date().toISOString().slice(0,10);
+  rows[fuIdx].lastcontact=todayStr;
+  if(!rows[fuIdx].next||/await|follow/i.test(rows[fuIdx].next||"")) rows[fuIdx].next="Sent follow-up "+todayStr+" — await reply";
+  stampRow(fuIdx); persistNow(); render();
+  F("fuStatus").className="setmsg ok"; F("fuStatus").textContent="Marked sent — last contact set to today.";
+};
+F("fuClose").onclick=()=>F("followupOverlay").classList.remove("open");
+F("followupOverlay").onclick=e=>{if(e.target.id==="followupOverlay")F("followupOverlay").classList.remove("open");};
 
 // ---------- morning digest test send (Phase 7) ----------
 if(SET("setSmsMethod"))SET("setSmsMethod").onchange=toggleSmsMethod;

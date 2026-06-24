@@ -190,6 +190,7 @@ const { reqKey, postingId, sameReq, expectedValue, computeTier, DEFAULT_TIER_THR
 const { computeActionItems } = require('./lib/action-items');   // P2.1 unified action model
 const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role timeline
 const { computePipelineHealth } = require('./lib/pipeline-health'); // P2.6 pipeline health score
+const { computeFollowup } = require('./lib/followup');           // P2.8 follow-up recommendation
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -1192,7 +1193,7 @@ app.post('/api/assist', async (req, res) => {
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
   // 'answer' = reusable Q&A draft; 'tailor' = résumé/answer suggestions to close JD keyword gaps.
-  const kind = ['cover', 'screening', 'answer', 'tailor'].includes(b.kind) ? b.kind : 'cover';
+  const kind = ['cover', 'screening', 'answer', 'tailor', 'followup'].includes(b.kind) ? b.kind : 'cover';
   const rows = readStore();
   const row = rows.find(r => reqKey(r) === String(b.key || '').toLowerCase().trim());
   const company = (row && row.company) || b.company || '';
@@ -1215,6 +1216,10 @@ app.post('/api/assist', async (req, res) => {
     user = `Candidate: ${a.name || ''}\n${targetLine}\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n${jd ? `\nJob context:\n${jd}\n` : ''}\nApplication question:\n${b.question || ''}\n\nThe candidate's own keywords / thoughts to build from (incorporate these honestly; do not invent beyond the narratives):\n${keywords || '(none provided)'}\n\nWrite a clear, honest answer (120-180 words) the candidate can reuse, grounded in the narratives and shaped by their keywords. First person, plain.`;
   } else if (kind === 'screening') {
     user = `Candidate: ${a.name || ''}\nTarget: ${role} at ${company}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nScreening question:\n${b.question || ''}\n\nWrite a tight, honest answer (120-180 words) grounded in the narratives.`;
+  } else if (kind === 'followup') {
+    const ctx = String(b.context || '').slice(0, 500);
+    const contact = String(b.contact || '').trim();
+    user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\nRecruiter/contact: ${contact || '(unknown — address generically)'}\n\nSituation: ${ctx || 'Follow up on a job application.'}\n\nCandidate narrative library (use ONLY these facts if you cite anything):\n${narr || '(none provided)'}\n\nWrite a SHORT, warm, professional follow-up message (60-110 words) the candidate can send. Reiterate genuine interest, reference the role, and ask a clear next-steps question. No overclaiming, no flattery, plain first-person. Output the message body only (no subject line, no placeholders like [Name] unless the contact is unknown).`;
   } else if (kind === 'tailor') {
     user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nKeywords the posting emphasizes that the résumé does NOT currently cover:\n${keywords || '(none provided)'}\n\nFor each missing keyword, say ONE of: (a) a concrete, HONEST résumé bullet or phrasing the candidate could add IF their narratives genuinely support it (cite which narrative), or (b) "gap — not supported by your background" when the narratives don't back it. Never fabricate experience. Output a short bulleted list.`;
   } else {
@@ -1984,6 +1989,15 @@ app.get('/api/reqs/:key/timeline', (req, res) => {
   if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
   const events = buildTimeline(row, enrichEntriesForKey(key));
   res.json({ ok: true, key, company: row.company, role: row.role, events, count: events.length });
+});
+
+// Deterministic follow-up recommendation for a role (P2.8) — state/channel/timing/contact. The
+// message itself is drafted on demand via POST /api/assist {kind:'followup'}. Read-only.
+app.get('/api/reqs/:key/followup', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const row = readStore().find(r => reqKey(r) === key);
+  if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
+  res.json({ ok: true, key, ...computeFollowup(row, new Date().toISOString().slice(0, 10)) });
 });
 
 app.patch('/api/reqs/:key', (req, res) => {

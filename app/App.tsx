@@ -339,6 +339,7 @@ function AppInner() {
         onRefresh={onRefresh}
         serverConfigured={!!serverUrl}
         syncState={syncState}
+        onOpenRole={(id) => setSelectedId(id)}
       />
     ) : lane === 'analytics' ? (
       <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />

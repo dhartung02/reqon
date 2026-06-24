@@ -1546,7 +1546,15 @@ Opening the board should immediately answer:
 
 ---
 
-## P2.3 — App Today Uses Unified Action Queue
+## P2.3 — App Today Uses Unified Action Queue — ✅ DONE (2026-06-24, pending device pass)
+
+**Shipped (code + jest; needs an on-device visual pass).** `app/src/actionItems.ts` ports the unified
+action model to the app (pure, offline — derived from the locally-synced rows; reuses the `today.ts`
+predicates), with `computeActions` + `groupActions` into the same sections as the web command center
+(Needs review · Follow-ups due · Apply next · Lead inbox · Duplicates). The Today screen now renders a
+prioritized action list (severity dot · company — role · reason) above the count cards; tapping an item
+opens its role detail (`onOpenRole` → `setSelectedId`). 5 new jest tests (71 total green), tsc clean.
+*Device pass:* confirm layout on the M4 iPad (portrait + landscape).
 
 ### Surface
 

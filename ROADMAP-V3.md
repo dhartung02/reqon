@@ -769,7 +769,21 @@ Settings → Users panel (create/disable/reset/grant) is part of P0.6; this item
 
 ---
 
-## P1.1 — Add AI Score / Tailor / Map-Fields UI to Web Board
+## P1.1 — Add AI Score / Tailor / Map-Fields UI to Web Board — ✅ DONE (2026-06-24)
+
+**Shipped.** The board's AI assistant modal (✍ AI draft on each row) now exposes server-side scoring:
+- **Re-score & explain fit** → `POST /api/assist/score`; renders a current→suggested card
+  (fit/prob/tier) + the AI rationale. *Explain Score is folded into this — the rationale is the
+  explanation, so one call serves both rather than two near-identical buttons.*
+- **Tailor positioning** → `POST /api/assist {kind:'tailor'}` into the editable draft area.
+- **Cover note / Screening draft** — pre-existing, retained.
+- **Apply suggested scores** — confirm-gated; writes fit/prob/tier to the row and appends a dated
+  `[AI score …]` stamp to notes (reviewable audit trail), then persists. No auto-apply, no submit.
+- Shows a "no candidate profile" warning when the profile is empty (drives weak scoring).
+
+**Deferred:** *Map Application Fields* — the board has no live web form to map, so map-fields stays
+an extension-only capability (it scans real form-field signatures). Revisit if a board-side
+"prefill preview" proves useful. Verified e2e against a live OpenAI key; `data.json` unaffected.
 
 ### Surface
 

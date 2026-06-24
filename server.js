@@ -2804,7 +2804,10 @@ function settingsPayload() {
     remote: {
       publicUrl: (process.env.PUBLIC_URL || '').trim(),
       lanUrl: lanBase()
-    }
+    },
+    profile: (() => { const p = readProfile(); const a = p.applicant || {}; return {
+      applicantName: a.name || '', hasResume: !!(p.resumeText || p.resumeFile || (p.keywords || []).length || (p.narratives || []).length)
+    }; })()
   };
 }
 

@@ -823,6 +823,20 @@
   <div class="modal">
     <h2>AI application assistant</h2>
     <p class="hint" id="assistCtx">—</p>
+    <div class="ahintrow" id="assistActions" style="flex-wrap:wrap;gap:6px">
+      <button class="mini" type="button" data-aiact="score" title="AI re-scores fit/prob/tier and explains why — review before applying">⟳ Re-score &amp; explain fit</button>
+      <button class="mini" type="button" data-aiact="tailor" title="AI suggests how to position the candidate for this role">✦ Tailor positioning</button>
+    </div>
+    <p class="setmuted" id="assistProfWarn" style="display:none;color:var(--warning)">No candidate profile yet — scoring/tailoring will be weak. Add one in Settings → Candidate profile.</p>
+    <div id="assistScoreCard" style="display:none;margin:8px 0;padding:10px 12px;border:1px solid var(--line,#2a2a3a);border-radius:10px;background:rgba(112,108,255,.06)">
+      <div style="display:flex;gap:18px;flex-wrap:wrap;font-family:'Spline Sans Mono',monospace;font-size:.82rem">
+        <span>Fit <b id="scNowFit">–</b> → <b id="scNewFit" style="color:var(--accent,#706CFF)">–</b></span>
+        <span>Prob <b id="scNowProb">–</b> → <b id="scNewProb" style="color:var(--accent,#706CFF)">–</b></span>
+        <span>Tier <b id="scNowTier">–</b> → <b id="scNewTier" style="color:var(--accent,#706CFF)">–</b></span>
+      </div>
+      <p id="scRationale" style="margin:8px 0 0;font-size:.86rem;line-height:1.45"></p>
+      <div class="ahintrow" style="margin-top:8px"><button class="btn" id="assistApplyScore" type="button">Apply suggested scores</button> <span class="setmuted" id="assistApplyNote">Saves the rationale to notes too. Nothing is submitted to any employer.</span></div>
+    </div>
     <div class="grid2">
       <div class="field"><label>Draft type</label><select id="assistKind"><option value="cover">Cover note</option><option value="screening">Screening question</option></select></div>
       <div class="field"><label>Model</label><input id="assistModelEcho" type="text" disabled></div>
@@ -2951,17 +2965,57 @@ SET("uploadResumeBtn").onclick=async()=>{
 };
 
 // ---------- AI application assistant (Phase 6) ----------
-let assistRow=null;
+let assistRow=null, assistIdx=-1, lastScore=null;
 window.openAssist=function(i){
-  const x=rows[i]; if(!x)return; assistRow=x;
+  const x=rows[i]; if(!x)return; assistRow=x; assistIdx=i; lastScore=null;
   F("assistCtx").textContent=(x.company||"")+" — "+(x.role||"");
   F("assistOut").value=""; F("assistMsg").textContent=""; F("assistMsg").className="setmsg";
   F("assistQ").value=""; F("assistJd").value=""; F("assistKind").value="cover"; F("assistQWrap").style.display="none";
+  F("assistScoreCard").style.display="none";
   fetchSettings().then(j=>{const as=j.assist||{};F("assistModelEcho").value=as.model||"";
     F("assistUsage").textContent=`Today: ${as.callsToday||0}/${as.dailyCalls||0} calls · ${as.tokensToday||0} tokens`;
+    F("assistProfWarn").style.display=(j.profile&&(j.profile.hasResume||j.profile.applicantName))?"none":"";
     if(as.enabled===false){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Assistant is disabled in Settings.";}
   }).catch(()=>{});
   F("assistOverlay").classList.add("open");
+};
+function assistKey(){return (assistRow.company+"|"+assistRow.role).toLowerCase().trim();}
+// AI score / tailor actions (P1.1) — share the modal; structured score renders a current→suggested card.
+document.getElementById("assistActions").addEventListener("click",async e=>{
+  const btn=e.target.closest("[data-aiact]"); if(!btn||!assistRow)return;
+  const act=btn.dataset.aiact;
+  F("assistMsg").className="setmsg"; F("assistMsg").textContent=act==="score"?"Scoring…":"Tailoring…"; btn.disabled=true;
+  try{
+    if(act==="score"){
+      const j=await (await fetch("/api/assist/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:assistKey(),jd:F("assistJd").value})})).json();
+      if(!j.ok)throw new Error(j.error||"failed");
+      lastScore=j;
+      F("scNowFit").textContent=assistRow.fit; F("scNewFit").textContent=j.fit;
+      F("scNowProb").textContent=assistRow.prob; F("scNewProb").textContent=j.prob;
+      F("scNowTier").textContent=assistRow.tier||"–"; F("scNewTier").textContent=j.tier;
+      F("scRationale").textContent=j.rationale||"";
+      F("assistScoreCard").style.display="";
+      F("assistMsg").className="setmsg ok"; F("assistMsg").textContent=`Suggested (${j.tokens} tokens). Review, then Apply or ignore — nothing changes until you apply.`;
+    }else if(act==="tailor"){
+      const j=await (await fetch("/api/assist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:assistKey(),kind:"tailor",jd:F("assistJd").value})})).json();
+      if(!j.ok)throw new Error(j.error||"failed");
+      F("assistOut").value=j.draft||"";
+      F("assistMsg").className="setmsg ok"; F("assistMsg").textContent=`Positioning ready (${j.tokens} tokens). Edit freely — nothing is submitted.`;
+      if(j.usage)F("assistUsage").textContent=`Today: ${j.usage.calls}/${j.usage.cap||0} calls · ${j.usage.tokens} tokens`;
+    }
+  }catch(err){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Failed: "+err.message;}
+  finally{btn.disabled=false;}
+});
+F("assistApplyScore").onclick=()=>{
+  if(!lastScore||assistIdx<0)return;
+  if(!confirm(`Apply AI scores to ${assistRow.company} — ${assistRow.role}?\n\nFit ${assistRow.fit} → ${lastScore.fit}\nProb ${assistRow.prob} → ${lastScore.prob}\nTier ${assistRow.tier||"–"} → ${lastScore.tier}`))return;
+  const r=rows[assistIdx];
+  r.fit=lastScore.fit; r.prob=lastScore.prob; r.tier=lastScore.tier;
+  const stamp=`[AI score ${new Date().toISOString().slice(0,10)}] fit ${lastScore.fit} · prob ${lastScore.prob} · ${lastScore.tier}: ${lastScore.rationale||""}`.trim();
+  r.notes=(r.notes?r.notes+"\n":"")+stamp;
+  stampRow(assistIdx); persistNow(); render();
+  F("assistMsg").className="setmsg ok"; F("assistMsg").textContent="Applied — scores updated and rationale saved to notes.";
+  F("assistScoreCard").style.display="none";
 };
 F("assistKind").onchange=()=>{F("assistQWrap").style.display=F("assistKind").value==="screening"?"":"none";};
 F("assistGenBtn").onclick=async()=>{

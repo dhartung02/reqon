@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { rolesInLane, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
+import { rolesInLane, laneOf, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
 import { todayActionCount } from './src/today';
 import { fonts, useThemedStyles, useScheme, ThemeProvider, type Palette } from './src/theme';
 import { useRoles } from './src/store/useRoles';
@@ -309,6 +309,14 @@ function AppInner() {
   }
 
   const selected = selectedId ? roles.find((r) => r.id === selectedId) ?? null : null;
+  // Open a role from a non-pipeline surface (Today action list). Phone: setSelectedId → full-screen
+  // detail. Wide: Today is full-width with no detail pane, so jump to the role's lane (which renders
+  // the master-detail) and select it there.
+  const openRole = useCallback((id: string) => {
+    const r = roles.find((x) => x.id === id);
+    setSelectedId(id);
+    if (wide && r) setLane(laneOf(r.status));
+  }, [roles, wide]);
   // Phone: tapping a role pushes a full-screen detail. Wide (iPad): it fills the detail pane instead.
   if (selected && !wide) {
     return (
@@ -351,7 +359,7 @@ function AppInner() {
         onRefresh={onRefresh}
         serverConfigured={!!serverUrl}
         syncState={syncState}
-        onOpenRole={(id) => setSelectedId(id)}
+        onOpenRole={openRole}
       />
     ) : lane === 'analytics' ? (
       <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
@@ -392,7 +400,7 @@ function AppInner() {
     <SafeAreaView style={styles.safe}>
       {wide ? (
         <View style={styles.wideShell}>
-          <NavRail active={lane} counts={counts} onChange={setLane} onAdd={() => setShowAdd(true)} onSettings={() => setShowSettings(true)} />
+          <NavRail active={lane} counts={counts} onChange={setLane} onAdd={() => setShowAdd(true)} onSettings={() => setShowSettings(true)} onNotifications={() => setShowNotifs(true)} unread={unread} />
           <View style={styles.wideContent}>
             <Text style={styles.wideTitle}>{VIEW_TITLE[lane]}</Text>
             {isPipeline ? (

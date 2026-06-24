@@ -186,7 +186,6 @@ export function SettingsModal({
     <View style={styles.srvBlock}>
       <Text style={styles.label}>Server status</Text>
       {statusRow('AI model', srv.aiModel ? `${srv.aiModel}${srv.aiEnabled === false ? ' (off)' : ''}${srv.aiKeySet === false ? ' · no key' : ''}` : '—')}
-      {statusRow('Salary target', srv.salaryTarget ? `$${(srv.salaryTarget / 1000).toFixed(0)}K${srv.salaryFloor ? ` (floor $${(srv.salaryFloor / 1000).toFixed(0)}K)` : ''}` : (srv.salaryFloor ? `floor $${(srv.salaryFloor / 1000).toFixed(0)}K` : 'not set'))}
       {statusRow('Sources enabled', srv.sourcesTotal != null ? `${srv.sourcesEnabled}/${srv.sourcesTotal}` : '—')}
       {statusRow('Digest', srv.digestEnabled ? `on · ${(srv.digestChannels || []).join(', ') || 'file'}` : 'off')}
       {statusRow('Remote-only', srv.remoteOnly ? 'yes' : 'no')}

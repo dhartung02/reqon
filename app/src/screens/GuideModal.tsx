@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Share } from 'react-native';
 import { fonts, useThemedStyles, type Palette } from '../theme';
 import { fetchGuide, generateGuide, reqKey } from '../sync/assist';
@@ -27,14 +27,18 @@ export function GuideModal({
 }: { visible: boolean; company: string; role: string; onClose: () => void }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [md, setMd] = useState<string | null>(null);
   const [exists, setExists] = useState<boolean | null>(null);
   const key = reqKey(company, role);
+  const aliveRef = useRef(true);
+  useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; }; }, []);
 
   const load = async () => {
     setBusy(true); setError(null);
     const r = await fetchGuide(key);
+    if (!aliveRef.current) return;
     setBusy(false);
     if (r.error) { setError(r.error); return; }
     setExists(!!r.exists);
@@ -42,11 +46,20 @@ export function GuideModal({
   };
   useEffect(() => { if (visible) { setMd(null); setExists(null); load(); } }, [visible, key]);
 
+  // Guide generation is a long, grounded AI call — too long for a single blocking request on a slow
+  // link. So we kick the POST off (which also registers a server job) and POLL guide.json until the
+  // markdown lands (up to ~2.5 min), rather than holding one request open the whole time.
   const generate = async () => {
-    setBusy(true); setError(null);
-    const r = await generateGuide(key);
-    if (r.error) { setBusy(false); setError(r.error); return; }
-    await load();
+    setGenerating(true); setError(null); setMd(null);
+    generateGuide(key).then((r) => { if (aliveRef.current && r.error) setError(r.error); });
+    const deadline = Date.now() + 150000;
+    while (aliveRef.current && Date.now() < deadline) {
+      await new Promise((res) => setTimeout(res, 3000));
+      if (!aliveRef.current) return;
+      const r = await fetchGuide(key);
+      if (r.exists && r.markdown) { setMd(r.markdown); setExists(true); setGenerating(false); return; }
+    }
+    if (aliveRef.current) { setGenerating(false); if (!md) setError('Still generating — it can take a minute. Tap Generate again to keep waiting.'); }
   };
 
   const blocks = md ? parseMarkdown(md) : [];
@@ -61,17 +74,22 @@ export function GuideModal({
           </View>
           <Text style={styles.sub}>{role} · {company}</Text>
 
-          {busy ? <ActivityIndicator color={c.emerald} style={{ marginVertical: 24 }} /> : null}
+          {busy || generating ? (
+            <View style={styles.empty}>
+              <ActivityIndicator color={c.emerald} />
+              {generating ? <Text style={styles.emptyText}>Generating — grounded AI guide, up to a minute…</Text> : null}
+            </View>
+          ) : null}
           {error ? <Text style={styles.err}>{error}</Text> : null}
 
-          {!busy && exists === false ? (
+          {!busy && !generating && exists === false ? (
             <View style={styles.empty}>
               <Text style={styles.emptyText}>No interview guide for this role yet.</Text>
               <Pressable style={styles.gen} onPress={generate}><Text style={styles.genText}>Generate guide · AI</Text></Pressable>
             </View>
           ) : null}
 
-          {!busy && blocks.length ? (
+          {!busy && !generating && blocks.length ? (
             <>
               <ScrollView style={styles.box} contentContainerStyle={{ padding: 16 }}>
                 {blocks.map((b, i) => (

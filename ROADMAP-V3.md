@@ -1117,6 +1117,15 @@ Web board has richer profile fields. App has partial profile support.
 
 ### Goal
 
+**✅ DONE (2026-06-24, pending device pass).** Seniority/role-title/keyword/negative-keyword/salary
+terms already live in the app's **Search criteria** screen; applicant info + links + education + work +
+EEO in **Profile**; saved answers in **Saved answers**. This filled the real gaps: a **Professional
+summary** field (with an **AI draft** button → `/api/profile/draft-summary`) and **Sector preferences**,
+both added to ProfileScreen and synced (`Profile.summary`/`sectors` round-trip through `pushProfile`/
+`fromServer`). tsc clean, 74 jest green. *Deferred:* a full narrative-snippet editor (the web has one;
+the app's Saved-answers library is the closest analog) — revisit if needed. *Device pass:* edit summary,
+AI-draft, save, confirm round-trip.
+
 Allow the app to view/edit key profile fields used by scoring and AI.
 
 ### Fields to Add

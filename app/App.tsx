@@ -18,6 +18,8 @@ import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
+import { NotificationsModal } from './src/screens/NotificationsModal';
+import { fetchNotifications } from './src/sync/notifications';
 import { BrowserScreen } from './src/screens/BrowserScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
@@ -67,6 +69,8 @@ function AppInner() {
   const [filter, setFilter] = useState<RoleFilter>(EMPTY_FILTER);
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [unread, setUnread] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -130,6 +134,14 @@ function AppInner() {
     });
     return () => sub.remove();
   }, [autoSync]);
+
+  // Refresh the notification-bell unread badge when a server is configured + after each sync (P1.8).
+  useEffect(() => {
+    if (!serverUrl) { setUnread(0); return; }
+    let alive = true;
+    fetchNotifications().then((r) => { if (alive) setUnread(r.unread); }).catch(() => {});
+    return () => { alive = false; };
+  }, [serverUrl, syncState.at]);
 
   const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
@@ -407,6 +419,12 @@ function AppInner() {
               </View>
             </View>
             <View style={styles.brandRight}>
+              <Pressable style={styles.iconBtn} onPress={() => setShowNotifs(true)} hitSlop={22} accessibilityLabel="Notifications">
+                <Text style={styles.bell}>🔔</Text>
+                {unread > 0 ? (
+                  <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>
+                ) : null}
+              </Pressable>
               <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={22} accessibilityLabel="Settings & sync">
                 <SettingsIcon size={18} color={c.textBase} />
               </Pressable>
@@ -467,6 +485,7 @@ function AppInner() {
           setShowGuide(true);
         }}
       />
+      <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} onUnreadChange={setUnread} />
       <StatusBar style={statusBar} />
     </SafeAreaView>
   );
@@ -488,6 +507,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bell: { fontSize: 16 },
+  badge: { position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', color: '#fff' },
   iconBtn: {
     width: 42,
     height: 42,

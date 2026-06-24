@@ -1143,7 +1143,14 @@ Allow the app to view/edit key profile fields used by scoring and AI.
 
 ---
 
-## P1.8 — Mirror Web Notifications Bell in App
+## P1.8 — Mirror Web Notifications Bell in App — ✅ DONE (2026-06-24, pending device pass)
+
+**Shipped (code + jest; needs device pass).** A 🔔 bell in the app brand bar (with an unread badge)
+opens a `NotificationsModal` that reads the server's `/api/notifications` feed (the same digest/scout/
+mail feed the web bell shows) and marks items read via `/api/notifications/read` — `sync/notifications.ts`.
+The unread badge refreshes when a server is configured + after each sync. The modal states that native
+push is EAS-build dependent while this in-app feed works in Expo Go now. tsc clean, 74 jest green;
+endpoint verified live. *Device pass:* confirm the bell + feed render and mark-read works.
 
 ### Surface
 

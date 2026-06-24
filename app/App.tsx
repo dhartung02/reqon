@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { rolesInLane, laneOf, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
+import { rolesInLane, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
 import { todayActionCount } from './src/today';
 import { fonts, useThemedStyles, useScheme, ThemeProvider, type Palette } from './src/theme';
 import { useRoles } from './src/store/useRoles';
@@ -70,6 +70,7 @@ function AppInner() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [todayRoleId, setTodayRoleId] = useState<string | null>(null); // role opened from Today → swipe-dismiss sheet
   const [unread, setUnread] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -143,14 +144,6 @@ function AppInner() {
     return () => { alive = false; };
   }, [serverUrl, syncState.at]);
 
-  // Open a role from a non-pipeline surface (Today action list). Phone: setSelectedId → full-screen
-  // detail. Wide: Today is full-width with no detail pane, so jump to the role's lane (which renders
-  // the master-detail) and select it there. Declared before any early return (Rules of Hooks).
-  const openRole = useCallback((id: string) => {
-    const r = roles.find((x) => x.id === id);
-    setSelectedId(id);
-    if (wide && r) setLane(laneOf(r.status));
-  }, [roles, wide]);
 
   const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
@@ -360,7 +353,7 @@ function AppInner() {
         onRefresh={onRefresh}
         serverConfigured={!!serverUrl}
         syncState={syncState}
-        onOpenRole={openRole}
+        onOpenRole={setTodayRoleId}
       />
     ) : lane === 'analytics' ? (
       <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
@@ -495,6 +488,33 @@ function AppInner() {
         }}
       />
       <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} onUnreadChange={setUnread} />
+      {/* Role opened from Today → a swipe-to-dismiss sheet over Today, so Back (or swipe down on iOS)
+          returns you exactly where you were instead of switching lanes. */}
+      <Modal
+        visible={!!todayRoleId && !!roles.find((r) => r.id === todayRoleId)}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setTodayRoleId(null)}
+      >
+        <SafeAreaView style={styles.safe}>
+          {(() => {
+            const r = roles.find((x) => x.id === todayRoleId);
+            if (!r) return null;
+            return (
+              <RoleDetailScreen
+                key={r.id}
+                role={r}
+                onBack={() => setTodayRoleId(null)}
+                onStatusChange={(s: Status) => setStatus(r.id, s)}
+                onUpdate={(patch) => update(r.id, patch)}
+                onDelete={() => { remove(r.id); setTodayRoleId(null); }}
+                onOpenPosting={(u) => setBrowserUrl(u)}
+                onBuildCv={(role) => { setCvTarget({ role: role.role, company: role.company, jd: role.notes ?? '' }); setShowCv(true); setTodayRoleId(null); }}
+              />
+            );
+          })()}
+        </SafeAreaView>
+      </Modal>
       <StatusBar style={statusBar} />
     </SafeAreaView>
   );

@@ -185,6 +185,7 @@ const liveRows = rows => rows.filter(r => r && r.deleted !== true);
 // the server, the React Native app, and the Chrome extension (pinned by tests/vectors/).
 const core = require('./core/crm-core');
 const { reqKey, postingId, sameReq, expectedValue, computeTier, DEFAULT_TIER_THRESHOLDS } = core;
+const { computeActionItems } = require('./lib/action-items');   // P2.1 unified action model
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -694,6 +695,31 @@ app.get('/api/pair', async (req, res) => {
 
 app.get('/api/reqs', (req, res) => {
   res.json(readStore());
+});
+
+// Unified, deterministic action items (P2.1) — derived from the live store + config, consumed by
+// web / app / extension. Filter with ?surface=web|app|extension and/or ?type=apply_next,...
+app.get('/api/action-items', (req, res) => {
+  try {
+    const w30 = assistWindowStats(30); const rate = assistRatePer1M(); const budget = assistMonthlyBudget();
+    const cost30 = estCost(w30.tokens, rate);
+    const ctx = {
+      today: new Date().toISOString().slice(0, 10),
+      profile: readProfile(),
+      scoutStatus: readJsonSafe(P.scoutStatus, {}),
+      sourceHealth: readJsonSafe(P.sourceHealth, {}),
+      mailConfigured: !!(cfg('GMAIL_USER') && cfg('GMAIL_APP_PASSWORD')),
+      remoteOnly: readJsonSafe(P.boards, {}).remoteOnly !== false,
+      assist: { tokens30d: w30.tokens, budgetPct: (budget && cost30 != null) ? Math.round((cost30 / budget) * 100) : null },
+    };
+    let items = computeActionItems(readStore(), ctx);
+    const surface = String(req.query.surface || '').trim();
+    if (surface) items = items.filter(it => (it.surfaces || []).includes(surface));
+    const types = String(req.query.type || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (types.length) items = items.filter(it => types.includes(it.type));
+    const counts = items.reduce((m, it) => { m[it.severity] = (m[it.severity] || 0) + 1; return m; }, {});
+    res.json({ ok: true, items, total: items.length, counts, generatedAt: nowIso() });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // Full replace — the board sends its whole state on every debounced save.

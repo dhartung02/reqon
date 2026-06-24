@@ -1393,7 +1393,17 @@ Popup/side panel should show:
 
 ---
 
-## P2.1 — Create Unified Action Item Model
+## P2.1 — Create Unified Action Item Model — ✅ DONE (2026-06-24)
+
+**Shipped.** `lib/action-items.js` (`computeActionItems(rows, ctx)`) is a pure, deterministic
+derivation of normalized action items from the live store + config; `GET /api/action-items` exposes
+them with `?surface=web|app|extension` and `?type=…` filters, plus severity counts. Types covered
+server-side: apply_next, follow_up_due, review_interview/offer/rejection, verify_role, needs_scoring,
+enrich_failed, duplicate_review, profile_missing, gmail_setup_needed, ai_budget_warning, scout_error.
+(`queued_sync`/`queued_extension_action` stay client-owned — the server can't see chrome.storage.)
+Each item carries severity, priority, reason, source, and a cta target. 8 unit tests; verified live
+(64 actions on the 191-row board, correctly ranked; filters work). This is the shared model P2.2/P2.3
+consume.
 
 ### Surface
 

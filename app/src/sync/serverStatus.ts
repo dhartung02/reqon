@@ -1,4 +1,5 @@
 import { getConfig } from './config';
+import { timedFetch } from './http';
 
 // Read-only server status for the app Settings "catch-up" panel (P1.9) — surfaces the newest
 // high-value web settings (AI model, salary target, sources, digest) without making the app a
@@ -23,7 +24,7 @@ export async function fetchServerStatus(): Promise<ServerStatus> {
   const { url, token } = await getConfig();
   if (!url) return { error: 'No sync server configured.' };
   try {
-    const r = await fetch(`${normalize(url)}/api/settings`, { headers: { 'X-CRM-Token': token } });
+    const r = await timedFetch(`${normalize(url)}/api/settings`, { headers: { 'X-CRM-Token': token } });
     const j = await r.json();
     if (!r.ok || !j.ok) return { error: j.error || `HTTP ${r.status}` };
     const sources = Array.isArray(j.sources) ? j.sources : [];

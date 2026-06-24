@@ -1,4 +1,5 @@
 import { getConfig } from './config';
+import { timedFetch } from './http';
 
 // Server-computed analytics (parity with the web). The app fetches this when a server is configured
 // and renders it; standalone/offline it falls back to local pipelineMetrics/pipelineHealth. Computing
@@ -21,7 +22,7 @@ export async function fetchServerAnalytics(): Promise<{ data?: ServerAnalytics; 
   const { url, token } = await getConfig();
   if (!url) return { error: 'standalone' };
   try {
-    const r = await fetch(`${normalize(url)}/api/analytics`, { headers: { 'X-CRM-Token': token } });
+    const r = await timedFetch(`${normalize(url)}/api/analytics`, { headers: { 'X-CRM-Token': token } });
     const j = await r.json();
     if (!r.ok || !j.ok) return { error: j.error || `HTTP ${r.status}` };
     return { data: j as ServerAnalytics };

@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 // API replaces it), which broke résumé upload. The legacy module keeps the base64 read working.
 import * as FileSystem from 'expo-file-system/legacy';
 import { getConfig } from './config';
+import { timedFetch } from './http';
 
 // Full applicant profile — mirrors the server profile shape so it's ONE profile (server-optional).
 // PII/EEO is stored in the keychain for the candidate's reference; it is NEVER auto-filled or
@@ -89,7 +90,7 @@ export async function pullProfile(): Promise<Profile> {
   const { url, token } = await getConfig();
   if (!url) return getProfile();
   try {
-    const r = await fetch(`${normalize(url)}/api/profile`, { headers: { 'X-CRM-Token': token } });
+    const r = await timedFetch(`${normalize(url)}/api/profile`, { headers: { 'X-CRM-Token': token } });
     const j = await r.json();
     if (r.ok && j.ok && j.profile) {
       const p = fromServer(j.profile);

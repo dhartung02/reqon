@@ -909,7 +909,14 @@ Role Detail → Build Tailored CV
 
 ---
 
-## P1.3 — Add Saved-Answers Library UI to Web Board
+## P1.3 — Add Saved-Answers Library UI to Web Board — ✅ DONE (2026-06-24)
+
+**Shipped.** Settings → Candidate profile now has a **Saved-answers library** (q/a/tags), mirroring
+the narrative-library editor: add / edit / remove rows, persisted via `PUT /api/profile`
+(`profile.answers[]`, which the server already parsed). The board is now the source-of-truth
+management surface; the AI "✍ AI draft" (`kind:'answer'`) grounds in these. Verified e2e: add → save
+→ round-trip (1 answer, id assigned) → remove → save (0). Profile is per-tenant, so answers isolate
+per user automatically.
 
 ### Surface
 

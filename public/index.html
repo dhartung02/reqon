@@ -979,6 +979,11 @@
             <div id="narrativeBox"></div>
             <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
           </div>
+          <div class="field"><label>Saved-answers library (reusable application Q&amp;A — the AI "✍ AI draft" pulls from these)</label>
+            <p class="hint" style="margin:0 0 8px">Common screening/application questions and your vetted answers. Tag them so the right one surfaces. Editable and never auto-submitted.</p>
+            <div id="answerBox"></div>
+            <div class="ahintrow"><button class="mini" id="addAnswerBtn" type="button">+ Add saved answer</button></div>
+          </div>
           <div class="field"><label>Demographics (EEO) — voluntary self-identification</label>
             <p class="hint" style="margin:0 0 8px">Standard self-ID answer sets, synced to the app. Stored privately for your reference — the apply-assist never auto-fills or submits these.</p>
             <div class="grid2">
@@ -2740,7 +2745,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&SET("settingsOverla
 fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
 
 // ---------- candidate profile + narrative library (Phase 5) ----------
-let PROFILE_NARRATIVES=[];
+let PROFILE_NARRATIVES=[]; let PROFILE_ANSWERS=[];
 let PROFILE_KEYWORDS=[]; let KW_REMOVED=new Set();
 let PROFILE_WORK=[]; let PROFILE_EDU=[];
 // Standard EEO self-ID answer sets (must match app/src/sync/profile.ts EEO_OPTIONS).
@@ -2881,6 +2886,8 @@ function fillProfile(p){
   fillEeo(p.eeo);
   PROFILE_NARRATIVES=(p.narratives||[]).map(n=>({id:n.id,title:n.title||"",body:n.body||"",tags:(n.tags||[]).join(", ")}));
   renderNarratives();
+  PROFILE_ANSWERS=(p.answers||[]).map(x=>({id:x.id,q:x.q||"",a:x.a||"",tags:(x.tags||[]).join(", ")}));
+  renderAnswers();
 }
 const qa=(s)=>String(s==null?"":s).replace(/"/g,"&quot;");
 function renderWorkHistory(){
@@ -2932,8 +2939,24 @@ function syncNarrativesFromDOM(){
 }
 window.removeNarrative=function(i){syncNarrativesFromDOM();PROFILE_NARRATIVES.splice(i,1);renderNarratives();};
 SET("addNarrativeBtn").onclick=()=>{syncNarrativesFromDOM();PROFILE_NARRATIVES.push({title:"",body:"",tags:""});renderNarratives();};
+function renderAnswers(){
+  SET("answerBox").innerHTML=PROFILE_ANSWERS.map((x,i)=>
+    `<div class="narr" data-i="${i}"><button class="narr-rm" type="button" onclick="removeAnswer(${i})">remove</button>`+
+    `<input class="ans-q" type="text" placeholder="Question (e.g. Why are you interested in this role?)" value="${(x.q||'').replace(/"/g,'&quot;')}">`+
+    `<textarea class="ans-a" rows="3" placeholder="Your saved answer…">${esc(x.a||'')}</textarea>`+
+    `<input class="ans-tags" type="text" placeholder="tags: comma-separated (e.g. motivation, remote)" value="${(x.tags||'').replace(/"/g,'&quot;')}"></div>`
+  ).join("")||'<div class="setmuted">No saved answers yet.</div>';
+}
+function syncAnswersFromDOM(){
+  const out=[]; SET("answerBox").querySelectorAll(".narr").forEach((el,i)=>{
+    out.push({id:(PROFILE_ANSWERS[i]||{}).id, q:el.querySelector(".ans-q").value, a:el.querySelector(".ans-a").value, tags:el.querySelector(".ans-tags").value});
+  });
+  PROFILE_ANSWERS=out;
+}
+window.removeAnswer=function(i){syncAnswersFromDOM();PROFILE_ANSWERS.splice(i,1);renderAnswers();};
+SET("addAnswerBtn").onclick=()=>{syncAnswersFromDOM();PROFILE_ANSWERS.push({q:"",a:"",tags:""});renderAnswers();};
 async function saveProfile(){
-  syncNarrativesFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
+  syncNarrativesFromDOM(); syncAnswersFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
   const body={
     applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim(),github:SET("profGithub").value.trim()},
     github:SET("profGithub").value.trim(),
@@ -2941,6 +2964,7 @@ async function saveProfile(){
     seniority:csvList(SET("profSeniority").value), roleTerms:csvList(SET("profRoleTerms").value),
     industries:csvList(SET("profIndustries").value), sectors:csvList(SET("profSectors").value),
     narratives:PROFILE_NARRATIVES.map(n=>({id:n.id,title:n.title,body:n.body,tags:csvList(n.tags)})),
+    answers:PROFILE_ANSWERS.filter(x=>x.q||x.a).map(x=>({id:x.id,q:x.q,a:x.a,tags:csvList(x.tags)})),
     keywordOverrides:kwOverrides(),
     workHistory:PROFILE_WORK.filter(w=>w.role||w.company),
     education:PROFILE_EDU.filter(e=>e.school||e.level||e.field),

@@ -68,18 +68,38 @@ async function flushQueue() {
   const { queue = [] } = await chrome.storage.local.get('queue');
   if (!queue.length) return;
   const remaining = [];
+  let lastError = '';
   for (const a of queue) {
-    try { await runAction(a); } catch (e) { remaining.push(a); }
+    try { await runAction(a); } catch (e) { remaining.push(a); lastError = e && e.message ? e.message : String(e); }
   }
-  await chrome.storage.local.set({ queue: remaining });
+  await chrome.storage.local.set({ queue: remaining, queueLastRetry: Date.now(), queueLastError: remaining.length ? lastError : '' });
   if (!remaining.length) chrome.alarms.clear('flush-queue');
+}
+// A short human label for a queued action (popup list).
+function queueLabel(a) {
+  if (a.kind === 'clip') return 'Clip: ' + (a.title ? String(a.title).slice(0, 60) : a.url);
+  if (a.kind === 'markApplied') return 'Mark applied: ' + (a.key || '');
+  return a.kind || 'action';
 }
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'flush-queue') flushQueue(); });
 
 // ---- actions ----
 async function runAction(a) {
   if (a.kind === 'clip') {
-    return api('/api/reqs/quickadd', { method: 'POST', body: JSON.stringify({ url: a.url, link: a.url, title: a.title, source: 'chrome-ext' }) });
+    const m = a.meta || {};
+    // Fold the user's note/tag/priority + a JD excerpt into notes so they surface on the board
+    // without needing new columns. Factual captures (salary/remote/source) map to real fields.
+    const noteParts = [];
+    if (a.note) noteParts.push('Note: ' + a.note);
+    if (a.tag) noteParts.push('Tags: ' + a.tag);
+    if (a.priority) noteParts.push('Priority: ' + a.priority);
+    if (m.jdExcerpt) noteParts.push('JD: ' + m.jdExcerpt);
+    const body = {
+      url: a.url, link: a.url, title: a.title, source: 'chrome-ext',
+      salary: m.salary || '', remote: m.remote || '', sourceType: m.source || '',
+      notes: noteParts.join('\n') || undefined,
+    };
+    return api('/api/reqs/quickadd', { method: 'POST', body: JSON.stringify(body) });
   }
   if (a.kind === 'markApplied') {
     // same semantics as the board's bulk Mark Applied — never overwrites an existing date/next
@@ -91,15 +111,16 @@ async function runAction(a) {
   throw new Error('unknown action ' + a.kind);
 }
 
-async function clip(url, title) {
+async function clip(url, title, extra) {
+  const action = Object.assign({ kind: 'clip', url, title }, extra || {});
   let out;
   try {
-    const j = await runAction({ kind: 'clip', url, title });
+    const j = await runAction(action);
     rowCache.at = 0;   // invalidate — the new row (and its auto-enrichment) should show up
     out = j.duplicate ? { ok: true, msg: 'Already tracked: ' + j.company + ' — ' + j.role }
                       : { ok: true, msg: 'Added: ' + j.company + ' — ' + j.role + ' (enriching…)' };
   } catch (e) {
-    await enqueue({ kind: 'clip', url, title });
+    await enqueue(action);
     out = { ok: false, msg: 'Server unreachable — clip queued, will retry. (' + e.message + ')' };
   }
   notify(out.msg);
@@ -166,7 +187,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const row = matchRow(rows, msg.url);
         sendResponse({ ok: true, row });
       } else if (msg.type === 'clip') {
-        sendResponse(await clip(msg.url, msg.title));
+        sendResponse(await clip(msg.url, msg.title, { meta: msg.meta, note: msg.note, tag: msg.tag, priority: msg.priority }));
       } else if (msg.type === 'markApplied') {
         sendResponse(await markApplied(msg.row));
       } else if (msg.type === 'reqs') {
@@ -191,6 +212,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'profile') {
         sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
+      } else if (msg.type === 'queueStatus') {
+        const { queue = [], queueLastRetry = 0, queueLastError = '' } = await chrome.storage.local.get(['queue', 'queueLastRetry', 'queueLastError']);
+        sendResponse({ ok: true, count: queue.length, items: queue.map((a, i) => ({ i, label: queueLabel(a), kind: a.kind, ts: a.ts })), lastRetry: queueLastRetry, lastError: queueLastError });
+      } else if (msg.type === 'queueRetry') {
+        await flushQueue();
+        const { queue = [], queueLastError = '' } = await chrome.storage.local.get(['queue', 'queueLastError']);
+        sendResponse({ ok: true, remaining: queue.length, lastError: queueLastError });
+      } else if (msg.type === 'queueDiscard') {
+        const { queue = [] } = await chrome.storage.local.get('queue');
+        if (Number.isInteger(msg.index) && msg.index >= 0 && msg.index < queue.length) queue.splice(msg.index, 1);
+        await chrome.storage.local.set({ queue });
+        if (!queue.length) chrome.alarms.clear('flush-queue');
+        sendResponse({ ok: true, remaining: queue.length });
+      } else if (msg.type === 'queueClear') {
+        await chrome.storage.local.set({ queue: [], queueLastError: '' });
+        chrome.alarms.clear('flush-queue');
+        sendResponse({ ok: true, remaining: 0 });
       } else if (msg.type === 'testConnection') {
         const j = await api('/api/health');
         sendResponse({ ok: true, msg: 'Connected — ' + j.count + ' rows on the board.' });

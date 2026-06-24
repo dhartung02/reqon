@@ -65,6 +65,7 @@
     try { if (e.labels && e.labels[0]) p.push(e.labels[0].textContent); } catch (x) {}
     return p.filter(Boolean).join(' ').toLowerCase();
   };
+  let highlighted = [];   // fields we filled this session — tracked so "Clear highlights" can reset them
   const setVal = (e, v) => {
     const proto = e.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
     const d = Object.getOwnPropertyDescriptor(proto, 'value');
@@ -73,7 +74,21 @@
     e.dispatchEvent(new Event('change', { bubbles: true }));
     e.style.outline = '2px solid #00E5A3';
     e.style.outlineOffset = '1px';
+    highlighted.push(e);
   };
+  function clearHighlights() { highlighted.forEach((e) => { try { e.style.outline = ''; e.style.outlineOffset = ''; } catch (x) {} }); highlighted = []; }
+  // Count fields we deliberately leave for the human, so the autofill summary (P1.13) is honest.
+  const EEO_CONSENT = /gender|race|ethnic|veteran|disab|hispanic|lgbt|sexual orientation|consent|agree|terms|privacy|authoriz|sponsor|eeo|demographic/i;
+  function skipTally() {
+    let eeoConsent = 0, file = 0, password = 0;
+    document.querySelectorAll('input, textarea').forEach((e) => {
+      const t = (e.type || '').toLowerCase();
+      if (t === 'file') { file++; return; }
+      if (t === 'password') { password++; return; }
+      if (EEO_CONSENT.test(fieldSig(e))) eeoConsent++;
+    });
+    return { eeoConsent, file, password };
+  }
   const SKIP_TYPES = ['password', 'file', 'hidden', 'submit', 'button', 'checkbox', 'radio', 'range', 'color'];
   // Fills standard/factual fields from the profile + inserts matching saved answers for simple
   // questions. Returns a result; callers (overlay button or side-panel message) surface the message.
@@ -107,7 +122,33 @@
       msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '') + ' — review, never auto-submitted.',
     };
   }
-  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '✎ Fill'); b.onclick = async () => { const res = await fillForm(); toast(res.msg, res.ok); }; return b; };
+  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '✎ Fill'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '✎ Fill'; renderFillSummary(res); }; return b; };
+
+  // Autofill summary (P1.13): after a fill, show exactly what changed + what was intentionally left,
+  // a review reminder, and a Clear-highlights action. Replaces the old one-line toast.
+  function renderFillSummary(res) {
+    if (!box) return;
+    const old = box.querySelector('.jpcrm-summary'); if (old) old.remove();
+    const sk = skipTally();
+    const wrap = el('div', 'jpcrm-summary');
+    const line = (txt, cls) => { const d = el('div', 'jpcrm-sum-line' + (cls ? ' ' + cls : ''), txt); wrap.appendChild(d); };
+    line((res.ok ? '✓ ' : '• ') + 'Filled ' + (res.factual || 0) + ' factual field' + ((res.factual === 1) ? '' : 's'), res.ok ? 'jpcrm-ok' : '');
+    if (res.answered) line('✓ Inserted ' + res.answered + ' saved answer' + (res.answered === 1 ? '' : 's'), 'jpcrm-ok');
+    if (res.ai) line('✓ ' + res.ai + ' field' + (res.ai === 1 ? '' : 's') + ' via AI map', 'jpcrm-ok');
+    if (res.aiError) line('AI fill unavailable: ' + res.aiError, 'jpcrm-warn-line');
+    const skips = [];
+    if (sk.eeoConsent) skips.push(sk.eeoConsent + ' EEO/consent');
+    if (sk.file) skips.push(sk.file + ' file upload');
+    if (sk.password) skips.push(sk.password + ' login');
+    if (skips.length) line('Skipped (left for you): ' + skips.join(', '));
+    line('Review every field — nothing is submitted.', 'jpcrm-dim');
+    const acts = el('div', 'jpcrm-clip-acts');
+    const clr = el('button', 'jpcrm-btn', 'Clear highlights');
+    clr.onclick = () => { clearHighlights(); wrap.remove(); };
+    acts.appendChild(clr);
+    wrap.appendChild(acts);
+    box.appendChild(wrap);
+  }
 
   // ---- AI smart-fill (T1.1): deterministic pass, then ask the server's map_fields tool to fill
   // remaining empty fields it's confident about. Server grounds in factual profile only; we apply
@@ -155,6 +196,45 @@
     return { ok: true, msg: 'Inserted into the focused field — review it.' };
   }
 
+  // ---- clip-capture metadata (P1.10) — read salient fields off the live page, score confidence ----
+  // Count the application form's shape so fillabilityHint() can classify it (P1.11).
+  function formStats() {
+    let inputs = 0, textareas = 0, hasFile = false, hasPassword = false, fillableNow = 0;
+    document.querySelectorAll('input, textarea').forEach((e) => {
+      const t = (e.type || '').toLowerCase();
+      if (t === 'file') { hasFile = true; return; }
+      if (t === 'password') { hasPassword = true; return; }
+      if (SKIP_TYPES.indexOf(t) >= 0) return;
+      if (e.tagName === 'TEXTAREA') { textareas++; return; }
+      inputs++;
+      const s = fieldSig(e);
+      // a field is "fillable now" if it maps to a factual key we hold
+      if (/name|email|phone|tel|linkedin|github|location|city|website|portfolio/.test(s)) fillableNow++;
+    });
+    return { inputs, textareas, hasFile, hasPassword, fillableNow };
+  }
+  // Pull company/role/remote/salary/JD-excerpt/ATS off the page. company/role stay best-effort
+  // (the server's parseTitle is authoritative); we send what we see so the lead arrives richer.
+  function captureMeta() {
+    const text = jdText();
+    const { source, applyMode } = detectATS(location.href);
+    const title = document.title || '';
+    const meta = {
+      source, applyMode,
+      remote: detectRemote(text),
+      salary: extractSalary(text),
+      jdExcerpt: text.slice(0, 600),
+      postingId: postingId(location.href),
+      seniority: /\b(principal|director|staff|head of|vp|vice president|lead|group)\b/i.test(title + ' ' + text.slice(0, 400)) ? 'senior' : '',
+    };
+    const fill = fillabilityHint(applyMode, formStats());
+    // The server's parseTitle resolves the employer; if the title is company-structured
+    // (" at X", "X hiring", "Role | X") we count company as a positive signal for confidence.
+    const hasCompanySignal = /\s(?:at|@|—|–|\||·|-)\s|hiring/i.test(title) || !!document.querySelector('meta[property="og:site_name"]');
+    const conf = captureConfidence(Object.assign({ company: hasCompanySignal ? title : '', role: title }, meta));
+    return { meta, fill, conf };
+  }
+
   let box;
   function mount() {
     box = el('div', 'jpcrm-box');
@@ -193,17 +273,67 @@
       };
       body.appendChild(g);
     }
-    body.appendChild(fillBtn());
+    const { fill } = captureMeta();
+    body.appendChild(fillabilityRow(fill));
+    if (fill.level !== 'External redirect') body.appendChild(fillBtn());
   }
 
   function renderUntracked() {
     box.querySelector('.jpcrm-status').textContent = 'Not tracked yet';
     const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
+    const { fill } = captureMeta();
+    body.appendChild(fillabilityRow(fill));
     const b = el('button', 'jpcrm-btn jpcrm-primary', '+ Clip to CRM');
-    b.onclick = async () => { b.disabled = true; b.textContent = 'Clipping…'; const r = await send({ type: 'clip', url: location.href, title: document.title }); toast(r.msg, r.ok); if (r.ok) setTimeout(() => refresh(true), 2500); else b.disabled = false; };
+    b.onclick = () => openClipPanel();
     body.appendChild(b);
-    body.appendChild(fillBtn());
+    if (fill.level !== 'External redirect') body.appendChild(fillBtn());
   }
+
+  // Fillability hint line (P1.11): "Likely fillable · 5 fields" + a tooltip of the reasons.
+  function fillabilityRow(fill) {
+    const cls = { 'Easy Apply': 'jpcrm-fl-ok', 'Likely fillable': 'jpcrm-fl-ok', 'Partially fillable': 'jpcrm-fl-mid',
+      'Manual-heavy': 'jpcrm-fl-warn', 'External redirect': 'jpcrm-fl-warn', 'Unknown': 'jpcrm-fl-dim' }[fill.level] || 'jpcrm-fl-dim';
+    const row = el('div', 'jpcrm-fill ' + cls);
+    row.appendChild(el('span', 'jpcrm-fill-dot'));
+    row.appendChild(el('span', null, fill.level));
+    if (fill.reasons && fill.reasons.length) row.title = fill.reasons.join('\n');
+    return row;
+  }
+
+  // Clip confirmation panel (P1.10 + P1.12): shows what was captured, confidence, and optional
+  // note/tag/priority before the row is created. Nothing is sent until the user confirms.
+  function openClipPanel() {
+    const { meta, conf } = captureMeta();
+    const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
+    const panel = el('div', 'jpcrm-clip');
+    const confCls = { High: 'jpcrm-c-hi', Medium: 'jpcrm-c-mid', Low: 'jpcrm-c-lo' }[conf.level] || 'jpcrm-c-mid';
+    panel.innerHTML =
+      '<div class="jpcrm-clip-h">' + esc(document.title).slice(0, 80) + '</div>' +
+      '<div class="jpcrm-clip-conf ' + confCls + '">Confidence: ' + conf.level + '</div>' +
+      (conf.detected.length ? '<div class="jpcrm-clip-meta">Detected: ' + conf.detected.map(esc).join(', ') + '</div>' : '') +
+      (conf.needsReview.length ? '<div class="jpcrm-clip-meta jpcrm-clip-warn">Needs review: ' + conf.needsReview.map(esc).join(', ') + '</div>' : '');
+    const note = el('input', 'jpcrm-in'); note.placeholder = 'Why save this? (optional note)';
+    const tag = el('input', 'jpcrm-in'); tag.placeholder = 'Tag (optional, e.g. dream, backup)';
+    const prio = el('select', 'jpcrm-in');
+    ['Priority: normal', 'Priority: high', 'Priority: low'].forEach((t, i) => { const o = el('option', null, t); o.value = ['', 'high', 'low'][i]; prio.appendChild(o); });
+    panel.appendChild(note); panel.appendChild(tag); panel.appendChild(prio);
+    const row = el('div', 'jpcrm-clip-acts');
+    const confirm = el('button', 'jpcrm-btn jpcrm-primary', '✓ Clip to CRM');
+    const cancel = el('button', 'jpcrm-btn', 'Cancel');
+    confirm.onclick = async () => {
+      confirm.disabled = cancel.disabled = true; confirm.textContent = 'Clipping…';
+      const r = await send({ type: 'clip', url: location.href, title: document.title, meta, note: note.value.trim(), tag: tag.value.trim(), priority: prio.value });
+      toast(r.msg, r.ok);
+      if (r.ok) setTimeout(() => refresh(true), 2500);
+      else { confirm.disabled = cancel.disabled = false; confirm.textContent = '✓ Clip to CRM'; }
+    };
+    cancel.onclick = () => renderUntracked();
+    row.appendChild(confirm); row.appendChild(cancel);
+    panel.appendChild(row);
+    body.appendChild(panel);
+  }
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   function toast(msg, ok) {
     const t = el('div', 'jpcrm-toast' + (ok ? '' : ' jpcrm-warn'), msg);

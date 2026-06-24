@@ -1191,7 +1191,14 @@ Expose the newest high-value settings added on web.
 
 ---
 
-## P1.10 — Improve Extension Clip Capture
+## P1.10 — Improve Extension Clip Capture — ✅ DONE (2026-06-24)
+
+**Shipped.** At clip time the content script now reads salary, remote/hybrid/onsite, ATS/source,
+apply mode, posting id, and a JD excerpt off the live page (`captureMeta()` in `content.js`, built on
+pure, unit-tested helpers in `lib.js`: `detectATS`/`detectRemote`/`extractSalary`/`captureConfidence`).
+The clip confirmation panel shows **Captured / Confidence (High·Med·Low) / Detected / Needs review**
+before anything is sent; the richer fields flow through `quickadd` (salary/remote/source/notes).
+Low-confidence clips read as leads to enrich. 10 lib unit tests pass; payload round-trip verified.
 
 ### Surface
 
@@ -1236,7 +1243,13 @@ Needs review: seniority unclear
 
 ---
 
-## P1.11 — Add Apply-Mode / Fillability Hint on Page Overlay
+## P1.11 — Add Apply-Mode / Fillability Hint on Page Overlay — ✅ DONE (2026-06-24)
+
+**Shipped.** The overlay shows a fillability line — **Easy Apply / Likely fillable / Partially
+fillable / Manual-heavy / External redirect / Unknown** — with the reasons in a tooltip
+(`fillabilityHint()` in `lib.js`, fed by a live `formStats()` count of inputs/textareas/file/password
+fields). The Fill button is hidden on external-redirect (account-gated) postings where it can't help.
+Unit-tested across ATS + form shapes.
 
 ### Surface
 
@@ -1275,7 +1288,12 @@ Overlay should show:
 
 ---
 
-## P1.12 — Add Custom Note / Tag at Clip
+## P1.12 — Add Custom Note / Tag at Clip — ✅ DONE (2026-06-24)
+
+**Shipped.** The clip confirmation panel has optional **note**, **tag**, and **priority** fields.
+They're folded into the row's notes (`Note: … / Tags: … / Priority: …`) so they surface on the board
+with no schema change. Captured before the row is created — "why I saved this" without opening the
+board.
 
 ### Surface
 
@@ -1301,7 +1319,12 @@ After clicking clip:
 
 ---
 
-## P1.13 — Add Autofill Summary
+## P1.13 — Add Autofill Summary — ✅ DONE (2026-06-24)
+
+**Shipped.** After Fill runs, the overlay shows a summary panel: factual fields filled, saved answers
+inserted, AI-mapped fields (when smart-fill), and what was deliberately skipped (EEO/consent, file
+upload, login) via `skipTally()`. Includes a review reminder and a **Clear highlights** action that
+removes the green field outlines (`highlighted[]` tracking). Replaces the old one-line toast.
 
 ### Surface
 
@@ -1330,7 +1353,13 @@ After Fill runs, show:
 
 ---
 
-## P1.14 — Add Queue Visibility
+## P1.14 — Add Queue Visibility — ✅ DONE (2026-06-24)
+
+**Shipped.** The popup shows a **Pending sync** section when the offline queue is non-empty: queued
+count, per-item labels (clip / mark-applied), last-retry time, last error, with **Retry now**,
+per-item **discard** (✕), and **Clear all**. Backed by new `bg.js` messages
+(`queueStatus`/`queueRetry`/`queueDiscard`/`queueClear`) and `queueLastRetry`/`queueLastError`
+tracking in `flushQueue()`.
 
 ### Surface
 

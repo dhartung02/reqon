@@ -62,8 +62,34 @@ function renderTracked(row) {
   };
 }
 
+// ---- offline queue visibility (P1.14) ----
+function relTime(ts) {
+  if (!ts) return '';
+  const d = (Date.now() - ts) / 1000;
+  if (d < 60) return 'just now';
+  if (d < 3600) return Math.floor(d / 60) + 'm ago';
+  if (d < 86400) return Math.floor(d / 3600) + 'h ago';
+  return Math.floor(d / 86400) + 'd ago';
+}
+async function refreshQueue() {
+  const q = await send({ type: 'queueStatus' });
+  const box = $('queue');
+  if (!q || !q.ok || !q.count) { box.classList.remove('open'); return; }
+  box.classList.add('open');
+  $('qcount').textContent = q.count;
+  $('qlist').innerHTML = q.items.map((it) =>
+    `<div class="qitem"><span class="qlabel" title="${esc(it.label)}">${esc(it.label)}</span>` +
+    `<button class="qx" data-i="${it.i}" title="Discard">✕</button></div>`).join('');
+  $('qlist').querySelectorAll('.qx').forEach((b) => { b.onclick = async () => { await send({ type: 'queueDiscard', index: +b.dataset.i }); await refreshQueue(); }; });
+  $('qerr').textContent = q.lastError ? 'Last error: ' + q.lastError : '';
+  $('qmeta').textContent = q.lastRetry ? 'Last retry ' + relTime(q.lastRetry) : 'Not retried yet';
+}
+$('qretry').onclick = async () => { $('qretry').disabled = true; $('qretry').textContent = 'Retrying…'; await send({ type: 'queueRetry' }); $('qretry').disabled = false; $('qretry').textContent = 'Retry now'; await refreshQueue(); await refresh(); };
+$('qclear').onclick = async () => { await send({ type: 'queueClear' }); await refreshQueue(); };
+
 async function refresh() {
   setMsg('');
+  refreshQueue();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   activeTab = tab || null;
   if (!tab || !tab.url || !/^https?:/.test(tab.url)) {

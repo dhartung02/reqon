@@ -2,7 +2,7 @@
 // Mirrors the semantics the server + board rely on (postingId / reqKey / matchRow / answer match).
 const test = require('node:test');
 const assert = require('node:assert');
-const { postingId, reqKey, sameReq, matchRow, bestAnswerMatch } = require('../lib.js');
+const { postingId, reqKey, sameReq, matchRow, bestAnswerMatch, detectATS, detectRemote, extractSalary, fillabilityHint, captureConfidence } = require('../lib.js');
 
 test('postingId extracts ids across ATS url shapes', () => {
   assert.strictEqual(postingId('https://boards.greenhouse.io/acme/jobs/4567890?gh_jid=4567890'), '4567890');
@@ -46,4 +46,44 @@ test('bestAnswerMatch needs >= 2 shared meaningful tokens', () => {
   const m = bestAnswerMatch('Tell us about your data platform experience', answers);
   assert.ok(m && /pipelines/.test(m.a));
   assert.strictEqual(bestAnswerMatch('favorite color', answers), null);   // no confident match
+});
+
+test('detectATS maps hosts to source + apply mode', () => {
+  assert.deepStrictEqual(detectATS('https://boards.greenhouse.io/acme/jobs/1'), { source: 'greenhouse', applyMode: 'Standard ATS' });
+  assert.deepStrictEqual(detectATS('https://jobs.ashbyhq.com/acme/listing/1'), { source: 'ashby', applyMode: 'Standard ATS' });
+  assert.strictEqual(detectATS('https://acme.wd5.myworkdayjobs.com/x').applyMode, 'External');
+  assert.strictEqual(detectATS('https://www.linkedin.com/jobs/view/1').applyMode, 'Easy Apply');
+  assert.deepStrictEqual(detectATS('https://careers.acme.com/x'), { source: '', applyMode: 'Unknown' });
+});
+
+test('detectRemote reads remote/hybrid/onsite from JD text', () => {
+  assert.strictEqual(detectRemote('This is a fully remote position.'), 'remote');
+  assert.strictEqual(detectRemote('Hybrid: 3 days in office.'), 'hybrid');
+  assert.strictEqual(detectRemote('Must work on-site in our NYC office.'), 'onsite');
+  assert.strictEqual(detectRemote('We make great software.'), '');
+});
+
+test('extractSalary finds plausible pay, ignores noise', () => {
+  assert.strictEqual(extractSalary('Base salary $120,000 - $160,000 per year'), '$120,000–$160,000');
+  assert.strictEqual(extractSalary('Range: $180k–$240k'), '$180k–$240k');
+  assert.strictEqual(extractSalary('Compensation: $200,000 annually'), '$200,000');
+  assert.strictEqual(extractSalary('5+ years experience, 10% bonus'), '');   // no real salary
+});
+
+test('fillabilityHint classifies by ATS + form shape', () => {
+  assert.strictEqual(fillabilityHint('External', {}).level, 'External redirect');
+  assert.strictEqual(fillabilityHint('Easy Apply', {}).level, 'Easy Apply');
+  assert.strictEqual(fillabilityHint('Standard ATS', { inputs: 6, textareas: 1, fillableNow: 5 }).level, 'Likely fillable');
+  assert.strictEqual(fillabilityHint('Standard ATS', { inputs: 8, textareas: 0, hasPassword: true }).level, 'Manual-heavy');
+  assert.strictEqual(fillabilityHint('Standard ATS', { inputs: 2, textareas: 4, fillableNow: 2 }).level, 'Partially fillable');
+  assert.strictEqual(fillabilityHint('Unknown', { inputs: 0, textareas: 0 }).level, 'Unknown');
+});
+
+test('captureConfidence bands + flags gaps', () => {
+  const hi = captureConfidence({ company: 'Acme', role: 'Principal PM', remote: 'remote', salary: '$200k', source: 'greenhouse', seniority: 'Principal' });
+  assert.strictEqual(hi.level, 'High');
+  assert.ok(hi.detected.includes('company') && hi.detected.includes('remote'));
+  const lo = captureConfidence({ company: 'Unknown', role: 'Untitled lead' });
+  assert.strictEqual(lo.level, 'Low');
+  assert.ok(lo.needsReview.some(r => /role/.test(r)));
 });

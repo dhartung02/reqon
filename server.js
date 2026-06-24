@@ -192,6 +192,7 @@ const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role
 const { computePipelineHealth } = require('./lib/pipeline-health'); // P2.6 pipeline health score
 const { computeFollowup } = require('./lib/followup');           // P2.8 follow-up recommendation
 const jobs = require('./lib/jobs');                              // P2.9 unified background-job registry
+const { computeAnalytics } = require('./lib/analytics');         // shared analytics (web + app parity)
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -702,6 +703,13 @@ app.get('/api/pair', async (req, res) => {
 
 app.get('/api/reqs', (req, res) => {
   res.json(readStore());
+});
+
+// Shared analytics (web + app parity) — computed once on the server so both surfaces show identical
+// numbers. The app fetches this when a server is configured, else falls back to its local metrics.
+app.get('/api/analytics', (req, res) => {
+  try { res.json({ ok: true, ...computeAnalytics(readStore(), { today: new Date().toISOString().slice(0, 10), now: nowIso() }) }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // Pipeline health score (P2.6) — a band + main risk + recommended next actions, deterministic.

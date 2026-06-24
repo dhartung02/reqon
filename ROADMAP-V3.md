@@ -1199,7 +1199,16 @@ This is an in-app feed first. Native push can remain future/EAS-build dependent.
 
 ---
 
-## P1.9 — Add App Settings Catch-Up
+## P1.9 — Add App Settings Catch-Up — ✅ DONE (2026-06-24, pending device pass)
+
+**Shipped (code + jest; needs device pass).** SettingsModal already had server URL/passphrase, QR +
+board pairing, sync now/test, theme, the Gmail-ingest panel, scout-mode picker, and nav to
+profile/search/rules/answers/CV. This added a read-only **Server status** block (via
+`sync/serverStatus.ts` → `/api/settings`): AI model + enabled/key state, salary target + floor,
+sources enabled count, digest on/channels, remote-only — refreshed on open and after Sync. tsc clean,
+74 jest green; `/api/settings` fields verified live (gpt-5.4-mini · $250K · 12 sources · digest on).
+*Device pass:* open Settings, confirm the status block populates. Notification-channel editing stays
+server-side by design (the app surfaces status + has the in-app feed from P1.8).
 
 ### Surface
 

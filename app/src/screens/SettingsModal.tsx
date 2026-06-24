@@ -7,6 +7,7 @@ import { testConnection, syncTwoWay } from '../sync/sync';
 import { decodePairing } from '@reqon/core';
 import { PairScanModal } from './PairScanModal';
 import { MailIngestPanel } from './MailIngestPanel';
+import { fetchServerStatus, type ServerStatus } from '../sync/serverStatus';
 import { ProfileScreen } from './ProfileScreen';
 import { SearchCriteriaScreen } from './SearchCriteriaScreen';
 import { TiersRulesScreen } from './TiersRulesScreen';
@@ -61,14 +62,15 @@ export function SettingsModal({
   const [scout, setScout] = useState<ScoutMode>('auto');
   const [scanOpen, setScanOpen] = useState(false);
   const [mailReload, setMailReload] = useState(0);   // bumped on "Sync now" to re-pull server settings
+  const [srv, setSrv] = useState<ServerStatus | null>(null);   // read-only server status (P1.9)
 
   useEffect(() => {
     if (visible) {
-      getConfig().then((cfg) => { setUrl(cfg.url); setToken(cfg.token); setStatus(null); });
+      getConfig().then((cfg) => { setUrl(cfg.url); setToken(cfg.token); setStatus(null); if (cfg.url) fetchServerStatus().then(setSrv); else setSrv(null); });
       getScoutMode().then(setScout);
       setSection('sync');
     }
-  }, [visible]);
+  }, [visible, mailReload]);
 
   const pickScout = (m: ScoutMode) => {
     setScout(m);
@@ -177,8 +179,22 @@ export function SettingsModal({
       {url ? <MailIngestPanel reloadSignal={mailReload} /> : null}
     </>
   );
+  const statusRow = (label: string, value: string) => (
+    <View style={styles.srvRow}><Text style={styles.srvLabel}>{label}</Text><Text style={styles.srvValue}>{value}</Text></View>
+  );
+  const serverStatusBlock = srv && !srv.error ? (
+    <View style={styles.srvBlock}>
+      <Text style={styles.label}>Server status</Text>
+      {statusRow('AI model', srv.aiModel ? `${srv.aiModel}${srv.aiEnabled === false ? ' (off)' : ''}${srv.aiKeySet === false ? ' · no key' : ''}` : '—')}
+      {statusRow('Salary target', srv.salaryTarget ? `$${(srv.salaryTarget / 1000).toFixed(0)}K${srv.salaryFloor ? ` (floor $${(srv.salaryFloor / 1000).toFixed(0)}K)` : ''}` : (srv.salaryFloor ? `floor $${(srv.salaryFloor / 1000).toFixed(0)}K` : 'not set'))}
+      {statusRow('Sources enabled', srv.sourcesTotal != null ? `${srv.sourcesEnabled}/${srv.sourcesTotal}` : '—')}
+      {statusRow('Digest', srv.digestEnabled ? `on · ${(srv.digestChannels || []).join(', ') || 'file'}` : 'off')}
+      {statusRow('Remote-only', srv.remoteOnly ? 'yes' : 'no')}
+    </View>
+  ) : null;
   const syncBottom = (
     <>
+      {serverStatusBlock}
       <Text style={styles.serverOnly}>Server-only by design: morning digest + email/Slack (SMTP), push notifications (APNs), AI keys & enrichment budgets, scheduling, and access tokens are managed on the server.</Text>
       {status ? <Text style={[styles.status, { color: statusColorFor(status.kind) }]}>{status.text}</Text> : null}
       {busy ? <ActivityIndicator color={c.emerald} /> : null}
@@ -316,6 +332,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.element, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   profileChev: { fontSize: 22, color: c.muted, lineHeight: 22 },
   serverOnly: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, lineHeight: 16, fontStyle: 'italic' },
+  srvBlock: { backgroundColor: c.element, borderRadius: 11, padding: 12, gap: 4 },
+  srvRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
+  srvLabel: { fontFamily: fonts.sans, fontSize: 13, color: c.muted },
+  srvValue: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.textHigh },
   input: { backgroundColor: c.element, borderWidth: 1, borderColor: c.element, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, color: c.textHigh, fontFamily: fonts.sans, fontSize: 15 },
   status: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   actions: { flexDirection: 'row', gap: 12, marginTop: 4 },

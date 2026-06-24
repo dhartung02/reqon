@@ -90,6 +90,24 @@ export function TodayScreen({
       </View>
       {scoutMsg ? <Text style={styles.scoutMsg}>{scoutMsg}</Text> : null}
 
+      <View style={styles.grid}>
+        {lanes.map((l) => {
+          const empty = l.count === 0;
+          return (
+            <Pressable
+              key={l.key}
+              style={[styles.card, wide && styles.cardWide, empty && styles.cardEmpty]}
+              disabled={empty || !l.jump}
+              onPress={() => l.jump && onJump(l.jump)}
+            >
+              <Text style={[styles.cardNum, { color: empty ? c.muted : tone[l.tone] }]}>{l.count}</Text>
+              <Text style={styles.cardTitle}>{l.title}</Text>
+              <Text style={styles.cardDesc}>{l.desc}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Text style={styles.sectionTitle}>ACTION NEEDED — DISCOVER → VERIFY → APPLY → FOLLOW UP</Text>
 
       {actionGroups.length > 0 && (
@@ -110,24 +128,6 @@ export function TodayScreen({
           ))}
         </View>
       )}
-
-      <View style={styles.grid}>
-        {lanes.map((l) => {
-          const empty = l.count === 0;
-          return (
-            <Pressable
-              key={l.key}
-              style={[styles.card, wide && styles.cardWide, empty && styles.cardEmpty]}
-              disabled={empty || !l.jump}
-              onPress={() => l.jump && onJump(l.jump)}
-            >
-              <Text style={[styles.cardNum, { color: empty ? c.muted : tone[l.tone] }]}>{l.count}</Text>
-              <Text style={styles.cardTitle}>{l.title}</Text>
-              <Text style={styles.cardDesc}>{l.desc}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
 
       <Text style={styles.foot}>
         {roles.length} roles tracked · Tier A: {tierA} · apply-next queue: {applyNext}

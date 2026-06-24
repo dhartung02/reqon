@@ -65,6 +65,11 @@ folder for a fully hands-off loop.
 - Change which keywords count or the min fit → `watchlist.json`.
 - Adjust scoring weights → the `PRIORITY_KW` / `SECONDARY_KW` / band logic in
   `scout.py` (mirrors `scoring-criteria.md`).
+- **Salary fit** — set `searchTerms.minSalary` + `searchTerms.salaryTarget` in `watchlist.json`
+  (Settings → Matching & scoring). The scout parses the top of each posting's range
+  (`parse_salary_top`) and nudges fit (`salary_adj`): ≥target +0.3, ≥min neutral, below min a
+  scaling penalty so under-paying roles can drop below min-fit. Unknown comp is never penalized;
+  both 0 disables it.
 
 ## Pluggable sources (`agent/sources/`)
 Source adapters live in the `sources/` package. Importing it registers every adapter

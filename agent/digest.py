@@ -40,7 +40,11 @@ def send(payload):
     port = int(os.environ.get("SMTP_PORT", "587") or "587")
     user = _require("SMTP_USER")
     pwd = _require("SMTP_PASS")
-    to = _require("DIGEST_TO")
+    # Recipient: the payload may override DIGEST_TO (used for email-to-SMS carrier gateways, which
+    # need a one-off address like 5551234567@vtext.com). Falls back to the configured DIGEST_TO.
+    to = (payload.get("to") or os.environ.get("DIGEST_TO", "")).strip()
+    if not to:
+        raise SystemExit("missing DIGEST_TO (and no per-message 'to' in the payload)")
     sender = os.environ.get("DIGEST_FROM", "").strip() or user
     recipients = [a.strip() for a in to.split(",") if a.strip()]
 
@@ -49,6 +53,7 @@ def send(payload):
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
     msg.attach(MIMEText(payload.get("text", ""), "plain", "utf-8"))
+    # Carrier SMS gateways choke on / strip HTML — a text-only payload (no 'html') stays a clean SMS.
     if payload.get("html"):
         msg.attach(MIMEText(payload["html"], "html", "utf-8"))
 

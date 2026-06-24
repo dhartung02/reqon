@@ -126,18 +126,34 @@ async function markApplied(row) {
 // AI draft (Phase 3) — POSTs to /api/assist. Captures the server's JSON error body (daily-cap,
 // no-key, etc.) so the panel can show a real message instead of a bare HTTP code. The server holds
 // the OpenAI key + grounds every draft in the candidate's narratives; never auto-submits.
-async function assist(payload) {
+// POST helper that surfaces the server's JSON error body (daily-cap, no-key, etc.) instead of a bare
+// HTTP code. Shared by assist / score / map-fields. The server holds the key + grounds everything.
+async function postJson(path, payload) {
   const cfg = await getCfg();
   const headers = { 'Content-Type': 'application/json' };
   if (cfg.token) headers['X-CRM-Token'] = cfg.token;
   try {
-    const r = await fetch(cfg.origin.replace(/\/$/, '') + '/api/assist', { method: 'POST', headers, body: JSON.stringify(payload || {}) });
+    const r = await fetch(cfg.origin.replace(/\/$/, '') + path, { method: 'POST', headers, body: JSON.stringify(payload || {}) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, error: j.error || ('HTTP ' + r.status) };
     return j;
   } catch (e) {
     return { ok: false, error: 'Network error reaching CRM (' + (e && e.message ? e.message : e) + ')' };
   }
+}
+const assist = (payload) => postJson('/api/assist', payload);
+
+// Patch a row's status (side-panel status controls, T1.3). Goes through the audited PATCH path, so
+// moving into an interview stage triggers the server-side interview-guide build.
+async function setStatus(row, status) {
+  const today = new Date().toISOString().slice(0, 10);
+  const fields = { status, lastcontact: today };
+  if (status === 'Applied' && !row.applied) fields.applied = today;
+  try {
+    await api('/api/reqs/' + encodeURIComponent(reqKey(row)), { method: 'PATCH', body: JSON.stringify({ fields, note: 'status set via chrome-ext' }) });
+    rowCache.at = 0; badgeActiveTab();
+    return { ok: true, status };
+  } catch (e) { return { ok: false, error: e.message }; }
 }
 
 // ---- messages from the content script / options page ----
@@ -158,6 +174,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true, rows: await getRows(!!msg.force) });
       } else if (msg.type === 'assist') {
         sendResponse(await assist(msg.payload));
+      } else if (msg.type === 'score') {
+        sendResponse(await postJson('/api/assist/score', msg.payload));
+      } else if (msg.type === 'mapFields') {
+        sendResponse(await postJson('/api/assist/map-fields', msg.payload));
+      } else if (msg.type === 'setStatus') {
+        sendResponse(await setStatus(msg.row, msg.status));
+      } else if (msg.type === 'genGuide') {
+        sendResponse(await postJson('/api/reqs/' + encodeURIComponent(msg.key) + '/guide', {}));
+      } else if (msg.type === 'patchFields') {
+        try {
+          await api('/api/reqs/' + encodeURIComponent(reqKey(msg.row)), { method: 'PATCH', body: JSON.stringify({ fields: msg.fields || {}, note: 'edited via chrome-ext' }) });
+          rowCache.at = 0; sendResponse({ ok: true });
+        } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'assistUsage') {
         try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'profile') {

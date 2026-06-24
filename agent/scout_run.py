@@ -58,8 +58,10 @@ def _load_dotenv():
 
 _load_dotenv()
 AGENT = os.path.join(ROOT, "agent")
-DATA_FILE = os.path.join(ROOT, "data.json")
-STATUS_FILE = os.path.join(AGENT, "scout-status.json")
+# Multi-user (ROADMAP-V3 PR0): the server passes the tenant's data/status paths via REQON_* env so a
+# scout run reads/writes that user's namespace. Unset -> legacy root paths (single-user, unchanged).
+DATA_FILE = os.environ.get("REQON_DATA_FILE") or os.path.join(ROOT, "data.json")
+STATUS_FILE = os.environ.get("REQON_STATUS_FILE") or os.path.join(AGENT, "scout-status.json")
 LOG_FILE = os.path.join(AGENT, "found-log.md")
 TODAY = datetime.date.today().isoformat()
 RUN = "scout-run-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -200,6 +202,24 @@ def http_open_status(url):
 def patch_row(company, role, fields, note, dry):
     if dry:
         return {"ok": True, "dry": True, "fields": fields}
+    # Multi-user: the gated loopback won't accept the server PATCH, so write straight to the
+    # tenant's data file (REQON_DATA_FILE). Match by the near-dupe-aware key, like the server.
+    if scout.FILE_MODE:
+        try:
+            with open(DATA_FILE, encoding="utf-8") as f:
+                rows = json.load(f)
+        except Exception:
+            rows = []
+        want = scout.norm_key(company, role)
+        hit = next((r for r in rows if scout.norm_key(r.get("company", ""), r.get("role", "")) == want), None)
+        if not hit:
+            return {"ok": False, "error": "no row matched key"}
+        hit.update(fields); hit["updatedAt"] = scout.NOW_ISO; hit["updatedBy"] = "scout"
+        tmp = DATA_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(rows, f, indent=2)
+        os.replace(tmp, DATA_FILE)
+        return {"ok": True, "via": "file"}
     key = urllib.parse.quote(str(company) + "|" + str(role), safe="")
     body = json.dumps({"fields": fields, "result": "pass", "run": RUN,
                        "note": note, "sourceUrl": fields.get("link")}).encode("utf-8")

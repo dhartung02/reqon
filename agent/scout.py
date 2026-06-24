@@ -40,12 +40,18 @@ import urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGENT = os.path.join(ROOT, "agent")
-DATA_FILE = os.path.join(ROOT, "data.json")
-BOARDS_FILE = os.path.join(AGENT, "boards.json")
-WATCHLIST_FILE = os.path.join(AGENT, "watchlist.json")
+# Multi-user (ROADMAP-V3 PR0): the server passes a tenant's namespace via REQON_* env so the scout
+# reads/writes THAT user's files. Unset (single-user) -> legacy root/agent paths, unchanged.
+DATA_FILE = os.environ.get("REQON_DATA_FILE") or os.path.join(ROOT, "data.json")
+BOARDS_FILE = os.environ.get("REQON_BOARDS_FILE") or os.path.join(AGENT, "boards.json")
+WATCHLIST_FILE = os.environ.get("REQON_WATCHLIST_FILE") or os.path.join(AGENT, "watchlist.json")
+# In multi-user the server gates loopback (no implicit-owner trust), so the scout can't POST to the
+# server API; REQON_FILE_MODE forces the direct-file merge path instead.
+FILE_MODE = os.environ.get("REQON_FILE_MODE") == "1" or bool(os.environ.get("REQON_DATA_FILE"))
 LOG_FILE = os.path.join(AGENT, "found-log.md")
-SOURCE_HEALTH_FILE = os.path.join(AGENT, "source-health.json")
+SOURCE_HEALTH_FILE = os.environ.get("REQON_SOURCE_HEALTH_FILE") or os.path.join(AGENT, "source-health.json")
 TODAY = datetime.date.today().isoformat()
+NOW_ISO = datetime.datetime.now().isoformat()
 PORT = int(os.environ.get("PORT", "8787"))
 UA = "job-scout/1.0 (+local CRM)"
 TIMEOUT = 20
@@ -179,6 +185,52 @@ def score_fit(title, desc):
     return round(min(fit, 9.0), 1)
 
 
+# Pull the top-of-range dollar figure from a salary string ("$193.5K–252.6K" -> 252600,
+# "$200,000-280,000" -> 280000). Returns 0 when nothing parseable (e.g. "competitive").
+# Token: optional $, a number, optional K/M. A range like "$193.5K–252.6K" only $-marks the first
+# half, so we also accept K/M-suffixed and large bare numbers — then take the MAX (top of range).
+SAL_NUM_RE = re.compile(r"(\$)?\s*([0-9][0-9,\.]*)\s*([kKmM])?")
+def parse_salary_top(s):
+    if not s:
+        return 0
+    best = 0
+    for m in SAL_NUM_RE.finditer(str(s)):
+        dollar, num, suf = m.group(1), m.group(2), m.group(3)
+        try:
+            val = float(num.replace(",", ""))
+        except ValueError:
+            continue
+        if suf in ("k", "K"):
+            val *= 1000
+        elif suf in ("m", "M"):
+            val *= 1_000_000
+        # Count it only if it's clearly money: had a $, a K/M suffix, or is a large bare number
+        # (>=10k → annual comp; this skips stray years/counts like "2024").
+        if not (dollar or suf or val >= 10000):
+            continue
+        best = max(best, val)
+    return int(best)
+
+
+# Salary fit: the candidate anchors to the TOP of the posted range. Above target = small bonus;
+# at/above the minimum = neutral; below = a penalty that scales (heavy under-pay can drop the role
+# below min-fit and fall out). Unknown comp is neutral — never penalize a missing salary.
+def salary_adj(sal_str, desired_min, desired_target):
+    if not desired_min and not desired_target:
+        return 0.0
+    top = parse_salary_top(sal_str)
+    if top <= 0:
+        return 0.0
+    target = desired_target or desired_min
+    if top >= target:
+        return 0.3
+    if desired_min and top >= desired_min:
+        return 0.0
+    if desired_min and top >= 0.8 * desired_min:
+        return -1.0
+    return -2.0
+
+
 def band_adj(title):
     t = title.lower()
     if any(b in t for b in ["vp ", "vice president", "head of"]):
@@ -282,6 +334,7 @@ def with_defaults(x):
         "referral": "No", "resume": "", "cover": "No", "followup": "",
         "lastcontact": "", "next": "Auto-scouted - review & apply", "added": TODAY,
         "reqCheck": "open", "source": "",
+        "updatedAt": NOW_ISO, "updatedBy": "scout",
     }
     base.update(x)
     return base
@@ -330,10 +383,12 @@ def file_merge(rows):
     new = dedupe_new(rows, store)
     for x in new:
         store.append(with_defaults(x))
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)   # tenant namespace dir may be new
     tmp = DATA_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(store, f, indent=2)
     os.replace(tmp, DATA_FILE)
+    return {"added": len(new), "skipped": len(rows) - len(new), "total": len(store), "via": "file"}
     return {"ok": True, "added": len(new), "skipped": len(rows) - len(new),
             "total": len(store), "via": "file"}
 
@@ -380,6 +435,8 @@ def main():
         min_tier = "B"
     skip_types = [s.lower() for s in boards.get("skipEmploymentTypes", EMPLOYMENT_SKIP_DEFAULT)]
     neg_kw = [k.lower() for k in watch.get("searchTerms", {}).get("negativeKeywords", [])]
+    desired_min = int(watch.get("searchTerms", {}).get("minSalary", 0) or 0)        # salary fit (Settings)
+    desired_target = int(watch.get("searchTerms", {}).get("salaryTarget", 0) or 0)
 
     # Optional resume tailoring: agent/profile.json (built by profile-from-resume.py).
     profile_path = os.path.join(AGENT, "profile.json")
@@ -474,6 +531,10 @@ def main():
             if neg_hits:
                 fit = round(max(0.0, fit - NEG_KW_PENALTY * neg_hits), 1)
                 stats["demoted"] += 1
+            # Salary fit (Settings → Matching & scoring): adjust fit toward desired comp.
+            sal_adj = salary_adj(p.get("salary", ""), desired_min, desired_target)
+            if sal_adj:
+                fit = round(max(0.0, min(9.0, fit + sal_adj)), 1)
             if fit < min_fit:
                 continue
             prob = score_prob(fit, title, rmode, bool(c.get("heritage")))
@@ -513,10 +574,13 @@ def main():
         log("\n[dry-run] %d candidates not written." % len(candidates), args.quiet)
         return 0
 
-    try:
-        result = http_merge(candidates)
-    except Exception:
+    if FILE_MODE:                       # multi-user: write straight to the tenant's data file
         result = file_merge(candidates)
+    else:
+        try:
+            result = http_merge(candidates)
+        except Exception:
+            result = file_merge(candidates)
     log("Merge: added %d, skipped %d, total %d (via %s)."
         % (result.get("added", 0), result.get("skipped", 0),
            result.get("total", "?"), result.get("via", "?")), args.quiet)

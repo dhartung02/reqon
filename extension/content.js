@@ -14,7 +14,11 @@
 
   // ---- JD keyword extraction (Phase 2) — the side panel asks the page for its salient terms ----
   const JD_SELECTORS = ['.jobs-description', '.show-more-less-html', '.posting-page', '.section-wrapper',
-    '#content .job__description', '[class*="job-description" i]', '[class*="description" i]', 'main', 'article'];
+    '#content .job__description',                          // greenhouse
+    '[data-ui="job-description"]', '.styles__content',     // smartrecruiters
+    '.job-description', '.description',                    // workable / generic
+    '[class*="vacancy" i]', '[class*="posting" i]',        // teamtailor / recruitee
+    '[class*="job-description" i]', '[class*="description" i]', 'main', 'article'];
   function jdText() {
     let best = '';
     for (const sel of JD_SELECTORS) {
@@ -31,9 +35,12 @@
   }
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg) return;
+    hookFocus();   // once the panel/overlay is in use, track the last-focused field for Insert
     if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords() }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
+    if (msg.type === 'smartFill') { smartFill().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
+    if (msg.type === 'insertDraft') { try { sendResponse(insertDraft(msg.text)); } catch (e) { sendResponse({ ok: false, msg: String(e) }); } return; }
   });
 
   // ---- apply-assist fill (mirrors the iOS in-app browser; runs in the real page) ----
@@ -102,6 +109,52 @@
   }
   const fillBtn = () => { const b = el('button', 'jpcrm-btn', '✎ Fill'); b.onclick = async () => { const res = await fillForm(); toast(res.msg, res.ok); }; return b; };
 
+  // ---- AI smart-fill (T1.1): deterministic pass, then ask the server's map_fields tool to fill
+  // remaining empty fields it's confident about. Server grounds in factual profile only; we apply
+  // only confidence >= 0.6. NEVER passwords/EEO/consent (those are skipped here too); NEVER submits.
+  async function smartFill() {
+    const base = await fillForm();
+    const candidates = [];
+    let idx = 0;
+    document.querySelectorAll('input, textarea').forEach((e) => {
+      const t = (e.type || '').toLowerCase();
+      if (SKIP_TYPES.indexOf(t) >= 0) return;
+      if (e.value && e.value.trim()) return;             // already filled (incl. deterministic pass)
+      if (t === 'email' || t === 'tel') { /* still allow */ }
+      e.setAttribute('data-reqon-i', String(idx));
+      candidates.push({ i: idx, sig: fieldSig(e), type: t });
+      idx++;
+    });
+    if (!candidates.length) return base;
+    const r = await send({ type: 'mapFields', payload: { fields: candidates } });
+    if (!r || !r.ok) return Object.assign(base, { aiError: (r && r.error) || 'AI fill unavailable' });
+    let ai = 0;
+    (r.fields || []).forEach((m) => {
+      if (!m || (typeof m.confidence === 'number' && m.confidence < 0.6)) return;
+      const e = document.querySelector('[data-reqon-i="' + m.i + '"]');
+      if (e && !(e.value && e.value.trim()) && m.value) { setVal(e, String(m.value)); ai++; }
+    });
+    return Object.assign(base, { ai, ok: (base.factual + base.answered + ai) > 0,
+      msg: `Filled ${base.factual} standard` + (base.answered ? ` + ${base.answered} answer` : '') + (ai ? ` + ${ai} AI` : '') + ' field(s) — review, never auto-submitted.' });
+  }
+
+  // ---- focus tracking + draft insert (T2.5): remember the last-focused field so an AI draft from
+  // the side panel can be dropped into the right textarea. Installed on demand.
+  let lastField = null, focusHooked = false;
+  function hookFocus() {
+    if (focusHooked) return; focusHooked = true;
+    document.addEventListener('focusin', (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) lastField = t;
+    }, true);
+  }
+  function insertDraft(text) {
+    const e = lastField;
+    if (!e || (e.tagName !== 'TEXTAREA' && e.tagName !== 'INPUT')) return { ok: false, msg: 'Tap a field on the page first, then Insert.' };
+    setVal(e, String(text || ''));
+    return { ok: true, msg: 'Inserted into the focused field — review it.' };
+  }
+
   let box;
   function mount() {
     box = el('div', 'jpcrm-box');
@@ -123,6 +176,22 @@
       const b = el('button', 'jpcrm-btn', '✓ Mark applied (today)');
       b.onclick = async () => { b.disabled = true; b.textContent = 'Saving…'; const r = await send({ type: 'markApplied', row }); toast(r.msg, r.ok); if (r.ok) { row.status = 'Applied'; renderTracked(row); } else b.disabled = false; };
       body.appendChild(b);
+    }
+    // Interview prep guide (T1.2): show for rows in an interview stage — open if built, else generate.
+    if (['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'].includes(row.status)) {
+      const g = el('button', 'jpcrm-btn', row.guideAt ? '📋 Interview guide' : '📋 Generate guide');
+      g.onclick = async () => {
+        const key = reqKey(row);
+        const { origin } = await new Promise((r) => chrome.storage.sync.get({ origin: 'http://localhost:8787' }, r));
+        const base = (origin || '').replace(/\/$/, '');
+        const url = base + '/api/reqs/' + encodeURIComponent(key) + '/guide';
+        if (row.guideAt) { window.open(url, '_blank'); return; }
+        g.disabled = true; g.textContent = 'Generating…';
+        const r2 = await send({ type: 'genGuide', key });
+        if (r2 && r2.ok) { row.guideAt = new Date().toISOString(); window.open(url, '_blank'); renderTracked(row); }
+        else { toast((r2 && r2.error) || 'Guide failed', false); g.disabled = false; g.textContent = '📋 Generate guide'; }
+      };
+      body.appendChild(g);
     }
     body.appendChild(fillBtn());
   }

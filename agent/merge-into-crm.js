@@ -29,10 +29,12 @@ function readInput() {
 }
 
 function withDefaults(x) {
+  const now = new Date();
   return Object.assign({
     status: 'Not Applied', applied: '', interview: '', recruiter: '', referral: 'No',
     resume: '—', cover: 'No', followup: '', lastcontact: '', next: '',
-    added: new Date().toISOString().slice(0, 10)
+    added: now.toISOString().slice(0, 10),
+    updatedAt: now.toISOString(), updatedBy: 'scout'
   }, x);
 }
 

@@ -31,7 +31,14 @@
         "https://jobs.ashbyhq.com/*",
         "https://jobs.lever.co/*",
         "https://www.linkedin.com/jobs/*",
-        "https://simplify.jobs/*"
+        "https://simplify.jobs/*",
+        "https://apply.workable.com/*",
+        "https://*.workable.com/*",
+        "https://jobs.smartrecruiters.com/*",
+        "https://*.recruitee.com/*",
+        "https://*.teamtailor.com/*",
+        "https://*.jobs.personio.de/*",
+        "https://*.jobs.personio.com/*"
       ],
       "js": ["lib.js", "content.js"],
       "css": ["overlay.css"],

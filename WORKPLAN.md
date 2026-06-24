@@ -1,7 +1,7 @@
 # WORKPLAN — Executing Roadmap v2
 
 *Handoff doc for Claude Code sessions. Read [ROADMAP.md](ROADMAP.md) first for the why;
-this file is the how. Last updated: 2026-06-18. **Status: WP-0 through WP-6 are all shipped
+this file is the how. Last updated: 2026-06-23. **Status: WP-0 through WP-6 are all shipped
 and merged to `main`** (status table at the bottom). The app then grew well past the original
 roadmap — see "Beyond the roadmap (shipped)" below. The only roadmap work still open is
 **dev-build-gated** (native Share Extension, on-device push registration, local
@@ -305,6 +305,65 @@ thresholds, analytics, score rationale, answers search/match, pairing codec):
   via `run-mail.sh` (piggybacks the scout). Notifies positives on the digest webhook.
 - **Résumé parser fix** — correct company/role segmentation, DOCX tabs, multi-degree, no
   truncation; **scout dedup** unified on the near-dupe-aware key.
+
+## AI + extension expansion (shipped after the above)
+
+Server, board, extension, and a new MCP server — all `node --check` clean, Python `py_compile`
+clean, extension logic unit-tested (`node --test extension/tests/*.test.js`). Live OpenAI/Chrome
+paths need on-machine verification (key + running board + load-unpacked).
+
+- **Responses API migration** — `openaiChat()` now uses `/v1/responses` with function calling +
+  built-in tools, auto-fallback to `/chat/completions` (`OPENAI_USE_CHAT` to force legacy).
+- **AI assist depth** — `/api/assist` adds the `tailor` kind; new `/api/assist/score` (`score_role`)
+  and `/api/assist/map-fields` (`map_fields`) via function calling; `/api/assist/usage` consumption
+  monitor (tokens, caps, $ estimate from `OPENAI_PRICE_PER_1M`, budget bar).
+- **File search / web search** — `OPENAI_VECTOR_STORE_ID` (build via `agent/setup-vector-store.py`)
+  grounds drafts/guides on résumé + narratives; `ASSIST_WEB_SEARCH=true` adds company context.
+- **Interview prep guides** — auto-built on entering an interview stage (PUT + PATCH), stored in
+  `agent/interview-guides/` (gitignored) + `row.guideAt`, served at `GET /api/reqs/:key/guide`,
+  bundled into backups + restorable. Surfaced on the board card, the extension overlay, and panel.
+- **Mail ingest trigger** — confident single-match interview emails advance `Applied → Recruiter
+  Screen` (gated by `--no-advance-interviews`), triggering the guide. Offers stay review-only.
+- **Extension (Reqon Clip)** — Reqon rebrand + icons + overlay toggle; `chrome.sidePanel` with
+  analytics, this-page record, **JD keyword coverage** + tailoring, **AI-assisted autofill**
+  (deterministic + `map_fields`), **AI draft** (insert/copy), **Score with AI**, status controls,
+  interview-guide link, and an **AI usage** monitor; broadened boards (Workable, SmartRecruiters,
+  Recruitee, Teamtailor, Personio).
+- **MCP server** (`mcp/`) — read-only `list_reqs`/`get_req`/`pipeline_stats` over the board API.
+
+## Board/Settings overhaul (shipped 2026-06-23)
+
+Server `node --check` clean, Python `ast`-parse clean, verified against a running board (preview).
+
+- **User guide** — footer definitions moved to a standalone `/guide` page (scores, link confidence,
+  lanes, apply modes, source health, data safety, integrations); board footer + ⓘ link to it.
+- **Card** — record-keeping strip (Added · Source · Updated-by; `updatedBy` stamped by board/scout/
+  merge) and inline-editable **Salary / range** + Location.
+- **Sources** — aligned single-column list with Select-all + "N of M enabled" counter; **source
+  health** relabeled, comma-formatted, leads with matches/errors.
+- **Candidate profile** — GitHub URL + AI-drafted professional summary (`/api/profile/draft-summary`);
+  removed the seeded `vp` seniority default.
+- **Workflow** — lifecycle/follow-up statuses are now multi-select chips (no freeform).
+- **AI assistant** — model fields are dropdowns from the live OpenAI list (`/api/assist/models`);
+  `OPENAI_PRICE_PER_1M` + `ASSIST_MONTHLY_BUDGET` surfaced in Settings.
+- **Env exposure** — read-only "all env vars" inventory (`/api/env-inventory`, secrets masked);
+  HTTPS/Tailscale/Caddy status (`/api/https-status`); tombstone relabeled "Deleted (recoverable)".
+  Settings no longer dismisses on a stray click (× / Close / Save / Esc only).
+- **Notifications engine** — `deliverDigest`/`dispatchNotify` fan out to 6 channels (in-app 🔔 bell
+  via `/api/notifications`, file, slack, email, **sms**, push); digest can fire **after the first
+  scout run of the day**; Gmail ingest emits `SUMMARY_JSON` → per-event rejection/interview/offer
+  alerts. **Free SMS** via carrier email-to-SMS gateway over SMTP (`SMS_METHOD=email`) alongside Twilio.
+- **Salary-fit scoring** — `parse_salary_top`/`salary_adj` in `scout.py` weight comp (top-of-range)
+  against `minSalary`+`salaryTarget` from Settings → Matching & scoring.
+- **Apply-mode fillability probe** — `/api/applymode/probe` (URL+HTML fingerprint) → opt-in
+  `/api/applymode/probe-ai`; learned host→mode persisted to `boards.applyModeHosts` and consulted by
+  `inferApplyMode`. Card "🔎 detect" button.
+- **Analytics distribution layer** — a cohort **lens** (job reqs / applications / interviews /
+  rejected / offers) drives distribution charts: top companies, roles (normalized), role levels,
+  salary bands, industry/sector, tier, remote posture — ranked bars / histogram / SVG donuts (no
+  chart lib). Plus weekly application velocity and avg-fit-by-outcome. All client-side in
+  `renderAnalytics` (helpers: `distBars`/`histogram`/`donut`/`velocityChart`/`fitByOutcome`,
+  `roleLevel`/`roleFamily`/`salaryBand`/`parseSalaryTopJS`).
 
 ## Open work (all dev-build-gated — needs EAS/Xcode)
 

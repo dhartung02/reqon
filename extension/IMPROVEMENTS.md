@@ -79,6 +79,32 @@ Uses the OpenAI integration already in `server.js` (`openaiChat` → `/v1/chat/c
   `ASSIST_WEB_SEARCH=true` (current company context). Function-calling capability is in `openaiChat`;
   wiring it into structured autofill/scoring + file_search grounding of narratives are the next steps.
 
+## Phase 5 — function calling, tools, reach, MCP, tests ✅ (built)
+
+**Tier 1**
+- **Function-calling scoring + field map** — `/api/assist/score` (`score_role` → fit/prob/tier/
+  rationale) and `/api/assist/map-fields` (`map_fields` → confident factual mappings), both via
+  Responses function calling. Side panel: **Score with AI** (with Apply-to-board); **Autofill** is now
+  AI-assisted (deterministic pass + `map_fields` for what's left, ≥0.6 confidence only).
+- **Interview guide in the extension** — overlay + side panel show **📋 Interview guide / Generate**
+  for rows in an interview stage (opens `/api/reqs/:key/guide`).
+- **Status controls in the side panel** — status dropdown + (via PATCH) auto-guide trigger.
+
+**Tier 2**
+- **File-search grounding** — `OPENAI_VECTOR_STORE_ID` enables the `file_search` tool on drafts +
+  guides; `agent/setup-vector-store.py` creates the store from résumé + narratives.
+- **Insert draft into page** — content-script focus tracker + `insertDraft`; panel "Insert into page".
+- **Coverage → tailoring** — `tailor` assist kind turns missing JD keywords into honest résumé
+  suggestions (panel "Suggest how to close the gaps").
+- **Broader boards** — Workable, SmartRecruiters, Recruitee, Teamtailor, Personio added to the
+  content-script matches + JD selectors.
+
+**Tier 3**
+- **Web search on drafts** — `ASSIST_WEB_SEARCH=true` now applies to drafts (not just guides).
+- **MCP server** — `mcp/` exposes `list_reqs` / `get_req` / `pipeline_stats` (read-only) to MCP
+  clients over the board API. `cd mcp && npm install`, then register the command.
+- **Extension tests** — `extension/tests/lib.test.js` (`node --test extension/tests/*.test.js`).
+
 ## Guardrails (unchanged)
 
 - Apply-assist fills factual fields + matching saved answers only — never passwords / EEO / consent,

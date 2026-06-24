@@ -30,7 +30,7 @@ async function renderPage() {
   }
   const r = await send({ type: 'lookup', url: tab.url, force: false });
   if (!r || r.ok === false) { $('page').innerHTML = '<div class="role">Can’t reach the board</div><div class="company muted">Check settings in the popup.</div>'; return; }
-  const autofillBtn = '<button id="autofill" class="btn btn-ghost">⚡ Autofill standard fields</button>';
+  const autofillBtn = '<button id="autofill" class="btn btn-ghost">⚡ Autofill (AI-assisted)</button>';
   const row = r.row;
   currentRow = row || null;
   if (!row) {
@@ -48,13 +48,72 @@ async function renderPage() {
     `<span class="chip">fit <b>${esc(row.fit ?? '—')}</b></span>` +
     `<span class="chip">prob <b>${esc(row.prob ?? '—')}</b></span>` +
     `<span class="chip">EV <b>${ev(row)}</b></span>`;
+  const interview = INTERVIEW_STATUSES.includes(row.status);
+  const guideBtn = interview
+    ? (row.guideAt
+        ? '<button id="guideOpen" class="btn btn-ghost">📋 Interview guide</button>'
+        : '<button id="guideGen" class="btn btn-ghost">📋 Generate interview guide</button>')
+    : '';
   $('page').innerHTML =
     `<div class="role">${esc(row.role || '—')}</div>` +
     `<div class="company">${esc(row.company || '')}</div>` +
     `<div class="metrics">${chips}</div>` +
-    `<div class="status ${statusClass(row.status)}">${esc(row.status || 'Not Applied')}</div>` +
-    autofillBtn;
+    `<select id="statusSel" class="sel" style="margin-top:8px">` +
+      STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
+    `</select>` +
+    autofillBtn +
+    '<button id="score" class="btn btn-ghost">✨ Score with AI</button>' +
+    guideBtn +
+    '<div id="scoreOut"></div>';
   $('autofill').onclick = doAutofill;
+  $('statusSel').onchange = (e) => doSetStatus(e.target.value);
+  $('score').onclick = doScore;
+  if ($('guideOpen')) $('guideOpen').onclick = () => openGuide(row);
+  if ($('guideGen')) $('guideGen').onclick = (e) => doGuide(row, e && e.target);
+}
+const STATUSES = ['Not Applied', 'Applied', 'Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer', 'Rejected', 'Archived'];
+const INTERVIEW_STATUSES = ['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'];
+
+async function doSetStatus(status) {
+  if (!currentRow) return;
+  setMsg('Updating status…');
+  const r = await send({ type: 'setStatus', row: currentRow, status });
+  if (!r || !r.ok) { setMsg((r && r.error) || 'Status update failed.', 'err'); return; }
+  setMsg(`Status → ${status}.`, 'ok');
+  setTimeout(refresh, 800);   // re-pull so guide button etc. reflect the change
+}
+
+async function openGuide(row) {
+  const o = await getOrigin();
+  if (o) chrome.tabs.create({ url: o + '/api/reqs/' + encodeURIComponent(reqKeyOf(row)) + '/guide' });
+}
+async function doGuide(row, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  const r = await send({ type: 'genGuide', key: reqKeyOf(row) });
+  if (!r || !r.ok) { setMsg((r && r.error) || 'Guide generation failed.', 'err'); if (btn) { btn.disabled = false; btn.textContent = '📋 Generate interview guide'; } return; }
+  await openGuide(row);
+  setTimeout(refresh, 600);
+}
+
+async function doScore() {
+  if (!currentRow) return;
+  const b = $('score'); if (b) { b.disabled = true; b.textContent = 'Scoring…'; }
+  let jd = '';
+  try { if (activeTab && activeTab.id != null) { const t = await chrome.tabs.sendMessage(activeTab.id, { type: 'jdText' }); if (t && t.ok) jd = t.text || ''; } } catch (e) { /* not a job page */ }
+  const r = await send({ type: 'score', payload: { key: reqKeyOf(currentRow), jd } });
+  if (b) { b.disabled = false; b.textContent = '✨ Score with AI'; }
+  const out = $('scoreOut');
+  if (!r || !r.ok) { if (out) out.innerHTML = `<div class="draft" style="border-color:#54322b;color:#e8a08f">⚠ ${esc((r && r.error) || 'Scoring failed')}</div>`; return; }
+  if (out) {
+    out.innerHTML =
+      `<div class="draft"><b>AI score</b> — fit ${esc(r.fit)}, prob ${esc(r.prob)}, tier ${esc(r.tier)}<br>${esc(r.rationale || '')}</div>` +
+      `<div class="draft-foot"><span class="tok">${esc(r.tokens ? '~' + r.tokens + ' tokens' : '')}</span><button id="applyScore" class="copybtn">Apply to board</button></div>`;
+    $('applyScore').onclick = async () => {
+      const rr = await send({ type: 'patchFields', row: currentRow, fields: { fit: r.fit, prob: r.prob, tier: r.tier } });
+      if (rr && rr.ok) { setMsg('Score applied to board.', 'ok'); setTimeout(refresh, 700); }
+      else setMsg((rr && rr.error) || 'Could not apply score.', 'err');
+    };
+  }
 }
 
 // Fill standard/factual fields on the open posting via its content script. Open-ended questions are
@@ -64,10 +123,11 @@ async function doAutofill() {
   if (!activeTab || !/^https?:/.test(activeTab.url || '')) { setMsg('Open a job posting to autofill.', 'err'); return; }
   if (b) { b.disabled = true; b.textContent = 'Filling…'; }
   let res = null;
-  try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'autofill' }); } catch (e) { res = null; }
-  if (b) { b.disabled = false; b.textContent = '⚡ Autofill standard fields'; }
-  if (!res) setMsg('Autofill works on the open posting on a supported board (Greenhouse, Ashby, Lever, LinkedIn).', 'err');
-  else setMsg(res.msg || (res.ok ? 'Filled — review before submitting.' : 'Nothing to fill here.'), res.ok ? 'ok' : '');
+  // smartFill = deterministic factual/answer pass + an AI map_fields pass for what's left (T1.1).
+  try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'smartFill' }); } catch (e) { res = null; }
+  if (b) { b.disabled = false; b.textContent = '⚡ Autofill (AI-assisted)'; }
+  if (!res) setMsg('Autofill works on the open posting on a supported board.', 'err');
+  else setMsg(res.msg || (res.ok ? 'Filled — review before submitting.' : 'Nothing to fill here.') + (res.aiError ? ' (AI pass: ' + res.aiError + ')' : ''), res.ok ? 'ok' : '');
 }
 
 async function doClip() {
@@ -109,7 +169,22 @@ async function renderCoverage() {
     covered.map((t) => `<span class="kw">${esc(t)}</span>`).join('') +
     missing.map((t) => `<span class="kw miss">${esc(t)}</span>`).join('') +
     '</div>' +
-    (missing.length ? '<div class="muted" style="margin-top:8px;font-size:.72rem">Red = in the posting, not in your résumé keywords.</div>' : '');
+    (missing.length ? '<div class="muted" style="margin-top:8px;font-size:.72rem">Red = in the posting, not in your résumé keywords.</div>' : '') +
+    (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:8px">✨ Suggest how to close the gaps</button><div id="tailorOut"></div>' : '');
+  const tb = $('tailor');
+  if (tb) tb.onclick = async () => {
+    tb.disabled = true; tb.textContent = 'Thinking…';
+    let jdText = '';
+    try { if (activeTab && activeTab.id != null) { const t = await chrome.tabs.sendMessage(activeTab.id, { type: 'jdText' }); if (t && t.ok) jdText = t.text || ''; } } catch (e) { /* ignore */ }
+    const payload = { kind: 'tailor', keywords: missing.join(', '), jd: jdText };
+    if (currentRow) payload.key = reqKeyOf(currentRow);
+    const r = await send({ type: 'assist', payload });
+    tb.disabled = false; tb.textContent = '✨ Suggest how to close the gaps';
+    const out = $('tailorOut');
+    if (!r || !r.ok) { if (out) out.innerHTML = `<div class="draft" style="border-color:#54322b;color:#e8a08f">⚠ ${esc((r && r.error) || 'Suggestion failed')}</div>`; return; }
+    if (out) { out.innerHTML = '<div class="draft" id="tailorText"></div>'; $('tailorText').textContent = r.draft || ''; }
+    loadUsage();
+  };
 }
 
 // ---- analytics ----
@@ -203,10 +278,17 @@ function renderDraft(text, tokens, usage) {
   const meta = (used != null ? `${used}${cap ? '/' + cap : ''} calls today` : '') + (tokens ? ` · ~${tokens} tokens` : '');
   const out = $('aiOut');
   out.innerHTML = `<div class="draft" id="draftText"></div>` +
-    `<div class="draft-foot"><span class="tok">${esc(meta)}</span><button id="copyDraft" class="copybtn">Copy</button></div>` +
+    `<div class="draft-foot"><span class="tok">${esc(meta)}</span><span><button id="insertDraft" class="copybtn">Insert into page</button> <button id="copyDraft" class="copybtn">Copy</button></span></div>` +
     `<div class="tok" style="margin-top:6px">Review before using — drafted from your narratives, never submitted.</div>`;
   $('draftText').textContent = text;
   $('copyDraft').onclick = async () => { try { await navigator.clipboard.writeText(text); setMsg('Draft copied.', 'ok'); } catch (e) { setMsg('Copy failed — select the text manually.', 'err'); } };
+  // Insert into the page's last-focused field (T2.5) — click into the target field first, then this.
+  $('insertDraft').onclick = async () => {
+    if (!activeTab || activeTab.id == null) { setMsg('No active page to insert into.', 'err'); return; }
+    let res = null;
+    try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'insertDraft', text }); } catch (e) { res = null; }
+    setMsg(res ? (res.msg || (res.ok ? 'Inserted.' : 'Tap a field on the page first.')) : 'Insert works on a supported job page.', res && res.ok ? 'ok' : 'err');
+  };
 }
 
 // ---- AI usage / consumption monitor ----

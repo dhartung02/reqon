@@ -1697,7 +1697,16 @@ GET /api/reqs/:key/timeline
 
 ---
 
-## P2.6 — Pipeline Health Score
+## P2.6 — Pipeline Health Score — ✅ DONE (2026-06-24)
+
+**Shipped.** `GET /api/pipeline-health` (pure `lib/pipeline-health.js`, 4 unit tests) turns the live
+pipeline into a band (Good / Fair / At risk) + score, the weighted **main risk**, deterministic
+**metrics** (apply-ready Tier A/B, applied 7d, response/rejection rate, follow-ups overdue, aging
+14d+ apps, avg EV) and **recommendations** mapped to action surfaces. Web: a health banner atop the
+Analytics tab with metric chips and clickable recommendations that jump to the relevant view
+(run-scout / apply-next / follow-ups / interviewing). Verified live (Fair · 74/100 · "47 apps aging
+14+ days, 2% response rate" on the real board); no console errors. Recommendations reuse the action
+vocabulary from P2.1.
 
 ### Surface
 

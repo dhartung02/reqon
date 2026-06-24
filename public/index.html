@@ -409,6 +409,20 @@
   @media(max-width:720px){.an-grid2{grid-template-columns:1fr}}
   .an-filterbanner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,184,0,.08);border:1px solid var(--warning);color:var(--warning);border-radius:9px;padding:8px 12px;font-size:.8rem;margin:2px 0}
   .an-filterbanner .mini{margin-left:auto}
+  /* pipeline health banner (P2.6) */
+  .healthbar{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px;margin-bottom:14px}
+  .healthbar.loading-h{color:var(--dim);font-size:.85rem}
+  .hb-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .hb-band{font-size:1.05rem;font-weight:700}
+  .hb-band.good{color:var(--positive)} .hb-band.fair{color:var(--warning)} .hb-band.risk{color:var(--danger)}
+  .hb-score{font-family:"Spline Sans Mono",ui-monospace,monospace;font-size:.82rem;color:var(--dim)}
+  .hb-risk{font-size:.86rem;color:var(--text-2);flex:1;min-width:200px}
+  .hb-metrics{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .hb-m{font-size:.72rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+  .hb-m b{color:var(--text)}
+  .hb-recs{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+  .hb-rec{font-size:.78rem;font-weight:600;color:var(--accent);background:rgba(0,229,163,.08);border:1px solid var(--accent);border-radius:8px;padding:6px 11px;cursor:pointer}
+  .hb-rec:hover{background:rgba(0,229,163,.16)}
   .an-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
   @media(max-width:1080px){.an-grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:720px){.an-grid3{grid-template-columns:1fr}}
@@ -1551,6 +1565,26 @@ function openSettingsTo(sect){
   head.onclick=()=>{ ccCollapsed=!ccCollapsed; document.getElementById('cmdCenter').classList.toggle('collapsed', ccCollapsed); };
 })();
 
+// ---- Pipeline health banner (P2.6) — shown atop the Analytics tab ----
+const HB_REC_ACTION={run_scout:()=>{setTab('open');try{triggerScout('both');}catch(e){}}, apply_next:()=>todoGo('applynext'), follow_up_due:()=>todoGo('followup'), review_interview:()=>{setTab('interviewing');}};
+async function loadPipelineHealth(){
+  const el=document.getElementById('healthBanner'); if(!el) return;
+  let j; try{ j=await (await fetch('/api/pipeline-health',{cache:'no-store'})).json(); }catch(e){ el.style.display='none'; return; }
+  if(!j||!j.ok){ el.style.display='none'; return; }
+  el.classList.remove('loading-h');
+  const bandCls=j.band==='Good'?'good':j.band==='Fair'?'fair':'risk';
+  const m=j.metrics||{};
+  const metricChips=[
+    ['apply-ready', m.applyReady], ['applied 7d', m.appliedLast7],
+    ['response', m.responseRate!=null?m.responseRate+'%':'—'], ['interviewing', m.interviewing],
+    ['follow-ups due', m.followupsOverdue], ['aging 14d+', m.agingApps]
+  ].map(([k,v])=>`<span class="hb-m">${k} <b>${v}</b></span>`).join('');
+  el.innerHTML=`<div class="hb-top"><span class="hb-band ${bandCls}">Pipeline health: ${esc(j.band)}</span><span class="hb-score">${j.score}/100</span><span class="hb-risk">⚠ ${esc(j.mainRisk)}</span></div>`
+    +`<div class="hb-metrics">${metricChips}</div>`
+    +`<div class="hb-recs">${j.recommendations.map((r,i)=>`<span class="hb-rec" data-act="${esc(r.action)}">→ ${esc(r.text)}</span>`).join('')}</div>`;
+  el.querySelectorAll('.hb-rec').forEach(b=>{ b.onclick=()=>{ const fn=HB_REC_ACTION[b.dataset.act]; if(fn)fn(); }; });
+}
+
 const SCLS={"Applied":"st-applied","Recruiter Screen":"st-active","Hiring Manager":"st-active","Panel":"st-active","Offer":"st-offer","Rejected":"st-rejected","Archived":"st-archived"};
 const BADGECLS={"Applied":"applied","Recruiter Screen":"active","Hiring Manager":"active","Panel":"active","Offer":"offer","Rejected":"rejected","Archived":"archived"};
 const isLinkedInSearch=u=>/linkedin\.com\/jobs\/search/i.test(u||"");
@@ -1767,7 +1801,8 @@ function render(){
   }
   if(analytics){
     // conversion & source-ROI analytics — computed client-side from the (non-status-filtered) base
-    board.innerHTML=renderAnalytics({qy,srcf,tf,amf,remoteOnly});
+    board.innerHTML='<div id="healthBanner" class="healthbar loading-h">Assessing pipeline health…</div>'+renderAnalytics({qy,srcf,tf,amf,remoteOnly});
+    loadPipelineHealth();
     renderSelbar();
     return;
   }

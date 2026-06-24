@@ -189,6 +189,7 @@ const core = require('./core/crm-core');
 const { reqKey, postingId, sameReq, expectedValue, computeTier, DEFAULT_TIER_THRESHOLDS } = core;
 const { computeActionItems } = require('./lib/action-items');   // P2.1 unified action model
 const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role timeline
+const { computePipelineHealth } = require('./lib/pipeline-health'); // P2.6 pipeline health score
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -699,6 +700,12 @@ app.get('/api/pair', async (req, res) => {
 
 app.get('/api/reqs', (req, res) => {
   res.json(readStore());
+});
+
+// Pipeline health score (P2.6) — a band + main risk + recommended next actions, deterministic.
+app.get('/api/pipeline-health', (req, res) => {
+  try { res.json({ ok: true, ...computePipelineHealth(readStore(), { today: new Date().toISOString().slice(0, 10) }) }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // Unified, deterministic action items (P2.1) — derived from the live store + config, consumed by

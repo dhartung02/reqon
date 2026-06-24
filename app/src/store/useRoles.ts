@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Role, Status } from '../model';
 import { initDb, getAllRoles, setRoleStatus, softDeleteRole, updateRole, addRole, type NewRole } from '../db/store';
 
-type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location'>>;
+type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'>>;
 
 // App-wide roles state, backed by the expo-sqlite store. Mutations write through then refresh, so
 // every screen reflects the persisted truth. (M4 layers sync on top of the same store.)

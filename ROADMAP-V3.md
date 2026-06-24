@@ -1007,7 +1007,18 @@ Role Detail should show:
 
 ---
 
-## P1.5 — Add AI Score / Map-Fields to App Apply Assist
+## P1.5 — Add AI Score / Map-Fields to App Apply Assist — ✅ DONE (2026-06-24, pending device pass)
+
+**Shipped (code + jest; needs device pass).** `requestScore` in `sync/assist.ts` calls
+`/api/assist/score`; a `ScoreModal` shows current → suggested fit/prob/tier + the rationale, and
+**Apply** persists fit/prob (tier + EV re-derive locally, and two-way sync pushes it up). A
+**Re-score · AI** action sits in RoleDetail's "Why this score" header. `EditablePatch`/`updateRole`
+extended to carry fit/prob. tsc clean, 71 jest green; score endpoint verified live (fit 8 · prob 7 ·
+tier A). *Device pass:* re-score a role, apply, confirm the card updates.
+
+**Deferred — map-fields autofill in the app:** that needs JS injection into the in-app apply WebView
+(the extension's content-script domain). The app's apply flow opens the posting; desktop fill stays
+with the extension / Simplify. Revisit if an in-WebView fill proves worth the complexity.
 
 ### Surface
 

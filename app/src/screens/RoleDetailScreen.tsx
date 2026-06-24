@@ -5,6 +5,7 @@ import { statusColor, type Role, type Status } from '../model';
 import { explainScore, type RationaleTone } from '../scout/explain';
 import { DraftModal } from './DraftModal';
 import { GuideModal } from './GuideModal';
+import { ScoreModal } from './ScoreModal';
 
 const INTERVIEW_STATUSES = ['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'];
 
@@ -19,7 +20,7 @@ const STATUSES: Status[] = [
   'Archived',
 ];
 
-type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location'>>;
+type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'>>;
 
 // Read-only fact row.
 function Field({ label, value }: { label: string; value?: string }) {
@@ -88,6 +89,7 @@ export function RoleDetailScreen({
   const accent = tierColor(role.tier, c);
   const [showDraft, setShowDraft] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [showScore, setShowScore] = useState(false);
   const toneColor: Record<RationaleTone, string> = { good: c.emerald, bad: c.danger, neutral: c.muted };
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -111,7 +113,10 @@ export function RoleDetailScreen({
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>WHY THIS SCORE</Text>
+        <View style={styles.scoreHead}>
+          <Text style={styles.sectionLabel}>WHY THIS SCORE</Text>
+          <Pressable onPress={() => setShowScore(true)} hitSlop={8}><Text style={styles.rescore}>Re-score · AI</Text></Pressable>
+        </View>
         {explainScore(role).map((line) => (
           <View key={line.text} style={styles.whyRow}>
             <View style={[styles.whyDot, { backgroundColor: toneColor[line.tone] }]} />
@@ -186,6 +191,7 @@ export function RoleDetailScreen({
 
       <DraftModal visible={showDraft} company={role.company} role={role.role} onClose={() => setShowDraft(false)} />
       <GuideModal visible={showGuide} company={role.company} role={role.role} onClose={() => setShowGuide(false)} />
+      <ScoreModal visible={showScore} role={role} onApply={(fit, prob) => onUpdate({ fit, prob })} onClose={() => setShowScore(false)} />
     </ScrollView>
   );
 }
@@ -214,6 +220,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   statusText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   section: { gap: 8 },
   sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted },
+  scoreHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rescore: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   whyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   whyDot: { width: 7, height: 7, borderRadius: 4, marginTop: 6 },
   whyText: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: c.textBase, lineHeight: 19 },

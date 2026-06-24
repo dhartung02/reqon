@@ -39,6 +39,25 @@ export async function generateGuide(key: string): Promise<{ ok?: boolean; error?
   }
 }
 
+// AI re-score (P1.5): the server scores fit/prob/tier grounded in the candidate's profile +
+// narratives. Returned as a suggestion — the app shows current → suggested and only applies on
+// the user's confirm (persisted to fit/prob; tier + EV re-derive locally).
+export async function requestScore(opts: { company?: string; role?: string }): Promise<{ fit?: number; prob?: number; tier?: string; rationale?: string; error?: string }> {
+  const { url, token } = await getConfig();
+  if (!url) return { error: 'Connect a sync server in Settings to use AI scoring.' };
+  try {
+    const r = await fetch(`${normalize(url)}/api/assist/score`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CRM-Token': token },
+      body: JSON.stringify({ company: opts.company, role: opts.role, key: reqKey(opts.company, opts.role) }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) return { error: j.error || `HTTP ${r.status}` };
+    return { fit: j.fit, prob: j.prob, tier: j.tier, rationale: j.rationale };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'network error' };
+  }
+}
+
 export async function requestDraft(opts: {
   company?: string;
   role?: string;

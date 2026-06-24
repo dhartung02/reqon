@@ -1507,6 +1507,16 @@ ${bodyHtml}</div></body></html>`;
 }
 
 // Open the guide (styled HTML page — what the board card links to).
+// Raw guide markdown as JSON (P1.4) — the app fetches this (authed) and renders it natively, since a
+// WebView can't easily send the X-CRM-Token for the styled HTML page.
+app.get('/api/reqs/:key/guide.json', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const fp = guidePath(key);
+  const row = readStore().find((r) => reqKey(r) === key);
+  if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
+  if (!fs.existsSync(fp)) return res.json({ ok: true, exists: false, key, company: row.company, role: row.role });
+  res.json({ ok: true, exists: true, key, company: row.company, role: row.role, guideAt: row.guideAt || null, markdown: fs.readFileSync(fp, 'utf8') });
+});
 app.get('/api/reqs/:key/guide', (req, res) => {
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
   const fp = guidePath(key);

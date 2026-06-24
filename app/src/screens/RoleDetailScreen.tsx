@@ -4,6 +4,9 @@ import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme
 import { statusColor, type Role, type Status } from '../model';
 import { explainScore, type RationaleTone } from '../scout/explain';
 import { DraftModal } from './DraftModal';
+import { GuideModal } from './GuideModal';
+
+const INTERVIEW_STATUSES = ['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'];
 
 const STATUSES: Status[] = [
   'Not Applied',
@@ -84,6 +87,7 @@ export function RoleDetailScreen({
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
   const [showDraft, setShowDraft] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const toneColor: Record<RationaleTone, string> = { good: c.emerald, bad: c.danger, neutral: c.muted };
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -166,6 +170,12 @@ export function RoleDetailScreen({
         <Text style={styles.draftBtnText}>Draft application text · AI</Text>
       </Pressable>
 
+      {INTERVIEW_STATUSES.includes(role.status) ? (
+        <Pressable style={styles.draftBtn} onPress={() => setShowGuide(true)}>
+          <Text style={styles.draftBtnText}>Interview prep guide · AI</Text>
+        </Pressable>
+      ) : null}
+
       <Pressable style={styles.draftBtn} onPress={() => onBuildCv(role)}>
         <Text style={styles.draftBtnText}>Build CV tailored to this role</Text>
       </Pressable>
@@ -175,6 +185,7 @@ export function RoleDetailScreen({
       </Pressable>
 
       <DraftModal visible={showDraft} company={role.company} role={role.role} onClose={() => setShowDraft(false)} />
+      <GuideModal visible={showGuide} company={role.company} role={role.role} onClose={() => setShowGuide(false)} />
     </ScrollView>
   );
 }

@@ -965,7 +965,15 @@ Capabilities:
 
 ---
 
-## P1.4 — Add Interview Guide Viewing to App Role Detail
+## P1.4 — Add Interview Guide Viewing to App Role Detail — ✅ DONE (2026-06-24, pending device pass)
+
+**Shipped (code + jest; needs device pass).** New server route `GET /api/reqs/:key/guide.json` returns
+the stored guide markdown (or `exists:false`) as authed JSON — so the app renders it natively instead
+of fighting WebView auth on the styled HTML page. App: `fetchGuide`/`generateGuide`/`reqKey` in
+`sync/assist.ts`, a `GuideModal` with a lightweight markdown renderer (headings/bullets/paragraphs) +
+Generate-when-missing + Share, and an **Interview prep guide · AI** button on RoleDetail for
+interview-stage rows. tsc clean, 71 jest tests green; `guide.json` verified live. *Device pass:* open
+on an interview-stage role, generate, confirm rendering.
 
 ### Surface
 

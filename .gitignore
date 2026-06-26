@@ -82,3 +82,6 @@ agent/apns-AuthKey.p8
 .expo/
 app/.expo/
 agent/jobs.json
+
+# server-acquired company logo cache (shared, regenerable)
+agent/logos/

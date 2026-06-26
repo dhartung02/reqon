@@ -348,15 +348,17 @@ function backupKind(name) {
 const app = express();
 
 // ─── Render multi-service split ──────────────────────────────────────────────────────────────
-// One codebase, three deployable roles selected by REQON_ROLE:
-//   api   (api.reqon.app)   — backend + /health only; root returns JSON; the board UI is NOT served.
-//   cloud (cloud.reqon.app) — serves the board UI and reverse-proxies API/auth/file paths to
-//                             REQON_API_BASE_URL, so the existing same-origin UI works unchanged and
-//                             no backend logic is duplicated here.
-//   all   (local default)   — monolith (UI + API in one process); unchanged dev behavior.
+// One codebase, four deployable roles selected by REQON_ROLE:
+//   api       (api.reqon.app)   — backend + /health only; root returns JSON; the board UI is NOT served.
+//   cloud     (cloud.reqon.app) — serves the board UI and reverse-proxies API/auth/file paths to
+//                                 REQON_API_BASE_URL, so the existing same-origin UI works unchanged and
+//                                 no backend logic is duplicated here.
+//   marketing (reqon.app)       — serves marketing/index.html at / with its fonts + images; no API or board.
+//   all       (local default)   — monolith (UI + API in one process); unchanged dev behavior.
 const REQON_ROLE = (process.env.REQON_ROLE || 'all').toLowerCase();
 const SERVE_API = REQON_ROLE === 'all' || REQON_ROLE === 'api';
 const SERVE_UI = REQON_ROLE === 'all' || REQON_ROLE === 'cloud';
+const SERVE_MARKETING = REQON_ROLE === 'marketing';
 
 // Liveness — always on, never gated. Render health checks hit this.
 app.get('/health', (req, res) => res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE }));
@@ -509,6 +511,11 @@ if (!SERVE_UI) {
   app.get('/', (req, res) => res.json({ ok: true, service: 'reqon-api', message: 'Reqon API. The product UI is at cloud.reqon.app.', health: '/health' }));
 }
 
+if (SERVE_MARKETING) {
+  app.use(express.static(path.join(__dirname, 'marketing')));
+  app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(__dirname, 'marketing', 'index.html')));
+}
+
 if (SERVE_UI) {
   app.get(['/m', '/mobile'], gateHtml, (req, res) => res.sendFile(path.join(ROOT, 'mobile.html')));
 
@@ -524,6 +531,10 @@ if (SERVE_UI) {
     if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
     return res.redirect('/login?next=/guide');
   }, (req, res) => res.sendFile(path.join(ROOT, 'public', 'guide.html')));
+
+  // Marketing page preview in local/all mode.
+  app.use('/marketing', express.static(path.join(__dirname, 'marketing')));
+  app.get('/marketing', (req, res) => res.sendFile(path.join(__dirname, 'marketing', 'index.html')));
 }
 
 // CORS. Two classes of caller:

@@ -499,6 +499,43 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// ---------- company logos (server-acquired, shared cache) ----------
+// The board shows a small company logo per req for polish. The SERVER fetches it once from a public
+// favicon service and caches it on disk, SHARED across all users/boards (logos aren't private) — so
+// the browser only ever talks to this origin, and the favicon source sees one request per company,
+// ever. No SSRF risk: we only ever call google.com (the company is a query param, not a fetched URL).
+// Unresolved logos return 204 → the board renders a colored monogram instead.
+const LOGO_DIR = path.join(process.env.REQON_DATA_DIR ? path.resolve(process.env.REQON_DATA_DIR) : ROOT, 'agent', 'logos');
+const LEGAL_SUFFIX = /\b(inc|llc|l\.l\.c|ltd|limited|corp|corporation|co|company|gmbh|plc|sa|ag|holdings|group|technologies|labs|software|systems)\b\.?/gi;
+function companyDomainGuess(name) {
+  const slug = String(name || '').toLowerCase().replace(LEGAL_SUFFIX, '').replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
+  return slug ? slug + '.com' : '';
+}
+const sanitizeDomain = (d) => String(d || '').toLowerCase().replace(/[^a-z0-9.-]/g, '').slice(0, 100);
+let logoFetching = new Set();   // in-flight de-dupe so a 200-row first paint doesn't stampede the source
+app.get('/api/logo', async (req, res) => {
+  const domain = sanitizeDomain(req.query.domain) || companyDomainGuess(req.query.company);
+  if (!domain || !domain.includes('.')) return res.status(204).end();
+  const file = path.join(LOGO_DIR, domain.replace(/[^a-z0-9.-]/g, '_') + '.png');
+  const sendCached = () => { res.set('Cache-Control', 'public, max-age=604800'); res.type('png'); fs.createReadStream(file).pipe(res); };
+  try { if (fs.statSync(file).size > 0) return sendCached(); } catch (e) { /* not cached yet */ }
+  if (logoFetching.has(domain)) return res.status(204).end();   // another request is fetching it; render monogram this paint
+  logoFetching.add(domain);
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+    const buf = Buffer.from(await r.arrayBuffer());
+    // Google returns a ~tiny default globe for unknown domains; treat very small payloads as "no logo".
+    if (r.ok && buf.length > 200) {
+      fs.mkdirSync(LOGO_DIR, { recursive: true });
+      fs.writeFileSync(file, buf);
+      return sendCached();
+    }
+    res.status(204).end();
+  } catch (e) { res.status(204).end(); }
+  finally { logoFetching.delete(domain); }
+});
+
 // Every /api request requires auth when APP_TOKEN is set — write endpoints are never open remotely.
 // The scoped INGEST_TOKEN is accepted ONLY for append-only ingest routes (merge/quickadd), so an
 // automated ingester (ChatGPT Action) can add roles but can't read PII, change settings, or wipe data.

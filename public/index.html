@@ -523,8 +523,15 @@
   .crow.st-rejected{opacity:.6} .crow.st-archived{opacity:.45}
   .crow-chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
   .crow-ev{font-family:"Spline Sans Mono",monospace;font-weight:700;font-size:1rem;text-align:center;line-height:1;color:var(--text-2)}
-  .crow-main{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .crow-main{display:flex;align-items:center;gap:8px;min-width:0}
   .crow-co{font-weight:700;color:var(--text);white-space:nowrap;flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis}
+  /* company logo avatar (monogram tile + real logo overlay) */
+  .logo{position:relative;width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;overflow:hidden;vertical-align:middle}
+  .logo.lg{width:30px;height:30px;border-radius:8px;margin-right:2px}
+  .logo-mono{font-size:.6rem;font-weight:800;color:#fff;letter-spacing:.02em;line-height:1}
+  .logo.lg .logo-mono{font-size:.82rem}
+  .logo-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;opacity:0;transition:opacity .18s}
+  .logo-img.on{opacity:1}
   .crow-role{color:var(--text-2);font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .crow-tail{display:flex;align-items:center;gap:9px;justify-content:flex-end;white-space:nowrap}
   .crow-src{font-family:"Spline Sans Mono",monospace;font-size:.66rem;letter-spacing:.02em;color:var(--ai);text-transform:lowercase;white-space:nowrap}
@@ -1431,6 +1438,16 @@ const selected=new Set();                  // checkbox selection (by row index)
 let visibleIdx=[];                         // row indices currently shown post-filter (for "select all visible")
 const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function expected(x){return +(((+x.fit||0)*(+x.prob||0))/10).toFixed(1);}
+// Company logo avatar (server-acquired + cached at /api/logo). A colored monogram tile shows first;
+// the real logo fades in over it when it loads, and a miss (204 / error) leaves the monogram. The
+// browser only hits our own /api/logo, never a third-party logo service.
+function logoColor(s){let h=0;for(const ch of String(s||'')) h=(h*31+ch.charCodeAt(0))>>>0;return `hsl(${h%360} 42% 30%)`;}
+function logoMono(s){const p=String(s||'').trim().split(/\s+/);return (((p[0]||'')[0]||'?')+((p[1]||'')[0]||'')).toUpperCase();}
+function logoHTML(company,cls){
+  if(!company) return '';
+  return `<span class="logo ${cls||''}" style="background:${logoColor(company)}"><span class="logo-mono">${esc(logoMono(company))}</span>`+
+    `<img class="logo-img" src="/api/logo?company=${encodeURIComponent(company)}" alt="" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('on')" onerror="this.remove()"></span>`;
+}
 function fitColor(v){if(v>=8.5)return"var(--t9)";if(v>=7)return"var(--t7)";if(v>=5)return"var(--t5)";return"var(--t3)";}
 // score bands (#6) — shared label/class for fit & expected value on a 0–10 scale
 function bandLabel(v){v=+v||0;if(v>=8)return"Excellent";if(v>=6.5)return"Strong";if(v>=5)return"Possible";return"Low priority";}
@@ -1658,7 +1675,7 @@ function reqCardHTML(x,i){
   <div class="req tier${x.tier} ${scls}" id="req-${i}" style="margin-left:8px">
     <div class="reqtop">
       <div>
-        <div class="rtitle"><span class="tierTag ${x.tier}">TIER ${x.tier}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
+        <div class="rtitle">${logoHTML(x.company,'lg')}<span class="tierTag ${x.tier}">TIER ${x.tier}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
         <div class="meta">
           <span class="pill ${rc}">${rt}</span>
           ${x.location?`<span class="pill">${esc(x.location)}</span>`:""}
@@ -1745,7 +1762,7 @@ function compactRowHTML(x, reason, showArchive){
   return `<div class="crow tier${x.tier} ${scls} ${sel} ${open}" data-i="${i}" onclick="rowClick(event,${i})">
     <input type="checkbox" class="crow-chk" ${selected.has(i)?"checked":""} onclick="event.stopPropagation();toggleSel(${i},this.checked)" title="Select for Open-in-tabs">
     <span class="crow-ev" title="Expected value = fit × probability · ${bandLabel(x._ev)}">${x._ev.toFixed(1)}</span>
-    <span class="crow-main"><span class="crow-co">${esc(x.company)}</span><span class="crow-role">${esc(x.role||'')}</span></span>
+    <span class="crow-main">${logoHTML(x.company)}<span class="crow-co">${esc(x.company)}</span><span class="crow-role">${esc(x.role||'')}</span></span>
     <span class="crow-tail"><span class="crow-src">${esc(rowSource(x))}</span>${applyModeBadge(x)}${reasonHtml}${badge}${archiveHtml}${x.link?`<a class="crow-open" href="${esc(x.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open the original listing in a new tab">Open ↗</a>`:''}</span>
     <span class="crow-caret">▾</span>
   </div>`;

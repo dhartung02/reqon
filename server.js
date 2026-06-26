@@ -627,6 +627,23 @@ app.get('/api/logo', async (req, res) => {
   finally { logoFetching.delete(domain); }
 });
 
+// Token-based login for extension / app clients: verifies username+password (multi-user) or
+// passphrase (single-user) and returns a per-user API token for X-CRM-Token use.
+// Placed BEFORE the /api auth gate — it is the credential exchange, not a protected resource.
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (MULTIUSER()) {
+    const u = users.verify(String(username || ''), String(password || ''));
+    if (!u) return res.status(401).json({ ok: false, error: 'Invalid username or password.' });
+    const tok = users.setToken(u.id);
+    return res.json({ ok: true, token: tok, userId: u.id, displayName: u.displayName || u.username });
+  }
+  // Single-user: password field carries the APP_TOKEN passphrase.
+  if (!APP_TOKEN) return res.json({ ok: true, token: '' });
+  if (!safeEq(sha(String(password || '')), TOKEN_HASH)) return res.status(401).json({ ok: false, error: 'Invalid passphrase.' });
+  return res.json({ ok: true, token: APP_TOKEN });
+});
+
 // Every /api request requires auth when APP_TOKEN is set — write endpoints are never open remotely.
 // The scoped INGEST_TOKEN is accepted ONLY for append-only ingest routes (merge/quickadd), so an
 // automated ingester (ChatGPT Action) can add roles but can't read PII, change settings, or wipe data.

@@ -2,7 +2,8 @@
 // the server config (origin + passphrase) + notification toggle. All server I/O goes through the
 // background service worker (bg.js) — the popup only sends messages.
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { origin: 'http://localhost:8787', token: '', notifyEnabled: true, overlayEnabled: true };
+const DEFAULTS = { origin: 'https://cloud.reqon.app', token: '', notifyEnabled: true, overlayEnabled: true };
+const CLOUD_ORIGIN = 'https://cloud.reqon.app';
 const send = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res));
 
 let activeTab = null;
@@ -130,11 +131,16 @@ async function doMarkApplied() {
 // ---- settings ----
 async function loadSettings() {
   const cfg = await getConfig();
-  $('origin').value = cfg.origin || '';
-  $('token').value = cfg.token || '';
+  const isCloud = !cfg.origin || cfg.origin === CLOUD_ORIGIN;
+  $('serverPreset').value = isCloud ? 'cloud' : 'personal';
+  $('customOriginWrap').style.display = isCloud ? 'none' : '';
+  $('origin').value = isCloud ? '' : (cfg.origin || '');
   $('notify').checked = cfg.notifyEnabled !== false;
   $('overlay').checked = cfg.overlayEnabled !== false;
 }
+$('serverPreset').onchange = () => {
+  $('customOriginWrap').style.display = $('serverPreset').value === 'personal' ? '' : 'none';
+};
 $('gear').onclick = () => $('settings').classList.toggle('open');
 $('panel').onclick = async () => {
   try {
@@ -146,17 +152,32 @@ $('panel').onclick = async () => {
   }
 };
 $('save').onclick = async () => {
-  const origin = ($('origin').value.trim() || DEFAULTS.origin).replace(/\/$/, '');
-  // request host permission for a non-localhost origin (tunnel/HTTPS)
+  const preset = $('serverPreset').value;
+  const origin = (preset === 'cloud' ? CLOUD_ORIGIN : ($('origin').value.trim() || CLOUD_ORIGIN)).replace(/\/$/, '');
+  const username = $('username').value.trim();
+  const password = $('password').value;
+  setMsg('Connecting…');
   try {
     const pattern = origin + '/*';
     if (!(await chrome.permissions.contains({ origins: [pattern] }))) {
       await chrome.permissions.request({ origins: [pattern] });
     }
-  } catch (e) { /* localhost already granted */ }
-  await chrome.storage.sync.set({ origin, token: $('token').value.trim(), notifyEnabled: $('notify').checked, overlayEnabled: $('overlay').checked });
-  setMsg('Saved.', 'ok');
-  await refresh();
+  } catch (e) {}
+  try {
+    const r = await fetch(origin + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) { setMsg(j.error || 'Login failed.', 'err'); return; }
+    await chrome.storage.sync.set({ origin, token: j.token || '', notifyEnabled: $('notify').checked, overlayEnabled: $('overlay').checked });
+    $('password').value = '';
+    setMsg(j.displayName ? `Connected as ${j.displayName}.` : 'Connected.', 'ok');
+    await refresh();
+  } catch (e) {
+    setMsg('Network error: ' + e.message, 'err');
+  }
 };
 $('test').onclick = async () => {
   setMsg('Testing…');

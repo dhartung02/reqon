@@ -74,15 +74,23 @@
   </div>
 
   <div id="settings" class="settings">
-    <label>Server origin</label>
-    <input id="origin" type="text" placeholder="http://localhost:8787">
-    <label>Passphrase (APP_TOKEN)</label>
-    <input id="token" type="password" placeholder="your server passphrase" autocomplete="off">
-    <p class="hint">Local: <code>http://localhost:8787</code>. Off-network: your HTTPS tunnel URL.</p>
+    <label>Server</label>
+    <select id="serverPreset" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #333c47;color:#e8eef5;border-radius:8px;padding:8px 10px;font:inherit">
+      <option value="cloud">Reqon Cloud</option>
+      <option value="personal">Personal server…</option>
+    </select>
+    <div id="customOriginWrap" style="display:none">
+      <label>Server URL</label>
+      <input id="origin" type="url" placeholder="https://your-server.com">
+    </div>
+    <label>Username</label>
+    <input id="username" type="text" placeholder="your username" autocomplete="username">
+    <label>Password</label>
+    <input id="password" type="password" placeholder="your password" autocomplete="current-password">
     <div class="togrow"><input id="overlay" type="checkbox"><label for="overlay">Show the on-page overlay on job postings</label></div>
     <div class="togrow"><input id="notify" type="checkbox"><label for="notify">Show a notification on clip / mark-applied</label></div>
     <div class="setrow">
-      <button id="save" class="btn btn-primary" style="flex:1">Save</button>
+      <button id="save" class="btn btn-primary" style="flex:1">Connect</button>
       <button id="test" class="btn btn-ghost" style="flex:1">Test</button>
     </div>
   </div>

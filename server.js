@@ -464,6 +464,9 @@ function sessionUser(req) {
   const c = parseCookies(req)[COOKIE];
   const uid = c && users.verifySession(c);
   if (!uid) return null;
+  // Cloud role: users.json lives on the API's persistent disk, not here.
+  // Cryptographic signature is sufficient — the API re-checks every /api/* call.
+  if (REQON_ROLE === 'cloud') return { id: uid, role: 'user', displayName: '' };
   const u = users.getById(uid);
   return (u && !u.disabled) ? u : null;
 }

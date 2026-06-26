@@ -5,7 +5,7 @@
  */
 importScripts('lib.js');
 
-const DEFAULTS = { origin: 'http://localhost:8787', token: '' };
+const DEFAULTS = { origin: 'https://cloud.reqon.app', token: '' };
 const getCfg = () => new Promise(r => chrome.storage.sync.get(DEFAULTS, r));
 
 // Optional desktop notification (toggle lives in the popup; default on).

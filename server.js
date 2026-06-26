@@ -1636,32 +1636,54 @@ const GUIDE_DIR = path.join(DATA_DIR, 'agent', 'interview-guides');
 const guidePath = (key) => path.join(GUIDE_DIR, crypto.createHash('sha1').update(key).digest('hex') + '.md');
 const guideMaxTokens = () => Math.max(800, parseInt(process.env.GUIDE_MAX_TOKENS || '1800', 10) || 1800);
 
-async function generateInterviewGuide(row) {
+const guideResearchMaxTokens = () => Math.max(guideMaxTokens(), parseInt(process.env.GUIDE_RESEARCH_MAX_TOKENS || '2800', 10) || 2800);
+
+// Build the guide. opts.research = true runs an opt-in web_search pass: the model researches the
+// company's real interview process/questions AND the company's own careers / "how we hire" page,
+// cites sources, and blends that with standard role/seniority question patterns. Default (no research)
+// is the original grounded-only guide — no network calls, no extra cost. Candidate-specific claims are
+// ALWAYS grounded only in the narrative library; research only adds company/role/industry context.
+async function generateInterviewGuide(row, opts = {}) {
+  const research = !!opts.research;
   const p = readProfile();
   const a = p.applicant || {};
   const narr = (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n');
   const jd = String(row.notes || '').slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10));
   const company = row.company || '', role = row.role || '';
-  const system = 'You are an expert interview coach preparing a candidate for a specific role. Produce a concise, practical interview prep guide in Markdown. Ground every candidate-specific claim ONLY in their narrative library — never invent employers, metrics, or titles. Be specific and actionable, not generic.';
-  const user = `Candidate: ${a.name || ''}\nTarget role: ${role}${company ? ` at ${company}` : ''}\n\nCandidate narrative library (use ONLY these facts for "your story" parts):\n${narr || '(none provided)'}\n\nJob context:\n${jd || '(none provided)'}\n\nWrite an interview prep guide with exactly these sections:\n## Role snapshot\n## Why you fit (from your narratives)\n## Likely questions & how to answer (8–10, mixing behavioral + role-specific; one or two lines of guidance each)\n## Your stories to lead with (map specific narratives to STAR)\n## Smart questions to ask them\n## Things to clarify / possible red flags\n## 48-hour prep checklist\nKeep it tight and skimmable.`;
-  const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: guideMaxTokens(), tools: assistTools(), temperature: 0.5 });
+  const groundRule = 'Ground every candidate-specific claim ONLY in their narrative library — never invent employers, metrics, or titles. Be specific and actionable, not generic.';
+  let system, sections, tools, maxTokens, researchHint = '';
+  if (research) {
+    const domain = companyDomainGuess(company);
+    system = 'You are an expert interview coach preparing a candidate for a specific role. Use the web_search tool to research (1) the interview process and real questions people report for THIS company and role, and (2) the company\'s OWN careers / "how we hire" / interview-prep page for their stated guidance. Prefer recent, reputable sources; cite each inline as a markdown link, and never present an unverified rumor as fact. Blend that intel with standard interview-question patterns appropriate to this seniority and domain. ' + groundRule;
+    sections = `## Role snapshot\n## ${company || 'The company'}'s interview process (what the research shows — cite sources; say "couldn't verify" where unsure)\n## Likely questions & how to answer (10–12: company/role-specific ones from the research PLUS standard patterns for this seniority + domain; 1–2 lines of guidance each)\n## Why you fit (from your narratives)\n## Your stories to lead with (map specific narratives to STAR)\n## Smart questions to ask them\n## Things to clarify / possible red flags\n## Sources (the links you used)\n## 48-hour prep checklist`;
+    tools = [{ type: 'web_search' }, ...(assistTools() || [])];
+    maxTokens = guideResearchMaxTokens();
+    researchHint = `\n${domain ? `Company site to check for their careers/interview page: https://${domain}\n` : ''}Research ${company || 'the company'}'s interview process${role ? ` for the "${role}" role` : ''} on the web before writing; cite what you find.\n`;
+  } else {
+    system = 'You are an expert interview coach preparing a candidate for a specific role. Produce a concise, practical interview prep guide in Markdown. ' + groundRule;
+    sections = `## Role snapshot\n## Why you fit (from your narratives)\n## Likely questions & how to answer (8–10, mixing behavioral + role-specific; one or two lines of guidance each)\n## Your stories to lead with (map specific narratives to STAR)\n## Smart questions to ask them\n## Things to clarify / possible red flags\n## 48-hour prep checklist`;
+    tools = assistTools();
+    maxTokens = guideMaxTokens();
+  }
+  const user = `Candidate: ${a.name || ''}\nTarget role: ${role}${company ? ` at ${company}` : ''}\n${researchHint}\nCandidate narrative library (use ONLY these facts for "your story" parts):\n${narr || '(none provided)'}\n\nJob context:\n${jd || '(none provided)'}\n\nWrite an interview prep guide with exactly these sections:\n${sections}\nKeep it tight and skimmable.`;
+  const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens, tools, temperature: 0.5 });
   return { markdown: content, tokens };
 }
 
 // Generate + persist + attach to the row. Re-reads the store before stamping guideAt so it never
 // clobbers a concurrent edit. Used by the manual POST and the PATCH status-change trigger.
-async function buildAndStoreGuide(key) {
+async function buildAndStoreGuide(key, opts = {}) {
   const rows = readStore();
   const row = rows.find((r) => reqKey(r) === key);
   if (!row) throw new Error('no row for key');
-  const { markdown, tokens } = await generateInterviewGuide(row);
+  const { markdown, tokens } = await generateInterviewGuide(row, opts);
   if (!markdown || !markdown.trim()) throw new Error('empty guide from model');
   fs.mkdirSync(GUIDE_DIR, { recursive: true });
   fs.writeFileSync(guidePath(key), markdown, 'utf8');
   const rows2 = readStore();
   const r2 = rows2.find((r) => reqKey(r) === key);
   if (r2) { r2.guideAt = new Date().toISOString(); touchRow(r2); writeStore(rows2); }
-  logChange({ ts: nowIso(), action: 'interview-guide', key, tokens: tokens || 0 });
+  logChange({ ts: nowIso(), action: 'interview-guide', key, tokens: tokens || 0, researched: !!opts.research });
   return markdown;
 }
 
@@ -1732,11 +1754,12 @@ app.post('/api/reqs/:key/guide', async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
-  const job = jobs.create('interview_guide', { label: 'Interview guide · ' + key });
+  const research = req.body?.research === true || req.query.research === '1' || req.query.research === 'true';
+  const job = jobs.create('interview_guide', { label: 'Interview guide · ' + key + (research ? ' · researched' : '') });
   try {
-    await buildAndStoreGuide(key);
-    jobs.finish(job.id, { key });
-    res.json({ ok: true, key, url: '/api/reqs/' + encodeURIComponent(key) + '/guide' });
+    await buildAndStoreGuide(key, { research });
+    jobs.finish(job.id, { key, researched: research });
+    res.json({ ok: true, key, researched: research, url: '/api/reqs/' + encodeURIComponent(key) + '/guide' });
   } catch (e) {
     jobs.fail(job.id, e.message);
     res.status(502).json({ ok: false, error: e.message });

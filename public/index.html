@@ -1754,21 +1754,25 @@ function reqCardHTML(x,i){
 const INTERVIEW_STATUSES=["Recruiter Screen","Hiring Manager","Panel","Offer"];
 const guideKey=x=>encodeURIComponent(((x.company||'')+'|'+(x.role||'')).toLowerCase().trim());
 function guideBtnHTML(x,i){
-  if(x.guideAt) return `<button class="mini" onclick="openGuide(${i})" title="Open the AI interview prep guide">📋 Interview guide</button>`;
-  if(INTERVIEW_STATUSES.includes(x.status)) return `<button class="mini" onclick="genGuide(${i})" title="Generate an AI interview prep guide for this role">📋 Generate guide</button>`;
+  // "Research this company" runs an opt-in web-search pass (real interview questions + the company's
+  // own careers/how-we-hire page, with sources). Shown both before and after a guide exists.
+  const research=`<button class="mini" onclick="genGuide(${i},true)" title="Generate a researched guide — searches the web for this company's interview process &amp; questions and cites sources (uses more AI credit)">🔎 Research company</button>`;
+  if(x.guideAt) return `<button class="mini" onclick="openGuide(${i})" title="Open the AI interview prep guide">📋 Interview guide</button> ${research}`;
+  if(INTERVIEW_STATUSES.includes(x.status)) return `<button class="mini" onclick="genGuide(${i})" title="Generate an AI interview prep guide grounded in your narratives">📋 Generate guide</button> ${research}`;
   return '';
 }
 function openGuide(i){ const x=rows[i]; if(x) window.open('/api/reqs/'+guideKey(x)+'/guide','_blank','noopener'); }
-async function genGuide(i){
+async function genGuide(i,research){
   const x=rows[i]; if(!x) return;
-  const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Generating…'; }
+  const btn=event&&event.target; const label=btn&&btn.textContent;
+  if(btn){ btn.disabled=true; btn.textContent=research?'Researching…':'Generating…'; }
   try{
-    const j=await (await fetch('/api/reqs/'+guideKey(x)+'/guide',{method:'POST'})).json();
+    const j=await (await fetch('/api/reqs/'+guideKey(x)+'/guide'+(research?'?research=1':''),{method:'POST'})).json();
     if(!j.ok) throw new Error(j.error||'failed');
     x.guideAt=new Date().toISOString();
     window.open('/api/reqs/'+guideKey(x)+'/guide','_blank','noopener');
     render();
-  }catch(e){ alert('Could not generate guide: '+e.message); if(btn){ btn.disabled=false; btn.textContent='📋 Generate guide'; } }
+  }catch(e){ alert('Could not generate guide: '+e.message); if(btn){ btn.disabled=false; btn.textContent=label||'📋 Generate guide'; } }
 }
 
 // Compact row — EV · company · role · status badge, with a checkbox + expand caret.

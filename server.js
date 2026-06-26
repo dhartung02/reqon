@@ -387,46 +387,11 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE });
 });
 
-// Marketing role: public placeholder only — no data, no auth, no API surface.
-// A catch-all registered here shadows every route defined below, so none of the API,
-// write, or auth handlers are reachable from outside.
+// Marketing role: serves marketing/index.html at / with self-hosted fonts + images.
+// express.static handles all assets; the catch-all keeps the API surface unexposed.
 if (SERVE_MARKETING) {
-  const CLOUD_URL = (process.env.REQON_CLOUD_BASE_URL || 'https://cloud.reqon.app').replace(/\/$/, '');
-  const MARKETING_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reqon</title>
-<style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{background:#1F1E5D;color:#EFEFEF;font-family:'Spline Sans','Helvetica Neue',Arial,sans-serif;
-       min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
-  .card{max-width:520px;width:100%}
-  h1{font-family:'Fraunces',Georgia,serif;font-size:2.5rem;color:#fff;letter-spacing:-.02em;margin-bottom:.5rem}
-  .tagline{font-size:1.1rem;color:#706CFF;font-weight:600;margin-bottom:1.5rem}
-  p{font-size:1rem;line-height:1.6;color:#D0D1D8;margin-bottom:1.5rem}
-  .coming-soon{font-size:.875rem;color:#5A5D77;margin-bottom:2rem}
-  .cta{display:inline-block;background:#706CFF;color:#fff;text-decoration:none;
-       padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.95rem;
-       transition:opacity .15s ease}
-  .cta:hover{opacity:.85}
-  .cta-label{font-size:.75rem;color:#5A5D77;margin-top:.75rem}
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>Reqon</h1>
-  <div class="tagline">AI-assisted job search CRM.</div>
-  <p>Reqon helps manage role discovery, application tracking, recruiter follow-up,
-     screening preparation, and job-search decision support.</p>
-  <p class="coming-soon">The public site is coming soon.</p>
-  <a class="cta" href="${CLOUD_URL}">Launch Reqon Cloud</a>
-  <p class="cta-label">${CLOUD_URL}</p>
-</div>
-</body>
-</html>`;
-  app.get('/', (req, res) => res.type('html').send(MARKETING_HTML));
+  app.use(express.static(path.join(__dirname, 'marketing')));
+  app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'marketing', 'index.html')));
   // Block every other path — no API, auth, or write surface is reachable in this role.
   app.use((req, res) => res.status(404).type('text').send('Not found'));
 }

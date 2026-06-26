@@ -68,14 +68,18 @@ services:
       - key: REQON_API_BASE_URL
         value: https://api.reqon.app    # where the cloud server proxies /api, /login, /guide, etc.
 
-  # ── 3. Marketing site (static) ─────────────────────────────────────────────────────────────
+  # ── 3. Marketing homepage (Web Service; REQON_ROLE=marketing) ──────────────────────────────
   - type: web
     name: reqon-marketing
-    runtime: static
-    buildCommand: ""
-    staticPublishPath: ./marketing
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm run start:marketing
+    healthCheckPath: /health
     autoDeploy: true
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    envVars:
+      - key: REQON_ROLE
+        value: marketing
+      - key: NODE_ENV
+        value: production

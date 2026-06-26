@@ -35,7 +35,13 @@
         }
       ],
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Reqon uses the microphone so you can speak your résumé narratives instead of typing them."
+        }
+      ]
     ]
   }
 }

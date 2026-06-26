@@ -3,6 +3,7 @@ import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView, Activi
 import { fonts, useThemedStyles, type Palette } from '../theme';
 import { suggestNarratives, polishNarrative, type NarrativeSuggestion } from '../sync/narratives';
 import { newAnswerId, type Narrative } from '../sync/profile';
+import { VoiceRecorder } from './VoiceRecorder';
 
 // Guided narrative builder (app). Suggest proof-point stories from the résumé → elaborate (type, or
 // later dictate) → polish → add. Mirrors the web flow; grounded server-side, never invents facts.
@@ -16,6 +17,7 @@ export function NarrativeBuilderModal({
   const [suggestions, setSuggestions] = useState<NarrativeSuggestion[] | null>(null);
   const [editing, setEditing] = useState<{ title: string; rough: string } | null>(null);
   const [polishing, setPolishing] = useState(false);
+  const [voice, setVoice] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -32,7 +34,17 @@ export function NarrativeBuilderModal({
   const pick = (s: NarrativeSuggestion) => {
     const seed = (s.draft || '') + (s.cover?.length ? '\n\nElaborate on:\n' + s.cover.map((x) => '- ' + x).join('\n') : '');
     setEditing({ title: s.title || '', rough: seed });
-    setMsg(null);
+    setVoice(false); setMsg(null);
+  };
+
+  const dictateNew = () => { setEditing({ title: '', rough: '' }); setVoice(true); setMsg(null); };
+
+  const onTranscript = (text: string) => {
+    if (!editing) { setVoice(false); return; }
+    const joined = editing.rough.trim() ? editing.rough.trim() + '\n\n' + text : text;
+    setEditing({ ...editing, rough: joined });
+    setVoice(false);
+    setMsg(text.trim() ? 'Transcribed — edit, then polish.' : 'Nothing was heard — try again.');
   };
 
   const polish = async () => {
@@ -71,6 +83,9 @@ export function NarrativeBuilderModal({
         {!busy && !editing && suggestions ? (
           suggestions.length === 0 ? <Text style={styles.dim}>No suggestions — add work history first.</Text> : (
             <ScrollView style={styles.scroll}>
+              <Pressable style={styles.dictateBtn} onPress={dictateNew}>
+                <Text style={styles.dictateText}>🎤 Dictate a new narrative</Text>
+              </Pressable>
               {suggestions.map((s, i) => (
                 <View key={i} style={styles.card}>
                   <Text style={styles.cardTitle}>{s.title}</Text>
@@ -93,10 +108,14 @@ export function NarrativeBuilderModal({
           <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
             <Text style={styles.fieldLabel}>Title</Text>
             <TextInput value={editing.title} onChangeText={(t) => setEditing({ ...editing, title: t })} style={styles.input} placeholderTextColor={c.muted} />
-            <Text style={styles.fieldLabel}>Your story (fill the [brackets] with real details, then polish)</Text>
+            <View style={styles.storyHead}>
+              <Text style={styles.fieldLabel}>Your story (fill the [brackets] with real details, then polish)</Text>
+              {!voice ? <Pressable onPress={() => setVoice(true)} hitSlop={8}><Text style={styles.speakLink}>🎤 Speak it</Text></Pressable> : null}
+            </View>
+            {voice ? <VoiceRecorder onTranscript={onTranscript} onCancel={() => setVoice(false)} /> : null}
             <TextInput value={editing.rough} onChangeText={(t) => setEditing({ ...editing, rough: t })} style={[styles.input, styles.multi]} multiline placeholderTextColor={c.muted} />
             <View style={styles.editActions}>
-              <Pressable onPress={() => { setEditing(null); setMsg(null); }} hitSlop={8}><Text style={styles.backLink}>← Suggestions</Text></Pressable>
+              <Pressable onPress={() => { setEditing(null); setVoice(false); setMsg(null); }} hitSlop={8}><Text style={styles.backLink}>← Suggestions</Text></Pressable>
               <View style={styles.editRight}>
                 <Pressable style={styles.polishBtn} onPress={polish} disabled={polishing}>
                   {polishing ? <ActivityIndicator size="small" color={c.canvas} /> : <Text style={styles.polishText}>✨ Polish</Text>}
@@ -130,6 +149,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   coverItem: { fontFamily: fonts.sans, fontSize: 13, color: c.textBase, lineHeight: 19, marginTop: 3 },
   useBtn: { marginTop: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: c.emerald, borderRadius: 9, paddingVertical: 8, paddingHorizontal: 14 },
   useBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
+  dictateBtn: { borderWidth: 1, borderStyle: 'dashed', borderColor: c.emerald, borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginBottom: 12 },
+  dictateText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
+  storyHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  speakLink: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   fieldLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: c.muted, marginTop: 12, marginBottom: 5 },
   input: { backgroundColor: c.element, borderRadius: 10, padding: 12, color: c.textHigh, fontFamily: fonts.sans, fontSize: 15 },
   multi: { minHeight: 160, textAlignVertical: 'top', lineHeight: 21 },

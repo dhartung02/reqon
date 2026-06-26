@@ -5,6 +5,7 @@
   "dependencies": {
     "@reqon/core": "file:../core",
     "expo": "^57.0.0-canary-20260526-13e89ca",
+    "expo-audio": "57.0.0-canary-20260526-13e89ca",
     "expo-camera": "57.0.0-canary-20260526-13e89ca",
     "expo-document-picker": "57.0.0-canary-20260526-13e89ca",
     "expo-file-system": "57.0.0-canary-20260526-13e89ca",

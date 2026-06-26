@@ -1359,6 +1359,41 @@ app.post('/api/profile/narratives/polish', async (req, res) => {
   } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
 });
 
+// Speech-to-text for the voice narrative builder (app). Accepts a base64 audio clip, transcribes it
+// via OpenAI Whisper (multipart upload to /v1/audio/transcriptions), returns plain text the user then
+// elaborates/polishes through the normal narrative path. The AI key never leaves the server. Whisper
+// is billed per audio-minute (not tokens), so usage is logged as a call with byte size, tokens 0.
+app.post('/api/transcribe', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const b = req.body || {};
+  const data = String(b.audioBase64 || '');
+  if (!data) return res.status(400).json({ ok: false, error: 'No audio provided.' });
+  const cap = assistDailyCalls(); const u = assistUsage();
+  if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
+  let buf; try { buf = Buffer.from(data, 'base64'); } catch (e) { return res.status(400).json({ ok: false, error: 'Bad audio encoding.' }); }
+  // Whisper accepts up to 25MB; the JSON body parser caps us at 8mb (~6MB decoded) first. Keep clips short.
+  const maxMb = parseInt(cfg('TRANSCRIBE_MAX_MB') || '6', 10);
+  if (buf.length > maxMb * 1024 * 1024) return res.status(413).json({ ok: false, error: `Recording too large (>${maxMb}MB). Keep narratives under a few minutes.` });
+  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+  const model = (cfg('OPENAI_TRANSCRIBE_MODEL') || 'whisper-1').trim();
+  const filename = (String(b.filename || 'narrative.m4a').replace(/[^\w.\-]/g, '_')) || 'narrative.m4a';
+  const mime = String(b.mimeType || 'audio/m4a').slice(0, 60);
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([buf], { type: mime }), filename);
+    form.append('model', model);
+    // A light prompt nudges Whisper toward résumé/product vocabulary spelling.
+    form.append('prompt', String(b.prompt || 'A product manager describing a work accomplishment (CDP, data platform, AI, identity).').slice(0, 400));
+    const r = await fetch(base + '/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + aiKey() }, body: form });
+    if (!r.ok) { const t = await r.text().catch(() => ''); return res.status(502).json({ ok: false, error: 'OpenAI HTTP ' + r.status + ' ' + t.slice(0, 200) }); }
+    const j = await r.json();
+    u.calls += 1; writeJsonPretty(P.assistUsage, u);
+    logAssist({ ts: new Date().toISOString(), kind: 'transcribe', model, tokens: 0, bytes: buf.length });
+    res.json({ ok: true, text: String(j.text || '').trim() });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
+});
+
 // Structured role scoring via function calling (T1.1). Returns fit/prob/tier/rationale — no prose
 // parsing. The caller decides whether to write it back to the row.
 app.post('/api/assist/score', async (req, res) => {

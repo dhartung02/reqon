@@ -370,18 +370,66 @@ function backupKind(name) {
 const app = express();
 
 // ─── Render multi-service split ──────────────────────────────────────────────────────────────
-// One codebase, three deployable roles selected by REQON_ROLE:
-//   api   (api.reqon.app)   — backend + /health only; root returns JSON; the board UI is NOT served.
-//   cloud (cloud.reqon.app) — serves the board UI and reverse-proxies API/auth/file paths to
-//                             REQON_API_BASE_URL, so the existing same-origin UI works unchanged and
-//                             no backend logic is duplicated here.
-//   all   (local default)   — monolith (UI + API in one process); unchanged dev behavior.
+// One codebase, four deployable roles selected by REQON_ROLE:
+//   api       (api.reqon.app)       — backend + /health only; root returns JSON; no board UI.
+//   cloud     (cloud.reqon.app)     — serves the board UI and reverse-proxies API paths to
+//                                    REQON_API_BASE_URL.
+//   marketing (reqon.app)           — public placeholder; no API, no data, no auth.
+//   all       (local default)       — monolith (UI + API in one process); unchanged dev behavior.
 const REQON_ROLE = (process.env.REQON_ROLE || 'all').toLowerCase();
 const SERVE_API = REQON_ROLE === 'all' || REQON_ROLE === 'api';
-const SERVE_UI = REQON_ROLE === 'all' || REQON_ROLE === 'cloud';
+const SERVE_UI  = REQON_ROLE === 'all' || REQON_ROLE === 'cloud';
+const SERVE_MARKETING = REQON_ROLE === 'marketing';
 
 // Liveness — always on, never gated. Render health checks hit this.
-app.get('/health', (req, res) => res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE }));
+app.get('/health', (req, res) => {
+  if (SERVE_MARKETING) return res.json({ ok: true, service: 'reqon-marketing', role: 'marketing' });
+  res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE });
+});
+
+// Marketing role: public placeholder only — no data, no auth, no API surface.
+// A catch-all registered here shadows every route defined below, so none of the API,
+// write, or auth handlers are reachable from outside.
+if (SERVE_MARKETING) {
+  const CLOUD_URL = (process.env.REQON_CLOUD_BASE_URL || 'https://cloud.reqon.app').replace(/\/$/, '');
+  const MARKETING_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reqon</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:#1F1E5D;color:#EFEFEF;font-family:'Spline Sans','Helvetica Neue',Arial,sans-serif;
+       min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+  .card{max-width:520px;width:100%}
+  h1{font-family:'Fraunces',Georgia,serif;font-size:2.5rem;color:#fff;letter-spacing:-.02em;margin-bottom:.5rem}
+  .tagline{font-size:1.1rem;color:#706CFF;font-weight:600;margin-bottom:1.5rem}
+  p{font-size:1rem;line-height:1.6;color:#D0D1D8;margin-bottom:1.5rem}
+  .coming-soon{font-size:.875rem;color:#5A5D77;margin-bottom:2rem}
+  .cta{display:inline-block;background:#706CFF;color:#fff;text-decoration:none;
+       padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.95rem;
+       transition:opacity .15s ease}
+  .cta:hover{opacity:.85}
+  .cta-label{font-size:.75rem;color:#5A5D77;margin-top:.75rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Reqon</h1>
+  <div class="tagline">AI-assisted job search CRM.</div>
+  <p>Reqon helps manage role discovery, application tracking, recruiter follow-up,
+     screening preparation, and job-search decision support.</p>
+  <p class="coming-soon">The public site is coming soon.</p>
+  <a class="cta" href="${CLOUD_URL}">Launch Reqon Cloud</a>
+  <p class="cta-label">${CLOUD_URL}</p>
+</div>
+</body>
+</html>`;
+  app.get('/', (req, res) => res.type('html').send(MARKETING_HTML));
+  // Block every other path — no API, auth, or write surface is reachable in this role.
+  app.use((req, res) => res.status(404).type('text').send('Not found'));
+}
 
 // Cloud role proxies the dynamic paths to the API service. Registered BEFORE the body parser so the
 // proxied request body streams through untouched. The browser stays same-origin with cloud.reqon.app
@@ -3701,8 +3749,11 @@ app.get('/api/export.xlsx', async (req, res) => {
 });
 
 // ---------- boot ----------
-ensureConfig();
-ensureStore();
+// Marketing role is stateless — skip data/config seeding entirely.
+if (!SERVE_MARKETING) {
+  ensureConfig();
+  ensureStore();
+}
 // Pure logic exported for the shared test-vector suite (tests/run-vectors.js) and future
 // clients. Requiring this module does NOT start the server, schedulers, or the migration.
 module.exports = { postingId, sameReq, reqKey, computeTier, reconcileSync, ensureRowIdentity, extractJobMeta, companyFromUrl, liveRows };
@@ -3737,6 +3788,14 @@ if (SERVE_API) {
 app.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces();
   const lan = Object.values(nets).flat().find(n => n && n.family === 'IPv4' && !n.internal);
+  if (SERVE_MARKETING) {
+    console.log(`\n  Reqon marketing placeholder running:`);
+    console.log(`    Local:   http://localhost:${PORT}`);
+    if (lan) console.log(`    LAN:     http://${lan.address}:${PORT}`);
+    console.log(`    Role:    marketing (no data, no auth, no API)`);
+    console.log('');
+    return;
+  }
   console.log(`\n  Job Pipeline CRM running:`);
   console.log(`    Local:   http://localhost:${PORT}`);
   if (lan) console.log(`    LAN:     http://${lan.address}:${PORT}`);

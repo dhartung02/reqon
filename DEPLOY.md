@@ -76,16 +76,27 @@ REQON_API_BASE_URL=https://api.reqon.app
 
 ## 3. reqon-marketing → reqon.app
 
-**Create:** New → **Static Site** → this repo. No build, no env, no secrets.
+**Create:** New → **Web Service** → this repo. Runtime **Node**. No disk, no secrets.
 
 | Setting | Value |
 |---|---|
 | Root Directory | *(blank — repo root)* |
-| Build Command | *(leave empty)* |
-| Publish Directory | `marketing` |
-| Rewrite/Redirect | `Source: /*` → `Destination: /index.html` (Action: Rewrite) |
+| Build Command | `npm install` |
+| Start Command | `npm run start:marketing` |
+| Health Check Path | `/health` |
 
-The CTA buttons link to `https://cloud.reqon.app`.
+**Environment variables (all non-secret):**
+```
+NODE_ENV=production
+REQON_ROLE=marketing
+REQON_API_BASE_URL=https://api.reqon.app
+REQON_CLOUD_BASE_URL=https://cloud.reqon.app
+REQON_PUBLIC_BASE_URL=https://reqon.app
+```
+
+No disk. No `APP_TOKEN`. No API keys or secrets of any kind.
+
+The service serves a public placeholder page at `/` and returns `{"ok":true,"service":"reqon-marketing","role":"marketing"}` at `/health`. All other paths return 404. No data is read or written.
 
 ---
 
@@ -126,8 +137,11 @@ curl https://cloud.reqon.app/health         # → {"ok":true,"service":"reqon-cl
 - DevTools → Network: `/api/reqs` is served from `cloud.reqon.app` (proxied) and returns your data.
 
 **reqon.app**
-- Open `https://reqon.app/` → marketing page renders, images load, **Open the app** → `cloud.reqon.app`.
-- `curl -I https://reqon.app/some/deep/path` → `200` (rewrite serves `index.html`).
+```
+curl https://reqon.app/health    # → {"ok":true,"service":"reqon-marketing","role":"marketing"}
+curl -I https://reqon.app/api/reqs  # → 404 (no API surface exposed)
+```
+- Open `https://reqon.app/` → placeholder page renders with "Coming soon" copy and a link to `cloud.reqon.app`.
 
 ---
 

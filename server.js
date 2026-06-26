@@ -507,7 +507,8 @@ function gateHtml(req, res, next) {
   return res.redirect('/login?next=' + encodeURIComponent(req.path));
 }
 // api role: root is a small JSON status, NOT the product UI (the board lives on cloud.reqon.app).
-if (!SERVE_UI) {
+// Exclude marketing role — it has its own root handler below.
+if (!SERVE_UI && !SERVE_MARKETING) {
   app.get('/', (req, res) => res.json({ ok: true, service: 'reqon-api', message: 'Reqon API. The product UI is at cloud.reqon.app.', health: '/health' }));
 }
 

@@ -1391,7 +1391,7 @@ app.post('/api/assist', async (req, res) => {
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
   // 'answer' = reusable Q&A draft; 'tailor' = résumé/answer suggestions to close JD keyword gaps.
-  const kind = ['cover', 'screening', 'answer', 'tailor', 'followup'].includes(b.kind) ? b.kind : 'cover';
+  const kind = ['cover', 'screening', 'answer', 'tailor', 'followup', 'thankyou'].includes(b.kind) ? b.kind : 'cover';
   const rows = readStore();
   const row = rows.find(r => reqKey(r) === String(b.key || '').toLowerCase().trim());
   const company = (row && row.company) || b.company || '';
@@ -1418,6 +1418,10 @@ app.post('/api/assist', async (req, res) => {
     const ctx = String(b.context || '').slice(0, 500);
     const contact = String(b.contact || '').trim();
     user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\nRecruiter/contact: ${contact || '(unknown — address generically)'}\n\nSituation: ${ctx || 'Follow up on a job application.'}\n\nCandidate narrative library (use ONLY these facts if you cite anything):\n${narr || '(none provided)'}\n\nWrite a SHORT, warm, professional follow-up message (60-110 words) the candidate can send. Reiterate genuine interest, reference the role, and ask a clear next-steps question. No overclaiming, no flattery, plain first-person. Output the message body only (no subject line, no placeholders like [Name] unless the contact is unknown).`;
+  } else if (kind === 'thankyou') {
+    const contact = String(b.contact || (row && row.recruiter) || '').trim();
+    const interviewDate = String(b.interviewDate || (row && row.interview) || '').trim();
+    user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\nInterviewer/recruiter: ${contact || '(unknown)'}\nInterview date: ${interviewDate || 'recently'}\n\nCandidate narrative library (use ONLY these if citing experience):\n${narr || '(none provided)'}\n\nWrite a SHORT, warm thank-you note (80-120 words) the candidate can send after the interview. Express genuine appreciation for the interviewer's time, reference the role by name, briefly mention one specific reason you remain excited about the opportunity (grounded in the narratives if applicable — otherwise keep it general), and close by expressing continued interest and asking about timeline or next steps. First person, plain and professional — not sycophantic or over-polished. Output the message body only (no subject line).`;
   } else if (kind === 'tailor') {
     user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nKeywords the posting emphasizes that the résumé does NOT currently cover:\n${keywords || '(none provided)'}\n\nFor each missing keyword, say ONE of: (a) a concrete, HONEST résumé bullet or phrasing the candidate could add IF their narratives genuinely support it (cite which narrative), or (b) "gap — not supported by your background" when the narratives don't back it. Never fabricate experience. Output a short bulleted list.`;
   } else {

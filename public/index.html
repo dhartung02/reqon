@@ -610,6 +610,8 @@
   .cell input,.cell select{background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:7px;padding:6px 8px;font-family:inherit;font-size:.8rem;outline:none}
   .cell input:focus,.cell select:focus{border-color:var(--gold)}
   .cell.full{grid-column:1/-1}
+  .dpw{display:flex;align-items:center;gap:2px}.dpw input{flex:1;min-width:0}
+  .dp-icon{background:none;border:none;cursor:pointer;padding:0 3px;font-size:.85rem;opacity:.45;line-height:1;flex:none}.dp-icon:hover{opacity:.9}
   .status-sel{font-weight:700}
   .rowacts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
   .trackstrip{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);font-family:"Spline Sans Mono",monospace;font-size:.68rem;color:var(--dim);letter-spacing:.01em}
@@ -871,13 +873,16 @@
       <div class="field"><label>Applied date</label><input id="f_applied" type="date"></div>
       <div class="field"><label>Interview date</label><input id="f_interview" type="date"></div>
     </div>
-    <div class="grid3">
-      <div class="field"><label>Recruiter</label><input id="f_recruiter" type="text"></div>
-      <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
-      <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
+    <div class="grid2">
+      <div class="field"><label>Recruiter name</label><input id="f_recruiter" type="text" placeholder="Jane Smith"></div>
+      <div class="field"><label>Recruiter email</label><input id="f_recruiterEmail" type="email" placeholder="jane@company.com"></div>
     </div>
     <div class="grid3">
+      <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
+      <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
       <div class="field"><label>Cover letter?</label><select id="f_cover"><option>No</option><option>Yes</option></select></div>
+    </div>
+    <div class="grid2">
       <div class="field"><label>Follow-up date</label><input id="f_followup" type="date"></div>
       <div class="field"><label>Last contact</label><input id="f_lastcontact" type="date"></div>
     </div>
@@ -944,7 +949,7 @@
       <div class="ahintrow" style="margin-top:8px"><button class="btn" id="assistApplyScore" type="button">Apply suggested scores</button> <span class="setmuted" id="assistApplyNote">Saves the rationale to notes too. Nothing is submitted to any employer.</span></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Draft type</label><select id="assistKind"><option value="cover">Cover note</option><option value="screening">Screening question</option></select></div>
+      <div class="field"><label>Draft type</label><select id="assistKind"><option value="cover">Cover note</option><option value="screening">Screening question</option><option value="thankyou">Thank-you note</option></select></div>
       <div class="field"><label>Model</label><input id="assistModelEcho" type="text" disabled></div>
     </div>
     <div class="field" id="assistQWrap" style="display:none"><label>Screening question</label><textarea id="assistQ" rows="2" placeholder="Paste the question to answer…"></textarea></div>
@@ -1011,6 +1016,45 @@
       <button class="btn ghost" id="fuDraft">✍ Draft message</button>
       <button class="btn ghost" id="fuCopy">Copy</button>
       <button class="btn" id="fuSent">✓ Mark sent</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="rejectionOverlay">
+  <div class="modal" style="max-width:480px">
+    <h2>Log rejection details</h2>
+    <p class="hint">Optional — helps you track patterns. Skip to just mark it Rejected.</p>
+    <div class="field"><label>Stage when rejected</label>
+      <select id="rej_stage">
+        <option value="">— unknown —</option>
+        <option>Before application</option>
+        <option>After application review</option>
+        <option>Phone / recruiter screen</option>
+        <option>Hiring manager</option>
+        <option>Panel interview</option>
+        <option>Final round</option>
+      </select>
+    </div>
+    <div class="field"><label>Reason (if known)</label>
+      <select id="rej_reason">
+        <option value="">— not shared —</option>
+        <option>Underqualified</option>
+        <option>Overqualified</option>
+        <option>Salary mismatch</option>
+        <option>Role fit</option>
+        <option>Culture fit</option>
+        <option>Lost to another candidate</option>
+        <option>Role eliminated or frozen</option>
+        <option>No feedback given</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Notes / recruiter feedback <span class="setmuted">(optional)</span></label>
+      <textarea id="rej_feedback" rows="3" placeholder="Verbatim feedback or your own impressions — useful for spotting patterns later"></textarea>
+    </div>
+    <div class="modalacts">
+      <button class="btn ghost" id="rejSkip">Skip</button>
+      <button class="btn" id="rejSave">Save &amp; mark rejected</button>
     </div>
   </div>
 </div>
@@ -1591,6 +1635,7 @@ async function load(){
 
 // ---- Command center: "What needs action" (P2.2) — consumes GET /api/action-items ----
 const CC_SECTIONS = [
+  { title: 'Thank-you notes due', types: ['thankyou_due'] },
   { title: 'Needs review', types: ['review_offer', 'review_interview'] },
   { title: 'Follow-ups due', types: ['follow_up_due'] },
   { title: 'Apply next', types: ['apply_next'] },
@@ -1644,11 +1689,20 @@ function ccOpenTarget(roleId, target){
       tierOpen.A=tierOpen.B=tierOpen.C=true;
       expanded.add(i); render();
       setTimeout(()=>{ const el=document.querySelector('.crow[data-i="'+i+'"]'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('cc-flash'); setTimeout(()=>el.classList.remove('cc-flash'),1500); } },80);
+      if(target==='thankyou') setTimeout(()=>openThankYou(i), 250);
       return;
     }
   }
   if(target&&target.indexOf('settings')===0){ const sect=target.split('/')[1]||'sources'; openSettingsTo(sect); }
 }
+window.openThankYou=function(i){
+  openAssist(i);
+  requestAnimationFrame(()=>{
+    F("assistKind").value="thankyou";
+    F("assistKind").dispatchEvent(new Event("change"));
+    setTimeout(()=>{ if(F("assistKind").value==="thankyou") F("assistGenBtn").click(); }, 350);
+  });
+};
 function openSettingsTo(sect){
   const sb=document.getElementById('settingsBtn'); if(sb)sb.click();
   setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+sect+'"]'); if(nav)nav.click(); },120);
@@ -1714,6 +1768,7 @@ function reqCardHTML(x,i){
       </div>
     </div>
     <div class="fitrat">${fitRationale(x).map(r=>`<div class="fr ${r.t}"><span class="frl">${r.l}</span><span class="frv">${esc(r.v)}</span></div>`).join("")}</div>
+    ${x.status==='Rejected'&&(x.rejectionStage||x.rejectionReason||x.rejectionFeedback)?`<div style="padding:8px 12px;margin:4px 0 6px;border-left:3px solid var(--danger,#c0392b);background:rgba(192,57,43,.07);border-radius:0 6px 6px 0"><p style="font-size:.76rem;font-weight:700;color:var(--danger,#e05252);margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em">Rejection notes</p>${x.rejectionStage?`<p style="font-size:.82rem;color:var(--text-2);margin:2px 0"><b>Stage:</b> ${esc(x.rejectionStage)}</p>`:''} ${x.rejectionReason?`<p style="font-size:.82rem;color:var(--text-2);margin:2px 0"><b>Reason:</b> ${esc(x.rejectionReason)}</p>`:''} ${x.rejectionFeedback?`<p style="font-size:.82rem;color:var(--text-2);margin:4px 0 0;font-style:italic">${esc(x.rejectionFeedback)}</p>`:''}</div>`:''}
     <div class="crm">
       <div class="cell"><label>Company (override)</label><input type="text" value="${(x.company||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'company',this.value)"></div>
       <div class="cell"><label>Sector</label><input type="text" value="${(x.sector||'').replace(/"/g,'&quot;')}" placeholder="CDP / AI Platform / Data Infra…" onchange="upd(${i},'sector',this.value)"></div>
@@ -1724,16 +1779,22 @@ function reqCardHTML(x,i){
         <select class="status-sel" style="color:${STATUS_COLOR[x.status]||'var(--text)'}" onchange="upd(${i},'status',this.value)">
           ${STATUS_ORDER.map(s=>`<option ${s===x.status?'selected':''}>${s}</option>`).join("")}
         </select></div>
-      <div class="cell"><label>Applied date</label><input type="date" value="${x.applied||''}" onchange="upd(${i},'applied',this.value)"></div>
-      <div class="cell"><label>Interview date</label><input type="date" value="${x.interview||''}" onchange="upd(${i},'interview',this.value)"></div>
-      <div class="cell"><label>Follow-up</label><input type="date" value="${x.followup||''}" onchange="upd(${i},'followup',this.value)"></div>
-      <div class="cell"><label>Recruiter</label><input type="text" value="${(x.recruiter||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'recruiter',this.value)"></div>
+      <div class="cell"><label>Applied date</label><span class="dpw"><input type="date" value="${x.applied||''}" onchange="upd(${i},'applied',this.value)"><button class="dp-icon" onclick="event.preventDefault();this.previousElementSibling.showPicker?.()" tabindex="-1" title="Pick date">📅</button></span></div>
+      <div class="cell"><label>Interview date</label><span class="dpw"><input type="date" value="${x.interview||''}" onchange="upd(${i},'interview',this.value)"><button class="dp-icon" onclick="event.preventDefault();this.previousElementSibling.showPicker?.()" tabindex="-1" title="Pick date">📅</button></span></div>
+      <div class="cell"><label>Follow-up</label><span class="dpw"><input type="date" value="${x.followup||''}" onchange="upd(${i},'followup',this.value)"><button class="dp-icon" onclick="event.preventDefault();this.previousElementSibling.showPicker?.()" tabindex="-1" title="Pick date">📅</button></span></div>
+      <div class="cell"><label>Recruiter name</label><input type="text" value="${(x.recruiter||'').replace(/"/g,'&quot;')}" placeholder="Jane Smith" onchange="upd(${i},'recruiter',this.value)"></div>
+      <div class="cell"><label>Recruiter email</label><input type="email" value="${(x.recruiterEmail||'').replace(/"/g,'&quot;')}" placeholder="jane@company.com" onchange="upd(${i},'recruiterEmail',this.value)"></div>
       <div class="cell"><label>Referral</label><select onchange="upd(${i},'referral',this.value)"><option ${x.referral==='No'?'selected':''}>No</option><option ${x.referral==='Yes'?'selected':''}>Yes</option></select></div>
       <div class="cell"><label>Resume ver.</label><select onchange="upd(${i},'resume',this.value)">${["—","PM","Director","Principal","Platform","AI"].map(o=>`<option ${o===x.resume?'selected':''}>${o}</option>`).join("")}</select></div>
       <div class="cell"><label>Cover letter</label><select onchange="upd(${i},'cover',this.value)"><option ${x.cover==='No'?'selected':''}>No</option><option ${x.cover==='Yes'?'selected':''}>Yes</option></select></div>
-      <div class="cell"><label>Last contact</label><input type="date" value="${x.lastcontact||''}" onchange="upd(${i},'lastcontact',this.value)"></div>
+      <div class="cell"><label>Last contact</label><span class="dpw"><input type="date" value="${x.lastcontact||''}" onchange="upd(${i},'lastcontact',this.value)"><button class="dp-icon" onclick="event.preventDefault();this.previousElementSibling.showPicker?.()" tabindex="-1" title="Pick date">📅</button></span></div>
       <div class="cell"><label>Apply mode ${x.link?`<button class="microbtn" onclick="detectApplyMode(${i})" title="Detect how this posting can be applied to (inspects the live page)">🔎 detect</button>`:''}</label><select onchange="upd(${i},'applyMode',this.value)">${APPLY_MODES.map(o=>`<option ${o===applyModeOf(x)?'selected':''}>${o}</option>`).join("")}</select></div>
       <div class="cell full"><label>Next action</label><input type="text" value="${(x.next||'').replace(/"/g,'&quot;')}" placeholder="e.g. tailor Principal resume, ask for referral" onchange="upd(${i},'next',this.value)"></div>
+      ${x.status==='Rejected'?`
+      <div class="cell"><label>Rejected at stage</label><select onchange="upd(${i},'rejectionStage',this.value)">${['','Before application','After application review','Phone / recruiter screen','Hiring manager','Panel interview','Final round'].map(o=>`<option ${o===(x.rejectionStage||'')?'selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="cell"><label>Rejection reason</label><select onchange="upd(${i},'rejectionReason',this.value)">${['','Underqualified','Overqualified','Salary mismatch','Role fit','Culture fit','Lost to another candidate','Role eliminated or frozen','No feedback given','Other'].map(o=>`<option ${o===(x.rejectionReason||'')?'selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="cell full"><label>Rejection notes</label><input type="text" value="${(x.rejectionFeedback||'').replace(/"/g,'&quot;')}" placeholder="Feedback or impressions" onchange="upd(${i},'rejectionFeedback',this.value)"></div>
+      `:''}
     </div>
     <div class="rowacts">
       ${x.link?`<a class="applylink" href="${x.link}" target="_blank" rel="noopener"><span class="mini link">Open ↗</span></a>`:""}
@@ -1743,6 +1804,7 @@ function reqCardHTML(x,i){
       <button class="mini" onclick="openCv(${i})" title="Build a CV tailored to this role (preloads company/role/JD)">📄 Tailored CV</button>
       <button class="mini" onclick="openTimeline(${i})" title="See how this role got here — capture, scoring, status changes">📜 Timeline</button>
       ${/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(x.status||'')?`<button class="mini" onclick="openFollowup(${i})" title="Follow-up recommendation + AI-drafted message">💬 Follow-up</button>`:''}
+      ${/^(Recruiter Screen|Hiring Manager|Panel)$/.test(x.status||'')?`<button class="mini" onclick="openThankYou(${i})" title="AI-draft a thank-you note after your interview">✉ Thank-you</button>`:''}
       ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
@@ -2500,7 +2562,23 @@ window.exportSelected=function(){
 };
 // WP-0: every client-side edit stamps updatedAt (+who) so per-row last-writer-wins has honest timestamps
 function stampRow(i){if(rows[i]){rows[i].updatedAt=new Date().toISOString();rows[i].updatedBy="you";}}
+let pendingRejIdx=-1;
+function showRejModal(i){pendingRejIdx=i;F('rej_stage').value='';F('rej_reason').value='';F('rej_feedback').value='';F('rejectionOverlay').classList.add('open');}
+function commitRejection(saveDetails){
+  const i=pendingRejIdx; if(i<0)return;
+  rows[i].status='Rejected'; rows[i].status_updated=new Date().toISOString().slice(0,10); stampRow(i);
+  if(saveDetails){
+    const stage=F('rej_stage').value,reason=F('rej_reason').value,fb=F('rej_feedback').value.trim();
+    if(stage)rows[i].rejectionStage=stage;
+    if(reason)rows[i].rejectionReason=reason;
+    if(fb)rows[i].rejectionFeedback=fb;
+  }
+  F('rejectionOverlay').classList.remove('open'); pendingRejIdx=-1;
+  persist(); render();
+}
+
 window.upd=function(i,field,val){
+  if(field==='status'&&val==='Rejected'){showRejModal(i);return;}
   rows[i][field]=val;stampRow(i);
   // moving to Applied auto-stamps today's applied date (only if not already set — never overwrites)
   if(field==='status'&&val==='Applied'&&!rows[i].applied){rows[i].applied=new Date().toISOString().slice(0,10);}
@@ -2512,7 +2590,7 @@ let editingIndex=-1;
 const F=id=>document.getElementById(id);
 function openModal(t){F("modalTitle").textContent=t;F("overlay").classList.add("open");}
 function closeModal(){F("overlay").classList.remove("open");editingIndex=-1;}
-const TEXT=["company","sector","role","salary","location","link","notes","recruiter","next","applied","interview","followup","lastcontact"];
+const TEXT=["company","sector","role","salary","location","link","notes","recruiter","recruiterEmail","next","applied","interview","followup","lastcontact"];
 const SEL=["remote","tier","conf","status","referral","resume","cover"];
 function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("f_prob").value="";F("f_remote").value="remote";F("f_tier").value="A";F("f_conf").value="unverified";F("f_status").value="Not Applied";F("f_referral").value="No";F("f_resume").value="—";F("f_cover").value="No";}
 function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
@@ -2523,6 +2601,9 @@ F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition"
 F("cancelBtn").onclick=closeModal;
 F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
 F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0){rows[editingIndex]={...rows[editingIndex],...o};stampRow(editingIndex);}else rows.unshift(o);persistNow();render();closeModal();};
+F('rejSave').onclick=()=>commitRejection(true);
+F('rejSkip').onclick=()=>commitRejection(false);
+F('rejectionOverlay').onclick=e=>{if(e.target.id==='rejectionOverlay')commitRejection(false);};
 ["search","statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("input",render));
 ["statusFilter","tierFilter","sourceFilter","applyModeFilter","sort"].forEach(id=>F(id).addEventListener("change",render));
 F("remoteOnly").onchange=render;F("activeOnly").onchange=render;F("notAppliedOnly").onchange=render;F("applyNextOnly").onchange=render;F("groupBy").onchange=render;
@@ -3426,6 +3507,7 @@ F("assistGenBtn").onclick=async()=>{
   F("assistMsg").className="setmsg";F("assistMsg").textContent="Generating…";F("assistGenBtn").disabled=true;
   try{
     const body={key:(assistRow.company+"|"+assistRow.role).toLowerCase().trim(),kind,question:F("assistQ").value,jd:F("assistJd").value};
+    if(kind==="thankyou"){body.contact=assistRow.recruiter||"";body.interviewDate=assistRow.interview||"";}
     const j=await (await fetch("/api/assist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
     if(!j.ok)throw new Error(j.error||"failed");
     F("assistOut").value=j.draft||"";

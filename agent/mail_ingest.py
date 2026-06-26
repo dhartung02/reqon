@@ -131,9 +131,8 @@ def crm_base():
     return (os.environ.get("CRM_BASE") or ("http://localhost:" + str(PORT))).rstrip("/")
 
 
-def patch_status(row, status, note):
-    body = json.dumps({"fields": {"status": status, "lastcontact": TODAY},
-                       "note": note}).encode("utf-8")
+def patch_fields(row, fields, note):
+    body = json.dumps({"fields": fields, "note": note}).encode("utf-8")
     req = urllib.request.Request(crm_base() + "/api/reqs/" + urllib.parse.quote(req_key(row)),
                                  data=body, method="PATCH",
                                  headers={"Content-Type": "application/json"})
@@ -142,6 +141,47 @@ def patch_status(row, status, note):
         req.add_header("X-CRM-Token", tok)
     with urllib.request.urlopen(req, timeout=20) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def patch_status(row, status, note):
+    return patch_fields(row, {"status": status, "lastcontact": TODAY}, note)
+
+
+# Month-name → number map for date extraction.
+_MONTHS = {
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7,
+    "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+_DATE_PAT = re.compile(
+    r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)?\s*,?\s*"
+    r"(january|february|march|april|may|june|july|august|september|october|november|december|"
+    r"jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+"
+    r"(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?",
+    re.IGNORECASE,
+)
+
+
+def extract_interview_date(body):
+    """Scan email body for a calendar date and return YYYY-MM-DD, or None if not found."""
+    today = datetime.date.today()
+    for m in _DATE_PAT.finditer(body or ""):
+        month = _MONTHS.get(m.group(1).lower())
+        if not month:
+            continue
+        day = int(m.group(2))
+        year = int(m.group(3)) if m.group(3) else today.year
+        try:
+            d = datetime.date(year, month, day)
+            # If parsed date is in the past and no year was explicit, roll forward a year.
+            if not m.group(3) and d < today:
+                d = datetime.date(year + 1, month, day)
+            return d.isoformat()
+        except ValueError:
+            continue
+    return None
 
 
 def notify(text):
@@ -306,7 +346,17 @@ def main():
             positives.append(("interview", matches, label))
             if args.apply:
                 try:
-                    patch_status(r, "Recruiter Screen", "auto: interview email %s (%s)" % (TODAY, ", ".join(cls["signals"][:2])))
+                    fields = {"status": "Recruiter Screen", "lastcontact": TODAY}
+                    # Capture recruiter name + email from the sender if not already on the row.
+                    if m.get("from_name") and not r.get("recruiter"):
+                        fields["recruiter"] = m["from_name"]
+                    if m.get("from_addr") and not r.get("recruiterEmail"):
+                        fields["recruiterEmail"] = m["from_addr"]
+                    # Try to extract the interview date from the body.
+                    iv_date = extract_interview_date(m.get("body", ""))
+                    if iv_date and not r.get("interview"):
+                        fields["interview"] = iv_date
+                    patch_fields(r, fields, "auto: interview email %s (%s)" % (TODAY, ", ".join(cls["signals"][:2])))
                     acted += 1
                 except Exception as e:
                     print("  ! could not advance %s: %s" % (req_key(r), e))

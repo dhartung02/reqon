@@ -1,0 +1,81 @@
+# Render Blueprint — Reqon's three-service production split.
+# One repo, three services:
+#   reqon-api        → api.reqon.app    (backend + /health; "/" is JSON; no product UI)
+#   reqon-cloud      → cloud.reqon.app  (board UI; reverse-proxies API paths to reqon-api)
+#   reqon-marketing  → reqon.app        (static marketing site)
+#
+# After first deploy, attach the custom domains in each service's Settings → Custom Domains.
+# Secrets (sync:false) are entered once in the Render dashboard — never committed.
+
+services:
+  # ── 1. Backend API ────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: reqon-api
+    runtime: node
+    plan: starter            # needs a paid plan for the persistent disk below
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm run start:api
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: reqon-data
+      mountPath: /var/reqon-data    # survives deploys; matches REQON_DATA_DIR
+      sizeGB: 1
+    envVars:
+      - key: REQON_ROLE
+        value: api
+      - key: NODE_ENV
+        value: production
+      - key: REQON_DATA_DIR
+        value: /var/reqon-data
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://cloud.reqon.app,https://reqon.app
+      - key: REQON_CLOUD_BASE_URL
+        value: https://cloud.reqon.app
+      - key: REQON_PUBLIC_BASE_URL
+        value: https://reqon.app
+      # PORT is injected by Render automatically; the server binds process.env.PORT.
+      # Secrets — set in the dashboard, never in this file:
+      - key: APP_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: INGEST_TOKEN
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+
+  # ── 2. Product UI (proxies to the API; holds NO secrets) ──────────────────────────────────
+  - type: web
+    name: reqon-cloud
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm run start:cloud
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: REQON_ROLE
+        value: cloud
+      - key: NODE_ENV
+        value: production
+      - key: REQON_API_BASE_URL
+        value: https://api.reqon.app    # where the cloud server proxies /api, /login, /guide, etc.
+
+  # ── 3. Marketing site (static) ─────────────────────────────────────────────────────────────
+  - type: web
+    name: reqon-marketing
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: ./marketing
+    autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

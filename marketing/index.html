@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reqon — your job search, sourced and ranked</title>
+<meta name="description" content="A self-hosted job-search command center that sources roles for you, scores them against your résumé, and tracks them through to offer. Your data never leaves your machine.">
+<meta property="og:title" content="Reqon — your job search, sourced and ranked">
+<meta property="og:description" content="Reqon polls real ATS boards daily, ranks roles by fit, and tracks them to offer. Self-hosted, private.">
+<meta property="og:type" content="website">
+<link rel="icon" href="images/glyph.svg" type="image/svg+xml">
+<style>
+  :root{
+    --canvas:#0B0C0E; --elem:#16181C; --elem2:#1B1F25; --line:#232A31;
+    --emerald:#00E5A3; --lime:#C8FF49; --amber:#FFB800; --muted:#64748B;
+    --text:#E2E8F0; --text2:#94A3B8;
+    --serif:"Fraunces",Georgia,serif; --sans:"Spline Sans","Inter",-apple-system,system-ui,sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Spline+Sans:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--canvas);color:var(--text);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.01em}
+  .accent{color:var(--emerald)}
+  .btn{display:inline-block;border-radius:11px;padding:13px 22px;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .12s,background .12s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn-primary{background:var(--emerald);color:#06211a}
+  .btn-ghost{border:1px solid var(--line);color:var(--text)}
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.22em;font-size:.8rem;text-transform:uppercase;color:var(--emerald)}
+  .brand img{width:26px;height:26px}
+  .nav-cta{display:flex;gap:12px;align-items:center}
+  /* hero */
+  .hero{padding:64px 0 40px;text-align:center}
+  .hero h1{font-size:clamp(2.4rem,6vw,4rem)}
+  .hero p.lede{font-size:clamp(1.05rem,2.2vw,1.4rem);color:var(--text2);max-width:680px;margin:20px auto 0}
+  .hero .cta{margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .trust{margin-top:18px;font-size:.85rem;color:var(--muted)}
+  .shot{margin:48px auto 0;max-width:980px;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 40px 80px -40px rgba(0,229,163,.25)}
+  .shot img{display:block;width:100%}
+  /* sections */
+  section{padding:56px 0}
+  .eyebrow{font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)}
+  .sec-h{font-size:clamp(1.6rem,3.5vw,2.4rem);margin-top:10px}
+  .sec-sub{color:var(--text2);max-width:640px;margin-top:12px}
+  /* pillars */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:36px}
+  .card{background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px}
+  .card .k{font-family:var(--serif);font-size:1.25rem;color:var(--text)}
+  .card .d{color:var(--text2);margin-top:8px;font-size:.95rem}
+  .card .dot{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:1.1rem;margin-bottom:14px}
+  /* feature rows */
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;margin-top:44px}
+  .feat.rev .ftext{order:2}
+  .feat img{width:100%;border:1px solid var(--line);border-radius:12px}
+  .feat h3{font-size:1.5rem}
+  .feat p{color:var(--text2);margin-top:10px}
+  @media(max-width:760px){.feat{grid-template-columns:1fr}.feat.rev .ftext{order:0}}
+  /* trust band */
+  .band{background:var(--elem);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .band .wrap{display:flex;gap:30px;flex-wrap:wrap;justify-content:space-between;align-items:center}
+  .band .point{flex:1;min-width:200px}
+  .band .point b{color:var(--emerald)}
+  /* final cta */
+  .final{text-align:center;padding:72px 0}
+  .final h2{font-size:clamp(1.8rem,4vw,2.6rem)}
+  footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted);font-size:.85rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand"><img src="images/glyph.svg" alt="Reqon">Reqon</div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="https://cloud.reqon.app">Sign in</a>
+      <a class="btn btn-primary" href="https://cloud.reqon.app">Open the app</a>
+    </div>
+  </nav>
+</div>
+
+<header class="hero wrap">
+  <div class="eyebrow">Self-hosted job-search command center</div>
+  <h1>Your job search, <span class="accent">sourced and ranked.</span></h1>
+  <p class="lede">Reqon polls real ATS boards every morning, scores each role against your résumé, and tracks the shortlist through to offer — so your energy goes to the few high-value roles, not the noise.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://cloud.reqon.app">Open the app →</a>
+    <a class="btn btn-ghost" href="#how">See how it works</a>
+  </div>
+  <div class="trust">Your data never leaves your machine · No résumé uploads to a third party · Open source</div>
+  <div class="shot"><img src="images/dashboard-overview.png" alt="Reqon pipeline board"></div>
+</header>
+
+<section class="wrap" id="why">
+  <div class="eyebrow">The problem</div>
+  <h2 class="sec-h">Most tools optimize for volume. Senior candidates need the opposite.</h2>
+  <p class="sec-sub">Discovery is noisy and links rot in days. Spreadsheets go stale the moment things get busy. And re-typing the same profile into every ATS burns the effort that should go into the 2–3 applications that actually matter. Reqon gives you a ranked, honest shortlist instead.</p>
+  <div class="grid">
+    <div class="card"><div class="dot" style="background:rgba(0,229,163,.12);color:var(--emerald)">⦿</div><div class="k">Scout sources for you</div><div class="d">Polls Greenhouse, Ashby, Lever and more daily via their real board APIs — no scraping, no rotting aggregator links.</div></div>
+    <div class="card"><div class="dot" style="background:rgba(200,255,73,.12);color:var(--lime)">▦</div><div class="k">Ranks by real fit</div><div class="d">Scores every role for fit and interview probability against your résumé and target criteria, then tiers them by expected value.</div></div>
+    <div class="card"><div class="dot" style="background:rgba(255,184,0,.12);color:var(--amber)">◷</div><div class="k">Tracks to offer</div><div class="d">A pipeline that follows each role from lead to offer, with follow-up nudges, interview prep, and recruiter-reply detection.</div></div>
+  </div>
+</section>
+
+<section class="wrap" id="how">
+  <div class="eyebrow">How it works</div>
+  <h2 class="sec-h">Discover → verify → apply → follow up.</h2>
+
+  <div class="feat">
+    <div class="ftext">
+      <h3>A command center, not a spreadsheet</h3>
+      <p>Open the board and see exactly what needs action today: high-EV roles to apply to, follow-ups gone quiet, interviews to prep, leads to verify — each one a tap from the detail.</p>
+    </div>
+    <img src="images/analytics.png" alt="Reqon analytics and pipeline health">
+  </div>
+
+  <div class="feat rev">
+    <div class="ftext">
+      <h3>Clip anything, fill applications faster</h3>
+      <p>A browser extension clips roles from any posting and an AI apply-assist pre-fills the factual fields from your profile — it never submits, never touches passwords or EEO. You stay in control.</p>
+    </div>
+    <img src="images/chrome-extension.png" alt="Reqon Chrome extension overlay">
+  </div>
+
+  <div class="feat">
+    <div class="ftext">
+      <h3>On your phone, in sync</h3>
+      <p>A companion app mirrors your pipeline, today's actions, analytics, and notifications — review and act on the go, fully synced with your board.</p>
+    </div>
+    <img src="images/mobile-companion.png" alt="Reqon mobile companion app">
+  </div>
+</section>
+
+<div class="band">
+  <div class="wrap" style="padding-top:36px;padding-bottom:36px">
+    <div class="point"><b>Private by design.</b><br>Self-hosted. Your pipeline, résumé, and notes stay on infrastructure you control.</div>
+    <div class="point"><b>Honest scoring.</b><br>Built to surface a real shortlist — fit and interview odds, not engagement-bait feeds.</div>
+    <div class="point"><b>Yours to run.</b><br>Open source, scriptable, and extensible — board, extension, and mobile app included.</div>
+  </div>
+</div>
+
+<section class="final wrap">
+  <h2>Spend your effort on the roles that matter.</h2>
+  <p class="sec-sub" style="margin:16px auto 0">Set your criteria once, let the scout work each morning, and apply to a ranked shortlist.</p>
+  <div class="cta" style="margin-top:28px">
+    <a class="btn btn-primary" href="https://cloud.reqon.app">Open Reqon →</a>
+  </div>
+</section>
+
+<div class="wrap">
+  <footer>
+    <div class="brand"><img src="images/glyph.svg" alt="">Reqon</div>
+    <div>© Reqon · <a href="https://cloud.reqon.app">app</a> · self-hosted job-search command center</div>
+  </footer>
+</div>
+</body>
+</html>

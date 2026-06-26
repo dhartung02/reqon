@@ -50,6 +50,12 @@ const MULTIUSER = () => store.multiUserEnabled();   // read live (env MULTIUSER=
 const PORT = process.env.PORT || 8787;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = reachable on the LAN
 const ROOT = __dirname;
+// Persisted data root — defaults to the repo (local), or a mounted disk on an ephemeral host via
+// REQON_DATA_DIR (mirrors lib/store.js). Code/examples/scripts stay under ROOT; only written data
+// (guides, audit log, digest snapshots, and everything under lib/store.js) lives here.
+const DATA_DIR = process.env.REQON_DATA_DIR ? path.resolve(process.env.REQON_DATA_DIR) : ROOT;
+// Ensure the persisted-data dirs exist before anything writes (a fresh mounted disk starts empty).
+try { for (const d of ['', 'agent', 'backups']) require('fs').mkdirSync(path.join(DATA_DIR, d), { recursive: true }); } catch (e) { console.error('[data-dir]', e.message); }
 // Per-user file paths resolve through the tenant store (lib/store.js). With multi-user OFF
 // (default) every key maps to the legacy location (root data.json, agent/*.json, backups/) so
 // single-user behavior is unchanged; P.data / P.backups env overrides still apply (in store.js).
@@ -340,6 +346,39 @@ function backupKind(name) {
 
 // ---------- app ----------
 const app = express();
+
+// ─── Render multi-service split ──────────────────────────────────────────────────────────────
+// One codebase, three deployable roles selected by REQON_ROLE:
+//   api   (api.reqon.app)   — backend + /health only; root returns JSON; the board UI is NOT served.
+//   cloud (cloud.reqon.app) — serves the board UI and reverse-proxies API/auth/file paths to
+//                             REQON_API_BASE_URL, so the existing same-origin UI works unchanged and
+//                             no backend logic is duplicated here.
+//   all   (local default)   — monolith (UI + API in one process); unchanged dev behavior.
+const REQON_ROLE = (process.env.REQON_ROLE || 'all').toLowerCase();
+const SERVE_API = REQON_ROLE === 'all' || REQON_ROLE === 'api';
+const SERVE_UI = REQON_ROLE === 'all' || REQON_ROLE === 'cloud';
+
+// Liveness — always on, never gated. Render health checks hit this.
+app.get('/health', (req, res) => res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE }));
+
+// Cloud role proxies the dynamic paths to the API service. Registered BEFORE the body parser so the
+// proxied request body streams through untouched. The browser stays same-origin with cloud.reqon.app
+// (the board's ~70 /api calls, window.open, downloads, and links all keep working); cookies the API
+// sets flow back through the proxy as cloud-origin cookies. No data/AI/secret logic runs in this role.
+if (REQON_ROLE === 'cloud') {
+  const target = (process.env.REQON_API_BASE_URL || '').replace(/\/$/, '');
+  if (!target) { console.error('[cloud] REQON_API_BASE_URL is required when REQON_ROLE=cloud'); process.exit(1); }
+  const { createProxyMiddleware } = require('http-proxy-middleware');
+  // Mount at root with a pathFilter (NOT app.use('/api', …)) so Express doesn't strip the mount
+  // segment — the full original path (/api/reqs, /login, …) is forwarded to the API intact.
+  const proxy = createProxyMiddleware({
+    target, changeOrigin: true, xfwd: true,
+    pathFilter: (pathname) => /^\/(api|login|logout|guide|m|mobile|pair)(\/|$|\?)/.test(pathname) || pathname === '/api',
+  });
+  app.use(proxy);
+  console.log('[cloud] proxying API paths -> ' + target);
+}
+
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false }));
 // ROADMAP-V3 PR0 slice 3: bind every request to its tenant namespace. Multi-user OFF -> owner
@@ -465,29 +504,46 @@ function gateHtml(req, res, next) {
   if (!APP_TOKEN) return res.status(503).send('Mobile/remote access is disabled. Set APP_TOKEN and restart to enable authenticated access.');
   return res.redirect('/login?next=' + encodeURIComponent(req.path));
 }
-app.get(['/m', '/mobile'], gateHtml, (req, res) => res.sendFile(path.join(ROOT, 'mobile.html')));
+// api role: root is a small JSON status, NOT the product UI (the board lives on cloud.reqon.app).
+if (!SERVE_UI) {
+  app.get('/', (req, res) => res.json({ ok: true, service: 'reqon-api', message: 'Reqon API. The product UI is at cloud.reqon.app.', health: '/health' }));
+}
 
-// Desktop board: open on localhost (single-user), gated when reached remotely; in multi-user mode
-// a login is always required (no implicit owner from localhost).
-app.get(['/', '/index.html'], (req, res, next) => {
-  if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
-  return res.redirect('/login?next=/');
-}, (req, res) => res.sendFile(path.join(ROOT, 'public', 'index.html')));
+if (SERVE_UI) {
+  app.get(['/m', '/mobile'], gateHtml, (req, res) => res.sendFile(path.join(ROOT, 'mobile.html')));
 
-// User guide — static help page (definitions, lanes, apply modes, integrations).
-app.get('/guide', (req, res, next) => {
-  if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
-  return res.redirect('/login?next=/guide');
-}, (req, res) => res.sendFile(path.join(ROOT, 'public', 'guide.html')));
+  // Desktop board: open on localhost (single-user), gated when reached remotely; in multi-user mode
+  // a login is always required (no implicit owner from localhost).
+  app.get(['/', '/index.html'], (req, res, next) => {
+    if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
+    return res.redirect('/login?next=/');
+  }, (req, res) => res.sendFile(path.join(ROOT, 'public', 'index.html')));
 
-// CORS for cross-origin capture tools (bookmarklet on linkedin.com etc.). Auth is via the
-// X-CRM-Token header (not cookies), so echoing the origin without credentials is safe — a caller
-// still needs the passphrase. Preflight (OPTIONS) must pass before the auth check below.
+  // User guide — static help page (definitions, lanes, apply modes, integrations).
+  app.get('/guide', (req, res, next) => {
+    if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
+    return res.redirect('/login?next=/guide');
+  }, (req, res) => res.sendFile(path.join(ROOT, 'public', 'guide.html')));
+}
+
+// CORS. Two classes of caller:
+//   • Credentialed browser apps (cloud.reqon.app, reqon.app, local dev) — must be on an ALLOWLIST to
+//     receive Access-Control-Allow-Credentials (cookies). Configurable via CORS_ALLOWED_ORIGINS.
+//   • Token-based capture tools (the bookmarklet on linkedin.com, the Chrome extension) — auth via
+//     the X-CRM-Token header, NOT cookies, so echoing their origin WITHOUT credentials stays safe and
+//     keeps them working from any page. Preflight (OPTIONS) must pass before the auth check below.
+const CORS_ALLOWLIST = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS ||
+    'https://cloud.reqon.app,https://reqon.app,http://localhost:8787,http://localhost:3000,http://localhost:19006')
+    .split(',').map((s) => s.trim()).filter(Boolean));
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
-  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    if (CORS_ALLOWLIST.has(origin)) res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CRM-Token');
   res.setHeader('Access-Control-Max-Age', '600');
   // Private Network Access: lets an https job page (e.g. linkedin.com) reach the local server
@@ -512,7 +568,7 @@ app.use('/api', (req, res, next) => {
   res.status(401).json({ ok: false, error: 'auth required' });
 });
 
-app.use(express.static(path.join(ROOT, 'public')));
+if (SERVE_UI) app.use(express.static(path.join(ROOT, 'public')));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, count: readStore().length, port: PORT, dataFile: P.data });
@@ -585,7 +641,7 @@ app.get('/api/admin/overview', requireAdmin, (req, res) => {
   res.json({ ok: true, server, users: rows });
 });
 // Append-only admin audit log (server-level): who did what to whom.
-const ADMIN_AUDIT = path.join(ROOT, 'agent', 'admin-audit.jsonl');
+const ADMIN_AUDIT = path.join(DATA_DIR, 'agent', 'admin-audit.jsonl');
 function logAdminAudit(entry) { try { fs.mkdirSync(path.dirname(ADMIN_AUDIT), { recursive: true }); fs.appendFileSync(ADMIN_AUDIT, JSON.stringify({ ts: nowIso(), ...entry }) + '\n'); } catch (e) {} }
 // List a user's snapshots (admin restore picker).
 app.get('/api/admin/users/:id/backups', requireAdmin, (req, res) => {
@@ -1443,7 +1499,7 @@ app.get('/api/assist/models', async (req, res) => {
 // Stored as Markdown in agent/interview-guides/<sha1(key)>.md and "attached" to the row via
 // row.guideAt. Generated from the candidate's narratives + the role's JD; grounded, never invented.
 const INTERVIEW_STAGES = new Set(['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer']);
-const GUIDE_DIR = path.join(ROOT, 'agent', 'interview-guides');
+const GUIDE_DIR = path.join(DATA_DIR, 'agent', 'interview-guides');
 const guidePath = (key) => path.join(GUIDE_DIR, crypto.createHash('sha1').update(key).digest('hex') + '.md');
 const guideMaxTokens = () => Math.max(800, parseInt(process.env.GUIDE_MAX_TOKENS || '1800', 10) || 1800);
 
@@ -1897,9 +1953,9 @@ async function deliverDigest(channels, payload) {
   const want = Array.isArray(channels) ? channels : parseChannels(channels, [digestChannel()]);
   const out = { delivered: [], skipped: [], errors: [] };
   try {
-    fs.mkdirSync(path.join(ROOT, 'agent'), { recursive: true });
-    fs.writeFileSync(path.join(ROOT, 'agent', 'digest-latest.html'), payload.html);
-    fs.writeFileSync(path.join(ROOT, 'agent', 'digest-latest.txt'), payload.text);
+    fs.mkdirSync(path.join(DATA_DIR, 'agent'), { recursive: true });
+    fs.writeFileSync(path.join(DATA_DIR, 'agent', 'digest-latest.html'), payload.html);
+    fs.writeFileSync(path.join(DATA_DIR, 'agent', 'digest-latest.txt'), payload.text);
   } catch (e) {}
   const set = new Set(want); set.add('file');   // file fallback always
   for (const ch of set) {
@@ -3471,21 +3527,28 @@ if (require.main !== module) return;   // imported for tests — stop before sid
 // ROADMAP-V3 PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
 // migrate the existing single-user board into that admin's namespace (Q1: "your current board
 // becomes your user"). Migration is once-only + reversible (legacy root files are left intact).
-if (MULTIUSER()) {
+// Backend-only boot work (data bootstrap, migrations, schedulers). The cloud role is a thin UI +
+// proxy and owns no data, so it skips all of this — it just serves the UI and listens.
+if (SERVE_API) {
+  // ROADMAP-V3 PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
+  // migrate the existing single-user board into that admin's namespace (Q1: "your current board
+  // becomes your user"). Migration is once-only + reversible (legacy root files are left intact).
+  if (MULTIUSER()) {
+    try {
+      const admin = users.ensureBootstrapAdmin();
+      if (admin) { const m = store.migrateLegacyToUser(admin.id); if (m.migrated) console.log(`[migrate] adopted legacy board into "${admin.id}" (${m.files} file(s))`); }
+    } catch (e) { console.error('[users] bootstrap/migrate failed:', e.message); }
+  }
+
+  // WP-0 one-time identity migration: backfill id/updatedAt on legacy rows (snapshot first).
   try {
-    const admin = users.ensureBootstrapAdmin();
-    if (admin) { const m = store.migrateLegacyToUser(admin.id); if (m.migrated) console.log(`[migrate] adopted legacy board into "${admin.id}" (${m.files} file(s))`); }
-  } catch (e) { console.error('[users] bootstrap/migrate failed:', e.message); }
+    const rows = readStore();
+    const n = ensureRowIdentity(rows);
+    if (n > 0) { snapshotData('phase'); writeStore(rows); console.log(`[migrate] backfilled id/updatedAt (${n} field(s) across ${rows.length} rows)`); }
+  } catch (e) { console.error('[migrate] identity backfill failed:', e.message); }
+
+  setInterval(digestScheduler, 60 * 1000);   // morning-digest scheduler (Phase 7)
 }
-
-// WP-0 one-time identity migration: backfill id/updatedAt on legacy rows (snapshot first).
-try {
-  const rows = readStore();
-  const n = ensureRowIdentity(rows);
-  if (n > 0) { snapshotData('phase'); writeStore(rows); console.log(`[migrate] backfilled id/updatedAt (${n} field(s) across ${rows.length} rows)`); }
-} catch (e) { console.error('[migrate] identity backfill failed:', e.message); }
-
-setInterval(digestScheduler, 60 * 1000);   // morning-digest scheduler (Phase 7)
 app.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces();
   const lan = Object.values(nets).flat().find(n => n && n.family === 'IPv4' && !n.internal);

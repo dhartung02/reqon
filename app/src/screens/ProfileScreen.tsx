@@ -9,10 +9,13 @@ import {
   draftSummary,
   EMPTY_PROFILE,
   EEO_OPTIONS,
+  newAnswerId,
   type Profile,
   type EduEntry,
   type WorkEntry,
+  type Narrative,
 } from '../sync/profile';
+import { NarrativeBuilderModal } from './NarrativeBuilderModal';
 
 // Dropdown select (Modal-based; no extra deps). Used for the standard EEO self-ID answer sets.
 function SelectField({ label, value, options, onChange }: { label: string; value?: string; options: readonly string[]; onChange: (v: string) => void }) {
@@ -65,6 +68,11 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  const setNarrative = (i: number, k: keyof Narrative, v: string) =>
+    setP((s) => ({ ...s, narratives: s.narratives.map((n, idx) => (idx === i ? { ...n, [k]: v } : n)) }));
+  const addNarrative = (n: Narrative) => setP((s) => ({ ...s, narratives: [n, ...s.narratives] }));
 
   useEffect(() => {
     pullProfile().then((prof) => { setP(prof); setLoading(false); });
@@ -143,6 +151,19 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
         </Pressable>
       </Section>
 
+      <Section title="NARRATIVES" onAdd={() => addNarrative({ id: newAnswerId(), title: '', body: '', tags: [] })}>
+        <Text style={styles.note}>Reusable proof-point stories the AI grounds cover notes, screening answers and tailoring in. Build them from your résumé, then reuse everywhere.</Text>
+        <Pressable style={styles.draftBtn} onPress={() => setBuilderOpen(true)}>
+          <Text style={styles.draftBtnText}>✨ Build from résumé · AI</Text>
+        </Pressable>
+        {p.narratives.map((n, i) => (
+          <EntryCard key={n.id || i} onRemove={() => setP((s) => ({ ...s, narratives: s.narratives.filter((_, idx) => idx !== i) }))}>
+            <Field label="Title" value={n.title} onChange={(v) => setNarrative(i, 'title', v)} />
+            <Field label="Story" value={n.body} onChange={(v) => setNarrative(i, 'body', v)} multiline submitBehavior="newline" style={[styles.input, styles.multi]} />
+          </EntryCard>
+        ))}
+      </Section>
+
       <ListSection title="SECTOR PREFERENCES" value={p.sectors} onChange={(a) => setP((s) => ({ ...s, sectors: a }))} />
 
       <Section title="LINKS">
@@ -194,6 +215,8 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
         <SelectField label="Disability status" value={p.eeo.disability} options={EEO_OPTIONS.disability} onChange={(v) => setEeo('disability', v)} />
         <SelectField label="Sexual orientation" value={p.eeo.orientation} options={EEO_OPTIONS.orientation} onChange={(v) => setEeo('orientation', v)} />
       </Section>
+
+      <NarrativeBuilderModal visible={builderOpen} onClose={() => setBuilderOpen(false)} onAdd={addNarrative} />
     </ScrollView>
   );
 }

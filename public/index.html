@@ -630,6 +630,14 @@
   .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:9px}
   .scoregrid .field{margin-bottom:0}
   .modalacts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  /* narrative builder modal */
+  .nb-list{display:flex;flex-direction:column;gap:12px;max-height:54vh;overflow:auto;margin:6px 0}
+  .nb-card{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+  .nb-h{font-family:"Fraunces",serif;font-weight:600;font-size:1.05rem;color:var(--text)}
+  .nb-draft{font-size:.86rem;color:var(--text-2);line-height:1.5;margin-top:6px}
+  .nb-cover{margin-top:9px;font-size:.8rem;color:var(--text-2)}
+  .nb-cover-l{font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-size:.66rem}
+  .nb-cover ul{margin:4px 0 0;padding-left:18px} .nb-cover li{margin:2px 0}
   /* settings drawer (#13,#14,#16) */
   .settings-modal{max-width:940px;width:100%;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
   .settings-head{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid var(--line);flex:none}
@@ -1000,6 +1008,19 @@
   </div>
 </div>
 
+<div class="overlay" id="nbOverlay">
+  <div class="modal">
+    <h2>Build narratives from your résumé</h2>
+    <p class="hint">AI suggests proof-point stories from your work history. Pick one, flesh it out with the prompts, then polish — grounded only in your real experience, never invented.</p>
+    <div id="nbBody"><div class="setmuted" style="padding:12px 2px">Reading your résumé…</div></div>
+    <div id="nbMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="nbClose">Close</button>
+      <button class="btn ghost" id="nbReroll" style="display:none">Suggest more</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="settingsOverlay">
   <div class="modal settings-modal">
     <div class="settings-head">
@@ -1105,7 +1126,7 @@
           </div>
           <div class="field"><label>Narrative library (reusable story blurbs for cover notes / screening answers)</label>
             <div id="narrativeBox"></div>
-            <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
+            <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button> <button class="mini" id="buildNarrativesBtn" type="button">✨ Build from résumé</button> <span class="setmuted">Don't start blank — let AI suggest stories from your work history, then polish.</span></div>
           </div>
           <div class="field"><label>Saved-answers library (reusable application Q&amp;A — the AI "✍ AI draft" pulls from these)</label>
             <p class="hint" style="margin:0 0 8px">Common screening/application questions and your vetted answers. Tag them so the right one surfaces. Editable and never auto-submitted.</p>
@@ -3195,6 +3216,65 @@ function syncNarrativesFromDOM(){
 }
 window.removeNarrative=function(i){syncNarrativesFromDOM();PROFILE_NARRATIVES.splice(i,1);renderNarratives();};
 SET("addNarrativeBtn").onclick=()=>{syncNarrativesFromDOM();PROFILE_NARRATIVES.push({title:"",body:"",tags:""});renderNarratives();};
+
+// ---------- guided narrative builder (suggest from résumé → elaborate → polish → add) ----------
+function nbSetMsg(t,kind){SET("nbMsg").className="setmsg "+(kind||"");SET("nbMsg").textContent=t||"";}
+async function openNarrativeBuilder(){
+  SET("nbOverlay").classList.add("open"); SET("nbReroll").style.display="none"; nbSetMsg("");
+  SET("nbBody").innerHTML='<div class="setmuted" style="padding:12px 2px">Reading your résumé…</div>';
+  await nbLoadSuggestions();
+}
+async function nbLoadSuggestions(){
+  try{
+    const j=await (await fetch("/api/profile/narratives/suggest",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    if(!j.suggestions.length){SET("nbBody").innerHTML='<div class="setmuted" style="padding:12px 2px">No suggestions — add more work history first.</div>';return;}
+    SET("nbReroll").style.display="";
+    SET("nbBody").innerHTML='<div class="nb-list">'+j.suggestions.map((s,i)=>{
+      window.__nbSug=window.__nbSug||{}; window.__nbSug[i]=s;
+      return `<div class="nb-card"><div class="nb-h">${esc(s.title||"Untitled")}</div>`
+        +`<div class="nb-draft">${esc(s.draft||"")}</div>`
+        +(Array.isArray(s.cover)&&s.cover.length?`<div class="nb-cover"><span class="nb-cover-l">Elaborate on:</span><ul>${s.cover.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>`:"")
+        +`<div class="ahintrow"><button class="mini" onclick="nbEdit(${i})">Use &amp; elaborate →</button></div></div>`;
+    }).join("")+'</div>';
+  }catch(e){SET("nbBody").innerHTML='<div class="setmsg err" style="padding:8px">'+esc(e.message)+'</div>';}
+}
+window.nbEdit=function(i){
+  const s=(window.__nbSug||{})[i]||{title:"",draft:"",cover:[]};
+  const seed=(s.draft||"")+(Array.isArray(s.cover)&&s.cover.length?"\n\nElaborate on:\n"+s.cover.map(c=>"- "+c).join("\n"):"");
+  SET("nbReroll").style.display="none";
+  SET("nbBody").innerHTML=
+    `<div class="field"><label>Title</label><input id="nbTitle" type="text" value="${(s.title||'').replace(/"/g,'&quot;')}"></div>`
+    +`<div class="field"><label>Your story (edit freely — fill the [bracketed prompts] with real details, then polish)</label><textarea id="nbRough" rows="9">${esc(seed)}</textarea></div>`
+    +`<div class="ahintrow"><button class="mini" onclick="nbBack()">← Back to suggestions</button> <button class="btn" id="nbPolishBtn" type="button">✨ Polish</button> <button class="btn ghost" id="nbAddBtn" type="button">Add to library</button></div>`;
+  SET("nbPolishBtn").onclick=nbPolish; SET("nbAddBtn").onclick=nbAdd; nbSetMsg("");
+};
+window.nbBack=function(){nbLoadSuggestions();nbSetMsg("");};
+async function nbPolish(){
+  const title=SET("nbTitle").value.trim(), rough=SET("nbRough").value.trim();
+  if(!rough){nbSetMsg("Write a few lines first.","err");return;}
+  nbSetMsg("Polishing…"); SET("nbPolishBtn").disabled=true;
+  try{
+    const j=await (await fetch("/api/profile/narratives/polish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,rough})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("nbTitle").value=j.title||title; SET("nbRough").value=j.body||rough;
+    nbSetMsg("Polished ("+j.tokens+" tokens). Edit if needed, then Add to library.","ok");
+  }catch(e){nbSetMsg("Failed: "+e.message,"err");}
+  finally{SET("nbPolishBtn").disabled=false;}
+}
+function nbAdd(){
+  const title=SET("nbTitle").value.trim(), body=SET("nbRough").value.trim();
+  if(!title&&!body){nbSetMsg("Nothing to add.","err");return;}
+  syncNarrativesFromDOM();
+  PROFILE_NARRATIVES.push({title,body:body.replace(/\n\nElaborate on:[\s\S]*$/,'').trim(),tags:""});
+  renderNarratives();
+  nbSetMsg("Added to your library — remember to Save profile. Pick another or close.","ok");
+  nbLoadSuggestions();
+}
+if(SET("buildNarrativesBtn"))SET("buildNarrativesBtn").onclick=openNarrativeBuilder;
+SET("nbClose").onclick=()=>SET("nbOverlay").classList.remove("open");
+SET("nbReroll").onclick=()=>{SET("nbBody").innerHTML='<div class="setmuted" style="padding:12px 2px">Thinking of more…</div>';nbLoadSuggestions();};
+SET("nbOverlay").onclick=e=>{if(e.target.id==="nbOverlay")SET("nbOverlay").classList.remove("open");};
 function renderAnswers(){
   SET("answerBox").innerHTML=PROFILE_ANSWERS.map((x,i)=>
     `<div class="narr" data-i="${i}"><button class="narr-rm" type="button" onclick="removeAnswer(${i})">remove</button>`+

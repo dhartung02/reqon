@@ -1354,6 +1354,67 @@ app.post('/api/profile/draft-summary', async (req, res) => {
   }
 });
 
+// Guided narrative builder (so you don't start from a blank slate). `suggest` mines the résumé /
+// work history / keywords for 4–6 proof-point story ideas — each with a rough first-person seed and
+// a few "things to elaborate on" prompts. `polish` tightens the user's rough notes into one clean,
+// honest narrative. Both ground ONLY in supplied facts (never invent metrics/employers/titles).
+function profileGrounding(p) {
+  const a = p.applicant || {};
+  const work = (p.workHistory || []).slice(0, 8).map(w => `- ${w.role || ''}${w.company ? ', ' + w.company : ''}${w.start || w.end ? ` (${w.start || ''}–${w.end || ''})` : ''}${w.description ? ': ' + String(w.description).slice(0, 400) : ''}`).join('\n');
+  const edu = (p.education || []).slice(0, 4).map(e => `- ${e.level || ''} ${e.field || ''}${e.school ? ', ' + e.school : ''}`).join('\n');
+  const kw = (p.keywords || []).slice(0, 30).map(k => k.kw).join(', ');
+  return { a, work, edu, kw };
+}
+app.post('/api/profile/narratives/suggest', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const cap = assistDailyCalls(); const u = assistUsage();
+  if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
+  const p = readProfile();
+  const { a, work, edu, kw } = profileGrounding(p);
+  if (!work && !edu) return res.status(400).json({ ok: false, error: 'Add work history or upload a résumé first — there is nothing to mine for narratives.' });
+  const existing = (p.narratives || []).map(n => n.title).join('; ');
+  const tool = { type: 'function', name: 'suggest_narratives',
+    description: 'Propose 4–6 reusable proof-point narratives (stories) drawn ONLY from the candidate background.',
+    parameters: { type: 'object', additionalProperties: false, properties: {
+      suggestions: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        title: { type: 'string', description: 'short, punchy story title, e.g. "Product Catalog 0→1"' },
+        cover: { type: 'array', items: { type: 'string' }, description: '2–3 specific things the candidate should elaborate on to make it land (a metric, the scope, their exact role, the business outcome)' },
+        draft: { type: 'string', description: 'a rough 2–3 sentence FIRST-PERSON seed grounded only in the supplied facts; where a metric would strengthen it but is unknown, write a [bracketed prompt] like "[add $ or % impact]"' },
+      }, required: ['title', 'cover', 'draft'] } },
+    }, required: ['suggestions'] } };
+  const system = 'You help a senior PM turn their résumé into reusable interview/application "narratives" — concrete proof-point stories. Ground every suggestion ONLY in the supplied work history, education, and keywords. Never invent employers, metrics, or titles; when a number would help but is not supplied, insert a [bracketed prompt] for the candidate to fill. Honest, plain, senior voice.';
+  const user = `Candidate: ${a.name || ''}\nTarget domains: ${(p.sectors || []).join(', ')}\n\nWork history:\n${work || '(none)'}\n\nEducation:\n${edu || '(none)'}\n\nKeywords: ${kw || '(none)'}\n\nAlready-written narratives (do NOT duplicate these): ${existing || '(none yet)'}\n\nPropose 4–6 distinct, high-impact narratives worth writing, each with a rough seed draft and what to elaborate on.`;
+  try {
+    const { args, tokens } = await callTool({ system, user, tool, maxTokens: 900 });
+    u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+    logAssist({ ts: new Date().toISOString(), kind: 'narrative-suggest', model: assistModel(), tokens });
+    res.json({ ok: true, suggestions: (args.suggestions || []).slice(0, 6), tokens });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
+});
+app.post('/api/profile/narratives/polish', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const b = req.body || {};
+  if (!String(b.rough || '').trim()) return res.status(400).json({ ok: false, error: 'Write a few rough lines first, then polish.' });
+  const cap = assistDailyCalls(); const u = assistUsage();
+  if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
+  const tool = { type: 'function', name: 'polish_narrative',
+    description: 'Tighten the candidate rough notes into ONE clean reusable narrative.',
+    parameters: { type: 'object', additionalProperties: false, properties: {
+      title: { type: 'string', description: 'short story title' },
+      body: { type: 'string', description: '60–110 words, first person, honest, skimmable; keep any real metrics, do NOT invent new ones' },
+    }, required: ['title', 'body'] } };
+  const system = 'You polish a job candidate\'s rough notes into one tight, reusable proof-point narrative. First person, plain senior voice, honest. Preserve real metrics; NEVER invent employers, numbers, or titles. If the notes contain [bracketed prompts] the candidate did not fill, drop them gracefully rather than fabricating.';
+  const user = `Working title: ${b.title || '(none)'}\n\nRough notes from the candidate:\n${b.rough}\n\nPolish into one clean narrative (title + 60–110 word body).`;
+  try {
+    const { args, tokens } = await callTool({ system, user, tool, maxTokens: 400 });
+    u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+    logAssist({ ts: new Date().toISOString(), kind: 'narrative-polish', model: assistModel(), tokens });
+    res.json({ ok: true, title: (args.title || b.title || '').trim(), body: (args.body || '').trim(), tokens });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
+});
+
 // Structured role scoring via function calling (T1.1). Returns fit/prob/tier/rationale — no prose
 // parsing. The caller decides whether to write it back to the row.
 app.post('/api/assist/score', async (req, res) => {

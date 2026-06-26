@@ -15,10 +15,13 @@ export interface Applicant { name?: string; email?: string; phone?: string; link
 // A reusable answer to a recurring application question (or a saved cover note). q = the question /
 // label, a = the answer, tags for filtering. Synced with the rest of the profile.
 export interface SavedAnswer { id: string; q: string; a: string; tags: string[] }
+// A reusable proof-point "story" the AI grounds drafts/guides in. Built via the narrative builder.
+export interface Narrative { id: string; title: string; body: string; tags: string[] }
 export interface Profile {
   applicant: Applicant;
   summary: string;       // professional summary (top of CV / AI grounding) — P1.7
   sectors: string[];     // sector preferences (e.g. CDP / Customer Data) — P1.7
+  narratives: Narrative[]; // reusable proof-point stories (grounding for AI)
   education: EduEntry[];
   workHistory: WorkEntry[];
   awards: string[];
@@ -29,7 +32,7 @@ export interface Profile {
 }
 
 const KEY = 'reqon.profile';
-export const EMPTY_PROFILE: Profile = { applicant: {}, summary: '', sectors: [], education: [], workHistory: [], awards: [], certs: [], volunteer: [], eeo: {}, answers: [] };
+export const EMPTY_PROFILE: Profile = { applicant: {}, summary: '', sectors: [], narratives: [], education: [], workHistory: [], awards: [], certs: [], volunteer: [], eeo: {}, answers: [] };
 
 export const newAnswerId = (): string => `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
@@ -70,6 +73,12 @@ function fromServer(sp: Record<string, unknown>): Profile {
     applicant: { name: a.name, email: a.email, phone: a.phone, linkedin: a.linkedin, github: a.github, website: a.website || a.personalUrl, location: a.location },
     summary: String(sp.summary || ''),
     sectors: arr<string>(sp.sectors).map(String),
+    narratives: arr<Partial<Narrative>>(sp.narratives).map((n) => ({
+      id: n.id || newAnswerId(),
+      title: String(n.title || ''),
+      body: String(n.body || ''),
+      tags: Array.isArray(n.tags) ? n.tags.map(String) : [],
+    })),
     education: arr<EduEntry>(sp.education),
     workHistory: arr<WorkEntry>(sp.workHistory),
     awards: arr<string>(sp.awards),
@@ -112,7 +121,7 @@ export async function pushProfile(p: Profile): Promise<{ ok: boolean; error?: st
     const r = await fetch(`${normalize(url)}/api/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-CRM-Token': token },
-      body: JSON.stringify({ applicant: p.applicant, summary: p.summary, sectors: p.sectors, education: p.education, workHistory: p.workHistory, awards: p.awards, certs: p.certs, volunteer: p.volunteer, eeo: p.eeo, answers: p.answers }),
+      body: JSON.stringify({ applicant: p.applicant, summary: p.summary, sectors: p.sectors, narratives: p.narratives, education: p.education, workHistory: p.workHistory, awards: p.awards, certs: p.certs, volunteer: p.volunteer, eeo: p.eeo, answers: p.answers }),
     });
     const j = await r.json();
     if (!r.ok || !j.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };

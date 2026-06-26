@@ -38,6 +38,17 @@
   .setrow { display: flex; gap: 8px; margin-top: 11px; }
   .setrow .btn { margin-top: 0; }
   .hint { font-size: .72rem; color: #8b97a4; margin: 5px 0 0; }
+  .queue { margin-top: 12px; border-top: 1px solid #28323d; padding-top: 11px; display: none; }
+  .queue.open { display: block; }
+  .queue h2 { font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: #e8755f; margin: 0 0 8px; }
+  .qitem { display: flex; align-items: center; gap: 6px; font-size: .76rem; color: #cdd7e1; padding: 6px 0; border-bottom: 1px solid #1c252e; }
+  .qitem .qlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qitem .qx { background: none; border: 0; color: #8b97a4; cursor: pointer; font-size: .9rem; padding: 0 3px; }
+  .qitem .qx:hover { color: #e8755f; }
+  .qerr { font-size: .72rem; color: #e8755f; margin: 7px 0 0; }
+  .qmeta { font-size: .7rem; color: #8b97a4; margin-top: 4px; }
+  .qrow { display: flex; gap: 8px; margin-top: 10px; }
+  .qrow .btn { margin-top: 0; padding: 8px; font-size: .8rem; }
 </style>
 <div class="wrap">
   <div class="head">
@@ -50,6 +61,17 @@
   </div>
   <button id="panel" class="btn btn-ghost" style="margin-top:10px">📊 Open analytics sidebar</button>
   <div id="msg"></div>
+
+  <div id="queue" class="queue">
+    <h2>Pending sync (<span id="qcount">0</span>)</h2>
+    <div id="qlist"></div>
+    <div id="qerr" class="qerr"></div>
+    <div id="qmeta" class="qmeta"></div>
+    <div class="qrow">
+      <button id="qretry" class="btn btn-primary" style="flex:1">Retry now</button>
+      <button id="qclear" class="btn btn-ghost" style="flex:1">Clear all</button>
+    </div>
+  </div>
 
   <div id="settings" class="settings">
     <label>Server origin</label>

@@ -12,12 +12,16 @@ export function NavRail({
   onChange,
   onAdd,
   onSettings,
+  onNotifications,
+  unread = 0,
 }: {
   active: Lane;
   counts: Record<Lane, number>;
   onChange: (l: Lane) => void;
   onAdd: () => void;
   onSettings: () => void;
+  onNotifications?: () => void;
+  unread?: number;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   return (
@@ -41,6 +45,13 @@ export function NavRail({
         <Pressable style={styles.addBtn} onPress={onAdd}>
           <Text style={styles.addText}>+ Add role</Text>
         </Pressable>
+        {onNotifications ? (
+          <Pressable style={styles.settingsRow} onPress={onNotifications} hitSlop={10} accessibilityLabel="Notifications">
+            <Text style={styles.bell}>🔔</Text>
+            <Text style={styles.settings}>Notifications</Text>
+            {unread > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View> : null}
+          </Pressable>
+        ) : null}
         <Pressable style={styles.settingsRow} onPress={onSettings} hitSlop={10} accessibilityLabel="Settings & sync">
           <SettingsIcon size={16} color={c.textBase} />
           <Text style={styles.settings}>Settings</Text>
@@ -65,4 +76,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   addText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 6 },
   settings: { fontFamily: fonts.sans, fontSize: 13, color: c.textBase },
+  bell: { fontSize: 14 },
+  badge: { minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', color: '#fff' },
 });

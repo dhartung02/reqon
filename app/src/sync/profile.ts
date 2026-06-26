@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 // API replaces it), which broke résumé upload. The legacy module keeps the base64 read working.
 import * as FileSystem from 'expo-file-system/legacy';
 import { getConfig } from './config';
+import { timedFetch } from './http';
 
 // Full applicant profile — mirrors the server profile shape so it's ONE profile (server-optional).
 // PII/EEO is stored in the keychain for the candidate's reference; it is NEVER auto-filled or
@@ -16,6 +17,8 @@ export interface Applicant { name?: string; email?: string; phone?: string; link
 export interface SavedAnswer { id: string; q: string; a: string; tags: string[] }
 export interface Profile {
   applicant: Applicant;
+  summary: string;       // professional summary (top of CV / AI grounding) — P1.7
+  sectors: string[];     // sector preferences (e.g. CDP / Customer Data) — P1.7
   education: EduEntry[];
   workHistory: WorkEntry[];
   awards: string[];
@@ -26,7 +29,7 @@ export interface Profile {
 }
 
 const KEY = 'reqon.profile';
-export const EMPTY_PROFILE: Profile = { applicant: {}, education: [], workHistory: [], awards: [], certs: [], volunteer: [], eeo: {}, answers: [] };
+export const EMPTY_PROFILE: Profile = { applicant: {}, summary: '', sectors: [], education: [], workHistory: [], awards: [], certs: [], volunteer: [], eeo: {}, answers: [] };
 
 export const newAnswerId = (): string => `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
@@ -65,6 +68,8 @@ function fromServer(sp: Record<string, unknown>): Profile {
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
   return {
     applicant: { name: a.name, email: a.email, phone: a.phone, linkedin: a.linkedin, github: a.github, website: a.website || a.personalUrl, location: a.location },
+    summary: String(sp.summary || ''),
+    sectors: arr<string>(sp.sectors).map(String),
     education: arr<EduEntry>(sp.education),
     workHistory: arr<WorkEntry>(sp.workHistory),
     awards: arr<string>(sp.awards),
@@ -85,7 +90,7 @@ export async function pullProfile(): Promise<Profile> {
   const { url, token } = await getConfig();
   if (!url) return getProfile();
   try {
-    const r = await fetch(`${normalize(url)}/api/profile`, { headers: { 'X-CRM-Token': token } });
+    const r = await timedFetch(`${normalize(url)}/api/profile`, { headers: { 'X-CRM-Token': token } });
     const j = await r.json();
     if (r.ok && j.ok && j.profile) {
       const p = fromServer(j.profile);
@@ -107,13 +112,29 @@ export async function pushProfile(p: Profile): Promise<{ ok: boolean; error?: st
     const r = await fetch(`${normalize(url)}/api/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-CRM-Token': token },
-      body: JSON.stringify({ applicant: p.applicant, education: p.education, workHistory: p.workHistory, awards: p.awards, certs: p.certs, volunteer: p.volunteer, eeo: p.eeo, answers: p.answers }),
+      body: JSON.stringify({ applicant: p.applicant, summary: p.summary, sectors: p.sectors, education: p.education, workHistory: p.workHistory, awards: p.awards, certs: p.certs, volunteer: p.volunteer, eeo: p.eeo, answers: p.answers }),
     });
     const j = await r.json();
     if (!r.ok || !j.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'network error' };
+  }
+}
+
+/** AI-draft a professional summary from the résumé/profile (server-grounded). P1.7. */
+export async function draftSummary(): Promise<{ summary?: string; error?: string }> {
+  const { url, token } = await getConfig();
+  if (!url) return { error: 'Connect a sync server in Settings to draft a summary.' };
+  try {
+    const r = await fetch(`${normalize(url)}/api/profile/draft-summary`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CRM-Token': token }, body: '{}',
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) return { error: j.error || `HTTP ${r.status}` };
+    return { summary: j.summary };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'network error' };
   }
 }
 

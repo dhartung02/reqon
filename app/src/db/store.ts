@@ -140,7 +140,7 @@ export async function setRoleStatus(id: string, status: Status): Promise<void> {
 }
 
 /** Patch arbitrary editable fields (bumps updatedAt). */
-export async function updateRole(id: string, patch: Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location'>>): Promise<void> {
+export async function updateRole(id: string, patch: Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'>>): Promise<void> {
   const keys = Object.keys(patch) as (keyof typeof patch)[];
   if (keys.length === 0) return;
   const d = await db();

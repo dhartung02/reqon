@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Reqon</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/favicon.svg" />
 <style>
   /* Bundled locally for offline / local-first (served from public/fonts; see public/fonts/LICENSE.md) */
   @font-face{font-family:"Spline Sans";src:url("/fonts/SplineSans.ttf") format("truetype");font-weight:300 700;font-display:swap}
@@ -142,12 +144,85 @@
   .pill.source{color:var(--violet);border-color:#3b3160;background:#1b1730}
   .crow-src{font-family:"Spline Sans Mono",monospace;font-size:.55rem;letter-spacing:.04em;color:var(--violet);text-transform:lowercase;white-space:nowrap}
   /* settings panel */
-  .setsources{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;max-height:210px;overflow:auto}
-  .setsources label{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0}
-  .setsources input{width:15px;height:15px;accent-color:var(--teal)}
-  .setsources .kind{font-family:"Spline Sans Mono",monospace;font-size:.56rem;color:var(--dim);margin-left:auto}
-  .setsources .kind.needkey{color:var(--coral)}
-  .setsources .kind.ok{color:var(--teal)}
+  /* sources: single aligned column — checkbox · name · right-flushed kind badge */
+  .setsources{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:260px;overflow:auto}
+  .setsources .srcrow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:.84rem;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0}
+  .setsources .srcrow:last-child{border-bottom:none}
+  .setsources .srcrow:hover{background:var(--panel)}
+  .setsources .srcrow input{width:15px;height:15px;accent-color:var(--teal);flex:none}
+  .setsources .srcrow .srcname{flex:1}
+  .setsources .srcrow .kind{font-family:"Spline Sans Mono",monospace;font-size:.58rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+  .setsources .srcrow .kind.needkey{color:var(--coral)} .setsources .srcrow .kind.ok{color:var(--teal)}
+  .setsources .srchdr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line-2);background:var(--panel);position:sticky;top:0;z-index:1}
+  .setsources .srchdr label{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text-2);cursor:pointer;text-transform:none;letter-spacing:0}
+  .setsources .srchdr input{width:15px;height:15px;accent-color:var(--teal);flex:none}
+  .setsources .srccount{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--dim)}
+  /* status multi-select chips (Workflow) */
+  .statuschips{display:flex;flex-wrap:wrap;gap:6px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:9px 10px}
+  .statuschips .schip{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;color:var(--text-2);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;text-transform:none;letter-spacing:0;user-select:none}
+  .statuschips .schip.on{color:var(--text);border-color:var(--teal);background:rgba(45,212,191,.08)}
+  .statuschips .schip input{width:13px;height:13px;accent-color:var(--teal);flex:none}
+  .chanchips{display:flex;flex-wrap:wrap;gap:6px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:9px 10px}
+  .chanchips .schip{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;color:var(--text-2);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;text-transform:none;letter-spacing:0;user-select:none}
+  .chanchips .schip.on{color:var(--text);border-color:var(--teal);background:rgba(45,212,191,.08)}
+  .chanchips .schip input{width:13px;height:13px;accent-color:var(--teal);flex:none}
+  .chanchips .needsetup{color:var(--coral);font-size:.62rem;font-family:"Spline Sans Mono",monospace;margin-left:2px}
+  /* in-app notification bell */
+  .adminstats{display:flex;flex-wrap:wrap;gap:8px}
+  .adminstats .astat{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:8px 12px;min-width:80px}
+  .adminstats .ak{font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+  .adminstats .av{font-weight:700;font-size:1.05rem;margin-top:2px;color:var(--text)}
+  .userslist .ustat{display:block;font-size:.7rem;color:var(--dim);font-family:"Spline Sans Mono",monospace;margin-top:3px}
+  .userslist .ukey{font-size:.6rem;border-radius:4px;padding:1px 6px;text-transform:uppercase;font-weight:700}
+  .userslist .ukey.shared{background:var(--accent);color:var(--bg)} .userslist .ukey.own{color:var(--teal);border:1px solid var(--teal)} .userslist .ukey.none{color:var(--dim);border:1px solid var(--line-2)}
+  .userslist{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;overflow:hidden}
+  .userslist .urow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:.84rem;flex-wrap:wrap}
+  .userslist .urow:last-child{border-bottom:none}
+  .userslist .uname{color:var(--text)} .userslist .uid{color:var(--dim);font-family:"Spline Sans Mono",monospace;font-size:.74rem}
+  .userslist .urole{font-size:.6rem;background:var(--accent);color:var(--bg);border-radius:4px;padding:1px 5px;font-weight:700;text-transform:uppercase}
+  .userslist .udis{font-size:.62rem;color:var(--coral);border:1px solid var(--coral);border-radius:4px;padding:1px 5px}
+  .userslist .uacts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .userslist .uacts label{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--text-2);text-transform:none;letter-spacing:0}
+  .userslist .uacts input{width:14px;height:14px;accent-color:var(--teal)}
+  .userchip{font-size:.78rem;color:var(--text-2);font-family:"Spline Sans Mono",monospace;white-space:nowrap}
+  .userchip a{color:var(--gold);text-decoration:none} .userchip a:hover{text-decoration:underline}
+  .userchip .urole{font-size:.6rem;background:var(--accent);color:var(--bg);border-radius:4px;padding:1px 5px;font-weight:700;text-transform:uppercase}
+  .bellwrap{position:relative;display:inline-block}
+  .bellbtn{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:10px;padding:8px 11px;cursor:pointer;font-size:.95rem;font-family:inherit}
+  .bellbtn:hover{color:var(--text);border-color:var(--accent)}
+  .bellcount{position:absolute;top:-5px;right:-5px;background:var(--coral);color:#15110a;font-size:.6rem;font-weight:700;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px}
+  .bellpop{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:46;width:min(360px,86vw);background:var(--panel);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow);max-height:420px;overflow:auto}
+  .bellpop.open{display:block}
+  .bellpop .bellhd{display:flex;justify-content:space-between;align-items:center;padding:10px 13px;border-bottom:1px solid var(--line);font-size:.78rem;color:var(--text-2)}
+  .bellpop .belln{padding:10px 13px;border-bottom:1px solid var(--line)}
+  .bellpop .belln:last-child{border-bottom:none}
+  .bellpop .belln.unread{background:rgba(45,212,191,.05)}
+  .bellpop .belln .bt{font-size:.82rem;color:var(--text);font-weight:600}
+  .bellpop .belln .bb{font-size:.76rem;color:var(--text-2);margin-top:2px}
+  .bellpop .belln .bw{font-size:.64rem;color:var(--dim);font-family:"Spline Sans Mono",monospace;margin-top:3px}
+  .bellempty{padding:18px 13px;color:var(--dim);font-size:.8rem;text-align:center}
+  /* source health — leads with matches; companies/scanned are muted secondary */
+  .srchealth-hdr{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:10px;padding:7px 10px;font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--line-2)}
+  .srchealth-row{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);align-items:baseline;font-size:.82rem}
+  .srchealth-row:last-child{border-bottom:none}
+  .srchealth-row .shname{color:var(--text);font-weight:600}
+  .srchealth-row .shwhen{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2)}
+  .srchealth-row .shval{display:flex;flex-direction:column;gap:1px}
+  .srchealth-row .shsub{font-size:.66rem;color:var(--dim)}
+  .srchealth-row .srcerr{color:var(--coral);font-size:.72rem;margin-left:6px}
+  /* HTTPS status + env inventory (Advanced) */
+  .httpsstat{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px}
+  .httpsline{display:flex;align-items:center;gap:8px;font-size:.86rem;color:var(--text)}
+  .httpsline .hdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .envinv{background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:300px;overflow:auto}
+  .envinv .envgrp{position:sticky;top:0;background:var(--panel);padding:7px 12px;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--line-2)}
+  .envinv .envrow{display:grid;grid-template-columns:1.4fr 2fr auto;gap:10px;align-items:baseline;padding:7px 12px;border-bottom:1px solid var(--line);font-size:.78rem}
+  .envinv .envrow:last-child{border-bottom:none}
+  .envinv .envkey{color:var(--violet);font-size:.74rem}
+  .envinv .envpurpose{color:var(--text-2)}
+  .envinv .envval{font-family:"Spline Sans Mono",monospace;color:var(--text);word-break:break-all}
+  .envinv .envset{font-family:"Spline Sans Mono",monospace;color:var(--teal)}
+  .envinv .envunset{color:var(--dim)}
   .setmuted{color:var(--dim);font-size:.72rem;font-weight:400;letter-spacing:0;text-transform:none}
   .ahintrow{display:flex;align-items:center;gap:9px;margin-top:6px}
   .setmsg{font-size:.8rem;min-height:1.1em;margin-top:6px}
@@ -206,6 +281,71 @@
   .today-card.danger .tc-n{color:var(--danger)} .today-card.active .tc-n{color:var(--active)} .today-card.muted .tc-n{color:var(--dim)}
   .today-card .tc-t{font-weight:600;font-size:.95rem;display:block}
   .today-card .tc-d{color:var(--dim);font-size:.79rem;margin-top:3px;display:block;line-height:1.35}
+  /* command center — "What needs action" (P2.2) */
+  .cmdcenter{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden}
+  .cc-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none}
+  .cc-title{font-weight:700;font-size:.95rem}
+  .cc-counts{display:flex;gap:6px;flex:1}
+  .cc-pill{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:20px}
+  .cc-pill.high{background:rgba(248,113,113,.16);color:var(--danger)}
+  .cc-pill.medium{background:rgba(255,184,0,.14);color:var(--warning)}
+  .cc-pill.low{background:rgba(148,163,184,.14);color:var(--text-2)}
+  .cc-toggle{background:none;border:0;color:var(--dim);font-size:1rem;cursor:pointer;transition:transform .15s}
+  .cmdcenter.collapsed .cc-toggle{transform:rotate(-90deg)}
+  .cmdcenter.collapsed .cc-body{display:none}
+  .cc-body{padding:2px 14px 12px}
+  .cc-sec{margin-top:10px}
+  .cc-sec-h{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 5px;font-weight:700}
+  .cc-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+  .cc-item:hover{background:var(--panel-2);border-color:var(--line)}
+  .cc-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--dim)}
+  .cc-dot.high{background:var(--danger)} .cc-dot.medium{background:var(--warning)} .cc-dot.low{background:var(--info)}
+  .cc-it-main{flex:1;min-width:0}
+  .cc-it-role{display:block;font-size:.84rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cc-it-reason{display:block;font-size:.76rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cc-x{background:none;border:0;color:var(--dim);cursor:pointer;font-size:.95rem;padding:0 4px;flex:0 0 auto}
+  .cc-x:hover{color:var(--danger)}
+  .cc-empty{color:var(--dim);font-size:.82rem;padding:8px 0}
+  .crow.cc-flash{animation:ccflash 1.4s ease-out}
+  @keyframes ccflash{0%{background:rgba(0,229,163,.22)}100%{background:transparent}}
+  /* per-role timeline (P2.5) */
+  .tl-body{max-height:52vh;overflow:auto;margin:6px 0}
+  .tl-ev{display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  .tl-ev:last-child{border-bottom:0}
+  .tl-rail{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;padding-top:2px}
+  .tl-dot{width:10px;height:10px;border-radius:50%;background:var(--dim)}
+  .tl-dot.you{background:var(--accent)} .tl-dot.scout{background:var(--info)} .tl-dot.ai{background:var(--ai)} .tl-dot.auto{background:var(--text-2)}
+  .tl-main{flex:1;min-width:0}
+  .tl-when{font-size:.72rem;color:var(--dim);font-family:"Spline Sans Mono",ui-monospace,monospace}
+  .tl-label{font-size:.88rem;font-weight:600;margin-top:1px}
+  .tl-detail{font-size:.78rem;color:var(--text-2);margin-top:1px}
+  .tl-actor{font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px}
+  /* follow-up recommendation (P2.8) */
+  .fu-rec{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+  .fu-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .fu-state{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:20px}
+  .fu-state.due{background:rgba(248,113,113,.16);color:var(--danger)}
+  .fu-state.soon{background:rgba(255,184,0,.14);color:var(--warning)}
+  .fu-state.scheduled{background:rgba(148,163,184,.14);color:var(--text-2)}
+  .fu-headline{font-weight:700;font-size:.95rem}
+  .fu-reason{font-size:.84rem;color:var(--text-2);margin-top:8px;line-height:1.45}
+  .fu-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .fu-m{font-size:.72rem;color:var(--text-2);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+  .fu-m b{color:var(--text)}
+  /* background jobs (P2.9) */
+  .jobs-body{max-height:54vh;overflow:auto;margin:6px 0}
+  .job-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  .job-row:last-child{border-bottom:0}
+  .job-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--dim)}
+  .job-dot.running{background:var(--active);animation:jpulse 1.2s ease-in-out infinite}
+  .job-dot.succeeded{background:var(--positive)} .job-dot.failed{background:var(--danger)} .job-dot.cancelled{background:var(--dim)}
+  @keyframes jpulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .job-main{flex:1;min-width:0}
+  .job-label{font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .job-sub{font-size:.74rem;color:var(--text-2)}
+  .job-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .job-cancel{background:none;border:1px solid var(--line);color:var(--text-2);border-radius:6px;font-size:.72rem;padding:3px 8px;cursor:pointer}
+  .job-cancel:hover{border-color:var(--danger);color:var(--danger)}
   .today-banner{background:rgba(105,197,126,.1);border:1px solid #2d5a3a;border-radius:10px;padding:11px 15px;color:var(--positive);font-weight:600;font-size:.9rem}
   .today-foot{color:var(--dim);font-size:.8rem}
   /* last scout run strip + all-clear */
@@ -293,6 +433,69 @@
   .an-note{color:var(--dim);font-size:.74rem;line-height:1.5}
   .an-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:720px){.an-grid2{grid-template-columns:1fr}}
+  .an-filterbanner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,184,0,.08);border:1px solid var(--warning);color:var(--warning);border-radius:9px;padding:8px 12px;font-size:.8rem;margin:2px 0}
+  .an-filterbanner .mini{margin-left:auto}
+  /* pipeline health banner (P2.6) */
+  .healthbar{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px;margin-bottom:14px}
+  .healthbar.loading-h{color:var(--dim);font-size:.85rem}
+  .hb-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .hb-band{font-size:1.05rem;font-weight:700}
+  .hb-band.good{color:var(--positive)} .hb-band.fair{color:var(--warning)} .hb-band.risk{color:var(--danger)}
+  .hb-score{font-family:"Spline Sans Mono",ui-monospace,monospace;font-size:.82rem;color:var(--dim)}
+  .hb-risk{font-size:.86rem;color:var(--text-2);flex:1;min-width:200px}
+  .hb-metrics{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .hb-m{font-size:.72rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+  .hb-m b{color:var(--text)}
+  .hb-recs{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+  .hb-rec{font-size:.78rem;font-weight:600;color:var(--accent);background:rgba(0,229,163,.08);border:1px solid var(--accent);border-radius:8px;padding:6px 11px;cursor:pointer}
+  .hb-rec:hover{background:rgba(0,229,163,.16)}
+  .an-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  @media(max-width:1080px){.an-grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:720px){.an-grid3{grid-template-columns:1fr}}
+  /* lens selector */
+  .an-lens{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+  .an-lens .ll{font-size:.7rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-right:2px}
+  .an-lens button{background:var(--panel);border:1px solid var(--line);color:var(--text-2);border-radius:999px;padding:6px 13px;font-size:.8rem;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .an-lens button:hover{color:var(--text);border-color:var(--line-2)}
+  .an-lens button.on{color:var(--bg);font-weight:700;border-color:transparent}
+  .an-lens button.on.l-all{background:var(--text-2)} .an-lens button.on.l-applied{background:var(--accent)}
+  .an-lens button.on.l-interviews{background:var(--active)} .an-lens button.on.l-rejected{background:var(--danger)} .an-lens button.on.l-offers{background:var(--positive)}
+  .an-lens button .lc{font-family:"Spline Sans Mono",monospace;font-size:.72rem;opacity:.8}
+  .an-card h3 .sub{font-weight:400;font-size:.74rem;color:var(--dim);margin-left:6px}
+  /* ranked distribution bars */
+  .dbar{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:.82rem}
+  .dbar .dl{flex:0 1 120px;min-width:48px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dbar .dtrack{flex:1 1 40px;min-width:34px;position:relative;background:var(--bg);border-radius:5px;height:16px}
+  .dbar .dfill{position:absolute;left:0;top:0;height:100%;background:var(--accent);border-radius:5px;min-width:2px}
+  .dbar .dn{font-family:"Spline Sans Mono",monospace;color:var(--text);white-space:nowrap;width:56px;text-align:right;flex:none}
+  .dbar .dn small{color:var(--dim)}
+  /* vertical histogram */
+  .histo{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:6px}
+  .histo .hbar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:5px}
+  .histo .hcol{width:100%;max-width:46px;background:var(--accent);border-radius:5px 5px 0 0;min-height:2px;transition:height .2s}
+  .histo .hn{font-family:"Spline Sans Mono",monospace;font-size:.72rem;color:var(--text)}
+  .histo .hl{font-size:.6rem;color:var(--dim);text-align:center;line-height:1.2}
+  /* donut */
+  .donut-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .donut-leg{display:flex;flex-direction:column;gap:5px;font-size:.78rem;flex:1;min-width:120px}
+  .donut-leg .dle{display:flex;align-items:center;gap:7px;color:var(--text-2)}
+  .donut-leg .sw{width:10px;height:10px;border-radius:3px;flex:none}
+  .donut-leg .dle .dlv{margin-left:auto;font-family:"Spline Sans Mono",monospace;color:var(--text)}
+  .donut-center{font-family:"Spline Sans Mono",monospace;fill:var(--text)}
+  /* velocity columns */
+  .vchart{display:flex;gap:10px;align-items:stretch}
+  .vaxis{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;width:22px;flex:none;font-family:"Spline Sans Mono",monospace;font-size:.66rem;color:var(--dim);height:170px;padding:2px 0 22px}
+  .vcols{flex:1;display:flex;align-items:flex-end;gap:6px;height:170px;border-left:1px solid var(--line-2);border-bottom:1px solid var(--line-2);padding-left:6px}
+  .vcols .vc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .vcols .vcn{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text);height:15px;line-height:15px}
+  .vcols .vcb{width:72%;background:var(--active);border-radius:4px 4px 0 0;min-height:2px}
+  .vcols .vcl{font-size:.66rem;color:var(--text-2);margin-top:5px;white-space:nowrap}
+  /* fit-by-outcome */
+  .fbar{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:.82rem}
+  .fbar .fl{width:110px;flex:none;color:var(--text-2)}
+  .fbar .ft{flex:1;min-width:0;position:relative;background:var(--bg);border-radius:5px;height:16px}
+  .fbar .ff{position:absolute;left:0;top:0;height:100%;border-radius:5px;min-width:2px}
+  .fbar .fn{font-family:"Spline Sans Mono",monospace;color:var(--text);width:78px;text-align:right}
   /* tier sections (#7) — subtle header + divider, no heavy block or thick rail */
   .tier-sec{margin-bottom:18px}
   .tier-head{display:flex;align-items:center;gap:9px;padding:6px 2px 8px;cursor:pointer;user-select:none;border-bottom:1px solid var(--line);margin-bottom:9px}
@@ -402,6 +605,10 @@
   .cell.full{grid-column:1/-1}
   .status-sel{font-weight:700}
   .rowacts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+  .trackstrip{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);font-family:"Spline Sans Mono",monospace;font-size:.68rem;color:var(--dim);letter-spacing:.01em}
+  .trackstrip b{color:var(--text-2);font-weight:600} .trackstrip .tsdot{margin:0 8px;opacity:.5}
+  .microbtn{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:6px;font-size:.62rem;padding:1px 6px;cursor:pointer;font-family:inherit;margin-left:6px;text-transform:none;letter-spacing:0}
+  .microbtn:hover{color:var(--text);border-color:var(--accent)}
   .mini{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:8px;padding:5px 11px;font-size:.73rem;cursor:pointer;font-family:inherit}
   .mini:hover{color:var(--text);border-color:var(--gold)}
   .mini.link{color:var(--gold);border-color:#5c4d28}
@@ -470,6 +677,7 @@
   @media(max-width:720px){.settings-body{flex-direction:column}.settings-nav{width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--line)}}
   .loading{text-align:center;color:var(--text-2);padding:60px 0;font-family:"Spline Sans Mono",monospace;letter-spacing:.1em}
   footer{margin-top:28px;border-top:1px solid var(--line);padding-top:18px;color:var(--dim);font-size:.77rem;line-height:1.6}
+  footer .guidelink{color:var(--gold);text-decoration:none} footer .guidelink:hover{text-decoration:underline}
   footer b{color:var(--text-2)}
 
   @media (max-width:880px){
@@ -496,10 +704,19 @@
         <p><b>Reqon — self-hosted job-search command center.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
         <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Tier</b> is set by expected value.</p>
         <p>Every edit saves server-side and persists. Use <b>Run Scout</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs action.</p>
+        <p style="margin-top:10px"><a href="/guide" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">Open the full user guide ↗</a></p>
       </div>
     </div>
     <div class="appbar-r">
       <span class="updated" id="updated">loading…</span>
+      <div class="bellwrap">
+        <button class="bellbtn" id="bellBtn" type="button" title="Notifications" aria-label="Notifications">🔔<span class="bellcount" id="bellCount" style="display:none">0</span></button>
+        <div class="bellpop" id="bellPop">
+          <div class="bellhd"><span>Notifications</span><button class="mini" id="bellReadAll" type="button">Mark all read</button></div>
+          <div id="bellList"><div class="bellempty">No notifications yet.</div></div>
+        </div>
+      </div>
+      <span class="userchip" id="userChip" style="display:none"></span>
       <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
     </div>
   </header>
@@ -569,6 +786,9 @@
         <button id="importBtn">Import roles (JSON)…</button>
         <button id="enrichAllBtn">Enrich all leads…</button>
         <div class="pop-sep"></div>
+        <button id="cvBuilderBtn">CV builder…</button>
+        <button id="jobsBtn">Background jobs…</button>
+        <div class="pop-sep"></div>
         <button id="exportXlsxBtn">Export Excel</button>
         <button id="exportBtn">Export CSV</button>
         <div class="pop-sep"></div>
@@ -590,12 +810,19 @@
     <span class="selstatus" id="selStatus"></span>
   </div>
 
+  <section id="cmdCenter" class="cmdcenter" hidden>
+    <div class="cc-head" id="ccHead">
+      <span class="cc-title">⚡ What needs action</span>
+      <span class="cc-counts" id="ccCounts"></span>
+      <button class="cc-toggle" id="ccToggle" title="Collapse / expand">▾</button>
+    </div>
+    <div class="cc-body" id="ccBody"></div>
+  </section>
+
   <div id="board"><div class="loading">▚ loading from server…</div></div>
 
   <footer>
-    <b>Link confidence.</b> <span style="color:var(--teal)">Verified</span> = I confirmed a live req this session. <span style="color:var(--gold)">Board-only</span> = link goes to the company's careers board (filter for the title); individual req URLs rotate/expire. <span style="color:var(--coral)">Unverified</span> = sourced from your uploaded doc, not yet confirmed — check before relying on it.<br>
-    <b>Fit</b> = domain/résumé match (your earlier 7-axis model, condensed). <b>Interview probability</b> = my estimate of landing a screen given seniority, remote competition, and how directly your background maps — deliberately separate from fit, since some perfect-fit roles are hard to land. <b>Expected value</b> = fit × probability, your best apply-effort allocator. <b>Tier A</b> refined by expected value, not raw fit. <b>Bands</b> (shown when a row is expanded): 8.0+ <span style="color:var(--green)">Excellent</span> · 6.5–7.9 <span style="color:var(--green)">Strong</span> · 5.0–6.4 <span style="color:var(--gold)">Possible</span> · &lt;5.0 <span style="color:var(--dim)">Low priority</span> — Tier A maps to Excellent/Strong, B to Possible, C below. All scores are estimates, salary ranges indicative — verify on each board.<br>
-    <b>Status.</b> Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks the tier (<span style="color:var(--t9)">A emerald</span> · <span style="color:var(--warning)">B amber</span> · <span style="color:var(--muted)">C muted</span>).
+    <span>Scores, statuses, lanes, apply modes, and integrations are explained in the <a href="/guide" target="_blank" rel="noopener" class="guidelink">user guide ↗</a>.</span>
   </footer>
 </div>
 
@@ -660,10 +887,47 @@
   </div>
 </div>
 
+<div class="overlay" id="onboardOverlay">
+  <div class="modal" style="max-width:560px">
+    <h2>Welcome to Reqon 👋</h2>
+    <p class="hint">A couple of quick questions so your first board is relevant. You can change all of this later in Settings.</p>
+    <div class="field"><label>What role(s) are you seeking? <span class="setmuted">one per line — titles the scout searches for</span></label>
+      <textarea id="obRoles" rows="4" placeholder="Principal Product Manager, AI Platform&#10;Director, Product Management&#10;Staff PM, Data Platform"></textarea>
+    </div>
+    <div class="grid2">
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="obRemote" type="checkbox" checked style="width:auto"> Remote roles only</label></div>
+      <div class="field"><label>Target salary (USD, optional)</label><input id="obSalary" type="number" min="0" step="5000" placeholder="e.g. 260000"></div>
+    </div>
+    <div class="field"><label>Résumé (optional — tailors scoring &amp; pre-fills your profile)</label>
+      <input id="obResume" type="file" accept=".docx,.txt,.md,.pdf">
+      <div class="ahintrow"><button class="mini" id="obResumeBtn" type="button">⬆ Upload &amp; parse</button> <span id="obResumeMsg" class="setmuted"></span></div>
+    </div>
+    <div id="obMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="obSkip" type="button">Skip for now</button>
+      <button class="btn" id="obSave" type="button">Save &amp; run my first scout</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="assistOverlay">
   <div class="modal">
     <h2>AI application assistant</h2>
     <p class="hint" id="assistCtx">—</p>
+    <div class="ahintrow" id="assistActions" style="flex-wrap:wrap;gap:6px">
+      <button class="mini" type="button" data-aiact="score" title="AI re-scores fit/prob/tier and explains why — review before applying">⟳ Re-score &amp; explain fit</button>
+      <button class="mini" type="button" data-aiact="tailor" title="AI suggests how to position the candidate for this role">✦ Tailor positioning</button>
+    </div>
+    <p class="setmuted" id="assistProfWarn" style="display:none;color:var(--warning)">No candidate profile yet — scoring/tailoring will be weak. Add one in Settings → Candidate profile.</p>
+    <div id="assistScoreCard" style="display:none;margin:8px 0;padding:10px 12px;border:1px solid var(--line,#2a2a3a);border-radius:10px;background:rgba(112,108,255,.06)">
+      <div style="display:flex;gap:18px;flex-wrap:wrap;font-family:'Spline Sans Mono',monospace;font-size:.82rem">
+        <span>Fit <b id="scNowFit">–</b> → <b id="scNewFit" style="color:var(--accent,#706CFF)">–</b></span>
+        <span>Prob <b id="scNowProb">–</b> → <b id="scNewProb" style="color:var(--accent,#706CFF)">–</b></span>
+        <span>Tier <b id="scNowTier">–</b> → <b id="scNewTier" style="color:var(--accent,#706CFF)">–</b></span>
+      </div>
+      <p id="scRationale" style="margin:8px 0 0;font-size:.86rem;line-height:1.45"></p>
+      <div class="ahintrow" style="margin-top:8px"><button class="btn" id="assistApplyScore" type="button">Apply suggested scores</button> <span class="setmuted" id="assistApplyNote">Saves the rationale to notes too. Nothing is submitted to any employer.</span></div>
+    </div>
     <div class="grid2">
       <div class="field"><label>Draft type</label><select id="assistKind"><option value="cover">Cover note</option><option value="screening">Screening question</option></select></div>
       <div class="field"><label>Model</label><input id="assistModelEcho" type="text" disabled></div>
@@ -676,6 +940,62 @@
     <div class="modalacts">
       <button class="btn ghost" id="assistClose">Close</button>
       <button class="btn" id="assistCopy">Copy draft</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="cvOverlay">
+  <div class="modal">
+    <h2>CV builder</h2>
+    <p class="hint" id="cvCtx">—</p>
+    <p class="setmuted" id="cvProfWarn" style="display:none;color:var(--warning)">No candidate profile yet — the CV will be sparse. Add work history, education, and a résumé in Settings → Candidate profile.</p>
+    <div class="field" id="cvJdWrap" style="display:none"><label>Job description (optional — tailors the summary to this role)</label><textarea id="cvJd" rows="3" placeholder="Paste the JD to tailor the summary; leave blank to use the role title only…"></textarea></div>
+    <div class="ahintrow"><button class="btn" id="cvGenBtn" type="button">Generate CV</button> <span id="cvSrc" class="setmuted"></span></div>
+    <div class="field" style="margin-top:10px"><label>Preview (Markdown — edit-and-export comes from the download buttons)</label><textarea id="cvPreview" rows="13" placeholder="Your CV appears here after Generate…" readonly></textarea></div>
+    <div id="cvMsg" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="cvClose">Close</button>
+      <a id="cvHtmlBtn" class="btn ghost" href="/api/cv.html" target="_blank" rel="noopener" style="display:none">Open print view (PDF)</a>
+      <a id="cvDocxBtn" class="btn" href="/api/cv.docx" style="display:none">Download .docx</a>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="timelineOverlay">
+  <div class="modal">
+    <h2>Role timeline</h2>
+    <p class="hint" id="tlCtx">—</p>
+    <div id="tlBody" class="tl-body"><div class="setmuted">Loading…</div></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="tlClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="jobsOverlay">
+  <div class="modal">
+    <h2>Background jobs</h2>
+    <p class="hint">Scout, enrichment, Gmail ingest, guides, digest and backups — running and recent.</p>
+    <div id="jobsBody" class="jobs-body"><div class="setmuted">Loading…</div></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="jobsRefresh">Refresh</button>
+      <button class="btn" id="jobsClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="followupOverlay">
+  <div class="modal">
+    <h2>Follow-up</h2>
+    <p class="hint" id="fuCtx">—</p>
+    <div id="fuRec" class="fu-rec"><div class="setmuted">Loading…</div></div>
+    <div class="field" style="margin-top:10px"><label>Message (AI-drafted — edit before you send; nothing is sent for you)</label><textarea id="fuMsg" rows="7" placeholder="Click “Draft message” to generate a follow-up grounded in your profile…"></textarea></div>
+    <div id="fuStatus" class="setmsg"></div>
+    <div class="modalacts">
+      <button class="btn ghost" id="fuClose">Close</button>
+      <button class="btn ghost" id="fuDraft">✍ Draft message</button>
+      <button class="btn ghost" id="fuCopy">Copy</button>
+      <button class="btn" id="fuSent">✓ Mark sent</button>
     </div>
   </div>
 </div>
@@ -695,6 +1015,7 @@
         <button data-sect="ai">AI assistant</button>
         <button data-sect="digest">Digest &amp; notifications</button>
         <button data-sect="data">Data safety</button>
+        <button data-sect="users" id="usersNavBtn" style="display:none">Admin</button>
         <button data-sect="advanced">Advanced</button>
       </nav>
       <div class="settings-content" id="settingsContent">
@@ -722,6 +1043,12 @@
             <div class="field"><label>Min tier to add</label><select id="setMinTier"><option value="A">A only</option><option value="B">A &amp; B</option><option value="C">A, B &amp; C (all)</option></select></div>
           </div>
           <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setRemoteOnly" type="checkbox" style="width:auto"> Remote-only (drop on-site)</label></div>
+          <div style="font-weight:600;font-size:.9rem;margin:10px 0 8px;padding-top:10px;border-top:1px solid var(--line)">Desired salary</div>
+          <div class="grid2">
+            <div class="field"><label>Minimum acceptable (USD)</label><input id="setSalaryFloor" type="number" min="0" max="2000000" step="5000" placeholder="e.g. 200000"></div>
+            <div class="field"><label>Target / ideal (USD)</label><input id="setSalaryTarget" type="number" min="0" max="2000000" step="5000" placeholder="e.g. 260000"></div>
+          </div>
+          <p class="hint" style="margin:-4px 0 8px">Scores salary fit against the <b>top</b> of each posting's range. At/above target = small fit bonus; at/above the minimum = neutral; below = a fit penalty that scales (well-below roles can drop out). Roles with no posted comp are never penalized. Leave both at 0 to ignore salary. <a href="/guide#scores" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">How fit works ↗</a></p>
           <div class="field"><label>Title bands (one per line)</label><textarea id="setTitles" rows="4"></textarea></div>
           <div class="field"><label>Domain keywords (one per line)</label><textarea id="setKeywords" rows="5"></textarea></div>
           <div class="grid2">
@@ -743,9 +1070,17 @@
             <div class="field"><label>Email</label><input id="profEmail" type="text"></div>
             <div class="field"><label>Phone</label><input id="profPhone" type="text"></div>
             <div class="field"><label>LinkedIn</label><input id="profLinkedin" type="text"></div>
+            <div class="field"><label>GitHub URL</label><input id="profGithub" type="text" placeholder="https://github.com/yourname"></div>
           </div>
           <div class="field"><label>Location</label><input id="profLocation" type="text"></div>
-          <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text"></div>
+          <div class="field"><label>Professional summary
+              <button class="mini" id="draftSummaryBtn" type="button" style="float:right">✨ AI draft from résumé</button></label>
+            <textarea id="profSummary" rows="4" placeholder="A 2–4 sentence positioning statement. Used in cover notes and as application 'about me' text. Leave blank and click AI draft to generate one from your résumé."></textarea>
+            <span id="summaryMsg" class="setmuted"></span>
+          </div>
+          <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text">
+            <p class="hint" style="margin:4px 0 0">Reference levels the scout treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
+          </div>
           <div class="field"><label>Role / title terms (comma-separated)</label><input id="profRoleTerms" type="text"></div>
           <div class="grid2">
             <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
@@ -772,6 +1107,11 @@
             <div id="narrativeBox"></div>
             <div class="ahintrow"><button class="mini" id="addNarrativeBtn" type="button">+ Add narrative</button></div>
           </div>
+          <div class="field"><label>Saved-answers library (reusable application Q&amp;A — the AI "✍ AI draft" pulls from these)</label>
+            <p class="hint" style="margin:0 0 8px">Common screening/application questions and your vetted answers. Tag them so the right one surfaces. Editable and never auto-submitted.</p>
+            <div id="answerBox"></div>
+            <div class="ahintrow"><button class="mini" id="addAnswerBtn" type="button">+ Add saved answer</button></div>
+          </div>
           <div class="field"><label>Demographics (EEO) — voluntary self-identification</label>
             <p class="hint" style="margin:0 0 8px">Standard self-ID answer sets, synced to the app. Stored privately for your reference — the apply-assist never auto-fills or submits these.</p>
             <div class="grid2">
@@ -792,19 +1132,19 @@
           <p class="ssd">How statuses route to board tabs, when hygiene lanes flag work, the analytics window, and per-source apply modes.</p>
           <div style="font-weight:600;font-size:.9rem;margin:2px 0 8px">Lifecycle tabs</div>
           <div class="grid2">
-            <div class="field"><label>Open</label><input id="setTabOpen" type="text" placeholder="Not Applied"></div>
-            <div class="field"><label>Applied</label><input id="setTabApplied" type="text" placeholder="Applied"></div>
-            <div class="field"><label>Interviewing</label><input id="setTabInterviewing" type="text" placeholder="Recruiter Screen, Hiring Manager, Panel, Offer"></div>
-            <div class="field"><label>Rejected + Archived</label><input id="setTabClosed" type="text" placeholder="Rejected, Archived"></div>
+            <div class="field"><label>Open</label><div id="setTabOpen" class="statuschips" data-chips></div></div>
+            <div class="field"><label>Applied</label><div id="setTabApplied" class="statuschips" data-chips></div></div>
+            <div class="field"><label>Interviewing</label><div id="setTabInterviewing" class="statuschips" data-chips></div></div>
+            <div class="field"><label>Rejected + Archived</label><div id="setTabClosed" class="statuschips" data-chips></div></div>
           </div>
-          <p class="hint" style="margin:-6px 0 12px">Comma-separated statuses routed to each board tab. Any unlisted status falls into Open.</p>
+          <p class="hint" style="margin:-6px 0 12px">Tick the statuses routed to each board tab. A status not ticked anywhere falls into <b>Open</b> (that's why <code>Not Applied</code> lives under Open by default). Each status should sit in exactly one tab.</p>
           <div class="field"><label>Analytics window (days; 0 = all time)</label><input id="setAnalyticsWindow" type="number" min="0" max="3650" step="1"></div>
           <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Hygiene lanes</div>
           <div class="grid2">
             <div class="field"><label>Follow-up due after (days)</label><input id="setFollowupDays" type="number" min="0" max="365" step="1"></div>
             <div class="field"><label>Closed-req handling</label><select id="setClosedHandling"><option value="suggest">Suggest (passive)</option><option value="auto">Prompt to archive</option></select></div>
           </div>
-          <div class="field"><label>Follow-up applies to statuses (comma-separated)</label><input id="setFollowupStatuses" type="text" placeholder="Applied, Recruiter Screen, Hiring Manager, Panel"></div>
+          <div class="field"><label>Follow-up applies to statuses</label><div id="setFollowupStatuses" class="statuschips" data-chips></div></div>
           <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setNeedsVerifyBoardonly" type="checkbox" style="width:auto"> Needs-verify lane also includes board-only links</label></div>
           <p class="hint" style="margin:-4px 0 12px">Lanes are non-destructive: closed reqs are surfaced for review and archived only on confirm (snapshot taken first) — never auto-deleted.</p>
           <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Apply mode</div>
@@ -818,7 +1158,7 @@
         <section class="sset" data-sect="ai" hidden>
           <div class="ssh">AI assistant</div>
           <p class="ssd">The OpenAI model and budget for scout rescoring, plus the per-req draft assistant. API keys live under Advanced.</p>
-          <div class="field"><label>OpenAI model</label><input id="setModel" type="text" placeholder="gpt-5.4-mini"></div>
+          <div class="field"><label>OpenAI model</label><select id="setModel"></select></div>
           <div class="grid2">
             <div class="field"><label>AI calls per run (cap)</label><input id="setAiMax" type="number" min="0" max="500" step="1"></div>
             <div class="field"><label>Re-enrich after (days)</label><input id="setAiTtl" type="number" min="0" max="365" step="1"></div>
@@ -832,21 +1172,31 @@
           <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Application draft assistant</div>
           <div class="grid2">
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setAssistEnabled" type="checkbox" style="width:auto"> Enable AI draft assistant</label></div>
-            <div class="field"><label>Assistant model (blank = scoring model)</label><input id="setAssistModel" type="text" placeholder="gpt-5.4-mini"></div>
+            <div class="field"><label>Assistant model (blank = scoring model)</label><select id="setAssistModel"></select></div>
             <div class="field"><label>Daily call cap</label><input id="setAssistDaily" type="number" min="0" max="1000" step="1"></div>
             <div class="field"><label>Max tokens per draft</label><input id="setAssistMaxTokens" type="number" min="64" max="4000" step="10"></div>
           </div>
           <p class="hint" id="assistUsageHint" style="margin:-4px 0 0">Per-req "✍ AI draft" composes a cover note or screening answer from your profile + narratives + JD. Output is editable and never auto-submitted.</p>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Cost estimation</div>
+          <div class="grid2">
+            <div class="field"><label>Price per 1M tokens (USD)</label><input id="setPricePer1M" type="number" min="0" step="0.01" placeholder="e.g. 0.60"></div>
+            <div class="field"><label>Monthly budget (USD, optional)</label><input id="setMonthlyBudget" type="number" min="0" step="1" placeholder="blank = no budget bar"></div>
+          </div>
+          <p class="hint" id="costHint" style="margin:-4px 0 0">OpenAI can't report your balance via API, so cost is <b>estimated</b> from logged tokens × the rate you set here (was <code>.env</code>-only). Authoritative billing: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">platform.openai.com/usage ↗</a></p>
         </section>
 
         <section class="sset" data-sect="digest" hidden>
           <div class="ssh">Digest &amp; notifications</div>
-          <p class="ssd">The always-on server composes a morning digest from your data and delivers it at the set time via Slack webhook or SMTP. A file fallback is always written to <code>agent/digest-latest.html</code>.</p>
+          <p class="ssd">The always-on server composes a digest from your data and delivers it to the channels you pick. A file fallback is always written to <code>agent/digest-latest.html</code>.</p>
           <div class="grid2">
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestEnabled" type="checkbox" style="width:auto"> Enable scheduled digest</label></div>
             <div class="field"><label>Time (HH:MM, server local)</label><input id="setDigestTime" type="text" placeholder="07:00"></div>
-            <div class="field"><label>Channel</label><select id="setDigestChannel"><option value="file">File only</option><option value="slack">Slack webhook</option><option value="email">Email (SMTP)</option></select></div>
             <div class="field"><label>Look-back window (days)</label><input id="setDigestDays" type="number" min="1" max="60" step="1"></div>
+            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestAfterScout" type="checkbox" style="width:auto"> Also send after the first scout run of the day</label></div>
+          </div>
+          <div class="field"><label>Delivery channels</label>
+            <div id="setDigestChannels" class="chanchips"></div>
+            <p class="hint" style="margin:6px 0 0">Pick any combination. A channel that isn't configured yet shows <span style="color:var(--coral)">needs setup</span> — set its keys below (Slack/Email/SMS) or under Advanced (iOS push). In-app shows in the board's 🔔 bell.</p>
           </div>
           <div class="field"><label>Slack incoming webhook URL <span id="webhookState" class="setmuted"></span></label><input id="setDigestWebhook" type="text" placeholder="https://hooks.slack.com/… (blank = keep)" autocomplete="off">
             <div class="ahintrow"><button class="mini danger" id="clearWebhookBtn" type="button">Clear webhook</button></div>
@@ -861,8 +1211,29 @@
               <div class="ahintrow"><button class="mini danger" id="clearSmtpPassBtn" type="button">Clear password</button></div>
             </div>
           </div>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">SMS <span id="smsState" class="setmuted"></span></div>
+          <div class="field"><label>SMS method</label><select id="setSmsMethod">
+            <option value="email">Email-to-SMS gateway (free — uses your SMTP)</option>
+            <option value="twilio">Twilio (paid API)</option>
+          </select></div>
+          <div id="smsEmailBlock">
+            <p class="hint" style="margin:0 0 8px">Free: sends a text through your carrier's email gateway over the SMTP above (set Email/SMTP first). Carrier-dependent and best-effort — fine for personal alerts. Pick your carrier and enter your mobile number.</p>
+            <div class="grid2">
+              <div class="field"><label>Carrier</label><select id="setSmsCarrier"></select></div>
+              <div class="field"><label>Your mobile number</label><input id="setSmsGatewayNumber" type="text" placeholder="5551234567"></div>
+            </div>
+          </div>
+          <div id="smsTwilioBlock" style="display:none">
+            <p class="hint" style="margin:0 0 8px">Twilio is a paid API. Inert until all four are set. Get the SID + auth token from the Twilio console; <b>From</b> is your Twilio number, <b>To</b> is your mobile.</p>
+            <div class="grid2">
+              <div class="field"><label>Twilio Account SID</label><input id="setTwilioSid" type="text" placeholder="ACxxxx…" autocomplete="off"></div>
+              <div class="field"><label>Twilio Auth Token <span id="twilioTokState" class="setmuted"></span></label><input id="setTwilioToken" type="password" placeholder="blank = keep" autocomplete="off"></div>
+              <div class="field"><label>From number</label><input id="setTwilioFrom" type="text" placeholder="+1555…"></div>
+              <div class="field"><label>To number (your mobile)</label><input id="setSmsTo" type="text" placeholder="+1555…"></div>
+            </div>
+          </div>
           <div class="ahintrow"><button class="mini" id="sendDigestBtn" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
-          <p class="hint" style="margin:8px 0 0">Save settings before sending a test. Gmail with 2-Step Verification needs an <b>App Password</b> (Google Account → Security → App passwords), not your account password.</p>
+          <p class="hint" style="margin:8px 0 0">Test sends to <b>all enabled channels</b>. Save settings before sending. Gmail with 2-Step Verification needs an <b>App Password</b> (Google Account → Security → App passwords), not your account password.</p>
 
           <div style="font-weight:600;font-size:.9rem;margin:16px 0 8px;padding-top:14px;border-top:1px solid var(--line)">Gmail response ingest (IMAP)</div>
           <p class="hint" style="margin:0 0 10px">Reads recruiter emails on the server and updates the board — auto-sets rejections, flags interviews/offers for review. Same credential model as the iOS app; this is the server-side equivalent. Needs a Gmail <b>App Password</b>.</p>
@@ -875,6 +1246,14 @@
           <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="mailAi" type="checkbox" style="width:auto"> Use AI for ambiguous emails (server OpenAI key)</label></div>
           <div class="ahintrow"><button class="mini" id="mailSaveBtn" type="button">Save</button> <button class="mini" id="mailTestBtn" type="button">Test (dry run)</button> <button class="mini" id="mailRunBtn" type="button">▶ Run now</button> <button class="mini danger" id="mailClearBtn" type="button">Clear credentials</button> <span id="mailStatus" class="setmuted"></span></div>
           <pre id="mailReport" class="mailreport" style="display:none"></pre>
+          <div style="font-weight:600;font-size:.85rem;margin:14px 0 6px">Notify me when ingest detects…</div>
+          <div class="statuschips" id="mailNotifyKinds" style="margin-bottom:8px">
+            <label class="schip"><input type="checkbox" value="rejection"> Rejection</label>
+            <label class="schip"><input type="checkbox" value="interview"> Interview</label>
+            <label class="schip"><input type="checkbox" value="offer"> Offer</label>
+          </div>
+          <div class="field"><label>…on these channels</label><div id="setMailNotifyChannels" class="chanchips"></div></div>
+          <p class="hint" style="margin:6px 0 0">Fires only on a real ingest run (not a dry run), for the event types you tick. Uses the same channels as the digest.</p>
         </section>
 
         <section class="sset" data-sect="data" hidden>
@@ -893,10 +1272,29 @@
             </div>
             <div id="backupList" class="bklist"><div class="setmuted" style="padding:8px">loading…</div></div>
           </div>
-          <div class="field"><label>Deleted rows (tombstones)</label>
-            <div class="ahintrow"><button class="mini danger" id="purgeTombstonesBtn" type="button">Purge tombstones</button> <span id="tombstoneInfo" class="setmuted"></span></div>
-            <p class="hint" style="margin:6px 0 0">Deletes are soft (tombstones) so they sync to other devices. Purging permanently removes them (snapshots first).</p>
+          <div class="field"><label>Deleted rows (recoverable)</label>
+            <div class="ahintrow"><button class="mini danger" id="purgeTombstonesBtn" type="button">Permanently remove deleted rows</button> <span id="tombstoneInfo" class="setmuted"></span></div>
+            <p class="hint" style="margin:6px 0 0">A deleted row isn't erased — it's hidden and flagged deleted so the deletion syncs to your other devices instead of the row reappearing. This permanently removes those hidden rows (a snapshot is taken first). <a href="/guide#safety" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">Learn more ↗</a></p>
           </div>
+        </section>
+
+        <section class="sset" data-sect="users" hidden>
+          <div class="ssh">Admin console</div>
+          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and scout. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
+          <div id="adminServer" class="adminstats"><div class="setmuted" style="padding:8px">loading…</div></div>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px">Users &amp; usage</div>
+          <div id="usersList" class="userslist"><div class="setmuted" style="padding:8px">loading…</div></div>
+          <div style="font-weight:600;font-size:.9rem;margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line)">Add a user</div>
+          <div class="grid2">
+            <div class="field"><label>Username</label><input id="nuUser" type="text" autocomplete="off" placeholder="e.g. eric"></div>
+            <div class="field"><label>Display name</label><input id="nuName" type="text" autocomplete="off" placeholder="Eric"></div>
+            <div class="field"><label>Email <span class="setmuted">welcome email + their digest go here</span></label><input id="nuEmail" type="email" autocomplete="off" placeholder="eric@example.com"></div>
+            <div class="field"><label>Temp password (≥8 chars)</label><input id="nuPass" type="text" autocomplete="off" placeholder="they change it after first login"></div>
+            <div class="field"><label>Role</label><select id="nuRole"><option value="user">User</option><option value="admin">Admin</option></select></div>
+          </div>
+          <div class="ahintrow"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.82rem"><input id="nuShared" type="checkbox" style="width:auto"> Allow this user to use the server's shared AI key</label></div>
+          <div class="ahintrow"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.82rem"><input id="nuWelcome" type="checkbox" checked style="width:auto"> Send a welcome email (needs SMTP configured + an email above)</label></div>
+          <div class="ahintrow"><button class="btn" id="nuAddBtn" type="button">Create user</button> <span id="usersMsg" class="setmsg"></span></div>
         </section>
 
         <section class="sset" data-sect="advanced" hidden>
@@ -905,6 +1303,9 @@
           <div class="safetynote">🔒 Keys are stored server-side in <code>.env</code> and are <b>never sent back to the browser</b>. Fields show only whether a key is set; leave blank to keep the current value.</div>
           <div class="field"><label>Connection status</label>
             <div id="connStatus" class="connstat"><div class="setmuted">loading…</div></div>
+          </div>
+          <div class="field"><label>HTTPS / remote access</label>
+            <div id="httpsStatus" class="httpsstat"><div class="setmuted">checking…</div></div>
           </div>
           <div class="field"><label>Access tokens (remote access)</label>
             <div class="tokrow"><span class="tokname">App passphrase</span><span id="appTokState" class="tokstate">—</span><span class="tokhint">full access</span></div>
@@ -951,6 +1352,10 @@
             <div class="field"><label>.p8 key (paste contents, blank = keep) — or path below</label><textarea id="apnsKeyP8" rows="3" placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----" autocomplete="off" style="font-family:'Spline Sans Mono',monospace;font-size:.72rem"></textarea></div>
             <div class="field"><label>…or server path to the .p8</label><input id="apnsKeyPath" type="text" placeholder="agent/AuthKey_ABC123.p8 (relative to project root)"></div>
             <div class="ahintrow"><button class="mini" id="apnsSaveBtn" type="button">Save</button> <button class="mini" id="apnsTestBtn" type="button">Send test push</button> <button class="mini danger" id="apnsClearBtn" type="button">Clear APNs</button> <span id="apnsStatus" class="setmuted"></span></div>
+          </div>
+          <div class="field"><label>All environment variables <button class="mini" id="refreshEnvBtn" type="button" style="float:right">↻ refresh</button></label>
+            <p class="hint" style="margin:0 0 8px">Everything the server reads from <code>.env</code>, in one place. Non-secret values are shown; secrets show only set/last-4 (edit secrets in their own fields above). The common knobs are editable under AI assistant / Digest / Workflow.</p>
+            <div id="envInventory" class="envinv"><div class="setmuted" style="padding:8px">loading…</div></div>
           </div>
         </section>
 
@@ -1072,6 +1477,15 @@ function inferSource(link){
   return"other";
 }
 const rowSource=x=>((x.source&&String(x.source).trim())||inferSource(x.link)||"—");
+// Record-keeping footer for a card (#4): added / source / last updated (+who). Pure display.
+// Uses the shared relative-time fmtWhen() defined below ("15h ago").
+function trackStrip(x){
+  const bits=[];
+  if(x.added)bits.push(`Added <b>${fmtWhen(x.added)}</b>`);
+  bits.push(`Source <b>${esc(rowSource(x))}</b>`);
+  if(x.updatedAt)bits.push(`Updated <b>${fmtWhen(x.updatedAt)}</b>${x.updatedBy?` by <b>${esc(x.updatedBy)}</b>`:''}`);
+  return `<div class="trackstrip">${bits.join('<span class="tsdot">·</span>')}</div>`;
+}
 function populateSourceFilter(){
   const sel=F("sourceFilter"); const cur=sel.value;
   const seen=[...new Set(rows.map(rowSource))].filter(s=>s&&s!=="—").sort();
@@ -1134,6 +1548,96 @@ async function load(){
     return;
   }
   render();
+  loadCommandCenter();
+}
+
+// ---- Command center: "What needs action" (P2.2) — consumes GET /api/action-items ----
+const CC_SECTIONS = [
+  { title: 'Needs review', types: ['review_offer', 'review_interview'] },
+  { title: 'Follow-ups due', types: ['follow_up_due'] },
+  { title: 'Apply next', types: ['apply_next'] },
+  { title: 'Lead inbox', types: ['needs_scoring', 'verify_role', 'enrich_failed'] },
+  { title: 'Duplicates', types: ['duplicate_review'] },
+  { title: 'Rejections processed', types: ['review_rejection'] },
+  { title: 'Setup & system', types: ['profile_missing', 'gmail_setup_needed', 'ai_budget_warning', 'scout_error'] },
+];
+const ccDismissed = new Set();   // session-only (no localStorage per project rule); deterministic items recompute on reload
+let ccCollapsed = false;
+async function loadCommandCenter(){
+  const box=document.getElementById('cmdCenter'); if(!box) return;
+  let j; try{ j=await (await fetch('/api/action-items?surface=web',{cache:'no-store'})).json(); }catch(e){ box.hidden=true; return; }
+  if(!j||!j.ok){ box.hidden=true; return; }
+  const items=(j.items||[]).filter(it=>!ccDismissed.has(it.id));
+  if(!items.length){ box.hidden=true; return; }
+  box.hidden=false;
+  box.classList.toggle('collapsed', ccCollapsed);
+  const c=j.counts||{};
+  document.getElementById('ccCounts').innerHTML=['high','medium','low'].filter(k=>c[k]).map(k=>`<span class="cc-pill ${k}">${c[k]} ${k}</span>`).join('');
+  const byType=new Map(); items.forEach(it=>{ if(!byType.has(it.type))byType.set(it.type,[]); byType.get(it.type).push(it); });
+  let html='';
+  for(const sec of CC_SECTIONS){
+    const secItems=sec.types.flatMap(t=>byType.get(t)||[]);
+    if(!secItems.length) continue;
+    html+=`<div class="cc-sec"><p class="cc-sec-h">${esc(sec.title)} · ${secItems.length}</p>`;
+    secItems.slice(0,12).forEach(it=>{
+      const label=it.roleId||it.company?`${esc(it.company||'')}${it.role?' — '+esc(it.role):''}`:'System';
+      html+=`<div class="cc-item" data-id="${esc(it.id)}" data-role="${esc(it.roleId||'')}" data-target="${esc((it.cta&&it.cta.target)||'')}">`
+        +`<span class="cc-dot ${esc(it.severity)}"></span>`
+        +`<span class="cc-it-main"><span class="cc-it-role">${label}</span><span class="cc-it-reason">${esc(it.reason||'')}</span></span>`
+        +`<button class="cc-x" title="Dismiss for this session">✕</button></div>`;
+    });
+    html+='</div>';
+  }
+  const body=document.getElementById('ccBody'); body.innerHTML=html||'<div class="cc-empty">All clear.</div>';
+  body.querySelectorAll('.cc-item').forEach(el=>{
+    el.querySelector('.cc-x').onclick=(e)=>{ e.stopPropagation(); ccDismissed.add(el.dataset.id); loadCommandCenter(); };
+    el.onclick=()=>ccOpenTarget(el.dataset.role, el.dataset.target);
+  });
+}
+function ccOpenTarget(roleId, target){
+  if(roleId){
+    const i=rows.findIndex(r=>r.id===roleId && r.deleted!==true);
+    if(i>=0){
+      // clean slate so the target row is guaranteed visible: use the board's own status→tab mapping
+      // (respects custom tab config), drop all filters/lanes, open every tier.
+      activeTab=tabKeyForStatus(rows[i].status||"Not Applied"); activeLane="all"; recentOnly=false; applyNextOnly=false;
+      ["search","statusFilter","tierFilter","sourceFilter","applyModeFilter"].forEach(id=>{const e=F(id);if(e)e.value="";});
+      ["remoteOnly","activeOnly","notAppliedOnly","applyNextOnly"].forEach(id=>{const e=F(id);if(e)e.checked=false;});
+      tierOpen.A=tierOpen.B=tierOpen.C=true;
+      expanded.add(i); render();
+      setTimeout(()=>{ const el=document.querySelector('.crow[data-i="'+i+'"]'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('cc-flash'); setTimeout(()=>el.classList.remove('cc-flash'),1500); } },80);
+      return;
+    }
+  }
+  if(target&&target.indexOf('settings')===0){ const sect=target.split('/')[1]||'sources'; openSettingsTo(sect); }
+}
+function openSettingsTo(sect){
+  const sb=document.getElementById('settingsBtn'); if(sb)sb.click();
+  setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+sect+'"]'); if(nav)nav.click(); },120);
+}
+(function ccWire(){
+  const head=document.getElementById('ccHead'); if(!head) return;
+  head.onclick=()=>{ ccCollapsed=!ccCollapsed; document.getElementById('cmdCenter').classList.toggle('collapsed', ccCollapsed); };
+})();
+
+// ---- Pipeline health banner (P2.6) — shown atop the Analytics tab ----
+const HB_REC_ACTION={run_scout:()=>{setTab('open');try{triggerScout('both');}catch(e){}}, apply_next:()=>todoGo('applynext'), follow_up_due:()=>todoGo('followup'), review_interview:()=>{setTab('interviewing');}};
+async function loadPipelineHealth(){
+  const el=document.getElementById('healthBanner'); if(!el) return;
+  let j; try{ j=await (await fetch('/api/pipeline-health',{cache:'no-store'})).json(); }catch(e){ el.style.display='none'; return; }
+  if(!j||!j.ok){ el.style.display='none'; return; }
+  el.classList.remove('loading-h');
+  const bandCls=j.band==='Good'?'good':j.band==='Fair'?'fair':'risk';
+  const m=j.metrics||{};
+  const metricChips=[
+    ['apply-ready', m.applyReady], ['applied 7d', m.appliedLast7],
+    ['response', m.responseRate!=null?m.responseRate+'%':'—'], ['interviewing', m.interviewing],
+    ['follow-ups due', m.followupsOverdue], ['aging 14d+', m.agingApps]
+  ].map(([k,v])=>`<span class="hb-m">${k} <b>${v}</b></span>`).join('');
+  el.innerHTML=`<div class="hb-top"><span class="hb-band ${bandCls}">Pipeline health: ${esc(j.band)}</span><span class="hb-score">${j.score}/100</span><span class="hb-risk">⚠ ${esc(j.mainRisk)}</span></div>`
+    +`<div class="hb-metrics">${metricChips}</div>`
+    +`<div class="hb-recs">${j.recommendations.map((r,i)=>`<span class="hb-rec" data-act="${esc(r.action)}">→ ${esc(r.text)}</span>`).join('')}</div>`;
+  el.querySelectorAll('.hb-rec').forEach(b=>{ b.onclick=()=>{ const fn=HB_REC_ACTION[b.dataset.act]; if(fn)fn(); }; });
 }
 
 const SCLS={"Applied":"st-applied","Recruiter Screen":"st-active","Hiring Manager":"st-active","Panel":"st-active","Offer":"st-offer","Rejected":"st-rejected","Archived":"st-archived"};
@@ -1175,6 +1679,8 @@ function reqCardHTML(x,i){
     <div class="crm">
       <div class="cell"><label>Company (override)</label><input type="text" value="${(x.company||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'company',this.value)"></div>
       <div class="cell"><label>Sector</label><input type="text" value="${(x.sector||'').replace(/"/g,'&quot;')}" placeholder="CDP / AI Platform / Data Infra…" onchange="upd(${i},'sector',this.value)"></div>
+      <div class="cell"><label>Salary / range</label><input type="text" value="${(x.salary||'').replace(/"/g,'&quot;')}" placeholder="e.g. $200K–280K (blank = not listed)" onchange="upd(${i},'salary',this.value)"></div>
+      <div class="cell"><label>Location</label><input type="text" value="${(x.location||'').replace(/"/g,'&quot;')}" placeholder="Remote / city" onchange="upd(${i},'location',this.value)"></div>
       <div class="cell full"><label>Role / title (override)</label><input type="text" value="${(x.role||'').replace(/"/g,'&quot;')}" onchange="upd(${i},'role',this.value)"></div>
       <div class="cell"><label>Status</label>
         <select class="status-sel" style="color:${STATUS_COLOR[x.status]||'var(--text)'}" onchange="upd(${i},'status',this.value)">
@@ -1188,7 +1694,7 @@ function reqCardHTML(x,i){
       <div class="cell"><label>Resume ver.</label><select onchange="upd(${i},'resume',this.value)">${["—","PM","Director","Principal","Platform","AI"].map(o=>`<option ${o===x.resume?'selected':''}>${o}</option>`).join("")}</select></div>
       <div class="cell"><label>Cover letter</label><select onchange="upd(${i},'cover',this.value)"><option ${x.cover==='No'?'selected':''}>No</option><option ${x.cover==='Yes'?'selected':''}>Yes</option></select></div>
       <div class="cell"><label>Last contact</label><input type="date" value="${x.lastcontact||''}" onchange="upd(${i},'lastcontact',this.value)"></div>
-      <div class="cell"><label>Apply mode</label><select onchange="upd(${i},'applyMode',this.value)">${APPLY_MODES.map(o=>`<option ${o===applyModeOf(x)?'selected':''}>${o}</option>`).join("")}</select></div>
+      <div class="cell"><label>Apply mode ${x.link?`<button class="microbtn" onclick="detectApplyMode(${i})" title="Detect how this posting can be applied to (inspects the live page)">🔎 detect</button>`:''}</label><select onchange="upd(${i},'applyMode',this.value)">${APPLY_MODES.map(o=>`<option ${o===applyModeOf(x)?'selected':''}>${o}</option>`).join("")}</select></div>
       <div class="cell full"><label>Next action</label><input type="text" value="${(x.next||'').replace(/"/g,'&quot;')}" placeholder="e.g. tailor Principal resume, ask for referral" onchange="upd(${i},'next',this.value)"></div>
     </div>
     <div class="rowacts">
@@ -1196,9 +1702,13 @@ function reqCardHTML(x,i){
       <button class="mini" onclick="editRow(${i})">Edit details</button>
       ${x.link?`<button class="mini" onclick="enrichRow(${i})" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
       <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
+      <button class="mini" onclick="openCv(${i})" title="Build a CV tailored to this role (preloads company/role/JD)">📄 Tailored CV</button>
+      <button class="mini" onclick="openTimeline(${i})" title="See how this role got here — capture, scoring, status changes">📜 Timeline</button>
+      ${/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(x.status||'')?`<button class="mini" onclick="openFollowup(${i})" title="Follow-up recommendation + AI-drafted message">💬 Follow-up</button>`:''}
       ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
+    ${trackStrip(x)}
   </div>`;
 }
 
@@ -1347,7 +1857,8 @@ function render(){
   }
   if(analytics){
     // conversion & source-ROI analytics — computed client-side from the (non-status-filtered) base
-    board.innerHTML=renderAnalytics({qy,srcf,tf,amf,remoteOnly});
+    board.innerHTML='<div id="healthBanner" class="healthbar loading-h">Assessing pipeline health…</div>'+renderAnalytics({qy,srcf,tf,amf,remoteOnly});
+    loadPipelineHealth();
     renderSelbar();
     return;
   }
@@ -1518,6 +2029,117 @@ window.todoGo=function(view){
 // ---------- analytics (Phase 8) ----------
 const STAGE_RANK={"Not Applied":0,"Applied":1,"Recruiter Screen":2,"Hiring Manager":3,"Panel":4,"Offer":5};
 const ACTIVE_STAGES=["Applied","Recruiter Screen","Hiring Manager","Panel","Offer"];
+// ---- analytics: lenses + distributions ----
+let analyticsLens="all";
+window.setAnalyticsLens=function(l){analyticsLens=l;render();};
+window.clearAnalyticsFilters=function(){F("search").value="";F("statusFilter").value="";F("tierFilter").value="";F("sourceFilter").value="";F("applyModeFilter").value="";F("remoteOnly").checked=false;render();};
+const LENSES=[
+  {k:"all",label:"Job reqs",cls:"l-all",pred:()=>true},
+  {k:"applied",label:"Applications",cls:"l-applied",pred:x=>ACTIVE_STAGES.includes(x.status)||x.status==="Rejected"||!!x.applied},
+  {k:"interviews",label:"Interviews",cls:"l-interviews",pred:x=>(STAGE_RANK[x.status]||0)>=2},
+  {k:"rejected",label:"Rejected",cls:"l-rejected",pred:x=>x.status==="Rejected"},
+  {k:"offers",label:"Offers",cls:"l-offers",pred:x=>x.status==="Offer"},
+];
+const lensPred=k=>(LENSES.find(l=>l.k===k)||LENSES[0]).pred;
+// Parse the top of a salary range ("$193.5K–252.6K" -> 252600). Mirrors scout.py parse_salary_top.
+function parseSalaryTopJS(s){
+  if(!s)return 0; let best=0; const re=/(\$)?\s*([0-9][0-9,.]*)\s*([kKmM])?/g; let m;
+  while((m=re.exec(String(s)))){ if(!m[2])continue; let v=parseFloat(m[2].replace(/,/g,'')); if(isNaN(v)){continue;}
+    if(/[kK]/.test(m[3]||""))v*=1000; else if(/[mM]/.test(m[3]||""))v*=1e6;
+    if(!(m[1]||m[3]||v>=10000))continue; best=Math.max(best,v); if(re.lastIndex===m.index)re.lastIndex++; }
+  return Math.round(best);
+}
+// $200–300K is broken into 10K bands (lower bound) for granularity in the candidate's target range.
+const SALARY_BANDS=["<$150K","$150–200K","$200K","$210K","$220K","$230K","$240K","$250K","$260K","$270K","$280K","$290K","$300K+","Not listed"];
+function salaryBand(x){
+  let v=Math.abs(parseSalaryTopJS(x.salary));
+  if(!(v>0))return"Not listed";          // ≤0 / unparseable → not a real salary
+  if(v<150000)return"<$150K";
+  if(v<200000)return"$150–200K";
+  if(v<300000)return"$"+(Math.floor(v/10000)*10)+"K";   // 234000 -> "$230K" (means 230–240K)
+  return"$300K+";
+}
+const LEVEL_ORDER=["Principal","Director","VP","Head","Group","Staff","Lead","Senior","Manager","Other"];
+function roleLevel(x){const t=(x.role||"").toLowerCase();
+  if(t.includes("principal"))return"Principal";
+  if(t.includes("vice president")||/\bvp\b/.test(t))return"VP";
+  if(t.includes("head of"))return"Head";
+  if(t.includes("director"))return"Director";
+  if(/\bgroup\b/.test(t))return"Group";
+  if(t.includes("staff"))return"Staff";
+  if(/\blead\b/.test(t))return"Lead";
+  if(t.includes("senior")||/\bsr\.?\b/.test(t))return"Senior";
+  if(t.includes("manager"))return"Manager";
+  return"Other";}
+// Normalize a role title for the "roles applied for" distribution (strip seniority + parentheticals).
+function roleFamily(x){let t=(x.role||"").replace(/\([^)]*\)/g,"").replace(/[–—-].*$/,"").trim();
+  t=t.replace(/\b(senior|sr\.?|principal|staff|lead|director|group|head of|vp|vice president|ii+|2|associate)\b/gi,"").replace(/\bproduct manager\b/i,"PM").replace(/\s+/g," ").replace(/^[ ,]+|[ ,]+$/g,"").trim();
+  return t||(x.role||"—");}
+const PALETTE=["#00E5A3","#2DD4BF","#79A6E0","#A78BDB","#FFB800","#F87171","#5A6470","#C8FF49","#706CFF","#94A3B8"];
+const esc2=s=>esc(s);
+// Ranked horizontal bars — top N categories by count, with % of cohort.
+function distBars(rs,keyFn,label,opt){
+  opt=opt||{}; const top=opt.top||12; const g={};
+  rs.forEach(x=>{const k=keyFn(x)||"—";g[k]=(g[k]||0)+1;});
+  let rows2=Object.entries(g).map(([k,n])=>({k,n}));
+  if(opt.order)rows2.sort((a,b)=>opt.order.indexOf(a.k)-opt.order.indexOf(b.k)); else rows2.sort((a,b)=>b.n-a.n);
+  const shown=opt.order?rows2:rows2.slice(0,top); const extra=opt.order?0:rows2.length-shown.length;
+  const tot=rs.length||1; const max=Math.max(...shown.map(r=>r.n),1);
+  if(!shown.length)return card(label,`<div class="an-empty">No data in this lens.</div>`,opt.sub);
+  const body=shown.map((r,i)=>{const col=opt.colorFn?opt.colorFn(r.k):"var(--accent)";
+    return `<div class="dbar"><span class="dl" title="${esc2(r.k)}">${esc2(r.k)}</span><span class="dtrack"><span class="dfill" style="width:${Math.round(r.n/max*100)}%;background:${col}"></span></span><span class="dn">${r.n} <small>${Math.round(r.n/tot*100)}%</small></span></div>`;}).join("");
+  const more=extra>0?`<p class="an-note" style="margin-top:8px">+${extra} more not shown</p>`:"";
+  return card(label,body+more,opt.sub);
+}
+// Vertical histogram for ordered bands.
+function histogram(rs,bandFn,bands,label,sub){
+  const g={}; bands.forEach(b=>g[b]=0); rs.forEach(x=>{const b=bandFn(x);if(b in g)g[b]++;});
+  const max=Math.max(...bands.map(b=>g[b]),1);
+  if(!rs.length)return card(label,`<div class="an-empty">No data in this lens.</div>`,sub);
+  const body=`<div class="histo">`+bands.map(b=>`<div class="hbar"><span class="hn">${g[b]}</span><span class="hcol" style="height:${Math.round(g[b]/max*100)}%"></span><span class="hl">${esc2(b)}</span></div>`).join("")+`</div>`;
+  return card(label,body,sub);
+}
+// SVG donut with legend.
+function donut(rs,keyFn,label,opt){
+  opt=opt||{}; const g={}; rs.forEach(x=>{const k=keyFn(x)||"—";g[k]=(g[k]||0)+1;});
+  let segs=Object.entries(g).map(([k,n])=>({k,n}));
+  if(opt.order)segs.sort((a,b)=>opt.order.indexOf(a.k)-opt.order.indexOf(b.k)); else segs.sort((a,b)=>b.n-a.n);
+  const tot=segs.reduce((s,r)=>s+r.n,0);
+  if(!tot)return card(label,`<div class="an-empty">No data in this lens.</div>`,opt.sub);
+  const r=52,cx=64,cy=64,C=2*Math.PI*r; let off=0;
+  const colOf=(k,i)=>opt.colorFn?opt.colorFn(k):PALETTE[i%PALETTE.length];
+  const circles=segs.map((s,i)=>{const len=s.n/tot*C;const el=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colOf(s.k,i)}" stroke-width="20" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cy})"></circle>`;off+=len;return el;}).join("");
+  const svg=`<svg viewBox="0 0 128 128" width="128" height="128" style="flex:none">${circles}<text x="64" y="60" text-anchor="middle" class="donut-center" font-size="20" font-weight="700">${tot}</text><text x="64" y="76" text-anchor="middle" fill="var(--dim)" font-size="9">${esc2(opt.unit||"reqs")}</text></svg>`;
+  const leg=`<div class="donut-leg">`+segs.map((s,i)=>`<div class="dle"><span class="sw" style="background:${colOf(s.k,i)}"></span>${esc2(s.k)}<span class="dlv">${s.n} · ${Math.round(s.n/tot*100)}%</span></div>`).join("")+`</div>`;
+  return card(label,`<div class="donut-wrap">${svg}${leg}</div>`,opt.sub);
+}
+function card(label,body,sub){return `<div class="an-card"><h3>${label}${sub?`<span class="sub">${sub}</span>`:""}</h3>${body}</div>`;}
+const TIER_COLOR=k=>({"A":"#00E5A3","Tier A":"#00E5A3","B":"#FFB800","Tier B":"#FFB800","C":"#5A6470","Tier C":"#5A6470"}[k]||"#94A3B8");
+const LEVEL_COLOR=k=>({Principal:"#00E5A3",Director:"#2DD4BF",VP:"#A78BDB",Head:"#79A6E0",Group:"#706CFF",Staff:"#C8FF49",Lead:"#FFB800",Senior:"#94A3B8",Manager:"#5A6470",Other:"#3a4550"}[k]||"#5A6470");
+// Weekly application volume over the window (by applied date).
+function velocityChart(rs){
+  const dated=rs.map(x=>x.applied).filter(Boolean).map(d=>Date.parse(d)).filter(t=>!isNaN(t));
+  if(!dated.length)return card("Application velocity",`<div class="an-empty">No applied dates yet — mark roles Applied (with a date) to see your weekly pace.</div>`);
+  const now=Date.now(); const weeks=12; const buckets=new Array(weeks).fill(0); const labels=[];
+  for(let i=0;i<weeks;i++){labels.push("");}
+  dated.forEach(t=>{const wk=Math.floor((now-t)/6048e5);if(wk>=0&&wk<weeks)buckets[weeks-1-wk]++;});
+  const max=Math.max(...buckets,1);
+  const cols=buckets.map((n,i)=>{const wAgo=weeks-1-i;const lbl=wAgo===0?"now":wAgo+"w";
+    return `<div class="vc" title="${n} applied, ${lbl}"><span class="vcn">${n||""}</span><div class="vcb" style="height:${Math.round(n/max*100)}%"></div><span class="vcl">${lbl}</span></div>`;}).join("");
+  const axis=`<div class="vaxis"><span>${max}</span><span>${Math.round(max/2)}</span><span>0</span></div>`;
+  const total=buckets.reduce((a,b)=>a+b,0);
+  const peakIdx=buckets.indexOf(max); const peakAgo=weeks-1-peakIdx;
+  return card("Application velocity",`<div class="vchart">${axis}<div class="vcols">${cols}</div></div>`+
+    `<p class="an-note" style="margin-top:8px">Applications per week (by applied date). <b>${total}</b> over ${weeks} weeks · busiest week: <b>${max}</b> (${peakAgo===0?"this week":peakAgo+"w ago"}). Y-axis = applications/week.</p>`);
+}
+// Avg fit by current outcome — does higher fit convert?
+function fitByOutcome(rs){
+  const groups=[{k:"Offer",f:x=>x.status==="Offer",c:"var(--positive)"},{k:"In interview",f:x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status),c:"var(--active)"},{k:"Awaiting",f:x=>x.status==="Applied",c:"var(--muted)"},{k:"Rejected",f:x=>x.status==="Rejected",c:"var(--danger)"}];
+  const rowsf=groups.map(g=>{const arr=rs.filter(g.f);const avg=arr.length?arr.reduce((s,x)=>s+(+x.fit||0),0)/arr.length:0;return {...g,n:arr.length,avg};});
+  if(!rowsf.some(r=>r.n))return card("Fit by outcome",`<div class="an-empty">No applications yet to compare fit against outcomes.</div>`);
+  const body=rowsf.map(r=>`<div class="fbar"><span class="fl">${r.k}</span><span class="ft"><span class="ff" style="width:${Math.round(r.avg/10*100)}%;background:${r.c}"></span></span><span class="fn">${r.avg?r.avg.toFixed(1):"—"} <small style="color:var(--dim)">n=${r.n}</small></span></div>`).join("");
+  return card("Avg fit by outcome",body+`<p class="an-note" style="margin-top:8px">Mean fit (0–10) of roles in each outcome — if interviews/offers skew higher than rejected, your fit model is predictive.</p>`);
+}
 function anMetrics(rs){
   const m={total:rs.length,applied:0,recruiter:0,hm:0,panel:0,offer:0,rejected:0,archived:0,notApplied:0};
   let ttrSum=0,ttrN=0;
@@ -1540,6 +2162,32 @@ function anBreakdown(rs,keyFn,label){
   return `<div class="an-card"><h3>${label}</h3><table class="an-table"><tr><th>${label}</th><th>Roles</th><th>App</th><th>Resp</th><th>Rej</th><th>Off</th><th>Resp&nbsp;%</th><th>Rej&nbsp;%</th></tr>`+
     out.map(r=>`<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${r.applied}</td><td>${r.resp}</td><td class="${r.rej?'rejcell':''}">${r.rej}</td><td>${r.offer}</td><td>${r.rr}%</td><td class="${r.rjr?'rejcell':''}">${r.rjr}%</td></tr>`).join("")+`</table></div>`;
 }
+// Source quality analytics (P2.7) — per-source rates so the user can decide which sources to
+// enable/disable/prioritize: A/B rate, applied rate, response rate, interview rate, closed/
+// unavailable rate, and duplicate count. Interview/response use current status (a floor, since
+// rejected-after-interview history isn't stored — consistent with the funnel caveat).
+const INTERVIEW_NOW=new Set(["Recruiter Screen","Hiring Manager","Panel","Offer"]);
+function sourceQuality(rs){
+  // duplicate detection: rows sharing company+normalized-role with another live row
+  const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const keyCount={}; rs.forEach(x=>{const k=norm(x.company)+"||"+norm(x.role);keyCount[k]=(keyCount[k]||0)+1;});
+  const g={}; rs.forEach(x=>{const s=rowSource(x);(g[s]=g[s]||[]).push(x);});
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const out=Object.keys(g).map(s=>{
+    const arr=g[s], n=arr.length;
+    const ab=arr.filter(x=>x.tier==="A"||x.tier==="B").length;
+    const applied=arr.filter(x=>x.applied||INTERVIEW_NOW.has(x.status)||x.status==="Rejected").length;
+    const resp=arr.filter(x=>INTERVIEW_NOW.has(x.status)).length;   // reached a recruiter/interview stage (floor)
+    const interviewed=arr.filter(x=>INTERVIEW_NOW.has(x.status)).length;
+    const closed=arr.filter(x=>x.status==="Archived"||x.reqCheck==="closed").length;
+    const dup=arr.filter(x=>keyCount[norm(x.company)+"||"+norm(x.role)]>1).length;
+    return {s,n,abP:pct(ab,n),appP:pct(applied,n),respP:pct(resp,applied),intP:pct(interviewed,applied),closedP:pct(closed,n),dup};
+  }).sort((a,b)=>b.n-a.n);
+  if(!out.length)return "";
+  return `<div class="an-card"><h3>Source quality</h3><table class="an-table"><tr><th>Source</th><th>Roles</th><th>A/B&nbsp;%</th><th>App&nbsp;%</th><th>Resp&nbsp;%</th><th>Int&nbsp;%</th><th>Closed&nbsp;%</th><th>Dup</th></tr>`+
+    out.map(r=>`<tr><td>${esc(r.s)}</td><td>${r.n}</td><td>${r.abP}%</td><td>${r.appP}%</td><td>${r.respP}%</td><td>${r.intP}%</td><td class="${r.closedP?'rejcell':''}">${r.closedP}%</td><td class="${r.dup?'rejcell':''}">${r.dup||''}</td></tr>`).join("")+
+    `</table><p class="an-note" style="margin-top:8px">A/B% = share that scored Tier A/B · Resp/Int% are of applied (current status, a floor) · Closed% = archived or dead postings · Dup = rows sharing a company+role with another. Use this to enable/disable/prioritize sources.</p></div>`;
+}
 // Auto-generated decision-support insights for the Analytics tab (#12).
 function buildInsights(rs,m){
   const out=[];
@@ -1558,6 +2206,15 @@ function buildInsights(rs,m){
   // gated vs fillable mix among applications
   const gatedApplied=rs.filter(x=>m&&applyModeOf(x)==="gated"&&x.status!=="Not Applied").length;
   if(gatedApplied>0)out.push({tone:"",html:`${gatedApplied} of your applications went through <b>gated</b> (login-walled) ATSs — fillable sources are faster to apply through if quality is comparable.`});
+  // manual-capture conversion (P2.7): how the roles YOU clipped/added perform vs scouted
+  const manualSet=new Set(["manual","chrome-ext","mobile","quick-add"]);
+  const manual=rs.filter(x=>manualSet.has((rowSource(x)||"").toLowerCase()));
+  if(manual.length>=3){
+    const mApplied=manual.filter(x=>x.applied||INTERVIEW_NOW.has(x.status)||x.status==="Rejected").length;
+    const mResp=manual.filter(x=>INTERVIEW_NOW.has(x.status)).length;
+    const mAB=manual.filter(x=>x.tier==="A"||x.tier==="B").length;
+    out.push({tone:mResp?"good":"",html:`Manual captures (you clipped/added): <b>${manual.length}</b> roles, ${mAB} Tier A/B, ${mApplied} applied, ${mResp} reached a recruiter — ${mApplied?Math.round(mResp/mApplied*100):0}% conversion.`});
+  }
   // Tier A engagement
   const tierA=rs.filter(x=>x.tier==="A");
   const tierAApplied=tierA.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
@@ -1615,10 +2272,35 @@ function renderAnalytics(f){
   const outcomes=`<div class="an-card"><h3>Application outcomes</h3><div class="an-funnel">`+
     obar("Awaiting reply",oc.awaiting,"neu")+obar("In interview",oc.interview,"act")+obar("Offer",oc.offer,"ok")+obar("Rejected",oc.rejected,"rej")+`</div>`+
     `<p class="an-note" style="margin-top:10px">Current status of your ${ocTotal} application${ocTotal===1?'':'s'} (mutually exclusive). Reject rate: <b style="color:var(--coral)">${m.rejectRate}%</b> of applied · response rate ${m.responseRate}%. Window: ${win}.</p></div>`;
-  const breakdowns=`<div class="an-grid2">`+
+  const breakdowns=`${sourceQuality(rs)}<div class="an-grid2">`+
     anBreakdown(rs,x=>rowSource(x),"Source / ATS")+anBreakdown(rs,x=>x.sector,"Sector")+
     anBreakdown(rs,x=>"Tier "+(x.tier||"?"),"Tier")+anBreakdown(rs,x=>applyModeOf(x),"Apply mode")+`</div>`;
-  return `<div class="an-wrap"><div class="an-bartop"><b style="color:var(--text)">Conversion &amp; source-ROI</b> · ${win} · adjust the window in ⚙ Settings; search/tier/source/apply-mode filters above still apply.</div>${insights}${kpis}<div class="an-grid2">${funnel}${outcomes}</div>${breakdowns}</div>`;
+
+  // ---- distributions, viewed through the selected lens ----
+  const cohort=rs.filter(lensPred(analyticsLens));
+  const lensDef=LENSES.find(l=>l.k===analyticsLens)||LENSES[0];
+  const lensBar=`<div class="an-lens"><span class="ll">View by</span>`+
+    LENSES.map(l=>{const c=rs.filter(l.pred).length;return `<button class="${l.cls} ${l.k===analyticsLens?'on':''}" onclick="setAnalyticsLens('${l.k}')">${l.label} <span class="lc">${c}</span></button>`;}).join("")+`</div>`;
+  // Surface any active toolbar filter — otherwise a lingering search (e.g. "netflix") silently
+  // shrinks the cohort and a single company reads as 100%.
+  const af=[]; if(f.qy)af.push(`search “${esc(f.qy)}”`); if(f.srcf)af.push(`source ${esc(f.srcf)}`); if(f.tf)af.push(`tier ${esc(f.tf)}`); if(f.amf)af.push(`apply-mode ${esc(f.amf)}`); if(f.remoteOnly)af.push(`remote-only`);
+  const filterBanner=af.length?`<div class="an-filterbanner">⚠ Filtered by ${af.join(" · ")} — showing ${cohort.length} of ${rows.filter(x=>x.deleted!==true).length} roles. <button class="mini" onclick="clearAnalyticsFilters()">Clear filters</button></div>`:"";
+  const distHead=`<div class="an-bartop" style="margin-top:4px"><b style="color:var(--text)">Distributions</b> · lens: <b style="color:var(--text)">${lensDef.label}</b> (${cohort.length} role${cohort.length===1?'':'s'}) · ${win}</div>${filterBanner}`;
+  const unit=lensDef.label.toLowerCase();
+  const barsRow=`<div class="an-grid3">`+
+    distBars(cohort,x=>x.company,"Top companies",{top:12})+
+    distBars(cohort,roleFamily,"Roles",{top:12})+
+    distBars(cohort,roleLevel,"Role levels",{order:LEVEL_ORDER,colorFn:LEVEL_COLOR})+`</div>`;
+  const salaryRow=histogram(cohort,salaryBand,SALARY_BANDS,"Salary bands","$200–300K in $10K bands (lower bound)");
+  const donutsRow=`<div class="an-grid3">`+
+    donut(cohort,x=>x.sector||"—","Industry / sector",{unit})+
+    donut(cohort,x=>"Tier "+(x.tier||"?"),"Tier",{order:["Tier A","Tier B","Tier C","Tier ?"],colorFn:TIER_COLOR,unit})+
+    donut(cohort,x=>({remote:"Remote",flex:"Flex/Hybrid",onsite:"On-site"}[x.remote]||"—"),"Remote posture",{unit})+`</div>`;
+  const distGrid=`${barsRow}${salaryRow}${donutsRow}`;
+  const trends=`<div class="an-grid2">${velocityChart(rs.filter(lensPred("applied")))}${fitByOutcome(rs)}</div>`;
+  const distSection=`${lensBar}${distHead}${distGrid}${trends}`;
+
+  return `<div class="an-wrap"><div class="an-bartop"><b style="color:var(--text)">Conversion &amp; source-ROI</b> · ${win} · adjust the window in ⚙ Settings; search/tier/source/apply-mode filters above still apply.</div>${insights}${kpis}<div class="an-grid2">${funnel}${outcomes}</div>${distSection}${breakdowns}</div>`;
 }
 function applyHygiene(h){ if(h&&typeof h==="object")HYGIENE={...HYGIENE_DEFAULT,...h}; if(rows.length)render(); }
 async function archiveRow(i){
@@ -1774,8 +2456,8 @@ window.exportSelected=function(){
   const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="job-pipeline-selected.csv";a.click();
   st.textContent=`Exported ${ids.length} row(s).`; st.classList.remove("warn");
 };
-// WP-0: every client-side edit stamps updatedAt so per-row last-writer-wins has honest timestamps
-function stampRow(i){if(rows[i])rows[i].updatedAt=new Date().toISOString();}
+// WP-0: every client-side edit stamps updatedAt (+who) so per-row last-writer-wins has honest timestamps
+function stampRow(i){if(rows[i]){rows[i].updatedAt=new Date().toISOString();rows[i].updatedBy="you";}}
 window.upd=function(i,field,val){
   rows[i][field]=val;stampRow(i);
   // moving to Applied auto-stamps today's applied date (only if not already set — never overwrites)
@@ -1792,9 +2474,9 @@ const TEXT=["company","sector","role","salary","location","link","notes","recrui
 const SEL=["remote","tier","conf","status","referral","resume","cover"];
 function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("f_prob").value="";F("f_remote").value="remote";F("f_tier").value="A";F("f_conf").value="unverified";F("f_status").value="Not Applied";F("f_referral").value="No";F("f_resume").value="—";F("f_cover").value="No";}
 function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
-function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);return o;}
+function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);o.updatedAt=new Date().toISOString();o.updatedBy="you";if(!o.source)o.source="manual";return o;}
 window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit requisition");};
-window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?\n\nKept as a recoverable tombstone (purge in Settings → Data safety) so the delete syncs to other devices.")){rows[i].deleted=true;stampRow(i);persistNow();render();}};
+window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?\n\nKept as a recoverable deleted row (remove permanently in Settings → Data safety) so the delete syncs to other devices.")){rows[i].deleted=true;stampRow(i);persistNow();render();}};
 F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition");};
 F("cancelBtn").onclick=closeModal;
 F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
@@ -1883,20 +2565,74 @@ window.selectedScoutSources=function(){return [...F("scoutSources").querySelecto
 function updateScoutScopeHint(){const n=selectedScoutSources().length;F("scoutScopeHint").textContent=n?`(${n} selected)`:"(all)";}
 
 const SET=id=>document.getElementById(id);
+// Status multi-select chips (Workflow) — only real status values can be chosen, never freeform text.
+function renderStatusChips(containerId,selected){
+  const box=SET(containerId); if(!box)return;
+  const sel=new Set(selected||[]);
+  box.innerHTML=STATUS_ORDER.map(s=>`<label class="schip ${sel.has(s)?'on':''}"><input type="checkbox" value="${s}" ${sel.has(s)?'checked':''}>${s}</label>`).join("");
+  box.querySelectorAll("input").forEach(cb=>cb.onchange=()=>cb.closest(".schip").classList.toggle("on",cb.checked));
+}
+function readStatusChips(containerId){const box=SET(containerId);if(!box)return[];return [...box.querySelectorAll("input:checked")].map(cb=>cb.value);}
+// Notification-channel chips (digest + Gmail events). Shows a "needs setup" flag for unconfigured ones.
+const CHANNEL_DEFS=[["inapp","🔔 In-app"],["file","📄 File"],["slack","Slack"],["email","Email"],["sms","SMS"],["push","iOS push"]];
+function renderChannelChips(containerId,selected,status){
+  const box=SET(containerId); if(!box)return;
+  const sel=new Set(selected||[]); status=status||{};
+  box.innerHTML=CHANNEL_DEFS.map(([v,label])=>{
+    const ready=status[v]!==false; const flag=ready?"":' <span class="needsetup">needs setup</span>';
+    return `<label class="schip ${sel.has(v)?'on':''}"><input type="checkbox" value="${v}" ${sel.has(v)?'checked':''}>${label}${flag}</label>`;
+  }).join("");
+  box.querySelectorAll("input").forEach(cb=>cb.onchange=()=>cb.closest(".schip").classList.toggle("on",cb.checked));
+}
+const readChannelChips=readStatusChips;   // same checkbox-read logic
+function wireChipToggle(containerId){const box=SET(containerId);if(box)box.querySelectorAll("input").forEach(cb=>cb.onchange=()=>cb.closest(".schip").classList.toggle("on",cb.checked));}
+function toggleSmsMethod(){const m=SET("setSmsMethod")?SET("setSmsMethod").value:"email";if(SET("smsEmailBlock"))SET("smsEmailBlock").style.display=m==="email"?"":"none";if(SET("smsTwilioBlock"))SET("smsTwilioBlock").style.display=m==="twilio"?"":"none";}
+// Model dropdowns — options come from the live OpenAI model list (server-cached); never freeform.
+async function populateModelSelects(curScoring,curAssistant){
+  const fill=(sel,models,val,allowBlank,blankLabel)=>{
+    if(!sel)return;
+    const opts=[...new Set([...(allowBlank?[]:[]),...models,val].filter(Boolean))].sort();
+    sel.innerHTML=(allowBlank?`<option value="">${blankLabel||"— same as scoring model —"}</option>`:"")+opts.map(m=>`<option value="${m}">${m}</option>`).join("");
+    sel.value=val||"";
+  };
+  // synchronous first pass so a value is present even before the fetch resolves
+  fill(SET("setModel"),[curScoring],curScoring,false);
+  fill(SET("setAssistModel"),[],curAssistant,true);
+  try{
+    const j=await (await fetch("/api/assist/models",{cache:"no-store"})).json();
+    const models=j.models||[];
+    fill(SET("setModel"),models,curScoring,false);
+    fill(SET("setAssistModel"),models,curAssistant,true);
+  }catch(e){/* keep the synchronous fallback */}
+}
+function updateSourceCount(){
+  const all=[...SET("setSources").querySelectorAll("input[data-src]")];
+  const on=all.filter(c=>c.checked).length;
+  const cnt=SET("srcCount"); if(cnt)cnt.textContent=`${on} of ${all.length} enabled`;
+  const sa=SET("srcSelectAll"); if(sa){sa.checked=on===all.length&&all.length>0;sa.indeterminate=on>0&&on<all.length;}
+}
 function fillSettings(j){
-  SET("setSources").innerHTML=j.sources.map(s=>{
+  const srcRowsHtml=j.sources.map(s=>{
     const k=s.needsKey?`<span class="kind ${s.configured?'ok':'needkey'}">${s.kind}${s.configured?'':' · key needed'}</span>`
                        :`<span class="kind">${s.kind}${s.note?(' · '+s.note):''}</span>`;
-    return `<label><input type="checkbox" data-src="${s.name}" ${s.enabled?'checked':''}> ${s.label} ${k}</label>`;
+    return `<label class="srcrow"><input type="checkbox" data-src="${s.name}" ${s.enabled?'checked':''}><span class="srcname">${s.label}</span>${k}</label>`;
   }).join("");
+  SET("setSources").innerHTML=
+    `<div class="srchdr"><label><input type="checkbox" id="srcSelectAll"> Select all</label><span class="srccount" id="srcCount"></span></div>`+srcRowsHtml;
+  SET("setSources").querySelectorAll("input[data-src]").forEach(c=>c.onchange=updateSourceCount);
+  const sa=SET("srcSelectAll");
+  if(sa)sa.onchange=()=>{SET("setSources").querySelectorAll("input[data-src]").forEach(c=>{c.checked=sa.checked;});updateSourceCount();};
+  updateSourceCount();
   SET("setMinFit").value=j.minFit;
+  SET("setSalaryFloor").value=j.salaryFloor?j.salaryFloor:"";
+  SET("setSalaryTarget").value=j.salaryTarget?j.salaryTarget:"";
   SET("setMinTier").value=["A","B","C"].includes(j.minTierToMerge)?j.minTierToMerge:"B";
   SET("setRemoteOnly").checked=!!j.remoteOnly;
   SET("setTitles").value=(j.titles||[]).join("\n");
   SET("setKeywords").value=(j.keywords||[]).join("\n");
   SET("setSkipTypes").value=(j.skipEmploymentTypes||[]).join("\n");
   SET("setNegKw").value=(j.negativeKeywords||[]).join("\n");
-  SET("setModel").value=j.llm.model||"";
+  populateModelSelects(j.llm.model||"", (j.assist&&j.assist.model)||"");
   SET("setKeyState").textContent=j.llm.keySet?`(set ••••${j.llm.keyLast4})`:"(not set)";
   SET("setKey").value="";
   const bud=j.budget||{}; SET("setAiMax").value=bud.maxPerRun!=null?bud.maxPerRun:40; SET("setAiTtl").value=bud.ttlDays!=null?bud.ttlDays:14;
@@ -1905,34 +2641,51 @@ function fillSettings(j){
   SET("setMinDelay").value=j.minDelaySeconds!=null?j.minDelaySeconds:0.4;
   const as=j.assist||{};
   SET("setAssistEnabled").checked=as.enabled!==false;
-  SET("setAssistModel").value=as.model||"";
   SET("setAssistDaily").value=as.dailyCalls!=null?as.dailyCalls:25;
   SET("setAssistMaxTokens").value=as.maxTokens!=null?as.maxTokens:700;
+  SET("setPricePer1M").value=as.pricePer1M!=null?as.pricePer1M:"";
+  SET("setMonthlyBudget").value=as.monthlyBudget!=null?as.monthlyBudget:"";
+  if(SET("costHint")){const c=as.estCost30d!=null?`~$${as.estCost30d} est. last 30d (${(as.tokens30d||0).toLocaleString()} tokens)`:"set a rate to estimate cost";const bp=as.budgetUsedPct!=null?` · ${as.budgetUsedPct}% of budget`:"";SET("costHint").innerHTML=`${c}${bp}. OpenAI can't report your balance via API. <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">platform.openai.com/usage ↗</a>`;}
   SET("assistUsageHint").textContent=`Used today: ${as.callsToday||0} call(s), ${as.tokensToday||0} tokens. Per-req "✍ AI draft" grounds in your profile + narratives; output is editable and never auto-submitted.`;
   const dg=j.digest||{};
   SET("setDigestEnabled").checked=!!dg.enabled;
   SET("setDigestTime").value=dg.time||"07:00";
-  SET("setDigestChannel").value=dg.channel||"file";
   SET("setDigestDays").value=dg.days!=null?dg.days:1;
+  SET("setDigestAfterScout").checked=!!dg.afterScout;
+  renderChannelChips("setDigestChannels",dg.channels||["file"],dg.channelStatus);
   SET("setDigestWebhook").value=""; SET("webhookState").textContent=dg.webhookSet?"(set)":"(not set)";
   SET("setDigestTo").value=dg.to||""; SET("setDigestFrom").value=dg.from||"";
   SET("setSmtpHost").value=dg.smtpHost||""; SET("setSmtpPort").value=dg.smtpPort||""; SET("setSmtpUser").value=dg.smtpUser||"";
   SET("setSmtpPass").value=""; SET("smtpState").textContent=dg.smtpSet?"(set)":"(not set)";
+  const sms=dg.sms||{};
+  SET("setSmsCarrier").innerHTML='<option value="">— pick carrier —</option>'+(sms.carriers||[]).map(c=>`<option value="${c}">${c}</option>`).join("");
+  SET("setSmsCarrier").value=sms.carrier||"";
+  SET("setSmsGatewayNumber").value=sms.gatewayNumber||"";
+  SET("setSmsMethod").value=sms.method||"email";
+  SET("setTwilioSid").value=""; SET("setTwilioSid").placeholder=sms.sidSet?"set ✓ — re-enter to change":"ACxxxx…";
+  SET("setTwilioToken").value=""; SET("twilioTokState").textContent=sms.tokenSet?"(set)":"(not set)";
+  SET("setTwilioFrom").value=sms.from||""; SET("setSmsTo").value=sms.to||"";
+  SET("smsState").textContent=sms.configured?`— configured ✓ (${sms.method})`:"— not configured";
+  toggleSmsMethod();
+  const mn=j.mailNotify||{};
+  renderChannelChips("setMailNotifyChannels",mn.channels||["inapp"],(j.digest||{}).channelStatus);
+  ["rejection","interview","offer"].forEach(k=>{const cb=document.querySelector(`#mailNotifyKinds input[value="${k}"]`);if(cb){cb.checked=!!mn[k];cb.closest(".schip").classList.toggle("on",cb.checked);}});
+  wireChipToggle("mailNotifyKinds");
   SET("digestStatus").textContent=dg.lastSent?`Last sent ${new Date(dg.lastSent).toLocaleString()} via ${dg.lastChannel||"?"}`+(dg.lastCounts?` (${dg.lastCounts.newFinds} new / ${dg.lastCounts.followUps} follow / ${dg.lastCounts.closed} closed)`:""):"Never sent.";
   const rm=j.remote||{}; SET("setPublicUrl").value=rm.publicUrl||""; SET("remoteLanHint").textContent=rm.lanUrl?`LAN: ${rm.lanUrl}`:"";
   const bk=j.backup||{}; const ret=bk.retention!=null?bk.retention:50;
   SET("setRetention").value=ret; SET("setGuardPct").value=bk.guardPct!=null?bk.guardPct:20; SET("setRetentionEcho").textContent=ret;
   const tm=j.tabStatusMap||{};
-  SET("setTabOpen").value=(tm.open||TAB_MAP_DEFAULT.open).join(", ");
-  SET("setTabApplied").value=(tm.applied||TAB_MAP_DEFAULT.applied).join(", ");
-  SET("setTabInterviewing").value=(tm.interviewing||TAB_MAP_DEFAULT.interviewing).join(", ");
-  SET("setTabClosed").value=(tm.closed||TAB_MAP_DEFAULT.closed).join(", ");
+  renderStatusChips("setTabOpen",tm.open||TAB_MAP_DEFAULT.open);
+  renderStatusChips("setTabApplied",tm.applied||TAB_MAP_DEFAULT.applied);
+  renderStatusChips("setTabInterviewing",tm.interviewing||TAB_MAP_DEFAULT.interviewing);
+  renderStatusChips("setTabClosed",tm.closed||TAB_MAP_DEFAULT.closed);
   SET("setAnalyticsWindow").value=j.analyticsWindowDays!=null?j.analyticsWindowDays:0;
   ANALYTICS_WINDOW=+j.analyticsWindowDays||0;
   applyTabMap(tm);   // sync the live board tabs + re-render
   const hg=j.hygiene||{};
   SET("setFollowupDays").value=hg.followupDays!=null?hg.followupDays:HYGIENE_DEFAULT.followupDays;
-  SET("setFollowupStatuses").value=(hg.followupStatuses||HYGIENE_DEFAULT.followupStatuses).join(", ");
+  renderStatusChips("setFollowupStatuses",hg.followupStatuses||HYGIENE_DEFAULT.followupStatuses);
   SET("setNeedsVerifyBoardonly").checked=hg.needsVerifyIncludeBoardonly===true;
   SET("setClosedHandling").value=["suggest","auto"].includes(hg.closedHandling)?hg.closedHandling:"suggest";
   applyHygiene(hg);
@@ -1947,7 +2700,7 @@ function fillSettings(j){
   SET("ingestTokState").textContent=au.ingestTokenSet?("Set ••••"+(au.ingestTokenLast4||"")):"Not set";
   SET("ingestTokState").className="tokstate"+(au.ingestTokenSet?" on":"");
   const tomb=rows.filter(x=>x.deleted===true).length;
-  SET("tombstoneInfo").textContent=tomb?`${tomb} tombstone(s) pending purge.`:"No tombstones.";
+  SET("tombstoneInfo").textContent=tomb?`${tomb} deleted row(s) recoverable until removed.`:"No deleted rows pending.";
 }
 // Advanced → connection status indicators (#16). Derives state from the settings payload.
 function buildConnStatus(j){
@@ -1988,7 +2741,7 @@ function applyTabMap(tm){
 async function fetchSettings(){return (await fetch("/api/settings",{cache:"no-store"})).json();}
 function openSettings(){
   F("scoutMenu").classList.remove("open");
-  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();loadMailConfig();loadPushConfig();})
+  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();loadMailConfig();loadPushConfig();loadHttpsStatus();loadEnvInventory();})
     .catch(()=>{SET("setMsg").className="setmsg err";SET("setMsg").textContent="Could not load settings.";SET("settingsOverlay").classList.add("open");});
 }
 
@@ -2038,12 +2791,42 @@ async function loadSourceHealth(){
     const j=await (await fetch("/api/source-health",{cache:"no-store"})).json();
     const src=(j.health&&j.health.sources)||{}; const keys=Object.keys(src);
     if(!keys.length){box.innerHTML='<div class="setmuted" style="padding:8px">No runs yet — run the scout to populate.</div>';return;}
-    box.innerHTML='<div class="bkrow" style="font-weight:700"><span class="bkkind">src</span><span class="bkname">last run</span><span class="bkmeta">co·posts·match·err</span></div>'+
-      keys.sort().map(k=>{const h=src[k]||{};const err=h.errors?` · <span style="color:var(--coral)">${h.errors}e</span>`:"";
-        return `<div class="bkrow"><span class="bkkind">${esc(k)}</span><span class="bkname">${h.lastRun?new Date(h.lastRun).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—"}${h.dry?" ·dry":""}</span><span class="bkmeta">${h.companies||0}·${h.postings||0}·${h.matches||0}${err}</span></div>`;}).join("");
+    const nf=n=>Number(n||0).toLocaleString();
+    box.innerHTML='<div class="srchealth-hdr"><span>Source</span><span>Last run</span><span>Matches added</span></div>'+
+      keys.sort().map(k=>{const h=src[k]||{};
+        const matches=`<b style="color:var(--accent)">${nf(h.matches)}</b>`;
+        const err=h.errors?`<span class="srcerr">⚠ ${nf(h.errors)} error${h.errors==1?'':'s'}</span>`:"";
+        const when=h.lastRun?new Date(h.lastRun).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+        return `<div class="srchealth-row"><span class="shname">${esc(k)}${h.dry?' <span class="setmuted">dry</span>':''}</span>`+
+          `<span class="shwhen">${when}</span>`+
+          `<span class="shval">${matches} ${err}<span class="shsub">${nf(h.companies)} companies · ${nf(h.postings)} scanned</span></span></div>`;}).join("");
   }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">Could not load: '+esc(e.message)+'</div>';}
 }
 SET("refreshHealthBtn").onclick=loadSourceHealth;
+async function loadHttpsStatus(){
+  const box=SET("httpsStatus"); if(!box)return;
+  try{
+    const j=await (await fetch("/api/https-status",{cache:"no-store"})).json();
+    const dot={https:"var(--green)",configured:"var(--gold)",lan:"var(--dim)"}[j.state]||"var(--dim)";
+    const label={https:"HTTPS active",configured:"Configured — tunnel not detected",lan:"LAN / HTTP only"}[j.state]||j.state;
+    box.innerHTML=`<div class="httpsline"><span class="hdot" style="background:${dot}"></span><b>${label}</b></div><div class="setmuted" style="margin-top:4px">${esc(j.detail||j.hint||"")}</div>`;
+  }catch(e){box.innerHTML='<div class="setmsg err">'+staleHint(e)+'</div>';}
+}
+// A non-JSON response usually means the running server predates this endpoint — guide the fix.
+function staleHint(e){const m=esc(e.message||'');return /JSON|Unexpected token/.test(m)?'This endpoint isn’t on the running server yet — restart it (<code>launchctl kickstart -k gui/$(id -u)/com.reqon.server</code>) and refresh.':('Could not load: '+m);}
+async function loadEnvInventory(){
+  const box=SET("envInventory"); if(!box)return;
+  try{
+    const j=await (await fetch("/api/env-inventory",{cache:"no-store"})).json();
+    box.innerHTML=(j.groups||[]).map(g=>
+      `<div class="envgrp">${esc(g.group)}</div>`+g.vars.map(v=>{
+        const val=v.secret?(v.set?`<span class="envset">set ••••${esc(v.last4)}</span>`:`<span class="envunset">not set</span>`)
+                          :(v.set?`<span class="envval">${esc(v.value)}</span>`:`<span class="envunset">—</span>`);
+        return `<div class="envrow"><code class="envkey">${esc(v.key)}</code><span class="envpurpose">${esc(v.purpose)}</span>${val}</div>`;
+      }).join("")).join("");
+  }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">'+staleHint(e)+'</div>';}
+}
+SET("refreshEnvBtn").onclick=loadEnvInventory;
 SET("discoverBtn").onclick=async()=>{
   const url=SET("discoverUrl").value.trim(); if(!url)return;
   SET("discoverResult").innerHTML="Detecting…";
@@ -2066,6 +2849,8 @@ async function saveSettings(){
     disabledSources:[...SET("setSources").querySelectorAll("input[data-src]")].filter(c=>!c.checked).map(c=>c.dataset.src),
     remoteOnly:SET("setRemoteOnly").checked,
     minFit:parseFloat(SET("setMinFit").value)||0,
+    salaryFloor:parseInt(SET("setSalaryFloor").value,10)||0,
+    salaryTarget:parseInt(SET("setSalaryTarget").value,10)||0,
     minTierToMerge:SET("setMinTier").value,
     titles:SET("setTitles").value.split("\n").map(s=>s.trim()).filter(Boolean),
     keywords:SET("setKeywords").value.split("\n").map(s=>s.trim()).filter(Boolean),
@@ -2073,14 +2858,14 @@ async function saveSettings(){
     negativeKeywords:SET("setNegKw").value.split("\n").map(s=>s.trim()).filter(Boolean),
     analyticsWindowDays:parseInt(SET("setAnalyticsWindow").value,10),
     tabStatusMap:{
-      open:SET("setTabOpen").value.split(",").map(s=>s.trim()).filter(Boolean),
-      applied:SET("setTabApplied").value.split(",").map(s=>s.trim()).filter(Boolean),
-      interviewing:SET("setTabInterviewing").value.split(",").map(s=>s.trim()).filter(Boolean),
-      closed:SET("setTabClosed").value.split(",").map(s=>s.trim()).filter(Boolean)
+      open:readStatusChips("setTabOpen"),
+      applied:readStatusChips("setTabApplied"),
+      interviewing:readStatusChips("setTabInterviewing"),
+      closed:readStatusChips("setTabClosed")
     },
     hygiene:{
       followupDays:parseInt(SET("setFollowupDays").value,10),
-      followupStatuses:SET("setFollowupStatuses").value.split(",").map(s=>s.trim()).filter(Boolean),
+      followupStatuses:readStatusChips("setFollowupStatuses"),
       needsVerifyIncludeBoardonly:SET("setNeedsVerifyBoardonly").checked,
       closedHandling:SET("setClosedHandling").value
     },
@@ -2095,10 +2880,24 @@ async function saveSettings(){
     assistModel:SET("setAssistModel").value.trim(),
     assistDailyCalls:parseInt(SET("setAssistDaily").value,10),
     assistMaxTokens:parseInt(SET("setAssistMaxTokens").value,10),
+    pricePer1M:SET("setPricePer1M").value.trim(),
+    monthlyBudget:SET("setMonthlyBudget").value.trim(),
     digestEnabled:SET("setDigestEnabled").checked,
     digestTime:SET("setDigestTime").value.trim(),
-    digestChannel:SET("setDigestChannel").value,
+    digestChannels:readChannelChips("setDigestChannels"),
+    digestAfterScout:SET("setDigestAfterScout").checked,
     digestDays:parseInt(SET("setDigestDays").value,10),
+    smsMethod:SET("setSmsMethod").value,
+    smsCarrier:SET("setSmsCarrier").value,
+    smsGatewayNumber:SET("setSmsGatewayNumber").value.trim(),
+    twilioFrom:SET("setTwilioFrom").value.trim(),
+    smsTo:SET("setSmsTo").value.trim(),
+    ...(SET("setTwilioSid").value.trim()?{twilioSid:SET("setTwilioSid").value.trim()}:{}),
+    ...(SET("setTwilioToken").value?{twilioToken:SET("setTwilioToken").value}:{}),
+    mailNotifyRejection:!!document.querySelector('#mailNotifyKinds input[value="rejection"]:checked'),
+    mailNotifyInterview:!!document.querySelector('#mailNotifyKinds input[value="interview"]:checked'),
+    mailNotifyOffer:!!document.querySelector('#mailNotifyKinds input[value="offer"]:checked'),
+    mailNotifyChannels:readChannelChips("setMailNotifyChannels"),
     digestTo:SET("setDigestTo").value.trim(),
     digestFrom:SET("setDigestFrom").value.trim(),
     smtpHost:SET("setSmtpHost").value.trim(),
@@ -2139,7 +2938,7 @@ SET("settingsCancel").onclick=()=>SET("settingsOverlay").classList.remove("open"
 SET("settingsCancelTop").onclick=()=>SET("settingsOverlay").classList.remove("open");
 SET("purgeTombstonesBtn").onclick=async()=>{
   const n=rows.filter(x=>x.deleted===true).length;
-  if(!n){SET("tombstoneInfo").textContent="No tombstones to purge.";return;}
+  if(!n){SET("tombstoneInfo").textContent="No deleted rows to remove.";return;}
   if(!confirm(`Permanently remove ${n} deleted row(s)?\n\nA snapshot is taken first.`))return;
   try{const j=await (await fetch("/api/maintenance/purge-tombstones",{method:"POST"})).json();
     if(!j.ok)throw new Error(j.error||"failed");
@@ -2177,8 +2976,11 @@ SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()
   SET("settingsNav").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
   document.querySelectorAll(".sset").forEach(s=>s.hidden=(s.dataset.sect!==k));
   SET("settingsContent").scrollTop=0;
+  if(k==='users')loadUsers();
 });
-SET("settingsOverlay").onclick=e=>{if(e.target.id==="settingsOverlay")SET("settingsOverlay").classList.remove("open");};
+// Settings stays open until you explicitly Save / Close / × — no click-outside dismissal (a stray
+// backdrop click used to drop the whole panel and lose your place). Esc still closes for keyboard users.
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&SET("settingsOverlay").classList.contains("open"))SET("settingsOverlay").classList.remove("open");});
 // device pairing: fetch a QR + paste-code that encodes this server's URL + passphrase
 (function(){
   const btn=SET("pairBtn"); if(!btn) return;
@@ -2199,7 +3001,7 @@ SET("settingsOverlay").onclick=e=>{if(e.target.id==="settingsOverlay")SET("setti
 fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
 
 // ---------- candidate profile + narrative library (Phase 5) ----------
-let PROFILE_NARRATIVES=[];
+let PROFILE_NARRATIVES=[]; let PROFILE_ANSWERS=[];
 let PROFILE_KEYWORDS=[]; let KW_REMOVED=new Set();
 let PROFILE_WORK=[]; let PROFILE_EDU=[];
 // Standard EEO self-ID answer sets (must match app/src/sync/profile.ts EEO_OPTIONS).
@@ -2327,6 +3129,8 @@ function fillProfile(p){
   p=p||{}; const a=p.applicant||{};
   SET("profName").value=a.name||""; SET("profEmail").value=a.email||""; SET("profPhone").value=a.phone||"";
   SET("profLinkedin").value=a.linkedin||""; SET("profLocation").value=a.location||"";
+  SET("profGithub").value=a.github||p.github||"";
+  SET("profSummary").value=p.summary||"";
   SET("profSeniority").value=(p.seniority||[]).join(", ");
   SET("profRoleTerms").value=(p.roleTerms||[]).join(", ");
   SET("profIndustries").value=(p.industries||[]).join(", ");
@@ -2338,6 +3142,8 @@ function fillProfile(p){
   fillEeo(p.eeo);
   PROFILE_NARRATIVES=(p.narratives||[]).map(n=>({id:n.id,title:n.title||"",body:n.body||"",tags:(n.tags||[]).join(", ")}));
   renderNarratives();
+  PROFILE_ANSWERS=(p.answers||[]).map(x=>({id:x.id,q:x.q||"",a:x.a||"",tags:(x.tags||[]).join(", ")}));
+  renderAnswers();
 }
 const qa=(s)=>String(s==null?"":s).replace(/"/g,"&quot;");
 function renderWorkHistory(){
@@ -2389,13 +3195,32 @@ function syncNarrativesFromDOM(){
 }
 window.removeNarrative=function(i){syncNarrativesFromDOM();PROFILE_NARRATIVES.splice(i,1);renderNarratives();};
 SET("addNarrativeBtn").onclick=()=>{syncNarrativesFromDOM();PROFILE_NARRATIVES.push({title:"",body:"",tags:""});renderNarratives();};
+function renderAnswers(){
+  SET("answerBox").innerHTML=PROFILE_ANSWERS.map((x,i)=>
+    `<div class="narr" data-i="${i}"><button class="narr-rm" type="button" onclick="removeAnswer(${i})">remove</button>`+
+    `<input class="ans-q" type="text" placeholder="Question (e.g. Why are you interested in this role?)" value="${(x.q||'').replace(/"/g,'&quot;')}">`+
+    `<textarea class="ans-a" rows="3" placeholder="Your saved answer…">${esc(x.a||'')}</textarea>`+
+    `<input class="ans-tags" type="text" placeholder="tags: comma-separated (e.g. motivation, remote)" value="${(x.tags||'').replace(/"/g,'&quot;')}"></div>`
+  ).join("")||'<div class="setmuted">No saved answers yet.</div>';
+}
+function syncAnswersFromDOM(){
+  const out=[]; SET("answerBox").querySelectorAll(".narr").forEach((el,i)=>{
+    out.push({id:(PROFILE_ANSWERS[i]||{}).id, q:el.querySelector(".ans-q").value, a:el.querySelector(".ans-a").value, tags:el.querySelector(".ans-tags").value});
+  });
+  PROFILE_ANSWERS=out;
+}
+window.removeAnswer=function(i){syncAnswersFromDOM();PROFILE_ANSWERS.splice(i,1);renderAnswers();};
+SET("addAnswerBtn").onclick=()=>{syncAnswersFromDOM();PROFILE_ANSWERS.push({q:"",a:"",tags:""});renderAnswers();};
 async function saveProfile(){
-  syncNarrativesFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
+  syncNarrativesFromDOM(); syncAnswersFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
   const body={
-    applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim()},
+    applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim(),github:SET("profGithub").value.trim()},
+    github:SET("profGithub").value.trim(),
+    summary:SET("profSummary").value.trim(),
     seniority:csvList(SET("profSeniority").value), roleTerms:csvList(SET("profRoleTerms").value),
     industries:csvList(SET("profIndustries").value), sectors:csvList(SET("profSectors").value),
     narratives:PROFILE_NARRATIVES.map(n=>({id:n.id,title:n.title,body:n.body,tags:csvList(n.tags)})),
+    answers:PROFILE_ANSWERS.filter(x=>x.q||x.a).map(x=>({id:x.id,q:x.q,a:x.a,tags:csvList(x.tags)})),
     keywordOverrides:kwOverrides(),
     workHistory:PROFILE_WORK.filter(w=>w.role||w.company),
     education:PROFILE_EDU.filter(e=>e.school||e.level||e.field),
@@ -2407,6 +3232,16 @@ async function saveProfile(){
     SET("profMsg").className="setmsg ok";SET("profMsg").textContent="Profile saved.";
   }catch(e){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Save failed: "+e.message;}
 }
+SET("draftSummaryBtn").onclick=async()=>{
+  const btn=SET("draftSummaryBtn"),msg=SET("summaryMsg");
+  btn.disabled=true; msg.className="setmuted"; msg.textContent="Drafting from your résumé…";
+  try{
+    const j=await (await fetch("/api/profile/draft-summary",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    SET("profSummary").value=j.summary||""; msg.textContent="Draft inserted — edit, then Save profile. ("+(j.tokens||0)+" tokens)";
+  }catch(e){msg.className="setmsg err";msg.textContent="Draft failed: "+e.message+" (needs an OpenAI key under Advanced).";}
+  finally{btn.disabled=false;}
+};
 SET("addWorkBtn").onclick=()=>{syncWorkFromDOM();PROFILE_WORK.push({role:"",company:"",location:"",start:"",end:"",description:""});renderWorkHistory();};
 SET("addEduBtn").onclick=()=>{syncEduFromDOM();PROFILE_EDU.push({school:"",level:"",field:"",start:"",end:""});renderEducation();};
 SET("kwAddBtn").onclick=()=>{
@@ -2430,17 +3265,57 @@ SET("uploadResumeBtn").onclick=async()=>{
 };
 
 // ---------- AI application assistant (Phase 6) ----------
-let assistRow=null;
+let assistRow=null, assistIdx=-1, lastScore=null;
 window.openAssist=function(i){
-  const x=rows[i]; if(!x)return; assistRow=x;
+  const x=rows[i]; if(!x)return; assistRow=x; assistIdx=i; lastScore=null;
   F("assistCtx").textContent=(x.company||"")+" — "+(x.role||"");
   F("assistOut").value=""; F("assistMsg").textContent=""; F("assistMsg").className="setmsg";
   F("assistQ").value=""; F("assistJd").value=""; F("assistKind").value="cover"; F("assistQWrap").style.display="none";
+  F("assistScoreCard").style.display="none";
   fetchSettings().then(j=>{const as=j.assist||{};F("assistModelEcho").value=as.model||"";
     F("assistUsage").textContent=`Today: ${as.callsToday||0}/${as.dailyCalls||0} calls · ${as.tokensToday||0} tokens`;
+    F("assistProfWarn").style.display=(j.profile&&(j.profile.hasResume||j.profile.applicantName))?"none":"";
     if(as.enabled===false){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Assistant is disabled in Settings.";}
   }).catch(()=>{});
   F("assistOverlay").classList.add("open");
+};
+function assistKey(){return (assistRow.company+"|"+assistRow.role).toLowerCase().trim();}
+// AI score / tailor actions (P1.1) — share the modal; structured score renders a current→suggested card.
+document.getElementById("assistActions").addEventListener("click",async e=>{
+  const btn=e.target.closest("[data-aiact]"); if(!btn||!assistRow)return;
+  const act=btn.dataset.aiact;
+  F("assistMsg").className="setmsg"; F("assistMsg").textContent=act==="score"?"Scoring…":"Tailoring…"; btn.disabled=true;
+  try{
+    if(act==="score"){
+      const j=await (await fetch("/api/assist/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:assistKey(),jd:F("assistJd").value})})).json();
+      if(!j.ok)throw new Error(j.error||"failed");
+      lastScore=j;
+      F("scNowFit").textContent=assistRow.fit; F("scNewFit").textContent=j.fit;
+      F("scNowProb").textContent=assistRow.prob; F("scNewProb").textContent=j.prob;
+      F("scNowTier").textContent=assistRow.tier||"–"; F("scNewTier").textContent=j.tier;
+      F("scRationale").textContent=j.rationale||"";
+      F("assistScoreCard").style.display="";
+      F("assistMsg").className="setmsg ok"; F("assistMsg").textContent=`Suggested (${j.tokens} tokens). Review, then Apply or ignore — nothing changes until you apply.`;
+    }else if(act==="tailor"){
+      const j=await (await fetch("/api/assist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:assistKey(),kind:"tailor",jd:F("assistJd").value})})).json();
+      if(!j.ok)throw new Error(j.error||"failed");
+      F("assistOut").value=j.draft||"";
+      F("assistMsg").className="setmsg ok"; F("assistMsg").textContent=`Positioning ready (${j.tokens} tokens). Edit freely — nothing is submitted.`;
+      if(j.usage)F("assistUsage").textContent=`Today: ${j.usage.calls}/${j.usage.cap||0} calls · ${j.usage.tokens} tokens`;
+    }
+  }catch(err){F("assistMsg").className="setmsg err";F("assistMsg").textContent="Failed: "+err.message;}
+  finally{btn.disabled=false;}
+});
+F("assistApplyScore").onclick=()=>{
+  if(!lastScore||assistIdx<0)return;
+  if(!confirm(`Apply AI scores to ${assistRow.company} — ${assistRow.role}?\n\nFit ${assistRow.fit} → ${lastScore.fit}\nProb ${assistRow.prob} → ${lastScore.prob}\nTier ${assistRow.tier||"–"} → ${lastScore.tier}`))return;
+  const r=rows[assistIdx];
+  r.fit=lastScore.fit; r.prob=lastScore.prob; r.tier=lastScore.tier;
+  const stamp=`[AI score ${new Date().toISOString().slice(0,10)}] fit ${lastScore.fit} · prob ${lastScore.prob} · ${lastScore.tier}: ${lastScore.rationale||""}`.trim();
+  r.notes=(r.notes?r.notes+"\n":"")+stamp;
+  stampRow(assistIdx); persistNow(); render();
+  F("assistMsg").className="setmsg ok"; F("assistMsg").textContent="Applied — scores updated and rationale saved to notes.";
+  F("assistScoreCard").style.display="none";
 };
 F("assistKind").onchange=()=>{F("assistQWrap").style.display=F("assistKind").value==="screening"?"":"none";};
 F("assistGenBtn").onclick=async()=>{
@@ -2462,12 +3337,145 @@ F("assistCopy").onclick=()=>{const t=F("assistOut").value;if(!t)return;try{navig
 F("assistClose").onclick=()=>F("assistOverlay").classList.remove("open");
 F("assistOverlay").onclick=e=>{if(e.target.id==="assistOverlay")F("assistOverlay").classList.remove("open");};
 
+// ---------- CV builder (P1.2) — wires the board to /api/cv (+ .docx/.html exports) ----------
+let cvRow=null, cvIdx=-1;
+function openCvModal(){
+  F("cvPreview").value=""; F("cvMsg").textContent=""; F("cvMsg").className="setmsg"; F("cvSrc").textContent="";
+  F("cvDocxBtn").style.display="none"; F("cvHtmlBtn").style.display="none";
+  fetchSettings().then(j=>{F("cvProfWarn").style.display=(j.profile&&(j.profile.hasResume||j.profile.applicantName))?"none":"";}).catch(()=>{});
+  F("cvOverlay").classList.add("open");
+}
+window.openCv=function(i){ const x=rows[i]; if(!x)return; cvRow=x; cvIdx=i;
+  F("cvCtx").textContent="Tailored CV — "+(x.company||"")+" — "+(x.role||"");
+  F("cvJdWrap").style.display=""; F("cvJd").value=(x.notes||"");
+  openCvModal();
+};
+function openCvGeneral(){ cvRow=null; cvIdx=-1; F("cvCtx").textContent="General CV — from your candidate profile"; F("cvJdWrap").style.display="none"; F("cvJd").value=""; openCvModal(); }
+if(F("cvBuilderBtn"))F("cvBuilderBtn").onclick=openCvGeneral;
+F("cvGenBtn").onclick=async()=>{
+  F("cvMsg").className="setmsg"; F("cvMsg").textContent="Generating…"; F("cvGenBtn").disabled=true;
+  try{
+    const body={};
+    if(cvRow)body.tailor={role:cvRow.role||"",company:cvRow.company||"",jd:F("cvJd").value||""};
+    const j=await (await fetch("/api/cv",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    F("cvPreview").value=j.markdown||"";
+    F("cvSrc").textContent=(j.source==="ai"?"summary: AI-written":"summary: from profile")+(j.tailoredFor?` · tailored for ${j.tailoredFor}`:"");
+    // cache-bust the downloads so they reflect THIS build
+    const v="?v="+Date.now(); F("cvDocxBtn").href="/api/cv.docx"+v; F("cvHtmlBtn").href="/api/cv.html"+v;
+    F("cvDocxBtn").style.display=""; F("cvHtmlBtn").style.display="";
+    F("cvMsg").className="setmsg ok"; F("cvMsg").textContent="Ready — download .docx or open the print view to save as PDF.";
+    if(cvRow&&cvIdx>=0){ rows[cvIdx].cvBuiltAt=new Date().toISOString(); rows[cvIdx].cvTailoredFor=j.tailoredFor||null; stampRow(cvIdx); persistNow(); }
+  }catch(e){F("cvMsg").className="setmsg err";F("cvMsg").textContent="Failed: "+e.message;}
+  finally{F("cvGenBtn").disabled=false;}
+};
+F("cvClose").onclick=()=>F("cvOverlay").classList.remove("open");
+F("cvOverlay").onclick=e=>{if(e.target.id==="cvOverlay")F("cvOverlay").classList.remove("open");};
+
+// ---------- Per-role timeline (P2.5) ----------
+const TL_ICON={captured:'📥',verified:'✅',applied:'📨',interview:'🗣️',guide:'📋',followup:'⏰',score:'📊',rejection:'❌',offer:'🎉',status:'🔄',enriched:'✨',enrich_failed:'⚠️',note:'📝'};
+window.openTimeline=async function(i){
+  const x=rows[i]; if(!x)return;
+  F("tlCtx").textContent=(x.company||"")+" — "+(x.role||"");
+  F("tlBody").innerHTML='<div class="setmuted">Loading…</div>';
+  F("timelineOverlay").classList.add("open");
+  try{
+    const key=((x.company||"")+"|"+(x.role||"")).toLowerCase().trim();
+    const j=await (await fetch("/api/reqs/"+encodeURIComponent(key)+"/timeline",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    if(!j.events.length){F("tlBody").innerHTML='<div class="setmuted" style="padding:10px 2px">No recorded history yet.</div>';return;}
+    F("tlBody").innerHTML=j.events.map(e=>{
+      const when=e.ts.length>10?e.ts.slice(0,16).replace("T"," "):e.ts;
+      return `<div class="tl-ev"><div class="tl-rail"><span class="tl-dot ${esc(e.actor)}"></span></div>`
+        +`<div class="tl-main"><div class="tl-when">${esc(when)}<span class="tl-actor">${esc(e.actor)}</span></div>`
+        +`<div class="tl-label">${TL_ICON[e.type]||'•'} ${esc(e.label)}</div>`
+        +(e.detail?`<div class="tl-detail">${esc(e.detail)}</div>`:'')+`</div></div>`;
+    }).join("");
+  }catch(err){F("tlBody").innerHTML='<div class="setmsg err" style="padding:8px">'+esc(err.message)+'</div>';}
+};
+F("tlClose").onclick=()=>F("timelineOverlay").classList.remove("open");
+F("timelineOverlay").onclick=e=>{if(e.target.id==="timelineOverlay")F("timelineOverlay").classList.remove("open");};
+
+// ---------- Follow-up recommendation + AI message (P2.8) ----------
+let fuRow=null, fuIdx=-1, fuRec=null;
+window.openFollowup=async function(i){
+  const x=rows[i]; if(!x)return; fuRow=x; fuIdx=i; fuRec=null;
+  F("fuCtx").textContent=(x.company||"")+" — "+(x.role||"");
+  F("fuMsg").value=""; F("fuStatus").textContent=""; F("fuStatus").className="setmsg";
+  F("fuRec").innerHTML='<div class="setmuted">Loading…</div>';
+  F("followupOverlay").classList.add("open");
+  try{
+    const key=((x.company||"")+"|"+(x.role||"")).toLowerCase().trim();
+    const j=await (await fetch("/api/reqs/"+encodeURIComponent(key)+"/followup",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    fuRec=j;
+    if(!j.applicable){F("fuRec").innerHTML='<div class="setmuted">'+esc(j.reason||"No follow-up needed.")+'</div>';return;}
+    F("fuRec").innerHTML=`<div class="fu-head"><span class="fu-state ${esc(j.state)}">${j.state==='due'?'Due now':j.state==='soon'?'Due soon':'Scheduled'}</span><span class="fu-headline">${esc(j.headline)}</span></div>`
+      +`<div class="fu-reason">${esc(j.reason)}</div>`
+      +`<div class="fu-meta"><span class="fu-m">channel <b>${esc(j.channel)}</b></span>`
+      +(j.contact?`<span class="fu-m">contact <b>${esc(j.contact)}</b></span>`:'')
+      +`<span class="fu-m">suggested <b>${esc(j.suggestedDate||'—')}</b></span></div>`;
+  }catch(e){F("fuRec").innerHTML='<div class="setmsg err">'+esc(e.message)+'</div>';}
+};
+F("fuDraft").onclick=async()=>{
+  if(!fuRow||!fuRec)return;
+  F("fuStatus").className="setmsg"; F("fuStatus").textContent="Drafting…"; F("fuDraft").disabled=true;
+  try{
+    const key=((fuRow.company||"")+"|"+(fuRow.role||"")).toLowerCase().trim();
+    const j=await (await fetch("/api/assist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,kind:"followup",context:fuRec.reason||"",contact:fuRec.contact||""})})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    F("fuMsg").value=j.draft||"";
+    F("fuStatus").className="setmsg ok"; F("fuStatus").textContent=`Draft ready (${j.tokens} tokens). Edit before sending — nothing is sent for you.`;
+  }catch(e){F("fuStatus").className="setmsg err";F("fuStatus").textContent="Failed: "+e.message;}
+  finally{F("fuDraft").disabled=false;}
+};
+F("fuCopy").onclick=()=>{const t=F("fuMsg").value;if(!t)return;try{navigator.clipboard.writeText(t);}catch(e){}F("fuStatus").className="setmsg ok";F("fuStatus").textContent="Copied.";};
+F("fuSent").onclick=()=>{
+  if(fuIdx<0)return;
+  const todayStr=new Date().toISOString().slice(0,10);
+  rows[fuIdx].lastcontact=todayStr;
+  if(!rows[fuIdx].next||/await|follow/i.test(rows[fuIdx].next||"")) rows[fuIdx].next="Sent follow-up "+todayStr+" — await reply";
+  stampRow(fuIdx); persistNow(); render();
+  F("fuStatus").className="setmsg ok"; F("fuStatus").textContent="Marked sent — last contact set to today.";
+};
+F("fuClose").onclick=()=>F("followupOverlay").classList.remove("open");
+F("followupOverlay").onclick=e=>{if(e.target.id==="followupOverlay")F("followupOverlay").classList.remove("open");};
+
+// ---------- Background jobs (P2.9) ----------
+async function loadJobs(){
+  const box=F("jobsBody"); if(!box)return;
+  try{
+    const j=await (await fetch("/api/jobs",{cache:"no-store"})).json();
+    if(!j.ok)throw new Error(j.error||"failed");
+    if(!j.jobs.length){box.innerHTML='<div class="setmuted" style="padding:10px 2px">No jobs yet. Run a scout, enrich a lead, or generate a guide.</div>';return;}
+    box.innerHTML=j.jobs.map(x=>{
+      const when=(x.finishedAt||x.startedAt||x.createdAt||"").slice(0,16).replace("T"," ");
+      const sub=x.status==="running"?(esc(x.phase||"running")+(x.progress?" · "+x.progress+"%":"")):(x.error?esc(x.error.slice(0,80)):(x.result?Object.entries(x.result).slice(0,3).map(([k,v])=>k+": "+(typeof v==="object"?JSON.stringify(v):v)).join(" · "):when));
+      return `<div class="job-row" data-id="${esc(x.id)}"><span class="job-dot ${esc(x.status)}"></span>`
+        +`<span class="job-main"><span class="job-label">${esc(x.label||x.type)}</span><span class="job-sub">${sub} · ${when}</span></span>`
+        +`<span class="job-status">${esc(x.status)}</span>`
+        +(x.status==="running"?`<button class="job-cancel" data-cancel="${esc(x.id)}">Cancel</button>`:'')+`</div>`;
+    }).join("");
+    box.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=async()=>{await fetch("/api/jobs/"+encodeURIComponent(b.dataset.cancel)+"/cancel",{method:"POST"});loadJobs();});
+  }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">'+esc(e.message)+'</div>';}
+}
+let jobsTimer=null;
+if(F("jobsBtn"))F("jobsBtn").onclick=()=>{F("jobsOverlay").classList.add("open");loadJobs();clearInterval(jobsTimer);jobsTimer=setInterval(loadJobs,4000);};
+F("jobsRefresh").onclick=loadJobs;
+function closeJobs(){F("jobsOverlay").classList.remove("open");clearInterval(jobsTimer);jobsTimer=null;}
+F("jobsClose").onclick=closeJobs;
+F("jobsOverlay").onclick=e=>{if(e.target.id==="jobsOverlay")closeJobs();};
+
 // ---------- morning digest test send (Phase 7) ----------
+if(SET("setSmsMethod"))SET("setSmsMethod").onchange=toggleSmsMethod;
 SET("sendDigestBtn").onclick=async()=>{
   SET("digestStatus").textContent="Sending…";
-  try{const j=await (await fetch("/api/digest/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({channel:SET("setDigestChannel").value})})).json();
+  try{const j=await (await fetch("/api/digest/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({channels:readChannelChips("setDigestChannels")})})).json();
     if(!j.ok)throw new Error(j.error||"failed");
-    SET("digestStatus").textContent=`Sent via ${j.delivered} — ${j.counts.newFinds} new / ${j.counts.followUps} follow-ups / ${j.counts.closed} closed.`;
+    const skipped=(j.skipped||[]).map(s=>`${s.channel} (${s.reason})`).join(", ");
+    const errs=(j.errors||[]).map(s=>`${s.channel}: ${s.error}`).join(", ");
+    SET("digestStatus").textContent=`Delivered: ${(j.delivered||[]).join(", ")||"none"}${skipped?` · skipped: ${skipped}`:""}${errs?` · errors: ${errs}`:""} — ${j.counts.newFinds} new / ${j.counts.followUps} follow-ups / ${j.counts.closed} closed.`;
+    pollNotifications();
   }catch(e){SET("digestStatus").textContent="Failed: "+e.message;}
 };
 SET("backfillApplyModeBtn").onclick=async()=>{
@@ -2518,6 +3526,28 @@ window.enrichRow=async function(i){
     else setScoutStatus("⚠ could not enrich: "+esc(r0.note||"no metadata"),false);
   }catch(e){setScoutStatus("⚠ enrich failed: "+esc(e.message),false);}
 };
+// Detect apply mode for a row: deterministic probe first; if inconclusive, ask before spending AI.
+// A confident verdict is persisted server-side by host, so the next row on that domain reuses it.
+window.detectApplyMode=async function(i){
+  const x=rows[i]; if(!x||!x.link)return;
+  const apply=(mode,how)=>{rows[i].applyMode=mode;stampRow(i);persistNow();render();setScoutStatus(`✓ Apply mode: ${mode} (${how})`,false);};
+  setScoutStatus("Inspecting the posting…",true);
+  try{
+    const j=await (await fetch("/api/applymode/probe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:x.link})})).json();
+    if(!j.ok)throw new Error(j.error||"probe failed");
+    if(j.confident){apply(j.mode,j.method);return;}
+    // inconclusive → ask before spending a token (per your preference)
+    setScoutStatus("",false);
+    const why=j.reason?` (${j.reason})`:"";
+    if(!confirm(`Couldn't determine the apply mode deterministically${why}.\n\nTry AI? It reads the page text and classifies it (uses one OpenAI call). The result is saved for this domain.`)){
+      setScoutStatus("Apply-mode detection skipped.",false);return;
+    }
+    setScoutStatus("Asking AI…",true);
+    const a=await (await fetch("/api/applymode/probe-ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:x.link})})).json();
+    if(!a.ok)throw new Error(a.error||"AI probe failed");
+    apply(a.mode,`AI${a.confidence!=null?` ${Math.round(a.confidence*100)}%`:""}`);
+  }catch(e){setScoutStatus("⚠ detect failed: "+esc(e.message),false);}
+};
 // Enrich every quick-add lead in the needsEnrichment queue.
 async function enrichAll(){
   F("overflowPop").classList.remove("open");
@@ -2549,6 +3579,129 @@ F("exportBtn").onclick=()=>{
 // About popover (app bar)
 F("aboutBtn").onclick=(e)=>{e.stopPropagation();F("aboutPop").classList.toggle("open");};
 document.addEventListener("click",(e)=>{if(!e.target.closest("#aboutBtn")&&!e.target.closest("#aboutPop"))F("aboutPop").classList.remove("open");});
+
+// ---- in-app notification bell (polls /api/notifications) ----
+let NOTIFS=[];
+function relWhen(iso){try{const d=(Date.now()-new Date(iso).getTime())/1000;if(d<60)return"just now";if(d<3600)return Math.floor(d/60)+"m ago";if(d<86400)return Math.floor(d/3600)+"h ago";return Math.floor(d/86400)+"d ago";}catch(e){return"";}}
+function renderBell(){
+  const unread=NOTIFS.filter(n=>!n.read).length;
+  const c=F("bellCount"); c.textContent=unread; c.style.display=unread?"flex":"none";
+  const list=F("bellList");
+  list.innerHTML=NOTIFS.length?NOTIFS.map(n=>`<div class="belln ${n.read?'':'unread'}"><div class="bt">${esc(n.title)}</div>${n.body?`<div class="bb">${esc(n.body)}</div>`:''}<div class="bw">${relWhen(n.ts)}</div></div>`).join(""):'<div class="bellempty">No notifications yet.</div>';
+}
+async function pollNotifications(){
+  try{const j=await (await fetch("/api/notifications",{cache:"no-store"})).json();if(j.ok){NOTIFS=j.items||[];renderBell();}}catch(e){}
+}
+F("bellBtn").onclick=(e)=>{e.stopPropagation();F("bellPop").classList.toggle("open");if(F("bellPop").classList.contains("open"))pollNotifications();};
+document.addEventListener("click",(e)=>{if(!e.target.closest("#bellBtn")&&!e.target.closest("#bellPop"))F("bellPop").classList.remove("open");});
+F("bellReadAll").onclick=async()=>{try{await fetch("/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});NOTIFS.forEach(n=>n.read=true);renderBell();}catch(e){}};
+pollNotifications(); setInterval(pollNotifications, 90000);
+
+// ---- multi-user: identity chip + first-run onboarding (ROADMAP-V3 PR0) ----
+async function checkMe(){
+  try{
+    const me=await (await fetch('/api/me',{cache:'no-store'})).json();
+    if(me.multiUser && me.user){
+      const chip=F('userChip'); chip.style.display='';
+      chip.innerHTML=`${esc(me.user.displayName||me.user.id)}${me.user.role==='admin'?' <span class="urole">admin</span>':''} · <a href="/logout">Log out</a>`;
+      if(me.user.role==='admin'){const ub=F('usersNavBtn'); if(ub)ub.style.display='';}
+      if(me.impersonatedBy) showImpBanner(me.user.displayName||me.user.id, me.impersonatedBy);
+      if(!me.onboarded){
+        const ob=await (await fetch('/api/onboarding',{cache:'no-store'})).json();
+        if(ob.needed) F('onboardOverlay').classList.add('open');
+      }
+    }
+  }catch(e){}
+}
+function showImpBanner(who, admin){
+  if(F('impBanner'))return;
+  const b=document.createElement('div'); b.id='impBanner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--warning,#d98a00);color:#1a1a1a;font:600 .8rem "Spline Sans",sans-serif;padding:7px 14px;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+  b.innerHTML='Viewing as <strong style="margin:0 4px">'+esc(who)+'</strong> (impersonated by '+esc(admin)+') — board edits affect this user. <button id="impStop" style="border:1px solid #1a1a1a;background:transparent;border-radius:6px;padding:3px 10px;cursor:pointer;font:inherit">Return to my account</button>';
+  document.body.appendChild(b); document.body.style.paddingTop='34px';
+  F('impStop').onclick=async()=>{ try{await fetch('/api/admin/stop-impersonate',{method:'POST'});}catch(e){} location.reload(); };
+}
+F('obResumeBtn').onclick=async()=>{
+  const f=F('obResume').files[0]; const msg=F('obResumeMsg');
+  if(!f){msg.textContent='Choose a résumé file first.';return;}
+  msg.textContent='Uploading…';
+  try{
+    const dataBase64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
+    const j=await (await fetch('/api/profile/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,dataBase64})})).json();
+    msg.textContent=j.ok?'Parsed ✓ — keywords + history captured.':('Failed: '+(j.error||'?'));
+  }catch(e){msg.textContent='Upload failed: '+e.message;}
+};
+async function completeOnboarding(runScout){
+  const roleTerms=F('obRoles').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const body={roleTerms,remoteOnly:F('obRemote').checked,runScout:false};
+  const sal=parseInt(F('obSalary').value,10); if(sal) body.salaryTarget=sal;
+  F('obMsg').className='setmsg'; F('obMsg').textContent='Saving…';
+  try{
+    const j=await (await fetch('/api/onboarding/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||'failed');
+    F('onboardOverlay').classList.remove('open');
+    if(runScout){ try{ await fetch('/api/scout/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'both'})}); setScoutStatus('Running your first scout…',true); }catch(e){} }
+    await load();
+  }catch(e){ F('obMsg').className='setmsg err'; F('obMsg').textContent='Failed: '+e.message; }
+}
+F('obSave').onclick=()=>completeOnboarding(true);
+F('obSkip').onclick=()=>completeOnboarding(false);
+checkMe();
+
+// ---- Settings → Users (admin) ----
+const _kfmt=n=>{n=+n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1)+'k':String(n);};
+async function loadUsers(){   // admin console: server stats + per-user usage + management
+  const box=SET('usersList'), srv=SET('adminServer'); if(!box)return;
+  try{
+    const j=await (await fetch('/api/admin/overview',{cache:'no-store'})).json();
+    if(!j.ok){box.innerHTML='<div class="setmsg err" style="padding:8px">'+esc(j.error||'failed')+'</div>';return;}
+    const s=j.server||{}; const up=s.uptimeSec||0; const upStr=up>86400?Math.floor(up/86400)+'d':up>3600?Math.floor(up/3600)+'h':Math.floor(up/60)+'m';
+    if(srv)srv.innerHTML=[['Users',s.userCount],['Total roles',(s.totalRows||0).toLocaleString()],['Uptime',upStr],
+      ['Shared-key 30d',_kfmt(s.shared30dTokens)+' tok'],['SMTP',s.smtpConfigured?'✓':'—'],['Shared key',s.sharedKeySet?'✓':'—'],['Node',esc(s.node||'')]]
+      .map(([k,v])=>`<div class="astat"><div class="ak">${k}</div><div class="av">${v}</div></div>`).join('');
+    box.innerHTML=(j.users||[]).map(u=>{
+      const key=u.useSharedKey?'<span class="ukey shared">shared</span>':(u.keyOwn?'<span class="ukey own">own key</span>':'<span class="ukey none">no key</span>');
+      const cost=u.ai30dCost!=null?'$'+u.ai30dCost:'—';
+      return `<div class="urow" data-uid="${esc(u.id)}">`
+      +`<span class="uname">${esc(u.displayName||u.id)} <span class="uid">@${esc(u.id)}</span>${u.email?` <span class="uid">${esc(u.email)}</span>`:''} ${u.role==='admin'?'<span class="urole">admin</span>':''}${u.disabled?' <span class="udis">disabled</span>':''}${u.onboarded?'':' <span class="udis" style="color:var(--warning);border-color:var(--warning)">onboarding</span>'}`
+      +`<span class="ustat">${u.rows} roles · ${u.applied} applied · AI ${_kfmt(u.ai30dTokens)} tok/30d (${cost}) · ${u.diskKB}KB · scout ${u.lastScout?relWhen(u.lastScout):'never'}</span></span>`
+      +`<span class="uacts">${key}<label title="Use the server's shared AI key (you fund it)"><input type="checkbox" class="u-shared" ${u.useSharedKey?'checked':''}> shared</label>`
+      +`<button class="mini" data-act="scout" title="Run a scout for this user now">Scout</button><button class="mini" data-act="digest" title="Send this user's digest now">Digest</button><button class="mini" data-act="cap" title="Set this user's AI usage caps">Caps</button><button class="mini" data-act="restore" title="Restore one of this user's snapshots">Restore</button><button class="mini" data-act="imp" title="Sign in as this user for support">Impersonate</button><button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`;}).join('')
+      ||'<div class="setmuted" style="padding:8px">No users yet.</div>';
+    box.querySelectorAll('.urow').forEach(row=>{const uid=row.dataset.uid;
+      row.querySelector('.u-shared').onchange=e=>{patchUser(uid,{useSharedKey:e.target.checked}).then(loadUsers);};
+      row.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>userAct(uid,b.dataset.act,row));});
+  }catch(e){box.innerHTML='<div class="setmsg err" style="padding:8px">'+esc(e.message)+'</div>';}
+}
+async function patchUser(uid,patch){ try{await fetch('/api/users/'+encodeURIComponent(uid),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});}catch(e){} }
+async function userAct(uid,act,row){
+  if(act==='del'){ if(!confirm('Delete user "'+uid+'"? Their data namespace stays on disk and can be removed manually.'))return; await fetch('/api/users/'+encodeURIComponent(uid),{method:'DELETE'}); loadUsers(); return; }
+  if(act==='toggle'){ await patchUser(uid,{disabled:!row.querySelector('.udis')}); loadUsers(); return; }
+  if(act==='reset'){ const pw=prompt('New temporary password for "'+uid+'" (≥8 chars):'); if(!pw)return; await patchUser(uid,{password:pw}); SET('usersMsg').className='setmsg ok'; SET('usersMsg').textContent='Password reset for '+uid+'.'; return; }
+  const run=async(payload,verb)=>{ SET('usersMsg').className='setmsg'; SET('usersMsg').textContent=verb+' '+uid+'…'; try{const r=await (await fetch('/api/admin/users/'+encodeURIComponent(uid)+'/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json(); SET('usersMsg').className=r.ok?'setmsg ok':'setmsg err'; SET('usersMsg').textContent=r.ok?(verb+' done for '+uid+'.'):('Failed: '+(r.error||'?')); loadUsers(); return r;}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} };
+  if(act==='digest'){ await run({action:'digest'},'Sending digest for'); return; }
+  if(act==='scout'){ if(!confirm('Run a scout now for "'+uid+'"? It searches the boards and appends new matches to their pipeline.'))return; await run({action:'scout'},'Scouting for'); return; }
+  if(act==='cap'){ const mt=prompt('Monthly AI token cap for "'+uid+'" (0 = unlimited):','0'); if(mt===null)return; const dc=prompt('Daily AI call cap for "'+uid+'" (0 = use server default):','0'); if(dc===null)return; await run({action:'setCap',monthlyTokens:mt,dailyCalls:dc},'Setting caps for'); return; }
+  if(act==='imp'){ if(!confirm('Sign in as "'+uid+'" for support? Your admin session is preserved and you can return via the banner. This is audited.'))return; try{const r=await (await fetch('/api/admin/impersonate/'+encodeURIComponent(uid),{method:'POST'})).json(); if(r.ok)location.reload(); else{SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+(r.error||'?');}}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} return; }
+  if(act==='restore'){
+    let list; try{ list=(await (await fetch('/api/admin/users/'+encodeURIComponent(uid)+'/backups')).json()).backups||[]; }catch(e){ list=[]; }
+    if(!list.length){ alert('No snapshots found for '+uid+'.'); return; }
+    const menu=list.slice(0,12).map((b,i)=>i+1+') '+b.name+' ('+relWhen(b.mtime)+', '+b.kind+')').join('\n');
+    const pick=prompt('Restore which snapshot for "'+uid+'"? Their current board is snapshotted first.\n\n'+menu+'\n\nEnter a number:'); if(!pick)return;
+    const idx=parseInt(pick,10)-1; if(isNaN(idx)||!list[idx]){alert('Invalid choice.');return;}
+    await run({action:'restore',file:list[idx].name},'Restoring '+list[idx].name+' for'); return;
+  }
+}
+if(SET('nuAddBtn'))SET('nuAddBtn').onclick=async()=>{
+  const body={username:SET('nuUser').value.trim(),displayName:SET('nuName').value.trim(),email:SET('nuEmail').value.trim(),password:SET('nuPass').value,role:SET('nuRole').value,useSharedKey:SET('nuShared').checked,sendWelcome:SET('nuWelcome').checked};
+  SET('usersMsg').className='setmsg'; SET('usersMsg').textContent='Creating…';
+  try{ const j=await (await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+    if(!j.ok)throw new Error(j.error||'failed');
+    const w=j.welcome||{}; const wmsg=w.ok?' Welcome email sent ✉':(w.skipped==='smtp-not-configured'?' (welcome email skipped — configure SMTP under Digest & notifications)':(w.skipped?'':(w.error?' (welcome email failed: '+w.error+')':'')));
+    SET('usersMsg').className='setmsg ok'; SET('usersMsg').textContent='Created @'+j.user.id+'.'+wmsg;
+    ['nuUser','nuName','nuEmail','nuPass'].forEach(id=>SET(id).value=''); SET('nuShared').checked=false; loadUsers();
+  }catch(e){ SET('usersMsg').className='setmsg err'; SET('usersMsg').textContent='Failed: '+e.message; }
+};
 
 // Toolbar popovers (Filters + overflow menu) — one open at a time, close on outside click
 function togglePop(popId){const p=F(popId);const wasOpen=p.classList.contains("open");document.querySelectorAll(".pop.open").forEach(x=>x.classList.remove("open"));if(!wasOpen)p.classList.add("open");}

@@ -1,8 +1,9 @@
 # Gmail response ingest (`mail_ingest.py`)
 
 Reads your application-response emails from Gmail and reflects them on the board — so a rejection
-flips the row to **Rejected** automatically, and an interview/offer **flags + notifies** you to
-review (never auto-advanced, since a misread shouldn't move your pipeline).
+flips the row to **Rejected** automatically, a confident **interview** email advances the row to
+**Recruiter Screen** (which triggers the interview prep guide server-side), and an **offer** is
+**flagged + notified** for review (never auto-advanced, since a misread shouldn't move you to Offer).
 
 Stdlib-only (Gmail IMAP via `imaplib`). It does **not** scrape or use a browser — it reads your
 own mailbox with an app password, the same ToS-safe pattern as `scout_linkedin.py`.
@@ -24,9 +25,10 @@ own mailbox with an app password, the same ToS-safe pattern as `scout_linkedin.p
 ## Use
 
 ```bash
-python3 agent/mail_ingest.py                 # DRY RUN — classify + report, write nothing
-python3 agent/mail_ingest.py --apply         # act: auto-set rejections, notify on positives
-python3 agent/mail_ingest.py --ai            # AI-classify the keyword-ambiguous ones (sends snippets to OpenAI)
+python3 agent/mail_ingest.py                       # DRY RUN — classify + report, write nothing
+python3 agent/mail_ingest.py --apply               # act: set rejections, advance confident interviews, notify
+python3 agent/mail_ingest.py --apply --no-advance-interviews   # act, but DON'T auto-advance interviews
+python3 agent/mail_ingest.py --ai                  # AI-classify the keyword-ambiguous ones (sends snippets to OpenAI)
 python3 agent/mail_ingest.py --since-days 30 --label "Job Search"
 ```
 
@@ -59,7 +61,16 @@ or cron entry pointing at `agent/run-mail.sh`:
 - **Writes** go through the audited `PATCH /api/reqs/:key` path (snapshots + change log). A
   rejection is only set on an active applied row (`Applied`/`Recruiter Screen`/`Hiring Manager`/
   `Panel`) — it never downgrades an `Offer` or touches a non-applied row.
+- **Interview advancement** is gated tighter than rejections: it only fires on a confident
+  classification (≥0.7) with **exactly one** match that is still at `Applied`, advancing it to
+  `Recruiter Screen`. The server, seeing that move, auto-builds the interview prep guide. Disable
+  with `--no-advance-interviews`. Offers are never auto-advanced.
 - Processed message-ids are remembered in `agent/mail-state.json` so nothing is acted on twice.
+- **Per-event notifications.** On a real `--apply` run the script prints a machine-readable
+  `SUMMARY_JSON` line (counts + per-event company/role). Run via the server (`POST /api/mail/run`),
+  it dispatches alerts for the event types you enabled (`MAIL_NOTIFY_REJECTION` / `_INTERVIEW` /
+  `_OFFER`) on the channels in `MAIL_NOTIFY_CHANNELS` (in-app/file/slack/email/sms/push) — set these
+  under Settings → Digest & notifications. Dry runs never notify.
 
 ## Privacy
 

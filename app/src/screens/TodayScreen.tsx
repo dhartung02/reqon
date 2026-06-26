@@ -2,7 +2,10 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Refre
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import type { Role, Lane } from '../model';
 import { todayLanes, isApplyNext, type Tone } from '../today';
+import { computeActions, groupActions, type Severity } from '../actionItems';
 import { useLayout } from '../useLayout';
+
+const sevColor = (c: Palette): Record<Severity, string> => ({ high: c.danger, medium: c.amber, low: c.active });
 
 const toneColor = (c: Palette): Record<Tone, string> => ({
   accent: c.emerald,
@@ -26,6 +29,7 @@ export function TodayScreen({
   onRefresh,
   serverConfigured,
   syncState,
+  onOpenRole,
 }: {
   roles: Role[];
   onJump: (l: Lane) => void;
@@ -38,10 +42,13 @@ export function TodayScreen({
   onRefresh: () => void;
   serverConfigured: boolean;
   syncState: { at?: number; error?: boolean };
+  onOpenRole?: (id: string) => void;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const { wide } = useLayout();
   const tone = toneColor(c);
+  const sev = sevColor(c);
+  const actionGroups = groupActions(computeActions(roles));
   const rel = (t: number) => {
     const s = (Date.now() - t) / 1000;
     return s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
@@ -83,8 +90,6 @@ export function TodayScreen({
       </View>
       {scoutMsg ? <Text style={styles.scoutMsg}>{scoutMsg}</Text> : null}
 
-      <Text style={styles.sectionTitle}>ACTION NEEDED — DISCOVER → VERIFY → APPLY → FOLLOW UP</Text>
-
       <View style={styles.grid}>
         {lanes.map((l) => {
           const empty = l.count === 0;
@@ -102,6 +107,27 @@ export function TodayScreen({
           );
         })}
       </View>
+
+      <Text style={styles.sectionTitle}>ACTION NEEDED — DISCOVER → VERIFY → APPLY → FOLLOW UP</Text>
+
+      {actionGroups.length > 0 && (
+        <View style={styles.actions}>
+          {actionGroups.map((g) => (
+            <View key={g.title} style={styles.actSec}>
+              <Text style={styles.actSecTitle}>{g.title.toUpperCase()} · {g.items.length}</Text>
+              {g.items.slice(0, 8).map((a) => (
+                <Pressable key={a.id} style={styles.actItem} disabled={!onOpenRole} onPress={() => onOpenRole && onOpenRole(a.roleId)}>
+                  <View style={[styles.actDot, { backgroundColor: sev[a.severity] }]} />
+                  <View style={styles.actMain}>
+                    <Text style={styles.actRole} numberOfLines={1}>{a.company}{a.role ? ` — ${a.role}` : ''}</Text>
+                    <Text style={styles.actReason} numberOfLines={1}>{a.reason}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.foot}>
         {roles.length} roles tracked · Tier A: {tierA} · apply-next queue: {applyNext}
@@ -134,6 +160,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   syncErr: { color: c.danger },
   scoutMsg: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
   sectionTitle: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '500', letterSpacing: 1.4, color: c.muted },
+  actions: { backgroundColor: c.element, borderRadius: 12, padding: 12, gap: 4 },
+  actSec: { marginTop: 6 },
+  actSecTitle: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: c.muted, marginBottom: 4 },
+  actItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  actDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  actMain: { flex: 1, minWidth: 0 },
+  actRole: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.textHigh },
+  actReason: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     flexBasis: '47.5%',

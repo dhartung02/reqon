@@ -6,7 +6,9 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:api": "REQON_ROLE=api node server.js",
+    "start:cloud": "REQON_ROLE=cloud node server.js"
   },
   "engines": {
     "node": ">=18"
@@ -16,6 +18,7 @@
     "exceljs": "^3.4.0",
     "expo": "^56.0.12",
     "express": "^4.19.2",
+    "http-proxy-middleware": "^3.0.7",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {

@@ -68,18 +68,38 @@ async function flushQueue() {
   const { queue = [] } = await chrome.storage.local.get('queue');
   if (!queue.length) return;
   const remaining = [];
+  let lastError = '';
   for (const a of queue) {
-    try { await runAction(a); } catch (e) { remaining.push(a); }
+    try { await runAction(a); } catch (e) { remaining.push(a); lastError = e && e.message ? e.message : String(e); }
   }
-  await chrome.storage.local.set({ queue: remaining });
+  await chrome.storage.local.set({ queue: remaining, queueLastRetry: Date.now(), queueLastError: remaining.length ? lastError : '' });
   if (!remaining.length) chrome.alarms.clear('flush-queue');
+}
+// A short human label for a queued action (popup list).
+function queueLabel(a) {
+  if (a.kind === 'clip') return 'Clip: ' + (a.title ? String(a.title).slice(0, 60) : a.url);
+  if (a.kind === 'markApplied') return 'Mark applied: ' + (a.key || '');
+  return a.kind || 'action';
 }
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'flush-queue') flushQueue(); });
 
 // ---- actions ----
 async function runAction(a) {
   if (a.kind === 'clip') {
-    return api('/api/reqs/quickadd', { method: 'POST', body: JSON.stringify({ url: a.url, link: a.url, title: a.title, source: 'chrome-ext' }) });
+    const m = a.meta || {};
+    // Fold the user's note/tag/priority + a JD excerpt into notes so they surface on the board
+    // without needing new columns. Factual captures (salary/remote/source) map to real fields.
+    const noteParts = [];
+    if (a.note) noteParts.push('Note: ' + a.note);
+    if (a.tag) noteParts.push('Tags: ' + a.tag);
+    if (a.priority) noteParts.push('Priority: ' + a.priority);
+    if (m.jdExcerpt) noteParts.push('JD: ' + m.jdExcerpt);
+    const body = {
+      url: a.url, link: a.url, title: a.title, source: 'chrome-ext',
+      salary: m.salary || '', remote: m.remote || '', sourceType: m.source || '',
+      notes: noteParts.join('\n') || undefined,
+    };
+    return api('/api/reqs/quickadd', { method: 'POST', body: JSON.stringify(body) });
   }
   if (a.kind === 'markApplied') {
     // same semantics as the board's bulk Mark Applied — never overwrites an existing date/next
@@ -91,15 +111,16 @@ async function runAction(a) {
   throw new Error('unknown action ' + a.kind);
 }
 
-async function clip(url, title) {
+async function clip(url, title, extra) {
+  const action = Object.assign({ kind: 'clip', url, title }, extra || {});
   let out;
   try {
-    const j = await runAction({ kind: 'clip', url, title });
+    const j = await runAction(action);
     rowCache.at = 0;   // invalidate — the new row (and its auto-enrichment) should show up
     out = j.duplicate ? { ok: true, msg: 'Already tracked: ' + j.company + ' — ' + j.role }
                       : { ok: true, msg: 'Added: ' + j.company + ' — ' + j.role + ' (enriching…)' };
   } catch (e) {
-    await enqueue({ kind: 'clip', url, title });
+    await enqueue(action);
     out = { ok: false, msg: 'Server unreachable — clip queued, will retry. (' + e.message + ')' };
   }
   notify(out.msg);
@@ -126,18 +147,34 @@ async function markApplied(row) {
 // AI draft (Phase 3) — POSTs to /api/assist. Captures the server's JSON error body (daily-cap,
 // no-key, etc.) so the panel can show a real message instead of a bare HTTP code. The server holds
 // the OpenAI key + grounds every draft in the candidate's narratives; never auto-submits.
-async function assist(payload) {
+// POST helper that surfaces the server's JSON error body (daily-cap, no-key, etc.) instead of a bare
+// HTTP code. Shared by assist / score / map-fields. The server holds the key + grounds everything.
+async function postJson(path, payload) {
   const cfg = await getCfg();
   const headers = { 'Content-Type': 'application/json' };
   if (cfg.token) headers['X-CRM-Token'] = cfg.token;
   try {
-    const r = await fetch(cfg.origin.replace(/\/$/, '') + '/api/assist', { method: 'POST', headers, body: JSON.stringify(payload || {}) });
+    const r = await fetch(cfg.origin.replace(/\/$/, '') + path, { method: 'POST', headers, body: JSON.stringify(payload || {}) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, error: j.error || ('HTTP ' + r.status) };
     return j;
   } catch (e) {
     return { ok: false, error: 'Network error reaching CRM (' + (e && e.message ? e.message : e) + ')' };
   }
+}
+const assist = (payload) => postJson('/api/assist', payload);
+
+// Patch a row's status (side-panel status controls, T1.3). Goes through the audited PATCH path, so
+// moving into an interview stage triggers the server-side interview-guide build.
+async function setStatus(row, status) {
+  const today = new Date().toISOString().slice(0, 10);
+  const fields = { status, lastcontact: today };
+  if (status === 'Applied' && !row.applied) fields.applied = today;
+  try {
+    await api('/api/reqs/' + encodeURIComponent(reqKey(row)), { method: 'PATCH', body: JSON.stringify({ fields, note: 'status set via chrome-ext' }) });
+    rowCache.at = 0; badgeActiveTab();
+    return { ok: true, status };
+  } catch (e) { return { ok: false, error: e.message }; }
 }
 
 // ---- messages from the content script / options page ----
@@ -150,7 +187,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const row = matchRow(rows, msg.url);
         sendResponse({ ok: true, row });
       } else if (msg.type === 'clip') {
-        sendResponse(await clip(msg.url, msg.title));
+        sendResponse(await clip(msg.url, msg.title, { meta: msg.meta, note: msg.note, tag: msg.tag, priority: msg.priority }));
       } else if (msg.type === 'markApplied') {
         sendResponse(await markApplied(msg.row));
       } else if (msg.type === 'reqs') {
@@ -158,10 +195,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true, rows: await getRows(!!msg.force) });
       } else if (msg.type === 'assist') {
         sendResponse(await assist(msg.payload));
+      } else if (msg.type === 'score') {
+        sendResponse(await postJson('/api/assist/score', msg.payload));
+      } else if (msg.type === 'mapFields') {
+        sendResponse(await postJson('/api/assist/map-fields', msg.payload));
+      } else if (msg.type === 'setStatus') {
+        sendResponse(await setStatus(msg.row, msg.status));
+      } else if (msg.type === 'genGuide') {
+        sendResponse(await postJson('/api/reqs/' + encodeURIComponent(msg.key) + '/guide', {}));
+      } else if (msg.type === 'patchFields') {
+        try {
+          await api('/api/reqs/' + encodeURIComponent(reqKey(msg.row)), { method: 'PATCH', body: JSON.stringify({ fields: msg.fields || {}, note: 'edited via chrome-ext' }) });
+          rowCache.at = 0; sendResponse({ ok: true });
+        } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'assistUsage') {
         try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'profile') {
         sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
+      } else if (msg.type === 'queueStatus') {
+        const { queue = [], queueLastRetry = 0, queueLastError = '' } = await chrome.storage.local.get(['queue', 'queueLastRetry', 'queueLastError']);
+        sendResponse({ ok: true, count: queue.length, items: queue.map((a, i) => ({ i, label: queueLabel(a), kind: a.kind, ts: a.ts })), lastRetry: queueLastRetry, lastError: queueLastError });
+      } else if (msg.type === 'queueRetry') {
+        await flushQueue();
+        const { queue = [], queueLastError = '' } = await chrome.storage.local.get(['queue', 'queueLastError']);
+        sendResponse({ ok: true, remaining: queue.length, lastError: queueLastError });
+      } else if (msg.type === 'queueDiscard') {
+        const { queue = [] } = await chrome.storage.local.get('queue');
+        if (Number.isInteger(msg.index) && msg.index >= 0 && msg.index < queue.length) queue.splice(msg.index, 1);
+        await chrome.storage.local.set({ queue });
+        if (!queue.length) chrome.alarms.clear('flush-queue');
+        sendResponse({ ok: true, remaining: queue.length });
+      } else if (msg.type === 'queueClear') {
+        await chrome.storage.local.set({ queue: [], queueLastError: '' });
+        chrome.alarms.clear('flush-queue');
+        sendResponse({ ok: true, remaining: 0 });
       } else if (msg.type === 'testConnection') {
         const j = await api('/api/health');
         sendResponse({ ok: true, msg: 'Connected — ' + j.count + ' rows on the board.' });

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reqon — User guide</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<style>
+  @font-face{font-family:"Spline Sans";src:url("/fonts/SplineSans.ttf") format("truetype");font-weight:300 700;font-display:swap}
+  @font-face{font-family:"Spline Sans Mono";src:url("/fonts/SplineSansMono.ttf") format("truetype");font-weight:400 700;font-display:swap}
+  @font-face{font-family:"Fraunces";src:url("/fonts/Fraunces.ttf") format("truetype");font-weight:400 900;font-display:swap}
+  :root{
+    --bg:#0B0C0E; --panel:#16181C; --panel-2:#1B1F25; --line:#232A31; --line-2:#2E3741;
+    --text:#E2E8F0; --text-2:#94A3B8; --dim:#64748B;
+    --accent:#00E5A3; --positive:#00E5A3; --active:#2DD4BF; --info:#79A6E0; --warning:#FFB800; --danger:#F87171; --ai:#A78BDB; --muted:#64748B;
+    --gold:var(--accent); --teal:var(--active); --green:var(--positive); --coral:var(--danger); --blue:var(--info); --violet:var(--ai);
+    --shadow:0 18px 50px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.6;margin:0;padding:clamp(18px,3vw,46px);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:26px}
+  .brandmark{font-family:"Spline Sans",sans-serif;font-weight:600;font-size:.62rem;letter-spacing:.26em;text-transform:uppercase;color:var(--accent)}
+  h1{font-family:"Fraunces",serif;font-weight:900;font-size:clamp(2rem,5vw,2.8rem);line-height:1.05;letter-spacing:-.015em;margin:.1em 0 .15em}
+  h2{font-family:"Fraunces",serif;font-weight:800;font-size:1.45rem;letter-spacing:-.01em;margin:2.2em 0 .5em;padding-top:.6em;border-top:1px solid var(--line)}
+  h3{font-size:1.02rem;margin:1.4em 0 .3em;color:var(--text)}
+  p,li{color:var(--text-2);font-size:.95rem}
+  b,strong{color:var(--text)}
+  a.back{color:var(--gold);text-decoration:none;font-size:.85rem;font-family:"Spline Sans Mono",monospace;border:1px solid var(--line-2);border-radius:9px;padding:7px 13px;white-space:nowrap}
+  a.back:hover{border-color:var(--gold)}
+  code{font-family:"Spline Sans Mono",monospace;font-size:.82em;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--text)}
+  .lead{font-size:1.05rem;color:var(--text-2);max-width:72ch}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:14px 0}
+  .pill{display:inline-block;font-family:"Spline Sans Mono",monospace;font-size:.72rem;padding:2px 8px;border-radius:999px;border:1px solid var(--line-2)}
+  .v{color:var(--teal);border-color:var(--teal)} .b{color:var(--gold);border-color:var(--gold)} .u{color:var(--coral);border-color:var(--coral)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:.9rem}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  td:first-child{color:var(--text);white-space:nowrap}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 8px}
+  .toc a{font-size:.82rem;color:var(--text-2);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 11px}
+  .toc a:hover{color:var(--text);border-color:var(--gold)}
+  .key{color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><span class="brandmark">Reqon</span><h1>User guide</h1></div>
+    <a class="back" href="/">← Back to board</a>
+  </div>
+
+  <p class="lead">Reqon is a self-hosted command center for your job search. It tracks every requisition by fit tier, scouts new roles from board APIs, and helps you draft and apply. This guide explains the scores, statuses, lanes, and the moving parts behind Settings.</p>
+
+  <div class="toc">
+    <a href="#scores">Scores &amp; tiers</a>
+    <a href="#confidence">Link confidence</a>
+    <a href="#status">Status &amp; tiers</a>
+    <a href="#lanes">Action lanes</a>
+    <a href="#applymode">Apply modes</a>
+    <a href="#sources">Sources &amp; health</a>
+    <a href="#safety">Data safety</a>
+    <a href="#integrations">Integrations</a>
+  </div>
+
+  <h2 id="scores">Scores &amp; tiers</h2>
+  <p><b>Fit</b> = domain / résumé match (a condensed version of the 7-axis model). <b>Interview probability</b> = the estimated odds of landing a screen given seniority, remote competition, and how directly your background maps — kept deliberately <em>separate</em> from fit, because some perfect-fit roles are genuinely hard to land. <b>Expected value</b> = fit × probability ÷ 10 — your best single number for allocating apply effort.</p>
+  <p><b>Tier</b> is set by expected value, not raw fit. <b>Bands</b> (shown on an expanded card):</p>
+  <table>
+    <tr><th>Band</th><th>Score</th><th>Meaning</th></tr>
+    <tr><td><span class="key">Excellent</span></td><td>8.0+</td><td>Tier A territory — apply with a tailored résumé</td></tr>
+    <tr><td><span class="key">Strong</span></td><td>6.5–7.9</td><td>Tier A/B — strong apply</td></tr>
+    <tr><td>Possible</td><td>5.0–6.4</td><td>Tier B — apply if capacity allows</td></tr>
+    <tr><td>Low priority</td><td>&lt;5.0</td><td>Tier C — skip unless something else pulls you in</td></tr>
+  </table>
+  <p>All scores are estimates and salary ranges are indicative — verify on each board.</p>
+
+  <h2 id="confidence">Link confidence</h2>
+  <table>
+    <tr><th>Badge</th><th>What it means</th></tr>
+    <tr><td><span class="pill v">Verified</span></td><td>A live req was confirmed this session. Safe to apply.</td></tr>
+    <tr><td><span class="pill b">Board-only</span></td><td>The link goes to the company's careers board, not a specific req. Individual req URLs rotate and expire — filter for the title when you land.</td></tr>
+    <tr><td><span class="pill u">Unverified</span></td><td>Sourced from an uploaded doc, not yet confirmed. Check before relying on it.</td></tr>
+  </table>
+  <p><b>What "Needs verification" asks of you:</b> open the link and confirm the posting is still live, then change confidence to Verified (or archive it if it's dead). It's a manual confidence check — there's no automated step — so you don't spend effort applying to a posting that's already closed.</p>
+
+  <h2 id="status">Status &amp; tier edge</h2>
+  <p>Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks the tier: <span style="color:var(--accent)">A emerald</span> · <span style="color:var(--warning)">B amber</span> · <span style="color:var(--muted)">C muted</span>.</p>
+
+  <h2 id="lanes">Action lanes</h2>
+  <p>The Today view surfaces work in lanes so you always know the next move:</p>
+  <table>
+    <tr><th>Lane</th><th>What lands here</th></tr>
+    <tr><td>Needs verify</td><td>Not-applied leads with an unverified link — confirm the live posting first.</td></tr>
+    <tr><td>Follow-up due</td><td>Active applications with no contact past your follow-up threshold.</td></tr>
+    <tr><td>Closed reqs</td><td>Postings detected as closed — review and archive (snapshots first; never auto-deleted).</td></tr>
+    <tr><td>Apply next</td><td>Tier A/B · verified · still open · not yet applied.</td></tr>
+  </table>
+
+  <h2 id="applymode">Apply modes</h2>
+  <p>Apply mode tells you how a posting can be filled. It's inferred from the source (the ATS the posting lives on) and can be overridden per row.</p>
+  <table>
+    <tr><th>Mode</th><th>Meaning</th></tr>
+    <tr><td><span class="key">fillable</span></td><td>A public ATS (Greenhouse, Ashby, Lever, Workable, SmartRecruiters, Recruitee, Personio, Teamtailor) — the apply-assist can pre-fill the form.</td></tr>
+    <tr><td>gated</td><td>A login-walled ATS (Workday, iCIMS, Taleo, SuccessFactors, BambooHR, Phenom, Jobvite) — open it and apply manually, or use Simplify Copilot.</td></tr>
+    <tr><td>simplify</td><td>Best handled by the Simplify Copilot browser extension.</td></tr>
+    <tr><td>manual</td><td>Apply by hand (LinkedIn, custom portals, quick-adds).</td></tr>
+  </table>
+
+  <h2 id="sources">Sources &amp; source health</h2>
+  <p>The scout polls public board APIs for the companies on your watchlist. In <b>Settings → Sources</b> you can enable/disable each source and add a company by pasting a careers URL (the detector recognizes the ATS automatically).</p>
+  <p><b>Source health</b> reports, per source, the result of the most recent scout run:</p>
+  <table>
+    <tr><th>Number</th><th>What it tells you</th></tr>
+    <tr><td>Matches</td><td><b>The number that matters</b> — roles that cleared your fit/tier bar and were added.</td></tr>
+    <tr><td>Errors</td><td>Parse/API failures last run. Anything &gt; 0 means that source needs attention.</td></tr>
+    <tr><td>Companies / Postings</td><td>How many companies were polled and how many raw postings were scanned — process telemetry, useful when debugging a quiet source.</td></tr>
+  </table>
+
+  <h2 id="safety">Data safety &amp; deleted rows</h2>
+  <p>Every board save snapshots the previous data first, and corruption-shaped saves (an empty save over a full store, or one that drops a large share of rows) are refused.</p>
+  <p><b>Deleted rows are recoverable.</b> When you delete a row it isn't erased — it's hidden and marked deleted, so the deletion still syncs to your other devices instead of the row reappearing. "Purge" permanently removes those hidden rows (after a snapshot). <span class="dim">(Internally these hidden rows are called "tombstones" — the database term for a soft-delete marker.)</span></p>
+
+  <h2 id="integrations">Integrations</h2>
+  <h3>Job aggregators — TheirStack &amp; Apify (Fantastic.jobs)</h3>
+  <p>These are optional paid third-party APIs that reach the gated ATSes (Workday, iCIMS, etc.) the scout can't poll directly. Each needs an API key (free trial tiers exist; real volume is paid). Add keys under <b>Settings → Advanced</b>. Both stay inert until a key is present — they never block a scout or digest run.</p>
+  <h3>iOS push (APNs)</h3>
+  <p>Push to the iOS app uses token-based Apple Push Notification service, which requires an Apple Developer account. You provide:</p>
+  <table>
+    <tr><th>Field</th><th>Where it comes from</th></tr>
+    <tr><td>.p8 key</td><td>Apple Developer → Keys → create an APNs key and download the <code>.p8</code> file once. It's the private key the server uses to sign push tokens (the modern replacement for push certificates).</td></tr>
+    <tr><td>Key ID</td><td>Shown next to that key in Apple Developer → Keys.</td></tr>
+    <tr><td>Team ID</td><td>Apple Developer → Membership.</td></tr>
+    <tr><td>Bundle ID</td><td>Your app's identifier, e.g. <code>com.reqon.app</code>.</td></tr>
+    <tr><td>Environment</td><td><code>sandbox</code> for dev / Expo Go / TestFlight builds; <code>production</code> for App Store builds.</td></tr>
+  </table>
+  <h3>Remote access (HTTPS)</h3>
+  <p>iOS blocks plaintext HTTP, so connecting from outside your LAN needs HTTPS via Tailscale Funnel or Caddy. Set your public hostname under <b>Settings → Advanced → Remote access URL</b> and the pairing QR will use it.</p>
+
+  <div class="card" style="margin-top:30px"><a class="back" href="/">← Back to board</a></div>
+</div>
+</body>
+</html>

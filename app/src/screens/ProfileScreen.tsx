@@ -6,6 +6,7 @@ import {
   pullProfile,
   pushProfile,
   uploadResume,
+  draftSummary,
   EMPTY_PROFILE,
   EEO_OPTIONS,
   type Profile,
@@ -63,6 +64,7 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState(false);
 
   useEffect(() => {
     pullProfile().then((prof) => { setP(prof); setLoading(false); });
@@ -79,6 +81,15 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
     const r = await pushProfile(p);
     setBusy(false);
     setStatus(r.ok ? { ok: true, text: 'Saved' } : { ok: false, text: r.error || 'Save failed' });
+  };
+
+  const runDraftSummary = async () => {
+    setDrafting(true); setStatus(null);
+    const r = await draftSummary();
+    setDrafting(false);
+    if (r.error) { setStatus({ ok: false, text: r.error }); return; }
+    setP((s) => ({ ...s, summary: r.summary || '' }));
+    setStatus({ ok: true, text: 'Summary drafted — review, then Save.' });
   };
 
   const pickResume = async () => {
@@ -124,6 +135,15 @@ export function ProfileScreen({ onBack }: { onBack: () => void }) {
         <Field label="Phone" value={p.applicant.phone} onChange={(v) => setApplicant('phone', v)} keyboardType="phone-pad" />
         <Field label="Location" value={p.applicant.location} onChange={(v) => setApplicant('location', v)} />
       </Section>
+
+      <Section title="PROFESSIONAL SUMMARY">
+        <Field label="Summary (top of CV · grounds AI)" value={p.summary} onChange={(v) => setP((s) => ({ ...s, summary: v }))} multiline style={[styles.input, styles.multi]} />
+        <Pressable style={styles.draftBtn} onPress={runDraftSummary} disabled={drafting}>
+          {drafting ? <ActivityIndicator size="small" color={c.emerald} /> : <Text style={styles.draftBtnText}>Draft from résumé · AI</Text>}
+        </Pressable>
+      </Section>
+
+      <ListSection title="SECTOR PREFERENCES" value={p.sectors} onChange={(a) => setP((s) => ({ ...s, sectors: a }))} />
 
       <Section title="LINKS">
         <Field label="LinkedIn URL" value={p.applicant.linkedin} onChange={(v) => setApplicant('linkedin', v)} autoCapitalize="none" />
@@ -236,6 +256,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   title: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, marginTop: -8 },
   resumeBtn: { backgroundColor: alpha(c.emerald, 0.1), borderWidth: 1, borderColor: alpha(c.emerald, 0.4), borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   resumeText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.emerald },
+  draftBtn: { marginTop: 8, backgroundColor: alpha(c.emerald, 0.1), borderWidth: 1, borderColor: alpha(c.emerald, 0.4), borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  draftBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
   status: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
   section: { gap: 10 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

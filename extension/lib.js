@@ -49,4 +49,108 @@ function bestAnswerMatch(question, answers) {
   return bestScore >= 2 ? best : null;
 }
 
-if (typeof module !== 'undefined') module.exports = { postingId, reqKey, sameReq, matchRow, bestAnswerMatch };
+// ---- clip-capture extraction (P1.10/P1.11) — pure, DOM-free so they're unit-testable ----
+// All take already-extracted strings (URL, JD text, simple form stats) and return structured hints.
+
+// Map a posting URL to its ATS source + a coarse apply mode. Mirrors the board's apply-mode vocab.
+// applyMode ∈ Easy Apply | Standard ATS | External | Unknown ; source is the lowercase ATS slug.
+const ATS_HOSTS = [
+  { re: /(^|\.)greenhouse\.io/i, source: 'greenhouse', mode: 'Standard ATS' },
+  { re: /(^|\.)ashbyhq\.com/i, source: 'ashby', mode: 'Standard ATS' },
+  { re: /(^|\.)lever\.co/i, source: 'lever', mode: 'Standard ATS' },
+  { re: /(^|\.)workable\.com/i, source: 'workable', mode: 'Standard ATS' },
+  { re: /(^|\.)smartrecruiters\.com/i, source: 'smartrecruiters', mode: 'Standard ATS' },
+  { re: /(^|\.)recruitee\.com/i, source: 'recruitee', mode: 'Standard ATS' },
+  { re: /(^|\.)teamtailor\.com/i, source: 'teamtailor', mode: 'Standard ATS' },
+  { re: /(^|\.)personio\.(de|com)/i, source: 'personio', mode: 'Standard ATS' },
+  { re: /(^|\.)myworkdayjobs\.com/i, source: 'workday', mode: 'External' },
+  { re: /(^|\.)icims\.com/i, source: 'icims', mode: 'External' },
+  { re: /(^|\.)taleo\.net/i, source: 'taleo', mode: 'External' },
+  { re: /(^|\.)successfactors\.com/i, source: 'successfactors', mode: 'External' },
+  { re: /(^|\.)linkedin\.com/i, source: 'linkedin', mode: 'Easy Apply' },
+  { re: /(^|\.)indeed\.com/i, source: 'indeed', mode: 'Easy Apply' },
+];
+function detectATS(url) {
+  let host = '';
+  try { host = new URL(String(url || '')).hostname; } catch (e) { host = String(url || ''); }
+  for (const h of ATS_HOSTS) { if (h.re.test(host)) return { source: h.source, applyMode: h.mode }; }
+  return { source: '', applyMode: 'Unknown' };
+}
+
+// Remote / hybrid / onsite from JD text. Conservative: returns '' when nothing is stated.
+function detectRemote(text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return '';
+  if (/\bhybrid\b/.test(t)) return 'hybrid';
+  if (/\b(fully remote|100% remote|remote[- ]first|work from home|wfh|remote, |remote\b)/.test(t)) {
+    if (/\bon[- ]?site\b|\bin[- ]?office\b|\brelocat/.test(t) && !/\bfully remote|100% remote\b/.test(t)) return 'hybrid';
+    return 'remote';
+  }
+  if (/\bon[- ]?site\b|\bin[- ]?office\b|\bin person\b/.test(t)) return 'onsite';
+  return '';
+}
+
+// First plausible salary / range from JD text → a tidy display string, else ''. Handles $120k,
+// $120,000, $120k–$160k, "120,000 - 160,000 per year". Ignores tiny numbers (equity %, years).
+function extractSalary(text) {
+  const t = String(text || '');
+  if (!t) return '';
+  const num = '\\$?\\d{2,3}(?:,\\d{3})?(?:\\.\\d+)?\\s*[kK]?';
+  const range = new RegExp(num + '\\s*(?:[-–—]|to)\\s*' + num, '');
+  let m = t.match(range);
+  if (!m) {
+    const single = new RegExp('\\$\\s*\\d{2,3}(?:,\\d{3})(?:\\.\\d+)?(?:\\s*(?:per year|/year|/yr|annually|a year))?', 'i');
+    m = t.match(single);
+    if (!m) { const k = t.match(new RegExp('\\$\\s*\\d{2,3}\\s*[kK]\\b')); if (k) m = k; }
+  }
+  if (!m) return '';
+  const looksMoney = /\$|[kK]\b|,\d{3}/.test(m[0]);
+  if (!looksMoney) return '';
+  return m[0].replace(/\s*(?:per year|\/year|\/yr|annually|a year)\s*$/i, '')
+    .replace(/\s+/g, ' ').replace(/\s*([-–—])\s*/, '–').trim();
+}
+
+// Estimate how fillable a posting's form is, from the ATS + simple DOM counts. Pure: caller passes
+// {inputs, textareas, hasFile, hasPassword, fillableNow} (counts), we classify + explain.
+// level ∈ Easy Apply | Likely fillable | Partially fillable | Manual-heavy | External redirect | Unknown
+function fillabilityHint(applyMode, stats) {
+  const s = stats || {};
+  const reasons = [];
+  if (applyMode === 'External') return { level: 'External redirect', reasons: ['Applies on an external portal (Workday/iCIMS/etc.) — likely account-gated.'] };
+  if (applyMode === 'Easy Apply') return { level: 'Easy Apply', reasons: ['Platform Easy Apply — quick, but autofill is limited inside it.'] };
+  const inputs = +s.inputs || 0, textareas = +s.textareas || 0;
+  if (!inputs && !textareas) return { level: 'Unknown', reasons: ['No application form detected on this page yet.'] };
+  if (s.hasPassword) reasons.push('Login/account required (password field present).');
+  if (s.hasFile) reasons.push('Résumé upload required — left for you to do.');
+  if (textareas >= 3) reasons.push(textareas + ' open-ended questions — most need your own words.');
+  const fillableNow = s.fillableNow != null ? +s.fillableNow : inputs;
+  let level;
+  if (s.hasPassword) level = 'Manual-heavy';
+  else if (fillableNow >= 4 && textareas <= 2) level = 'Likely fillable';
+  else if (fillableNow >= 1) level = 'Partially fillable';
+  else level = 'Manual-heavy';
+  if (level === 'Likely fillable' && !reasons.length) reasons.push(fillableNow + ' standard fields can be auto-filled from your profile.');
+  if (level === 'Partially fillable' && !reasons.some(r => /standard/.test(r))) reasons.push(fillableNow + ' standard field(s) fillable; the rest need review.');
+  return { level, reasons };
+}
+
+// Roll captured clip metadata into a confidence band + human-readable detected / needs-review lists.
+function captureConfidence(meta) {
+  const m = meta || {};
+  const detected = [], needsReview = [];
+  const hasCompany = m.company && !/^(unknown|untitled)/i.test(m.company);
+  const hasRole = m.role && !/^untitled/i.test(m.role);
+  hasCompany ? detected.push('company') : needsReview.push('company unclear');
+  hasRole ? detected.push('role') : needsReview.push('role/title unclear');
+  if (m.remote) detected.push(m.remote); else needsReview.push('work location (remote/onsite)');
+  if (m.salary) detected.push('salary'); else needsReview.push('salary not posted');
+  if (m.source) detected.push(m.source);
+  if (!m.seniority) needsReview.push('seniority unclear');
+  let score = 0;
+  if (hasCompany) score += 2; if (hasRole) score += 2;
+  if (m.remote) score += 1; if (m.salary) score += 1; if (m.source) score += 1;
+  const level = score >= 6 ? 'High' : score >= 4 ? 'Medium' : 'Low';
+  return { level, detected, needsReview };
+}
+
+if (typeof module !== 'undefined') module.exports = { postingId, reqKey, sameReq, matchRow, bestAnswerMatch, detectATS, detectRemote, extractSalary, fillabilityHint, captureConfidence };

@@ -20,6 +20,9 @@ const { spawn } = require('child_process');
 const ExcelJS = require('exceljs');
 const QRCode = require('qrcode');
 const docx = require('docx');
+const store = require('./lib/store');   // tenant-scoped paths (ROADMAP-V3 PR0): owner==legacy paths
+const users = require('./lib/users');   // user registry + auth (multi-user mode)
+const MULTIUSER = () => store.multiUserEnabled();   // read live (env MULTIUSER=true)
 
 // --- minimal .env loader (no dependency) ---------------------------------------
 // Loads <project>/.env into process.env on boot so secrets (e.g. OPENAI_API_KEY)
@@ -47,13 +50,84 @@ const docx = require('docx');
 const PORT = process.env.PORT || 8787;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = reachable on the LAN
 const ROOT = __dirname;
-// DATA_FILE / BACKUP_DIR are overridable via env (no effect in normal use) so the data
-// layer can be exercised in isolation by tests and stays portable for open-source.
-const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : path.join(ROOT, 'data.json');
+// Persisted data root — defaults to the repo (local), or a mounted disk on an ephemeral host via
+// REQON_DATA_DIR (mirrors lib/store.js). Code/examples/scripts stay under ROOT; only written data
+// (guides, audit log, digest snapshots, and everything under lib/store.js) lives here.
+const DATA_DIR = process.env.REQON_DATA_DIR ? path.resolve(process.env.REQON_DATA_DIR) : ROOT;
+// Ensure the persisted-data dirs exist before anything writes (a fresh mounted disk starts empty).
+try { for (const d of ['', 'agent', 'backups']) require('fs').mkdirSync(path.join(DATA_DIR, d), { recursive: true }); } catch (e) { console.error('[data-dir]', e.message); }
+// Per-user file paths resolve through the tenant store (lib/store.js). With multi-user OFF
+// (default) every key maps to the legacy location (root data.json, agent/*.json, backups/) so
+// single-user behavior is unchanged; P.data / P.backups env overrides still apply (in store.js).
+// `P.<key>` are getters: they resolve to the CURRENT request's tenant at access time.
+const P = {
+  get data() { return store.paths().data; },
+  get backups() { return store.paths().backups; },
+  get profile() { return store.paths().profile; },
+  get boards() { return store.paths().boards; },
+  get watchlist() { return store.paths().watchlist; },
+  get notifications() { return store.paths().notifications; },
+  get digestState() { return store.paths().digestState; },
+  get pushTokens() { return store.paths().pushTokens; },
+  get mailState() { return store.paths().mailState; },
+  get guidesDir() { return store.paths().guidesDir; },
+  get scoutStatus() { return store.paths().scoutStatus; },
+  get sourceHealth() { return store.paths().sourceHealth; },
+  get secrets() { return store.paths().secrets; },
+  get settings() { return store.paths().settings; },
+  get assistUsage() { return store.paths().assistUsage; },
+  get assistLog() { return store.paths().assistLog; },
+  get cvCache() { return store.paths().cvCache; },
+  get enrichLog() { return store.paths().enrichLog; },
+  get changeLog() { return store.paths().changeLog; },
+};
+// Per-user settings (ROADMAP-V3 PR0): these config keys live in the user's namespace, not shared
+// .env — so each user has their own digest schedule/channels, AI caps/model, Gmail ingest, SMS, etc.
+// Anything NOT in this set stays server-level in .env (SMTP sending identity, PUBLIC_URL, tokens,
+// aggregator keys, APNs). Owner / single-user always read .env (unchanged).
+const PER_USER_CFG = new Set([
+  'DIGEST_ENABLED', 'DIGEST_TIME', 'DIGEST_CHANNEL', 'DIGEST_CHANNELS', 'DIGEST_DAYS', 'DIGEST_AFTER_SCOUT', 'DIGEST_TO', 'DIGEST_SLACK_WEBHOOK',
+  'ASSIST_ENABLED', 'ASSIST_MODEL', 'ASSIST_DAILY_CALLS', 'ASSIST_MAX_TOKENS', 'ASSIST_MONTHLY_BUDGET', 'ASSIST_MONTHLY_TOKENS',
+  'OPENAI_MODEL', 'OPENAI_JD_CHARS', 'OPENAI_MAX_TOKENS', 'OPENAI_PRICE_PER_1M', 'AI_ENRICH_MAX_PER_RUN', 'AI_ENRICH_TTL_DAYS',
+  'GMAIL_USER', 'GMAIL_APP_PASSWORD', 'GMAIL_LABEL', 'MAIL_AI', 'MAIL_SINCE_DAYS',
+  'MAIL_NOTIFY_REJECTION', 'MAIL_NOTIFY_INTERVIEW', 'MAIL_NOTIFY_OFFER', 'MAIL_NOTIFY_CHANNELS',
+  'SMS_METHOD', 'SMS_CARRIER', 'SMS_GATEWAY_NUMBER', 'SMS_TO', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM',
+]);
+const perUserScope = () => MULTIUSER() && store.currentUser() !== store.OWNER;
+// Resolve a config value for the current tenant: per-user settings override .env for PER_USER_CFG keys.
+function cfg(key) {
+  if (perUserScope() && PER_USER_CFG.has(key)) { const s = store.readJson(P.settings, {}); if (key in s) return s[key]; }
+  return process.env[key];
+}
+// Write per-user config keys to the tenant's settings.json (0600). Returns the count written.
+function setUserCfg(updates) {
+  const s = store.readJson(P.settings, {}); let n = 0;
+  for (const [k, v] of Object.entries(updates)) { if (v === '' || v == null) delete s[k]; else s[k] = String(v); n++; }
+  store.writeJsonAtomic(P.settings, s); try { fs.chmodSync(P.settings, 0o600); } catch (e) {}
+  return n;
+}
+// Environment for a spawned subprocess (scout/digest/mail): the user's per-user settings + secrets
+// overlaid on the shared env, so the Python honors per-user config without any Python changes.
+function tenantEnv() {
+  if (!perUserScope()) return process.env;
+  const s = store.readJson(P.settings, {}); const sec = store.readJson(P.secrets, {});
+  const env = { ...process.env }; for (const [k, v] of Object.entries(s)) env[k] = String(v);
+  const k = aiKey(); if (k) env.OPENAI_API_KEY = k; for (const [kk, vv] of Object.entries(sec)) if (vv) env[kk] = String(vv);
+  return env;
+}
+// Per-user AI key (decision #2): each user funds their own OpenAI usage unless an admin grants
+// `useSharedKey` (server-funded). Single-user / implicit-owner -> the shared .env key, unchanged.
+function aiKey() {
+  if (!MULTIUSER()) return process.env.OPENAI_API_KEY || '';
+  const uid = store.currentUser();
+  if (uid === store.OWNER) return process.env.OPENAI_API_KEY || '';
+  const u = users.getById(uid);
+  if (u && u.useSharedKey) return process.env.OPENAI_API_KEY || '';
+  return store.readJson(P.secrets, {}).OPENAI_API_KEY || '';
+}
 // Personal seed.json (gitignored) if present, else the shipped generic sample. Lets a fresh
 // open-source clone boot with sample data and zero personal data committed.
 const SEED_FILE = fs.existsSync(path.join(ROOT, 'seed.json')) ? path.join(ROOT, 'seed.json') : path.join(ROOT, 'seed.example.json');
-const BACKUP_DIR = process.env.BACKUP_DIR ? path.resolve(process.env.BACKUP_DIR) : path.join(ROOT, 'backups');
 
 // ---- data-safety knobs (read live so Settings changes take effect without restart) ----
 // Auto-snapshots to keep (manual/phase snapshots are never auto-pruned).
@@ -67,7 +141,7 @@ const putGuardPct = () => {
 
 // ---------- store ----------
 function ensureStore() {
-  if (!fs.existsSync(DATA_FILE)) {
+  if (!fs.existsSync(P.data)) {
     const seed = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
     writeStore(seed);
     console.log(`[seed] No data.json found — seeded ${seed.length} requisitions from seed.json`);
@@ -84,7 +158,7 @@ function ensureConfig() {
 }
 function readStore() {
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return JSON.parse(fs.readFileSync(P.data, 'utf8'));
   } catch (e) {
     console.error('[store] read failed:', e.message);
     return [];
@@ -92,9 +166,9 @@ function readStore() {
 }
 function writeStore(rows) {
   // atomic write: write tmp then rename, so a crash mid-write never corrupts data.json
-  const tmp = DATA_FILE + '.tmp';
+  const tmp = P.data + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(rows, null, 2));
-  fs.renameSync(tmp, DATA_FILE);
+  fs.renameSync(tmp, P.data);
 }
 // ---------- row identity (WP-0 / sync foundation) ----------
 // Every row carries a stable `id` (UUID) and `updatedAt` (ISO) so two stores can reconcile
@@ -119,6 +193,12 @@ const liveRows = rows => rows.filter(r => r && r.deleted !== true);
 // the server, the React Native app, and the Chrome extension (pinned by tests/vectors/).
 const core = require('./core/crm-core');
 const { reqKey, postingId, sameReq, expectedValue, computeTier, DEFAULT_TIER_THRESHOLDS } = core;
+const { computeActionItems } = require('./lib/action-items');   // P2.1 unified action model
+const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role timeline
+const { computePipelineHealth } = require('./lib/pipeline-health'); // P2.6 pipeline health score
+const { computeFollowup } = require('./lib/followup');           // P2.8 follow-up recommendation
+const jobs = require('./lib/jobs');                              // P2.9 unified background-job registry
+const { computeAnalytics } = require('./lib/analytics');         // shared analytics (web + app parity)
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
 function tierThresholds(boards) {
@@ -150,11 +230,12 @@ function mergePolicyBlock(row, boards) {
 }
 
 // Append-only enrichment audit log — one JSON object per line. Every change reconstructable.
-const ENRICH_LOG = path.join(ROOT, 'agent', 'enrichment-log.jsonl');
+// Tenant-scoped (P.enrichLog) so one user's role history never bleeds into another's timeline.
 function logEnrichment(entry) {
   try {
-    fs.mkdirSync(path.dirname(ENRICH_LOG), { recursive: true });
-    fs.appendFileSync(ENRICH_LOG, JSON.stringify(entry) + '\n');
+    const f = P.enrichLog;
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.appendFileSync(f, JSON.stringify(entry) + '\n');
   } catch (e) { console.error('[enrich-log]', e.message); }
 }
 
@@ -162,24 +243,24 @@ function logEnrichment(entry) {
 // Append-only board change-log — one JSON object per accepted PUT/restore. Keys + changed
 // field names only (bounded; no full-row dumps), so any edit is reconstructable from the
 // snapshots + this ledger.
-const CHANGE_LOG = path.join(ROOT, 'agent', 'change-log.jsonl');
 function logChange(entry) {
   try {
-    fs.mkdirSync(path.dirname(CHANGE_LOG), { recursive: true });
-    fs.appendFileSync(CHANGE_LOG, JSON.stringify(entry) + '\n');
+    const f = P.changeLog;
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.appendFileSync(f, JSON.stringify(entry) + '\n');
   } catch (e) { console.error('[change-log]', e.message); }
 }
-function ensureBackupDir() { if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true }); }
+function ensureBackupDir() { if (!fs.existsSync(P.backups)) fs.mkdirSync(P.backups, { recursive: true }); }
 const backupStamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 // Copy the CURRENT store to backups/data.<kind>-<stamp>.json. kind 'auto' is the pre-overwrite
 // safety snapshot (subject to retention); 'manual' is a user-triggered keep-forever snapshot.
 function snapshotData(kind) {
   try {
-    if (!fs.existsSync(DATA_FILE)) return null;
+    if (!fs.existsSync(P.data)) return null;
     ensureBackupDir();
     const stamp = backupStamp();
     const name = `data.${kind}-${stamp}.json`;
-    fs.copyFileSync(DATA_FILE, path.join(BACKUP_DIR, name));
+    fs.copyFileSync(P.data, path.join(P.backups, name));
     snapshotGuides(kind, stamp);   // bundle the attached interview guides alongside this snapshot
     return name;
   } catch (e) { console.error('[snapshot]', e.message); return null; }
@@ -196,7 +277,7 @@ function snapshotGuides(kind, stamp) {
       try { bundle[k] = { guideAt: r.guideAt, markdown: fs.readFileSync(guidePath(k), 'utf8') }; } catch (e) { /* file gone */ }
     }
     if (Object.keys(bundle).length) {
-      fs.writeFileSync(path.join(BACKUP_DIR, `guides.${kind}-${stamp}.json`), JSON.stringify(bundle, null, 2));
+      fs.writeFileSync(path.join(P.backups, `guides.${kind}-${stamp}.json`), JSON.stringify(bundle, null, 2));
     }
   } catch (e) { console.error('[snapshot-guides]', e.message); }
 }
@@ -204,7 +285,7 @@ function snapshotGuides(kind, stamp) {
 function restoreGuides(dataFileName) {
   try {
     const guidesName = dataFileName.replace(/^data\./, 'guides.');
-    const fp = path.join(BACKUP_DIR, guidesName);
+    const fp = path.join(P.backups, guidesName);
     if (guidesName === dataFileName || !fs.existsSync(fp)) return 0;
     const bundle = JSON.parse(fs.readFileSync(fp, 'utf8'));
     fs.mkdirSync(GUIDE_DIR, { recursive: true });
@@ -221,13 +302,13 @@ function pruneAutoBackups() {
   try {
     ensureBackupDir();
     const keep = backupRetention();
-    const byNewest = (re) => fs.readdirSync(BACKUP_DIR)
+    const byNewest = (re) => fs.readdirSync(P.backups)
       .filter(f => re.test(f))
-      .map(f => ({ f, t: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs }))
+      .map(f => ({ f, t: fs.statSync(path.join(P.backups, f)).mtimeMs }))
       .sort((a, b) => b.t - a.t);
-    for (const x of byNewest(/^data\.auto-.*\.json$/).slice(keep)) { try { fs.unlinkSync(path.join(BACKUP_DIR, x.f)); } catch (e) {} }
+    for (const x of byNewest(/^data\.auto-.*\.json$/).slice(keep)) { try { fs.unlinkSync(path.join(P.backups, x.f)); } catch (e) {} }
     // Prune the paired guide bundles to the same retention so they don't accumulate.
-    for (const x of byNewest(/^guides\.auto-.*\.json$/).slice(keep)) { try { fs.unlinkSync(path.join(BACKUP_DIR, x.f)); } catch (e) {} }
+    for (const x of byNewest(/^guides\.auto-.*\.json$/).slice(keep)) { try { fs.unlinkSync(path.join(P.backups, x.f)); } catch (e) {} }
   } catch (e) { console.error('[prune]', e.message); }
 }
 // Diff two stores by reqKey -> { added:[keys], removed:[keys], changed:[{key, fields}] }.
@@ -247,13 +328,13 @@ function diffStores(before, after) {
   }
   return { added, removed, changed };
 }
-// Resolve a user-supplied backup filename safely inside BACKUP_DIR (no path traversal).
+// Resolve a user-supplied backup filename safely inside P.backups (no path traversal).
 function resolveBackup(name) {
   if (typeof name !== 'string' || !name) return null;
   if (path.basename(name) !== name) return null;            // had a separator -> reject
   if (!/^[\w.\-]+\.json$/.test(name)) return null;
-  const fp = path.join(BACKUP_DIR, name);
-  if (path.dirname(path.resolve(fp)) !== path.resolve(BACKUP_DIR)) return null;
+  const fp = path.join(P.backups, name);
+  if (path.dirname(path.resolve(fp)) !== path.resolve(P.backups)) return null;
   return fs.existsSync(fp) ? fp : null;
 }
 function backupKind(name) {
@@ -265,8 +346,45 @@ function backupKind(name) {
 
 // ---------- app ----------
 const app = express();
+
+// ─── Render multi-service split ──────────────────────────────────────────────────────────────
+// One codebase, three deployable roles selected by REQON_ROLE:
+//   api   (api.reqon.app)   — backend + /health only; root returns JSON; the board UI is NOT served.
+//   cloud (cloud.reqon.app) — serves the board UI and reverse-proxies API/auth/file paths to
+//                             REQON_API_BASE_URL, so the existing same-origin UI works unchanged and
+//                             no backend logic is duplicated here.
+//   all   (local default)   — monolith (UI + API in one process); unchanged dev behavior.
+const REQON_ROLE = (process.env.REQON_ROLE || 'all').toLowerCase();
+const SERVE_API = REQON_ROLE === 'all' || REQON_ROLE === 'api';
+const SERVE_UI = REQON_ROLE === 'all' || REQON_ROLE === 'cloud';
+
+// Liveness — always on, never gated. Render health checks hit this.
+app.get('/health', (req, res) => res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE }));
+
+// Cloud role proxies the dynamic paths to the API service. Registered BEFORE the body parser so the
+// proxied request body streams through untouched. The browser stays same-origin with cloud.reqon.app
+// (the board's ~70 /api calls, window.open, downloads, and links all keep working); cookies the API
+// sets flow back through the proxy as cloud-origin cookies. No data/AI/secret logic runs in this role.
+if (REQON_ROLE === 'cloud') {
+  const target = (process.env.REQON_API_BASE_URL || '').replace(/\/$/, '');
+  if (!target) { console.error('[cloud] REQON_API_BASE_URL is required when REQON_ROLE=cloud'); process.exit(1); }
+  const { createProxyMiddleware } = require('http-proxy-middleware');
+  // Mount at root with a pathFilter (NOT app.use('/api', …)) so Express doesn't strip the mount
+  // segment — the full original path (/api/reqs, /login, …) is forwarded to the API intact.
+  const proxy = createProxyMiddleware({
+    target, changeOrigin: true, xfwd: true,
+    pathFilter: (pathname) => /^\/(api|login|logout|guide|m|mobile|pair)(\/|$|\?)/.test(pathname) || pathname === '/api',
+  });
+  app.use(proxy);
+  console.log('[cloud] proxying API paths -> ' + target);
+}
+
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false }));
+// ROADMAP-V3 PR0 slice 3: bind every request to its tenant namespace. Multi-user OFF -> owner
+// (legacy paths; a no-op). resolveUserId/sessionUser below are function declarations (hoisted), so
+// this closure resolves them at request time. AsyncLocalStorage propagates through async handlers.
+app.use((req, res, next) => { const uid = resolveUserId(req); if (MULTIUSER()) store.ensureUserDir(uid); store.runAs(uid, () => next()); });
 
 // ---------- auth (opt-in via APP_TOKEN; protects remote/tunnel exposure) ----------
 // If APP_TOKEN is unset the server behaves exactly as before (open) — fine for a
@@ -275,6 +393,7 @@ app.use(express.urlencoded({ extended: false }));
 // a server restart — auth checks, the login cookie, and the pairing QR all read these.
 let APP_TOKEN = process.env.APP_TOKEN || '';
 const COOKIE = 'crm_auth';
+const IMP_COOKIE = 'crm_imp';                 // admin marker cookie while impersonating a user
 let TOKEN_HASH = APP_TOKEN ? crypto.createHash('sha256').update(APP_TOKEN).digest('hex') : '';
 // Scoped, least-privilege token for automated ingestion (e.g. a ChatGPT Action). It authorizes
 // ONLY append-only writes (POST /api/reqs/merge + /api/reqs/quickadd) — never reads, the profile
@@ -305,7 +424,20 @@ function tunneled(req) {
     req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.headers['cf-ray']);
 }
 const trustedLocal = req => isLoopback(req) && !tunneled(req);
+// Multi-user: resolve the signed session cookie -> a live (non-disabled) user, or null.
+function sessionUser(req) {
+  const c = parseCookies(req)[COOKIE];
+  const uid = c && users.verifySession(c);
+  if (!uid) return null;
+  const u = users.getById(uid);
+  return (u && !u.disabled) ? u : null;
+}
+// Multi-user: resolve a per-user access token (X-CRM-Token / ?token) -> its user (extension/app/ingest).
+function tokenUser(req) { const h = req.headers['x-crm-token'] || req.query.token; return h ? users.userByToken(h) : null; }
+// The tenant id for this request: the session OR token user in multi-user mode, else the implicit owner.
+function resolveUserId(req) { if (!MULTIUSER()) return store.OWNER; const u = sessionUser(req) || tokenUser(req); return u ? u.id : store.OWNER; }
 function authed(req) {
+  if (MULTIUSER()) return !!(sessionUser(req) || tokenUser(req));   // multi-user: valid user session OR per-user token
   if (!APP_TOKEN) return true;          // auth disabled -> original behavior
   if (trustedLocal(req)) return true;   // desktop board on the Mac itself
   const c = parseCookies(req)[COOKIE];
@@ -316,8 +448,9 @@ function authed(req) {
 }
 const secureReq = req => (req.headers['x-forwarded-proto'] || '').includes('https');
 
-function loginPage(nextUrl, msg) {
-  const nxt = String(nextUrl || '/m').replace(/"/g, '');
+function loginPage(nextUrl, msg, multi) {
+  const nxt = String(nextUrl || (multi ? '/' : '/m')).replace(/"/g, '');
+  const userField = multi ? `<input type="text" name="username" placeholder="Username" autofocus autocapitalize="none" autocomplete="username" style="margin-bottom:10px">` : '';
   return `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><meta name=theme-color content="#0e1217">
 <title>Sign in</title><style>
 body{background:#0e1217;color:#e9eef4;font-family:system-ui,-apple-system,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}
@@ -327,8 +460,9 @@ input{width:100%;box-sizing:border-box;background:#0e1217;border:1px solid #3341
 input:focus{border-color:#edc05a}button{width:100%;margin-top:12px;background:#edc05a;color:#15110a;border:0;border-radius:10px;padding:12px;font-weight:700;font-size:.95rem}
 .err{color:#ef8268;font-size:.8rem;margin-top:10px}</style>
 <form method="POST" action="/login">
-<h1>Job Pipeline CRM</h1><p>Enter the access passphrase.</p>
-<input type="password" name="passphrase" placeholder="Passphrase" autofocus autocomplete="current-password">
+<h1>Reqon</h1><p>${multi ? 'Sign in to your board.' : 'Enter the access passphrase.'}</p>
+${userField}
+<input type="password" name="passphrase" placeholder="${multi ? 'Password' : 'Passphrase'}" ${multi ? '' : 'autofocus'} autocomplete="current-password">
 <input type="hidden" name="next" value="${nxt}">
 <button type="submit">Sign in</button>
 ${msg ? `<div class="err">${msg}</div>` : ''}
@@ -336,16 +470,24 @@ ${msg ? `<div class="err">${msg}</div>` : ''}
 }
 
 app.get('/login', (req, res) => {
+  if (MULTIUSER()) return res.type('html').send(loginPage(req.query.next, '', true));
   if (!APP_TOKEN) return res.status(503).send('Remote access disabled. Set APP_TOKEN env var and restart.');
   res.type('html').send(loginPage(req.query.next, ''));
 });
 app.post('/login', (req, res) => {
+  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000'];
+  if (secureReq(req)) flags.push('Secure');
+  if (MULTIUSER()) {
+    const next = (req.body.next || '/').startsWith('/') ? req.body.next : '/';
+    const u = users.verify(req.body.username || '', req.body.passphrase || req.body.password || '');
+    if (!u) return res.status(401).type('html').send(loginPage(next, 'Incorrect username or password.', true));
+    res.setHeader('Set-Cookie', `${COOKIE}=${users.makeSession(u.id)}; ${flags.join('; ')}`);
+    return res.redirect(next);
+  }
   if (!APP_TOKEN) return res.status(503).send('Remote access disabled. Set APP_TOKEN env var and restart.');
   const ok = safeEq(sha(req.body.passphrase || ''), TOKEN_HASH);
   const next = (req.body.next || '/m').startsWith('/') ? req.body.next : '/m';
   if (!ok) return res.status(401).type('html').send(loginPage(next, 'Incorrect passphrase.'));
-  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000'];
-  if (secureReq(req)) flags.push('Secure');
   res.setHeader('Set-Cookie', `${COOKIE}=${TOKEN_HASH}; ${flags.join('; ')}`);
   res.redirect(next);
 });
@@ -358,25 +500,50 @@ app.get('/logout', (req, res) => {
 // remote/tunneled client without a token.
 function gateHtml(req, res, next) {
   if (authed(req)) return next();
+  if (MULTIUSER()) return res.redirect('/login?next=' + encodeURIComponent(req.path));
   if (!APP_TOKEN) return res.status(503).send('Mobile/remote access is disabled. Set APP_TOKEN and restart to enable authenticated access.');
   return res.redirect('/login?next=' + encodeURIComponent(req.path));
 }
-app.get(['/m', '/mobile'], gateHtml, (req, res) => res.sendFile(path.join(ROOT, 'mobile.html')));
+// api role: root is a small JSON status, NOT the product UI (the board lives on cloud.reqon.app).
+if (!SERVE_UI) {
+  app.get('/', (req, res) => res.json({ ok: true, service: 'reqon-api', message: 'Reqon API. The product UI is at cloud.reqon.app.', health: '/health' }));
+}
 
-// Desktop board: open on localhost, gated when reached remotely.
-app.get(['/', '/index.html'], (req, res, next) => {
-  if (authed(req) || !APP_TOKEN) return next();
-  return res.redirect('/login?next=/');
-}, (req, res) => res.sendFile(path.join(ROOT, 'public', 'index.html')));
+if (SERVE_UI) {
+  app.get(['/m', '/mobile'], gateHtml, (req, res) => res.sendFile(path.join(ROOT, 'mobile.html')));
 
-// CORS for cross-origin capture tools (bookmarklet on linkedin.com etc.). Auth is via the
-// X-CRM-Token header (not cookies), so echoing the origin without credentials is safe — a caller
-// still needs the passphrase. Preflight (OPTIONS) must pass before the auth check below.
+  // Desktop board: open on localhost (single-user), gated when reached remotely; in multi-user mode
+  // a login is always required (no implicit owner from localhost).
+  app.get(['/', '/index.html'], (req, res, next) => {
+    if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
+    return res.redirect('/login?next=/');
+  }, (req, res) => res.sendFile(path.join(ROOT, 'public', 'index.html')));
+
+  // User guide — static help page (definitions, lanes, apply modes, integrations).
+  app.get('/guide', (req, res, next) => {
+    if (authed(req) || (!APP_TOKEN && !MULTIUSER())) return next();
+    return res.redirect('/login?next=/guide');
+  }, (req, res) => res.sendFile(path.join(ROOT, 'public', 'guide.html')));
+}
+
+// CORS. Two classes of caller:
+//   • Credentialed browser apps (cloud.reqon.app, reqon.app, local dev) — must be on an ALLOWLIST to
+//     receive Access-Control-Allow-Credentials (cookies). Configurable via CORS_ALLOWED_ORIGINS.
+//   • Token-based capture tools (the bookmarklet on linkedin.com, the Chrome extension) — auth via
+//     the X-CRM-Token header, NOT cookies, so echoing their origin WITHOUT credentials stays safe and
+//     keeps them working from any page. Preflight (OPTIONS) must pass before the auth check below.
+const CORS_ALLOWLIST = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS ||
+    'https://cloud.reqon.app,https://reqon.app,http://localhost:8787,http://localhost:3000,http://localhost:19006')
+    .split(',').map((s) => s.trim()).filter(Boolean));
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
-  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    if (CORS_ALLOWLIST.has(origin)) res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CRM-Token');
   res.setHeader('Access-Control-Max-Age', '600');
   // Private Network Access: lets an https job page (e.g. linkedin.com) reach the local server
@@ -401,10 +568,147 @@ app.use('/api', (req, res, next) => {
   res.status(401).json({ ok: false, error: 'auth required' });
 });
 
-app.use(express.static(path.join(ROOT, 'public')));
+if (SERVE_UI) app.use(express.static(path.join(ROOT, 'public')));
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, count: readStore().length, port: PORT, dataFile: DATA_FILE });
+  res.json({ ok: true, count: readStore().length, port: PORT, dataFile: P.data });
+});
+
+// ---------- multi-user: identity, accounts, onboarding (ROADMAP-V3 PR0 slices 3-4) ----------
+function reqUser(req) { return MULTIUSER() ? sessionUser(req) : null; }
+function requireAdmin(req, res, next) {
+  if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Multi-user is disabled.' });
+  const u = sessionUser(req);
+  if (!u || u.role !== 'admin') return res.status(403).json({ ok: false, error: 'Admin only.' });
+  next();
+}
+// Who am I + onboarding state (drives the user menu + the first-run prompts).
+app.get('/api/me', (req, res) => {
+  if (!MULTIUSER()) return res.json({ ok: true, multiUser: false, user: { id: store.OWNER, displayName: 'Owner', role: 'admin', useSharedKey: true } });
+  const u = sessionUser(req); if (!u) return res.status(401).json({ ok: false, error: 'not signed in' });
+  const impId = users.verifySession(parseCookies(req)[IMP_COOKIE]);
+  const imp = impId && users.getById(impId);
+  res.json({ ok: true, multiUser: true, user: { id: u.id, username: u.username, displayName: u.displayName, role: u.role, useSharedKey: !!u.useSharedKey }, onboarded: readProfile().onboarded === true, impersonatedBy: (imp && imp.role === 'admin') ? imp.displayName || imp.username : null });
+});
+app.post('/api/me/password', (req, res) => {
+  if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Multi-user is disabled.' });
+  const u = sessionUser(req); if (!u) return res.status(401).json({ ok: false, error: 'not signed in' });
+  const b = req.body || {};
+  if (!users.verifyPassword(b.current || '', users.getById(u.id).passwordHash)) return res.status(403).json({ ok: false, error: 'Current password is incorrect.' });
+  try { users.update(u.id, { password: b.next || '' }); res.json({ ok: true }); } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+// Admin user management.
+app.get('/api/users', requireAdmin, (req, res) => res.json({ ok: true, users: users.list() }));
+app.post('/api/users', requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  try {
+    const u = users.create({ username: b.username, displayName: b.displayName, email: b.email, password: b.password, role: b.role, useSharedKey: !!b.useSharedKey });
+    store.seedNewUser(u.id);
+    let welcome = { skipped: 'not-requested' };
+    if (b.sendWelcome !== false && u.email) { try { welcome = await sendWelcomeEmail(u, b.password); } catch (e) { welcome = { ok: false, error: e.message }; } }
+    res.json({ ok: true, user: u, welcome });
+  } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+app.patch('/api/users/:id', requireAdmin, (req, res) => {
+  const b = req.body || {}; const patch = {};
+  for (const k of ['displayName', 'role', 'disabled', 'useSharedKey', 'password']) if (k in b) patch[k] = b[k];
+  try { const u = users.update(req.params.id, patch); if (!u) return res.status(404).json({ ok: false, error: 'no such user' }); res.json({ ok: true, user: u }); }
+  catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  const me = sessionUser(req); if (me && me.id === req.params.id) return res.status(400).json({ ok: false, error: "can't delete yourself" });
+  res.json({ ok: users.remove(req.params.id) });
+});
+// Admin console (P0.7): per-user usage + server stats. Each user's numbers are read inside their
+// own tenant context so the per-user namespaces stay the source of truth.
+function dirSizeBytes(d) { let n = 0; try { for (const f of fs.readdirSync(d)) { const fp = path.join(d, f); const st = fs.statSync(fp); n += st.isDirectory() ? dirSizeBytes(fp) : st.size; } } catch (e) {} return n; }
+app.get('/api/admin/overview', requireAdmin, (req, res) => {
+  const rows = users.list().map(u => store.runAs(u.id, () => {
+    const live = liveRows(readStore());
+    const today = assistUsage(); const w30 = assistWindowStats(30); const rate = assistRatePer1M();
+    const ss = readJsonSafe(P.scoutStatus, {}); const ds = readJsonSafe(P.digestState, {});
+    let backups = 0; try { backups = fs.readdirSync(P.backups).filter(f => /^data\./.test(f)).length; } catch (e) {}
+    return { id: u.id, displayName: u.displayName, email: u.email, role: u.role, disabled: u.disabled,
+      onboarded: readProfile().onboarded === true, useSharedKey: u.useSharedKey, keyOwn: !u.useSharedKey && !!(store.readJson(P.secrets, {}).OPENAI_API_KEY),
+      rows: live.length, applied: live.filter(r => r.status && r.status !== 'Not Applied').length,
+      aiToday: { calls: today.calls || 0, tokens: today.tokens || 0 }, ai30dTokens: w30.tokens, ai30dCost: estCost(w30.tokens, rate),
+      lastScout: ss.finishedAt || ss.startedAt || null, lastDigest: ds.lastSent || null,
+      diskKB: Math.round(dirSizeBytes(store.pathsFor(u.id).dir) / 1024), backups };
+  }));
+  const server = { uptimeSec: Math.round(process.uptime()), node: process.version, userCount: rows.length,
+    totalRows: rows.reduce((s, u) => s + u.rows, 0), shared30dTokens: rows.filter(u => u.useSharedKey).reduce((s, u) => s + u.ai30dTokens, 0),
+    sharedKeySet: !!process.env.OPENAI_API_KEY, smtpConfigured: emailConfigured(), publicUrl: (process.env.PUBLIC_URL || '').trim() || null };
+  res.json({ ok: true, server, users: rows });
+});
+// Append-only admin audit log (server-level): who did what to whom.
+const ADMIN_AUDIT = path.join(DATA_DIR, 'agent', 'admin-audit.jsonl');
+function logAdminAudit(entry) { try { fs.mkdirSync(path.dirname(ADMIN_AUDIT), { recursive: true }); fs.appendFileSync(ADMIN_AUDIT, JSON.stringify({ ts: nowIso(), ...entry }) + '\n'); } catch (e) {} }
+// List a user's snapshots (admin restore picker).
+app.get('/api/admin/users/:id/backups', requireAdmin, (req, res) => {
+  const u = users.getById(req.params.id); if (!u) return res.status(404).json({ ok: false, error: 'no such user' });
+  const list = store.runAs(u.id, () => {
+    try { return fs.readdirSync(P.backups).filter(f => /^data\..*\.json$/.test(f)).map(f => { const st = fs.statSync(path.join(P.backups, f)); return { name: f, mtime: st.mtimeMs, kind: backupKind(f) }; }).sort((a, b) => b.mtime - a.mtime).slice(0, 50); } catch (e) { return []; }
+  });
+  res.json({ ok: true, backups: list });
+});
+// Admin-triggered per-user actions, all audited. Supports: digest, scout, restore, setCap.
+app.post('/api/admin/users/:id/run', requireAdmin, (req, res) => {
+  const u = users.getById(req.params.id); if (!u) return res.status(404).json({ ok: false, error: 'no such user' });
+  const b = req.body || {}; const action = b.action; const adminId = (sessionUser(req) || {}).id;
+  logAdminAudit({ admin: adminId, target: u.id, action });
+  if (action === 'digest') { store.runAs(u.id, () => composeDigestAndDeliver()); return res.json({ ok: true, started: 'digest', user: u.id }); }
+  if (action === 'scout') { const r = store.runAs(u.id, () => triggerScout('both', '')); return res.status(r.status || 200).json({ ...r, user: u.id }); }
+  if (action === 'restore') { const r = store.runAs(u.id, () => restoreData(b.file)); return res.status(r.status || 200).json({ ...r, user: u.id }); }
+  if (action === 'setCap') {
+    const upd = {};
+    if (b.monthlyTokens != null) upd.ASSIST_MONTHLY_TOKENS = String(Math.max(0, parseInt(b.monthlyTokens, 10) || 0));
+    if (b.dailyCalls != null) upd.ASSIST_DAILY_CALLS = String(Math.max(0, Math.min(1000, parseInt(b.dailyCalls, 10) || 0)));
+    store.runAs(u.id, () => setUserCfg(upd));
+    return res.json({ ok: true, user: u.id, caps: upd });
+  }
+  return res.status(400).json({ ok: false, error: 'unknown action (digest|scout|restore|setCap)' });
+});
+// Impersonate-for-support: an admin assumes a user's session (audited), with a marker cookie so they
+// can return to their own account. Signed sessions are stateless, so we re-derive both sides by id.
+app.post('/api/admin/impersonate/:id', requireAdmin, (req, res) => {
+  const target = users.getById(req.params.id); if (!target) return res.status(404).json({ ok: false, error: 'no such user' });
+  const admin = sessionUser(req);
+  logAdminAudit({ admin: admin.id, target: target.id, action: 'impersonate-start' });
+  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000']; if (secureReq(req)) flags.push('Secure');
+  res.setHeader('Set-Cookie', [`${COOKIE}=${users.makeSession(target.id)}; ${flags.join('; ')}`, `${IMP_COOKIE}=${users.makeSession(admin.id)}; ${flags.join('; ')}`]);
+  res.json({ ok: true, impersonating: target.id, asAdmin: admin.id });
+});
+app.post('/api/admin/stop-impersonate', (req, res) => {
+  const adminId = users.verifySession(parseCookies(req)[IMP_COOKIE]);
+  const admin = adminId && users.getById(adminId);
+  if (!admin || admin.role !== 'admin') return res.status(400).json({ ok: false, error: 'not impersonating' });
+  logAdminAudit({ admin: admin.id, target: store.currentUser(), action: 'impersonate-stop' });
+  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000']; if (secureReq(req)) flags.push('Secure');
+  res.setHeader('Set-Cookie', [`${COOKIE}=${users.makeSession(admin.id)}; ${flags.join('; ')}`, `${IMP_COOKIE}=; HttpOnly; Path=/; Max-Age=0`]);
+  res.json({ ok: true, restored: admin.id });
+});
+// Onboarding (Q2): brand-new users answer a couple of prompts; we save their search terms + mark
+// them onboarded so their first board view is relevant. Résumé upload reuses /api/profile/resume;
+// the first scout is kicked off by the client via /api/scout/run after this completes.
+app.get('/api/onboarding', (req, res) => {
+  const prof = readProfile(); const rows = liveRows(readStore());
+  res.json({ ok: true, needed: MULTIUSER() && prof.onboarded !== true && rows.length === 0,
+    roleTerms: prof.roleTerms || [], hasResume: !!(prof.workHistory && prof.workHistory.length) });
+});
+app.post('/api/onboarding/complete', (req, res) => {
+  const b = req.body || {};
+  const titles = Array.isArray(b.roleTerms) ? b.roleTerms.map(String).map(s => s.trim()).filter(Boolean).slice(0, 12) : [];
+  try {
+    const watch = readJsonSafe(P.watchlist, {}); watch.searchTerms = watch.searchTerms || {};
+    if (titles.length) watch.searchTerms.titles = titles;
+    if (Array.isArray(b.keywords) && b.keywords.length) watch.searchTerms.keywords = b.keywords.map(String).map(s => s.trim()).filter(Boolean);
+    if (b.salaryTarget != null && !isNaN(+b.salaryTarget)) watch.searchTerms.salaryTarget = Math.max(0, Math.round(+b.salaryTarget));
+    writeJsonPretty(P.watchlist, watch);
+    if (typeof b.remoteOnly === 'boolean') { const boards = readJsonSafe(P.boards, {}); boards.remoteOnly = b.remoteOnly; writeJsonPretty(P.boards, boards); }
+    const prof = readProfile(); prof.onboarded = true; if (titles.length) prof.roleTerms = titles;
+    writeJsonPretty(P.profile, prof);
+    res.json({ ok: true, onboarded: true, titles });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // Device pairing: package this server's LAN URL + passphrase into one QR/code the app can
@@ -441,9 +745,13 @@ app.get('/api/pair', async (req, res) => {
     if (typeof core.encodePairing !== 'function') {
       throw new Error('core.encodePairing unavailable — server is running a stale build; restart it.');
     }
-    const code = core.encodePairing(url, APP_TOKEN);
+    // Multi-user: bake THIS user's per-user token so the paired device binds to their board
+    // (regenerates the token — re-pairing supersedes old devices, like a passphrase change).
+    const u = MULTIUSER() ? sessionUser(req) : null;
+    const tok = u ? users.setToken(u.id) : APP_TOKEN;
+    const code = core.encodePairing(url, tok);
     const qrSvg = await QRCode.toString(code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
-    res.json({ ok: true, url, hasToken: !!APP_TOKEN, code, qrSvg });
+    res.json({ ok: true, url, hasToken: !!tok, code, qrSvg, user: u ? u.id : null });
   } catch (e) {
     res.status(500).json({ ok: false, error: e && e.message ? e.message : String(e) });
   }
@@ -451,6 +759,70 @@ app.get('/api/pair', async (req, res) => {
 
 app.get('/api/reqs', (req, res) => {
   res.json(readStore());
+});
+
+// Shared analytics (web + app parity) — computed once on the server so both surfaces show identical
+// numbers. The app fetches this when a server is configured, else falls back to its local metrics.
+app.get('/api/analytics', (req, res) => {
+  try { res.json({ ok: true, ...computeAnalytics(readStore(), { today: new Date().toISOString().slice(0, 10), now: nowIso() }) }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// Pipeline health score (P2.6) — a band + main risk + recommended next actions, deterministic.
+app.get('/api/pipeline-health', (req, res) => {
+  try { res.json({ ok: true, ...computePipelineHealth(readStore(), { today: new Date().toISOString().slice(0, 10) }) }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// Unified, deterministic action items (P2.1) — derived from the live store + config, consumed by
+// web / app / extension. Filter with ?surface=web|app|extension and/or ?type=apply_next,...
+app.get('/api/action-items', (req, res) => {
+  try {
+    const w30 = assistWindowStats(30); const rate = assistRatePer1M(); const budget = assistMonthlyBudget();
+    const cost30 = estCost(w30.tokens, rate);
+    const ctx = {
+      today: new Date().toISOString().slice(0, 10),
+      profile: readProfile(),
+      scoutStatus: readJsonSafe(P.scoutStatus, {}),
+      sourceHealth: readJsonSafe(P.sourceHealth, {}),
+      mailConfigured: !!(cfg('GMAIL_USER') && cfg('GMAIL_APP_PASSWORD')),
+      remoteOnly: readJsonSafe(P.boards, {}).remoteOnly !== false,
+      assist: { tokens30d: w30.tokens, budgetPct: (budget && cost30 != null) ? Math.round((cost30 / budget) * 100) : null },
+    };
+    let items = computeActionItems(readStore(), ctx);
+    const surface = String(req.query.surface || '').trim();
+    if (surface) items = items.filter(it => (it.surfaces || []).includes(surface));
+    const types = String(req.query.type || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (types.length) items = items.filter(it => types.includes(it.type));
+    const counts = items.reduce((m, it) => { m[it.severity] = (m[it.severity] || 0) + 1; return m; }, {});
+    res.json({ ok: true, items, total: items.length, counts, generatedAt: nowIso() });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// Unified background-job registry (P2.9) — observe scout/enrichment/gmail/guide/digest/backup
+// without reading logs. ?type= / ?active=1 filters.
+app.get('/api/jobs', (req, res) => {
+  const opts = {};
+  if (req.query.type) opts.type = String(req.query.type);
+  if (req.query.active === '1' || req.query.active === 'true') opts.active = true;
+  res.json({ ok: true, jobs: jobs.list(opts), counts: jobs.counts() });
+});
+app.get('/api/jobs/:id', (req, res) => {
+  const j = jobs.get(req.params.id);
+  if (!j) return res.status(404).json({ ok: false, error: 'no such job' });
+  res.json({ ok: true, job: j });
+});
+app.post('/api/jobs/:id/cancel', (req, res) => {
+  const r = jobs.cancel(req.params.id);
+  res.status(r.ok ? 200 : 400).json(r);
+});
+// Trigger a job by type for the dispatchable kinds (others have their own parameterized endpoints).
+app.post('/api/jobs', (req, res) => {
+  const type = String((req.body || {}).type || '');
+  if (type === 'scout') { const r = triggerScout('both', ''); return res.status(r.status || 200).json(r); }
+  if (type === 'digest') { composeDigestAndDeliver(); return res.json({ ok: true, started: 'digest' }); }
+  if (type === 'backup') { const job = jobs.create('backup', { label: 'Manual backup' }); try { const f = snapshotData('manual'); jobs.finish(job.id, { file: f }); return res.json({ ok: true, started: 'backup', file: f }); } catch (e) { jobs.fail(job.id, e.message); return res.status(500).json({ ok: false, error: e.message }); } }
+  return res.status(400).json({ ok: false, error: 'Type not dispatchable here (use the dedicated endpoint): ' + (type || '(none)') });
 });
 
 // Full replace — the board sends its whole state on every debounced save.
@@ -498,7 +870,7 @@ app.put('/api/reqs', (req, res) => {
     // Auto-build interview guides for rows that just entered an interview stage via the board's
     // whole-state save (the per-row PATCH path triggers separately). Background; bounded to genuine
     // transitions (prev status not already an interview stage).
-    if (process.env.OPENAI_API_KEY && assistEnabled()) {
+    if (aiKey() && assistEnabled()) {
       const beforeStatus = new Map(current.map((r) => [reqKey(r), r.status]));
       for (const r of rows) {
         const k = reqKey(r);
@@ -522,7 +894,7 @@ app.post('/api/reqs/merge', (req, res) => {
   const incoming = Array.isArray(b) ? b : (b && (Array.isArray(b.roles) ? b.roles : (Array.isArray(b.requisitions) ? b.requisitions : null)));
   if (!Array.isArray(incoming)) return res.status(400).json({ ok: false, error: 'Expected a JSON array, or an object { "roles": [...] }.' });
   const rows = readStore();
-  const boards = readJsonSafe(BOARDS_FILE, {});
+  const boards = readJsonSafe(P.boards, {});
   let added = 0, skippedPolicy = 0;
   const addedKeys = [], policyDrops = [];
   for (const x of incoming) {
@@ -566,17 +938,21 @@ function parseTitle(title) {
   const raw = String(title || '').trim();
   const wasLinkedIn = /\|\s*LinkedIn\b/i.test(raw);
   let t = raw
-    .replace(/\s*\|\s*LinkedIn.*$/i, '')                                  // strip "| LinkedIn …"
+    .replace(/^\(\d+\)\s*/, '')                                          // strip "(3) " unread-count prefix
+    .replace(/\s*\|\s*LinkedIn.*$/i, '')                                 // strip "| LinkedIn …"
     .replace(/\s*\|\s*(Indeed|Glassdoor|Greenhouse|Lever|Workday|Ashby|SmartRecruiters|iCIMS|ZipRecruiter).*$/i, '')
     .trim();
   let company = '', role = '', location = '', m;
-  if ((m = t.match(/^(.+?)\s+hiring\s+(.+)$/i))) {                        // "Company hiring <rest>"
-    company = m[1].trim();
+  if ((m = t.match(/^(.{2,60}?)\s+hiring\s+(.+)$/i))) {                   // "Company hiring <rest> [in Location]"
+    company = m[1].trim().replace(/,$/, '');
     const rest = m[2].trim();
     const im = rest.match(/^(.*\S)\s+in\s+(.+)$/i);                       // greedy -> split on the LAST " in "
     if (im) { role = im[1].trim(); location = im[2].trim(); }
     else { role = rest; }
-  } else if (wasLinkedIn && /\s[–—-]\s/.test(t)) {                        // LinkedIn "Role - Company" page title
+  } else if (t.includes(' | ')) {                                        // LinkedIn job-view "Role | Company"
+    const parts = t.split(' | ').map(s => s.trim()).filter(Boolean);
+    role = parts[0]; company = parts.length > 1 ? parts[parts.length - 1] : '';
+  } else if (wasLinkedIn && /\s[–—-]\s/.test(t)) {                       // LinkedIn "Role - Company" page title
     const idx = Math.max(t.lastIndexOf(' - '), t.lastIndexOf(' – '), t.lastIndexOf(' — '));
     role = t.slice(0, idx).trim();
     company = t.slice(idx + 3).trim();
@@ -585,6 +961,8 @@ function parseTitle(title) {
   }
   return { company, role, location };
 }
+// Aggregators / job boards are never the employer — don't let them become the company.
+const AGGREGATOR_HOSTS = new Set(['linkedin', 'indeed', 'glassdoor', 'ziprecruiter', 'google', 'lnkd', 'dice', 'monster']);
 
 app.post('/api/reqs/quickadd', (req, res) => {
   const b = req.body || {};
@@ -598,7 +976,11 @@ app.post('/api/reqs/quickadd', (req, res) => {
     role = role || p.role;
     location = location || p.location;
   }
-  if (!company) company = hostName(link) || 'Unknown';
+  // Never stamp an aggregator/job-board host (linkedin, indeed, …) as the company — leave it Unknown
+  // so it reads as a lead to enrich, not a fake employer.
+  if (company && AGGREGATOR_HOSTS.has(company.toLowerCase())) company = '';
+  const host = hostName(link);
+  if (!company) company = (host && !AGGREGATOR_HOSTS.has(host.toLowerCase())) ? host : 'Unknown';
   if (!role) role = b.title ? String(b.title).trim().slice(0, 140) : 'Untitled lead';
   if (!link && !b.title && !b.company) {
     return res.status(400).json({ ok: false, error: 'Provide at least a link or a title.' });
@@ -616,7 +998,7 @@ app.post('/api/reqs/quickadd', (req, res) => {
     needsEnrichment: true,   // Tier 1: every fresh capture is queued for deep enrichment
     id: crypto.randomUUID(), updatedAt: nowIso()
   };
-  row.applyMode = inferApplyMode(row, readJsonSafe(BOARDS_FILE, {}));   // Phase 4
+  row.applyMode = inferApplyMode(row, readJsonSafe(P.boards, {}));   // Phase 4
   const rows = readStore();
   if (rows.some(r => sameReq(r, row))) {   // req-id aware: same title at one company is only a dup when the posting id matches
     return res.json({ ok: true, added: 0, skipped: 1, duplicate: true, company, role, total: rows.length });
@@ -637,7 +1019,7 @@ app.post('/api/reqs/quickadd', (req, res) => {
 // Stamp applyMode (inferred from source) onto rows that lack it. Never overwrites an existing
 // value. Snapshots before writing. Idempotent.
 app.post('/api/applymode/backfill', (req, res) => {
-  const boards = readJsonSafe(BOARDS_FILE, {});
+  const boards = readJsonSafe(P.boards, {});
   const rows = readStore();
   const before = rows.length;
   let stamped = 0;
@@ -652,11 +1034,10 @@ app.post('/api/applymode/backfill', (req, res) => {
 });
 
 // ---------- candidate profile + narrative library (Phase 5) ----------
-const PROFILE_FILE = path.join(ROOT, 'agent', 'profile.json');
 const PROFILE_PYTHON = path.join(ROOT, 'agent', 'profile-from-resume.py');
 function readProfile() {
   // personal profile.json (gitignored) if present, else the shipped generic example
-  let p = readJsonSafe(PROFILE_FILE, null);
+  let p = readJsonSafe(P.profile, null);
   if (p == null) p = readJsonSafe(path.join(ROOT, 'agent', 'profile.example.json'), {});
   return Object.assign(
     { applicant: {}, seniority: [], roleTerms: [], industries: [], sectors: [], keywords: [], narratives: [], remoteOnly: true },
@@ -664,7 +1045,7 @@ function readProfile() {
   );
 }
 function snapshotProfile() {
-  try { if (fs.existsSync(PROFILE_FILE)) { ensureBackupDir(); const n = `profile.${backupStamp()}.json`; fs.copyFileSync(PROFILE_FILE, path.join(BACKUP_DIR, n)); return n; } } catch (e) {}
+  try { if (fs.existsSync(P.profile)) { ensureBackupDir(); const n = `profile.${backupStamp()}.json`; fs.copyFileSync(P.profile, path.join(P.backups, n)); return n; } } catch (e) {}
   return null;
 }
 const PROFILE_ARRAY_FIELDS = ['seniority', 'roleTerms', 'industries', 'sectors', 'priorityKeywords', 'secondaryKeywords'];
@@ -718,6 +1099,9 @@ app.put('/api/profile', (req, res) => {
     }));
   }
   if (typeof b.remoteOnly === 'boolean') next.remoteOnly = b.remoteOnly;
+  // GitHub URL + professional summary (free text). github also mirrored onto applicant for the app.
+  if (typeof b.github === 'string') { next.github = b.github.trim(); next.applicant = Object.assign({}, next.applicant, { github: b.github.trim() }); }
+  if (typeof b.summary === 'string') next.summary = b.summary.trim();
   // Rich CV sections (Reqon app): structured entries + simple lists + EEO (stored only — never
   // auto-submitted; the apply-assist deliberately skips demographic fields).
   const objArr = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object') : null);
@@ -737,7 +1121,7 @@ app.put('/api/profile', (req, res) => {
         tags: Array.isArray(x.tags) ? x.tags.map(String).map((s) => s.trim()).filter(Boolean) : [],
       }));
   }
-  try { snapshotProfile(); writeJsonPretty(PROFILE_FILE, next); res.json({ ok: true, profile: next }); }
+  try { snapshotProfile(); writeJsonPretty(P.profile, next); res.json({ ok: true, profile: next }); }
   catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
@@ -751,13 +1135,13 @@ app.post('/api/profile/resume', (req, res) => {
   let buf; try { buf = Buffer.from(b.dataBase64, 'base64'); } catch (e) { return res.status(400).json({ ok: false, error: 'Bad base64.' }); }
   if (!buf.length || buf.length > 8 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'Empty or too-large file (8MB max).' });
   ensureBackupDir();
-  const tmpPath = path.join(BACKUP_DIR, 'resume-upload-' + backupStamp() + path.extname(fn).toLowerCase());
+  const tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + path.extname(fn).toLowerCase());
   try { fs.writeFileSync(tmpPath, buf); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   const preserved = readProfile();
   snapshotProfile();
   let child, done = false;
   const finish = (status, payload) => { if (done) return; done = true; try { fs.unlinkSync(tmpPath); } catch (e) {} res.status(status).json(payload); };
-  try { child = spawn(resolvePython(), [PROFILE_PYTHON, tmpPath], { cwd: ROOT, env: process.env }); }
+  try { child = spawn(resolvePython(), [PROFILE_PYTHON, tmpPath], { cwd: ROOT, env: tenantEnv() }); }
   catch (e) { return finish(500, { ok: false, error: 'python launch failed: ' + e.message }); }
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 30000);
   let err = '';
@@ -784,7 +1168,7 @@ app.post('/api/profile/resume', (req, res) => {
       regen.keywordOverrides = preserved.keywordOverrides;
       regen.keywords = applyKeywordOverrides(regen.parsedKeywords, preserved.keywordOverrides);
     }
-    try { writeJsonPretty(PROFILE_FILE, regen); } catch (e) { return finish(500, { ok: false, error: e.message }); }
+    try { writeJsonPretty(P.profile, regen); } catch (e) { return finish(500, { ok: false, error: e.message }); }
     finish(200, { ok: true, profile: regen });
   });
 });
@@ -793,20 +1177,18 @@ app.post('/api/profile/resume', (req, res) => {
 // Per-req cover-note / screening-answer drafts, grounded in the candidate profile + narrative
 // library + JD. Budget-gated (daily call cap + per-call token cap), logged, editable, NEVER
 // auto-submitted. Optional: needs OPENAI_API_KEY and ASSIST_ENABLED != 'false'.
-const ASSIST_USAGE = path.join(ROOT, 'agent', 'assist-usage.json');
-const ASSIST_LOG = path.join(ROOT, 'agent', 'assist-log.jsonl');
-const assistEnabled = () => process.env.ASSIST_ENABLED !== 'false';
-const assistModel = () => process.env.ASSIST_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini';
-const assistDailyCalls = () => Math.max(0, parseInt(process.env.ASSIST_DAILY_CALLS || '25', 10) || 0);
-const assistMaxTokens = () => Math.max(64, Math.min(4000, parseInt(process.env.ASSIST_MAX_TOKENS || '700', 10) || 700));
+const assistEnabled = () => cfg('ASSIST_ENABLED') !== 'false';
+const assistModel = () => cfg('ASSIST_MODEL') || cfg('OPENAI_MODEL') || 'gpt-5.4-mini';
+const assistDailyCalls = () => Math.max(0, parseInt(cfg('ASSIST_DAILY_CALLS') || '25', 10) || 0);
+const assistMaxTokens = () => Math.max(64, Math.min(4000, parseInt(cfg('ASSIST_MAX_TOKENS') || '700', 10) || 700));
 function assistUsage() {
   const today = new Date().toISOString().slice(0, 10);
-  let u = readJsonSafe(ASSIST_USAGE, {});
+  let u = readJsonSafe(P.assistUsage, {});
   if (u.date !== today) u = { date: today, calls: 0, tokens: 0 };
   return u;
 }
 function logAssist(entry) {
-  try { fs.mkdirSync(path.dirname(ASSIST_LOG), { recursive: true }); fs.appendFileSync(ASSIST_LOG, JSON.stringify(entry) + '\n'); } catch (e) {}
+  try { fs.mkdirSync(path.dirname(P.assistLog), { recursive: true }); fs.appendFileSync(P.assistLog, JSON.stringify(entry) + '\n'); } catch (e) {}
 }
 // Pull the assistant text out of a Responses-API result (raw HTTP — no SDK output_text helper
 // guaranteed, so handle both the convenience field and the structured output array).
@@ -841,8 +1223,11 @@ async function chatCompletions(base, key, { model, system, user, maxTokens, temp
 }
 
 async function openaiChat({ model, system, user, maxTokens, tools, toolChoice, temperature }) {
-  const key = process.env.OPENAI_API_KEY;
+  const key = aiKey();
   if (!key) throw new Error('no OPENAI_API_KEY');
+  // Per-user monthly token cap (admin-settable). 0/unset = no cap. Enforced at the single AI chokepoint.
+  const cap = parseInt(cfg('ASSIST_MONTHLY_TOKENS'), 10) || 0;
+  if (cap > 0 && assistWindowStats(30).tokens >= cap) throw new Error(`Monthly AI token cap reached (${cap.toLocaleString()}). Ask your admin to raise it.`);
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
   const temp = temperature != null ? temperature : 0.4;
   const usingTools = Array.isArray(tools) && tools.length;
@@ -874,13 +1259,32 @@ async function openaiChat({ model, system, user, maxTokens, tools, toolChoice, t
   return { content: extractResponsesText(j), tokens: responsesTokens(j), toolCalls };
 }
 
+// Built-in Responses tools, enabled by env (T2.4 file_search, T3.8 web_search). Returns undefined
+// when none set, so the normal chat-fallback path still applies.
+function assistTools() {
+  const tools = [];
+  if (process.env.ASSIST_WEB_SEARCH === 'true') tools.push({ type: 'web_search' });
+  if (process.env.OPENAI_VECTOR_STORE_ID) tools.push({ type: 'file_search', vector_store_ids: [process.env.OPENAI_VECTOR_STORE_ID] });
+  return tools.length ? tools : undefined;
+}
+// Force a single function-call (structured output) and return the parsed arguments (T1.1).
+async function callTool({ system, user, tool, maxTokens }) {
+  const { toolCalls, tokens } = await openaiChat({
+    model: assistModel(), system, user, maxTokens: maxTokens || 500,
+    tools: [tool], toolChoice: { type: 'function', name: tool.name }, temperature: 0.2,
+  });
+  const call = (toolCalls || [])[0];
+  if (!call) throw new Error('model returned no structured result (function calling needs the Responses API)');
+  let args; try { args = JSON.parse(call.arguments || '{}'); } catch (e) { throw new Error('could not parse model output'); }
+  return { args, tokens };
+}
+
 app.post('/api/assist', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
-  // 'answer' = a Saved-Answers draft (reusable Q&A): grounded in the profile + the question + the
-  // candidate's keywords/thoughts, and NOT tied to any req (no company/role required).
-  const kind = ['cover', 'screening', 'answer'].includes(b.kind) ? b.kind : 'cover';
+  // 'answer' = reusable Q&A draft; 'tailor' = résumé/answer suggestions to close JD keyword gaps.
+  const kind = ['cover', 'screening', 'answer', 'tailor', 'followup'].includes(b.kind) ? b.kind : 'cover';
   const rows = readStore();
   const row = rows.find(r => reqKey(r) === String(b.key || '').toLowerCase().trim());
   const company = (row && row.company) || b.company || '';
@@ -894,7 +1298,7 @@ app.post('/api/assist', async (req, res) => {
   const p = readProfile();
   const a = p.applicant || {};
   const narr = (p.narratives || []).map(n => `- ${n.title}: ${n.body}`).join('\n');
-  const jd = String(b.jd || (row && row.notes) || '').slice(0, parseInt(process.env.OPENAI_JD_CHARS || '3500', 10));
+  const jd = String(b.jd || (row && row.notes) || '').slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10));
   const keywords = String(b.keywords || '').slice(0, 1500);
   const system = 'You help a job candidate draft application materials. Write in first person, plain and PM-level, honest — no overclaiming, no flowery "ChatGPT" phrasing. Ground every claim ONLY in the candidate\'s narrative library; never invent employers, metrics, or titles. Be concise.';
   let user;
@@ -903,17 +1307,120 @@ app.post('/api/assist', async (req, res) => {
     user = `Candidate: ${a.name || ''}\n${targetLine}\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n${jd ? `\nJob context:\n${jd}\n` : ''}\nApplication question:\n${b.question || ''}\n\nThe candidate's own keywords / thoughts to build from (incorporate these honestly; do not invent beyond the narratives):\n${keywords || '(none provided)'}\n\nWrite a clear, honest answer (120-180 words) the candidate can reuse, grounded in the narratives and shaped by their keywords. First person, plain.`;
   } else if (kind === 'screening') {
     user = `Candidate: ${a.name || ''}\nTarget: ${role} at ${company}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nScreening question:\n${b.question || ''}\n\nWrite a tight, honest answer (120-180 words) grounded in the narratives.`;
+  } else if (kind === 'followup') {
+    const ctx = String(b.context || '').slice(0, 500);
+    const contact = String(b.contact || '').trim();
+    user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\nRecruiter/contact: ${contact || '(unknown — address generically)'}\n\nSituation: ${ctx || 'Follow up on a job application.'}\n\nCandidate narrative library (use ONLY these facts if you cite anything):\n${narr || '(none provided)'}\n\nWrite a SHORT, warm, professional follow-up message (60-110 words) the candidate can send. Reiterate genuine interest, reference the role, and ask a clear next-steps question. No overclaiming, no flattery, plain first-person. Output the message body only (no subject line, no placeholders like [Name] unless the contact is unknown).`;
+  } else if (kind === 'tailor') {
+    user = `Candidate: ${a.name || ''}\nTarget: ${role}${company ? ` at ${company}` : ''}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nKeywords the posting emphasizes that the résumé does NOT currently cover:\n${keywords || '(none provided)'}\n\nFor each missing keyword, say ONE of: (a) a concrete, HONEST résumé bullet or phrasing the candidate could add IF their narratives genuinely support it (cite which narrative), or (b) "gap — not supported by your background" when the narratives don't back it. Never fabricate experience. Output a short bulleted list.`;
   } else {
     user = `Candidate: ${a.name || ''}\nTarget: ${role} at ${company}\n\nCandidate narrative library (use ONLY these facts):\n${narr || '(none provided)'}\n\nJob context:\n${jd}\n\nDraft a short cover note (150-220 words): why this role fits, 1-2 concrete proof points from the narratives, and a confident close. First person, plain.`;
   }
   try {
-    const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: assistMaxTokens() });
-    u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(ASSIST_USAGE, u);
+    const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: assistMaxTokens(), tools: assistTools() });
+    u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
     logAssist({ ts: new Date().toISOString(), key: reqKey({ company, role }), kind, model: assistModel(), tokens, question: (kind === 'screening' || kind === 'answer') ? String(b.question || '').slice(0, 200) : undefined });
     res.json({ ok: true, draft: content, kind, tokens, usage: { calls: u.calls, tokens: u.tokens, cap } });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message });
   }
+});
+
+// Draft a professional summary from the candidate's own résumé/profile (work history, education,
+// narratives, keywords). Honest, grounded — never invents employers/metrics. Returns text only;
+// the user reviews and saves it. Reuses the assistant key + daily cap.
+app.post('/api/profile/draft-summary', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const cap = assistDailyCalls();
+  const u = assistUsage();
+  if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
+  const p = readProfile();
+  const a = p.applicant || {};
+  const work = (p.workHistory || []).slice(0, 6).map(w => `- ${w.role || ''}${w.company ? ', ' + w.company : ''}${w.start || w.end ? ` (${w.start || ''}–${w.end || ''})` : ''}${w.description ? ': ' + String(w.description).slice(0, 240) : ''}`).join('\n');
+  const edu = (p.education || []).slice(0, 4).map(e => `- ${e.level || ''} ${e.field || ''}${e.school ? ', ' + e.school : ''}`).join('\n');
+  const narr = (p.narratives || []).map(n => `- ${n.title}: ${n.body}`).join('\n');
+  const kw = (p.keywords || []).slice(0, 25).map(k => k.kw).join(', ');
+  if (!work && !narr && !edu) return res.status(400).json({ ok: false, error: 'Add work history, education, or narratives first — there is nothing to summarize.' });
+  const system = 'You write a concise first-person professional summary for a job candidate. Plain, senior-PM voice — honest, no flowery "ChatGPT" phrasing, no overclaiming. Ground every claim ONLY in the supplied work history, education, and narratives. Never invent employers, metrics, or titles.';
+  const user = `Candidate: ${a.name || ''}${a.location ? ` (${a.location})` : ''}\nTarget seniority/domains: ${(p.seniority || []).join(', ')} · ${(p.sectors || []).join(', ')}\n\nWork history:\n${work || '(none)'}\n\nEducation:\n${edu || '(none)'}\n\nNarrative library:\n${narr || '(none)'}\n\nKeywords: ${kw || '(none)'}\n\nWrite a 2–4 sentence professional summary in first person the candidate can use as an "about me" / positioning statement. Lead with what they are and their strongest proven impact. No bullet points.`;
+  try {
+    const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: 320, temperature: 0.5 });
+    u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+    logAssist({ ts: new Date().toISOString(), kind: 'summary', model: assistModel(), tokens });
+    res.json({ ok: true, summary: (content || '').trim(), tokens, usage: { calls: u.calls, tokens: u.tokens, cap } });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// Structured role scoring via function calling (T1.1). Returns fit/prob/tier/rationale — no prose
+// parsing. The caller decides whether to write it back to the row.
+app.post('/api/assist/score', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const b = req.body || {};
+  const rows = readStore();
+  const row = rows.find((r) => reqKey(r) === String(b.key || '').toLowerCase().trim());
+  const company = (row && row.company) || b.company || '';
+  const role = (row && row.role) || b.role || '';
+  if (!company && !role) return res.status(404).json({ ok: false, error: 'Req not found and no company/role provided.' });
+  const p = readProfile();
+  const a = p.applicant || {};
+  const narr = (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n');
+  const jd = String(b.jd || (row && row.notes) || '').slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10));
+  const tool = { type: 'function', name: 'score_role',
+    description: 'Score how well this role fits the candidate and the odds of landing an interview.',
+    parameters: { type: 'object', additionalProperties: false, properties: {
+      fit: { type: 'number', description: '0-10: domain/résumé match' },
+      prob: { type: 'number', description: '0-10: probability of getting a screen' },
+      tier: { type: 'string', enum: ['A', 'B', 'C'] },
+      rationale: { type: 'string', description: 'one or two sentences, honest' },
+    }, required: ['fit', 'prob', 'tier', 'rationale'] } };
+  const system = 'You score job fit for a Principal/Director-level product manager focused on data platforms, CDP, AI platform, and martech. Be honest and calibrated; remote-only (penalize on-site). Ground in the candidate facts; do not inflate.';
+  const user = `Candidate: ${a.name || ''}\nSeniority: ${(p.seniority || []).join(', ')}\nDomains: ${(p.sectors || []).join(', ')}\n\nNarratives:\n${narr || '(none)'}\n\nTarget role: ${role}${company ? ` at ${company}` : ''}\nJob description:\n${jd || '(none provided)'}`;
+  try {
+    const { args, tokens } = await callTool({ system, user, tool, maxTokens: 300 });
+    const u = assistUsage(); u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+    logAssist({ ts: new Date().toISOString(), key: reqKey({ company, role }), kind: 'score', model: assistModel(), tokens });
+    res.json({ ok: true, fit: args.fit, prob: args.prob, tier: args.tier, rationale: args.rationale, tokens });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
+});
+
+// Structured field mapping via function calling (T1.1). Given scanned form fields ({i, sig, type}),
+// returns {i, value, confidence} grounded ONLY in the candidate's factual profile — for the
+// extension's AI smart-fill of fields the deterministic matcher missed. Never invents values.
+app.post('/api/assist/map-fields', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const b = req.body || {};
+  const fields = Array.isArray(b.fields) ? b.fields.slice(0, 60) : [];
+  if (!fields.length) return res.json({ ok: true, fields: [], tokens: 0 });
+  const p = readProfile();
+  const a = p.applicant || {};
+  const facts = {
+    name: a.name || '', email: a.email || '', phone: a.phone || '', location: a.location || '',
+    linkedin: a.linkedin || '', github: a.github || '', website: a.website || a.personalUrl || '',
+    seniority: (p.seniority || [])[0] || '', authorized_us: 'Yes', requires_sponsorship: 'No',
+  };
+  const tool = { type: 'function', name: 'map_fields',
+    description: 'Map application form fields to the candidate factual values. Only include a field when you are confident; never invent a value.',
+    parameters: { type: 'object', additionalProperties: false, properties: {
+      fields: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        i: { type: 'integer', description: 'the field index given in the input' },
+        value: { type: 'string' },
+        confidence: { type: 'number', description: '0-1' },
+      }, required: ['i', 'value', 'confidence'] } },
+    }, required: ['fields'] } };
+  const system = 'You map web-form fields to a candidate\'s known factual values. Use ONLY the provided facts. If a field has no confident match (or is a password/EEO/consent/essay), omit it. Never fabricate.';
+  const user = `Candidate facts (the only values you may use):\n${JSON.stringify(facts, null, 2)}\n\nForm fields (index + signature text + html type):\n${fields.map((f) => `#${f.i} [${f.type || ''}] ${String(f.sig || '').slice(0, 160)}`).join('\n')}`;
+  try {
+    const { args, tokens } = await callTool({ system, user, tool, maxTokens: 600 });
+    const u = assistUsage(); u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+    logAssist({ ts: new Date().toISOString(), key: 'map-fields', kind: 'mapfields', model: assistModel(), tokens });
+    const out = (args.fields || []).filter((f) => f && Number.isInteger(f.i) && typeof f.value === 'string');
+    res.json({ ok: true, fields: out, tokens });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
 });
 
 // ---------- assist consumption monitor ----------
@@ -925,7 +1432,7 @@ function assistWindowStats(days) {
   const cutoff = Date.now() - days * 86400000;
   let calls = 0, tokens = 0;
   try {
-    const txt = fs.readFileSync(ASSIST_LOG, 'utf8');
+    const txt = fs.readFileSync(P.assistLog, 'utf8');
     for (const line of txt.split(/\r?\n/)) {
       if (!line.trim()) continue;
       let e; try { e = JSON.parse(line); } catch (_) { continue; }
@@ -936,8 +1443,8 @@ function assistWindowStats(days) {
   return { calls, tokens };
 }
 // Price is user-supplied — we never hardcode a model price (it would go stale / be wrong).
-const assistRatePer1M = () => { const v = parseFloat(process.env.OPENAI_PRICE_PER_1M || ''); return isFinite(v) && v > 0 ? v : null; };
-const assistMonthlyBudget = () => { const v = parseFloat(process.env.ASSIST_MONTHLY_BUDGET || ''); return isFinite(v) && v > 0 ? v : null; };
+const assistRatePer1M = () => { const v = parseFloat(cfg('OPENAI_PRICE_PER_1M') || ''); return isFinite(v) && v > 0 ? v : null; };
+const assistMonthlyBudget = () => { const v = parseFloat(cfg('ASSIST_MONTHLY_BUDGET') || ''); return isFinite(v) && v > 0 ? v : null; };
 const estCost = (tokens, rate) => rate == null ? null : Math.round((tokens / 1e6) * rate * 100) / 100;
 
 app.get('/api/assist/usage', (req, res) => {
@@ -950,7 +1457,7 @@ app.get('/api/assist/usage', (req, res) => {
   const cost30 = estCost(w30.tokens, rate);
   res.json({
     ok: true,
-    enabled: assistEnabled(), keySet: !!process.env.OPENAI_API_KEY, model: assistModel(),
+    enabled: assistEnabled(), keySet: !!aiKey(), model: assistModel(),
     today: { calls: u.calls, tokens: u.tokens, cap },
     last7d: { calls: w7.calls, tokens: w7.tokens, estCost: estCost(w7.tokens, rate) },
     last30d: { calls: w30.calls, tokens: w30.tokens, estCost: cost30 },
@@ -961,11 +1468,38 @@ app.get('/api/assist/usage', (req, res) => {
   });
 });
 
+// Model picker — the real list from OpenAI (GET /v1/models), filtered to chat-capable gpt-* ids and
+// cached 1h. No fabricated names: if there's no key or the call fails, fall back to the currently
+// configured model(s) only, so the dropdown always at least round-trips the saved value.
+let _modelCache = { at: 0, list: null };
+async function listOpenAiModels() {
+  const cur = [cfg('OPENAI_MODEL'), cfg('ASSIST_MODEL'), 'gpt-5.4-mini'].filter(Boolean);
+  const fallback = [...new Set(cur)];
+  if (!aiKey()) return { models: fallback, source: 'fallback' };
+  if (_modelCache.list && Date.now() - _modelCache.at < 3600000) return { models: _modelCache.list, source: 'cache' };
+  try {
+    const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+    const r = await fetch(base + '/models', { headers: { Authorization: 'Bearer ' + aiKey() } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    let ids = (j.data || []).map(m => m.id).filter(id => /^(gpt|o\d|chatgpt)/i.test(id) && !/audio|realtime|transcribe|tts|image|embedding|moderation/i.test(id));
+    ids = [...new Set([...ids, ...fallback])].sort();
+    _modelCache = { at: Date.now(), list: ids };
+    return { models: ids, source: 'api' };
+  } catch (e) {
+    return { models: fallback, source: 'fallback', error: e.message };
+  }
+}
+app.get('/api/assist/models', async (req, res) => {
+  const r = await listOpenAiModels();
+  res.json({ ok: true, ...r, current: { scoring: cfg('OPENAI_MODEL') || 'gpt-5.4-mini', assistant: cfg('ASSIST_MODEL') || '' } });
+});
+
 // ---------- interview prep guide (auto-generated when a role reaches an interview stage) ----------
 // Stored as Markdown in agent/interview-guides/<sha1(key)>.md and "attached" to the row via
 // row.guideAt. Generated from the candidate's narratives + the role's JD; grounded, never invented.
 const INTERVIEW_STAGES = new Set(['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer']);
-const GUIDE_DIR = path.join(ROOT, 'agent', 'interview-guides');
+const GUIDE_DIR = path.join(DATA_DIR, 'agent', 'interview-guides');
 const guidePath = (key) => path.join(GUIDE_DIR, crypto.createHash('sha1').update(key).digest('hex') + '.md');
 const guideMaxTokens = () => Math.max(800, parseInt(process.env.GUIDE_MAX_TOKENS || '1800', 10) || 1800);
 
@@ -973,12 +1507,11 @@ async function generateInterviewGuide(row) {
   const p = readProfile();
   const a = p.applicant || {};
   const narr = (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n');
-  const jd = String(row.notes || '').slice(0, parseInt(process.env.OPENAI_JD_CHARS || '3500', 10));
+  const jd = String(row.notes || '').slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10));
   const company = row.company || '', role = row.role || '';
   const system = 'You are an expert interview coach preparing a candidate for a specific role. Produce a concise, practical interview prep guide in Markdown. Ground every candidate-specific claim ONLY in their narrative library — never invent employers, metrics, or titles. Be specific and actionable, not generic.';
   const user = `Candidate: ${a.name || ''}\nTarget role: ${role}${company ? ` at ${company}` : ''}\n\nCandidate narrative library (use ONLY these facts for "your story" parts):\n${narr || '(none provided)'}\n\nJob context:\n${jd || '(none provided)'}\n\nWrite an interview prep guide with exactly these sections:\n## Role snapshot\n## Why you fit (from your narratives)\n## Likely questions & how to answer (8–10, mixing behavioral + role-specific; one or two lines of guidance each)\n## Your stories to lead with (map specific narratives to STAR)\n## Smart questions to ask them\n## Things to clarify / possible red flags\n## 48-hour prep checklist\nKeep it tight and skimmable.`;
-  const tools = (process.env.ASSIST_WEB_SEARCH === 'true') ? [{ type: 'web_search' }] : undefined;
-  const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: guideMaxTokens(), tools, temperature: 0.5 });
+  const { content, tokens } = await openaiChat({ model: assistModel(), system, user, maxTokens: guideMaxTokens(), tools: assistTools(), temperature: 0.5 });
   return { markdown: content, tokens };
 }
 
@@ -1038,6 +1571,16 @@ ${bodyHtml}</div></body></html>`;
 }
 
 // Open the guide (styled HTML page — what the board card links to).
+// Raw guide markdown as JSON (P1.4) — the app fetches this (authed) and renders it natively, since a
+// WebView can't easily send the X-CRM-Token for the styled HTML page.
+app.get('/api/reqs/:key/guide.json', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const fp = guidePath(key);
+  const row = readStore().find((r) => reqKey(r) === key);
+  if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
+  if (!fs.existsSync(fp)) return res.json({ ok: true, exists: false, key, company: row.company, role: row.role });
+  res.json({ ok: true, exists: true, key, company: row.company, role: row.role, guideAt: row.guideAt || null, markdown: fs.readFileSync(fp, 'utf8') });
+});
 app.get('/api/reqs/:key/guide', (req, res) => {
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
   const fp = guidePath(key);
@@ -1053,13 +1596,16 @@ app.get('/api/reqs/:key/guide', (req, res) => {
 
 // Force (re)generate a guide (board "Generate guide" button). Awaits so the card can open it after.
 app.post('/api/reqs/:key/guide', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const job = jobs.create('interview_guide', { label: 'Interview guide · ' + key });
   try {
     await buildAndStoreGuide(key);
+    jobs.finish(job.id, { key });
     res.json({ ok: true, key, url: '/api/reqs/' + encodeURIComponent(key) + '/guide' });
   } catch (e) {
+    jobs.fail(job.id, e.message);
     res.status(502).json({ ok: false, error: e.message });
   }
 });
@@ -1068,7 +1614,7 @@ app.post('/api/reqs/:key/guide', async (req, res) => {
 // Assembles a downloadable .docx CV from the candidate's profile. The summary is AI-written when a
 // key is available (grounded in the same facts), else deterministic. Body sections are ALWAYS the
 // real structured fields (work history / education / narratives / awards) — never invented.
-const CV_CACHE = path.join(ROOT, 'agent', 'cv-latest.json');
+// CV cache is tenant-scoped (P.cvCache) so one user's last-built CV never leaks to another.
 
 function cvSections(p) {
   const a = p.applicant || {};
@@ -1103,8 +1649,8 @@ async function cvSummary(p, tailor) {
   // Optional per-role tailoring: bias the summary's emphasis toward a target role/JD, still grounded.
   const t = tailor && (tailor.role || tailor.company || tailor.jd) ? tailor : null;
   const targetLine = t ? `Target role: ${[t.role, t.company].filter(Boolean).join(' at ')}`.trim() : '';
-  const jd = t && t.jd ? `\nTarget job description:\n${String(t.jd).slice(0, parseInt(process.env.OPENAI_JD_CHARS || '3500', 10))}` : '';
-  if (facts && process.env.OPENAI_API_KEY && assistEnabled()) {
+  const jd = t && t.jd ? `\nTarget job description:\n${String(t.jd).slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10))}` : '';
+  if (facts && aiKey() && assistEnabled()) {
     try {
       const system = t
         ? 'Write a 2–3 sentence professional summary for the top of a CV, tailored to the target role — lead with the candidate\'s most relevant experience for it. Ground ONLY in the facts provided; never invent employers, titles, or metrics, and never claim skills not in the facts. No first-person pronouns, no flowery phrasing.'
@@ -1171,7 +1717,7 @@ app.post('/api/cv', async (req, res) => {
     const { text: summary, source } = await cvSummary(p, tailor);
     const markdown = cvMarkdown(s, summary);
     const tailoredFor = tailor && (tailor.role || tailor.company) ? [tailor.role, tailor.company].filter(Boolean).join(' at ') : null;
-    try { writeJsonPretty(CV_CACHE, { sections: s, summary, source, tailoredFor, builtAt: new Date().toISOString() }); } catch (e) {}
+    try { writeJsonPretty(P.cvCache, { sections: s, summary, source, tailoredFor, builtAt: new Date().toISOString() }); } catch (e) {}
     res.json({ ok: true, markdown, source, name: s.name, tailoredFor });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
@@ -1215,7 +1761,7 @@ ${s.volunteer.length ? sec('Volunteer', ul(s.volunteer)) : ''}
 
 app.get('/api/cv.html', async (req, res) => {
   try {
-    let cache = readJsonSafe(CV_CACHE, null);
+    let cache = readJsonSafe(P.cvCache, null);
     if (!cache || !cache.sections) { const p = readProfile(); cache = { sections: cvSections(p), summary: (await cvSummary(p)).text }; }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(cvHtml(cache.sections, cache.summary || ''));
@@ -1225,7 +1771,7 @@ app.get('/api/cv.html', async (req, res) => {
 // Stream the CV as a .docx (uses the last POST /api/cv content, else builds fresh).
 app.get('/api/cv.docx', async (req, res) => {
   try {
-    let cache = readJsonSafe(CV_CACHE, null);
+    let cache = readJsonSafe(P.cvCache, null);
     if (!cache || !cache.sections) { const p = readProfile(); cache = { sections: cvSections(p), summary: (await cvSummary(p)).text }; }
     const buf = await cvDocxBuffer(cache.sections, cache.summary || '');
     const safe = (String(cache.sections.name || 'CV').replace(/[^\w .-]/g, '').trim() || 'CV') + ' CV.docx';
@@ -1239,12 +1785,11 @@ app.get('/api/cv.docx', async (req, res) => {
 // Composed server-side from the store (deterministic, no external calls). Delivered by an
 // in-server scheduler via Slack webhook or SMTP email, with a file fallback always written.
 // (Express can't reach the M365/Slack MCP connectors, so we use a webhook / SMTP.)
-const DIGEST_STATE = path.join(ROOT, 'agent', 'digest-state.json');
 const DIGEST_PYTHON = path.join(ROOT, 'agent', 'digest.py');
-const digestEnabled = () => process.env.DIGEST_ENABLED === 'true';
-const digestTime = () => /^\d{1,2}:\d{2}$/.test(process.env.DIGEST_TIME || '') ? process.env.DIGEST_TIME : '07:00';
-const digestChannel = () => ['file', 'slack', 'email'].includes(process.env.DIGEST_CHANNEL) ? process.env.DIGEST_CHANNEL : 'file';
-const digestDays = () => Math.max(1, Math.min(60, parseInt(process.env.DIGEST_DAYS || '1', 10) || 1));
+const digestEnabled = () => cfg('DIGEST_ENABLED') === 'true';
+const digestTime = () => /^\d{1,2}:\d{2}$/.test(cfg('DIGEST_TIME') || '') ? cfg('DIGEST_TIME') : '07:00';
+const digestChannel = () => ['file', 'slack', 'email'].includes(cfg('DIGEST_CHANNEL')) ? cfg('DIGEST_CHANNEL') : 'file';
+const digestDays = () => Math.max(1, Math.min(60, parseInt(cfg('DIGEST_DAYS') || '1', 10) || 1));
 // Local date-only day delta. Parses "YYYY-MM-DD" as LOCAL midnight (not UTC) so a same-day
 // date reads as 0 days regardless of clock time / timezone (fixes the 7am "1 day old" bug).
 function daysSinceServer(d) {
@@ -1261,7 +1806,7 @@ function daysSinceServer(d) {
 function composeDigest(days) {
   days = Math.max(1, Math.min(60, days || digestDays()));
   const rows = liveRows(readStore());
-  const hy = hygieneSettings(readJsonSafe(BOARDS_FILE, {}));
+  const hy = hygieneSettings(readJsonSafe(P.boards, {}));
   const ev = r => +(((+r.fit || 0) * (+r.prob || 0)) / 10).toFixed(1);
   const byEv = (a, b) => ev(b) - ev(a);
   const newFinds = rows.filter(r => { const d = daysSinceServer(r.added); return d != null && d < days && r.status === 'Not Applied'; }).sort(byEv);
@@ -1295,36 +1840,156 @@ function composeDigest(days) {
   };
 }
 
-async function deliverDigest(channel, payload) {
-  channel = channel || digestChannel();
-  // always write the file fallback
+// ---------- notification channels (Phase: notifications) ----------
+const ALL_CHANNELS = ['inapp', 'file', 'slack', 'email', 'sms', 'push'];
+function parseChannels(str, fallback) {
+  const set = String(str || '').split(',').map(s => s.trim().toLowerCase()).filter(c => ALL_CHANNELS.includes(c));
+  return set.length ? [...new Set(set)] : (fallback || []);
+}
+// Digest channels: new multi-select DIGEST_CHANNELS, else the legacy single DIGEST_CHANNEL, else file.
+function digestChannels() { return parseChannels(cfg('DIGEST_CHANNELS'), [digestChannel()]); }
+// US carrier email-to-SMS gateways — a free SMS path that reuses SMTP (no Twilio account). Carrier-
+// dependent and best-effort (carriers filter/throttle), but $0. number@gateway -> arrives as a text.
+const CARRIER_GATEWAYS = {
+  verizon: 'vtext.com', att: 'txt.att.net', tmobile: 'tmomail.net', sprint: 'messaging.sprintpcs.com',
+  uscellular: 'email.uscc.net', boost: 'sms.myboostmobile.com', cricket: 'sms.cricketwireless.net',
+  metro: 'mymetropcs.com', googlefi: 'msg.fi.google.com', xfinity: 'vtext.com', visible: 'vtext.com'
+};
+const smsMethod = () => (cfg('SMS_METHOD') === 'email' ? 'email' : 'twilio');
+const twilioConfigured = () => !!(cfg('TWILIO_ACCOUNT_SID') && cfg('TWILIO_AUTH_TOKEN') && cfg('TWILIO_FROM') && cfg('SMS_TO'));
+function smsGatewayAddress() {
+  const digits = String(cfg('SMS_GATEWAY_NUMBER') || '').replace(/\D/g, '');
+  const dom = CARRIER_GATEWAYS[(cfg('SMS_CARRIER') || '').toLowerCase()];
+  return (digits && dom) ? `${digits}@${dom}` : '';
+}
+const emailSmsConfigured = () => !!(emailConfigured() && smsGatewayAddress());
+const smsConfigured = () => smsMethod() === 'email' ? emailSmsConfigured() : twilioConfigured();
+const slackConfigured = () => !!cfg('DIGEST_SLACK_WEBHOOK');
+const emailConfigured = () => !!(process.env.SMTP_HOST && process.env.SMTP_USER);
+function channelReady(ch) {
+  return ch === 'inapp' || ch === 'file' ? true
+    : ch === 'slack' ? slackConfigured()
+    : ch === 'email' ? emailConfigured()
+    : ch === 'sms' ? smsConfigured()
+    : ch === 'push' ? apnsConfigured()
+    : false;
+}
+// In-app feed — a capped notifications log the board can poll + show as a bell with an unread count.
+function appendInApp(n) {
   try {
-    fs.mkdirSync(path.join(ROOT, 'agent'), { recursive: true });
-    fs.writeFileSync(path.join(ROOT, 'agent', 'digest-latest.html'), payload.html);
-    fs.writeFileSync(path.join(ROOT, 'agent', 'digest-latest.txt'), payload.text);
+    const feed = readJsonSafe(P.notifications, { items: [] });
+    feed.items = feed.items || [];
+    feed.items.unshift({ id: 'n' + crypto.randomBytes(4).toString('hex'), ts: new Date().toISOString(), read: false,
+      title: n.title || '', body: n.body || '', kind: n.kind || 'info', link: n.link || '' });
+    feed.items = feed.items.slice(0, 100);
+    writeJsonPretty(P.notifications, feed);
   } catch (e) {}
-  if (channel === 'slack') {
-    const url = process.env.DIGEST_SLACK_WEBHOOK || '';
-    if (!url) throw new Error('Slack channel selected but DIGEST_SLACK_WEBHOOK is not set.');
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: payload.text }) });
-    if (!r.ok) throw new Error('Slack webhook HTTP ' + r.status);
-    return { channel: 'slack' };
+}
+// SMS — routes to the configured method. 'email' = free carrier email-to-SMS gateway over SMTP;
+// 'twilio' = Twilio REST. Both soft-fail (skip) when not configured.
+async function sendSms(text) {
+  if (smsMethod() === 'email') {
+    if (!emailSmsConfigured()) return { ok: false, skipped: 'email-sms-not-configured' };
+    // Plain, short, text-only so the carrier gateway delivers it as a clean SMS (no HTML).
+    await sendEmailPayload({ subject: '', text: String(text).slice(0, 300), html: '', to: smsGatewayAddress(), counts: {} });
+    return { ok: true, via: 'email-gateway' };
   }
-  if (channel === 'email') {
-    // SMTP via the stdlib Python deliverer (no Node SMTP dep)
-    const tmp = path.join(BACKUP_DIR, 'digest-payload-' + backupStamp() + '.json');
-    ensureBackupDir();
-    fs.writeFileSync(tmp, JSON.stringify(payload));
-    await new Promise((resolve, reject) => {
-      let err = '';
-      const child = spawn(resolvePython(), [DIGEST_PYTHON, '--send-file', tmp], { cwd: ROOT, env: process.env });
-      child.stderr && child.stderr.on('data', d => { err += d; });
-      child.once('error', e => reject(e));
-      child.once('exit', code => { try { fs.unlinkSync(tmp); } catch (e) {} code === 0 ? resolve() : reject(new Error('email send failed: ' + (err.trim() || ('exit ' + code)))); });
-    });
-    return { channel: 'email' };
+  if (!twilioConfigured()) return { ok: false, skipped: 'sms-not-configured' };
+  const sid = cfg('TWILIO_ACCOUNT_SID');
+  const auth = Buffer.from(sid + ':' + cfg('TWILIO_AUTH_TOKEN')).toString('base64');
+  const form = new URLSearchParams({ To: cfg('SMS_TO'), From: cfg('TWILIO_FROM'), Body: String(text).slice(0, 1500) });
+  const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+    method: 'POST', headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded' }, body: form
+  });
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('Twilio HTTP ' + r.status + ' ' + t.slice(0, 120)); }
+  return { ok: true, via: 'twilio' };
+}
+async function sendSlack(text) {
+  const url = cfg('DIGEST_SLACK_WEBHOOK') || '';
+  if (!url) return { ok: false, skipped: 'slack-not-configured' };
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+  if (!r.ok) throw new Error('Slack webhook HTTP ' + r.status);
+  return { ok: true };
+}
+async function sendEmailPayload(payload) {
+  if (!emailConfigured()) return { ok: false, skipped: 'email-not-configured' };
+  const tmp = path.join(P.backups, 'digest-payload-' + backupStamp() + '.json');
+  ensureBackupDir(); fs.writeFileSync(tmp, JSON.stringify(payload));
+  await new Promise((resolve, reject) => {
+    let err = '';
+    const child = spawn(resolvePython(), [DIGEST_PYTHON, '--send-file', tmp], { cwd: ROOT, env: tenantEnv() });
+    child.stderr && child.stderr.on('data', d => { err += d; });
+    child.once('error', e => reject(e));
+    child.once('exit', code => { try { fs.unlinkSync(tmp); } catch (e) {} code === 0 ? resolve() : reject(new Error('email send failed: ' + (err.trim() || ('exit ' + code)))); });
+  });
+  return { ok: true };
+}
+// Current tenant's email (for per-user digest delivery). '' in single-user / no email set.
+function currentUserEmail() { if (!MULTIUSER()) return ''; const u = users.getById(store.currentUser()); return (u && u.email) || ''; }
+// Welcome email for a new user — sent from the server's outbound identity (DIGEST_FROM / SMTP_USER,
+// e.g. reqonapp@gmail.com) to the user's address. Best-effort; skips if SMTP or email is missing.
+const _he = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+async function sendWelcomeEmail(user, tempPassword) {
+  if (!user || !user.email) return { ok: false, skipped: 'no-email' };
+  if (!emailConfigured()) return { ok: false, skipped: 'smtp-not-configured' };
+  const base = (process.env.PUBLIC_URL || '').trim() || lanBase() || ('http://localhost:' + PORT);
+  const name = user.displayName || user.username || user.id;
+  const pwLine = tempPassword ? `Temporary password: ${tempPassword}  (change it in Settings after your first sign-in)\n` : '';
+  const text = `Hi ${name},\n\nAn account was created for you on Reqon — your self-hosted job-search command center.\n\n` +
+    `Sign in: ${base}/login\nUsername: ${user.id}\n${pwLine}\n` +
+    `On first sign-in you'll answer a couple of quick questions (the roles you're after, an optional résumé) so your board starts relevant.\n\n— Reqon`;
+  const html = `<div style="font-family:system-ui,Arial,sans-serif;color:#1F1E5D;max-width:560px;line-height:1.55">` +
+    `<h2 style="color:#1F1E5D">Welcome to <span style="color:#00B57F">Reqon</span> 👋</h2>` +
+    `<p>Hi ${_he(name)}, an account was created for you on Reqon — your job-search command center.</p>` +
+    `<p><b>Sign in:</b> <a href="${_he(base)}/login">${_he(base)}/login</a><br><b>Username:</b> ${_he(user.id)}` +
+    (tempPassword ? `<br><b>Temporary password:</b> <code>${_he(tempPassword)}</code> <span style="color:#5A5D77">(change it in Settings after first sign-in)</span>` : '') + `</p>` +
+    `<p>On first sign-in we'll ask a couple of quick questions (target roles, an optional résumé) so your board starts relevant.</p>` +
+    `<p style="color:#5A5D77">— Reqon</p></div>`;
+  return sendEmailPayload({ subject: 'Welcome to Reqon', text, html, to: user.email, counts: {} });
+}
+// Deliver a digest payload to every requested channel. File is always written. Per-channel failures
+// are collected (one bad channel doesn't sink the rest). Returns {delivered:[], skipped:[], errors:[]}.
+async function deliverDigest(channels, payload) {
+  const want = Array.isArray(channels) ? channels : parseChannels(channels, [digestChannel()]);
+  const out = { delivered: [], skipped: [], errors: [] };
+  try {
+    fs.mkdirSync(path.join(DATA_DIR, 'agent'), { recursive: true });
+    fs.writeFileSync(path.join(DATA_DIR, 'agent', 'digest-latest.html'), payload.html);
+    fs.writeFileSync(path.join(DATA_DIR, 'agent', 'digest-latest.txt'), payload.text);
+  } catch (e) {}
+  const set = new Set(want); set.add('file');   // file fallback always
+  for (const ch of set) {
+    try {
+      let r;
+      if (ch === 'file') { out.delivered.push('file'); continue; }
+      if (ch === 'inapp') { const c = payload.counts || {}; appendInApp({ title: 'Digest', body: `${c.newFinds || 0} new · ${c.followUps || 0} follow-ups · ${c.closed || 0} closed`, kind: 'digest' }); out.delivered.push('inapp'); continue; }
+      if (ch === 'slack') r = await sendSlack(payload.text);
+      else if (ch === 'email') { const to = currentUserEmail(); r = await sendEmailPayload(to ? { ...payload, to } : payload); }
+      else if (ch === 'sms') r = await sendSms(payload.subject || payload.text.slice(0, 300));
+      else if (ch === 'push') { const c = payload.counts || {}; r = await sendPush({ title: 'Morning digest', body: `${c.newFinds || 0} new · ${c.followUps || 0} follow-ups · ${c.closed || 0} closed`, eventKey: 'digest-' + new Date().toISOString().slice(0, 10) }); }
+      if (r && r.ok) out.delivered.push(ch);
+      else out.skipped.push({ channel: ch, reason: (r && r.skipped) || 'not configured' });
+    } catch (e) { out.errors.push({ channel: ch, error: e.message }); }
   }
-  return { channel: 'file', file: 'agent/digest-latest.html' };
+  return out;
+}
+// Generic short-event notification (used by Gmail ingest). Dispatches to the given channels.
+async function dispatchNotify({ title, body, channels, kind, eventKey }) {
+  const want = new Set(Array.isArray(channels) ? channels : parseChannels(channels, ['inapp']));
+  const out = { delivered: [], skipped: [], errors: [] };
+  for (const ch of want) {
+    try {
+      let r;
+      if (ch === 'inapp') { appendInApp({ title, body, kind: kind || 'event' }); out.delivered.push('inapp'); continue; }
+      if (ch === 'file') { out.skipped.push({ channel: 'file', reason: 'n/a for events' }); continue; }
+      if (ch === 'slack') r = await sendSlack(`*${title}*\n${body}`);
+      else if (ch === 'email') r = await sendEmailPayload({ subject: title, text: title + '\n\n' + body, html: `<h3>${title}</h3><p>${body}</p>`, counts: {} });
+      else if (ch === 'sms') r = await sendSms(title + ' — ' + body);
+      else if (ch === 'push') r = await sendPush({ title, body, eventKey: eventKey || 'evt-' + Date.now() });
+      if (r && r.ok) out.delivered.push(ch); else out.skipped.push({ channel: ch, reason: (r && r.skipped) || 'not configured' });
+    } catch (e) { out.errors.push({ channel: ch, error: e.message }); }
+  }
+  return out;
 }
 
 app.get('/api/digest', (req, res) => {
@@ -1334,51 +1999,68 @@ app.get('/api/digest', (req, res) => {
 
 app.post('/api/digest/send', async (req, res) => {
   const b = req.body || {};
-  const channel = ['file', 'slack', 'email'].includes(b.channel) ? b.channel : digestChannel();
+  // accept an explicit channels array (test a specific set) or fall back to the configured set
+  const channels = Array.isArray(b.channels) ? parseChannels(b.channels.join(','), digestChannels())
+    : (b.channel ? parseChannels(b.channel, digestChannels()) : digestChannels());
   try {
     const payload = composeDigest(b.days);
-    const r = await deliverDigest(channel, payload);
-    let st = readJsonSafe(DIGEST_STATE, {});
-    st.lastSent = new Date().toISOString(); st.lastChannel = r.channel; st.lastCounts = payload.counts;
-    writeJsonPretty(DIGEST_STATE, st);
-    res.json({ ok: true, delivered: r.channel, counts: payload.counts });
+    const r = await deliverDigest(channels, payload);
+    let st = readJsonSafe(P.digestState, {});
+    st.lastSent = new Date().toISOString(); st.lastChannel = r.delivered.join('+'); st.lastCounts = payload.counts;
+    writeJsonPretty(P.digestState, st);
+    res.json({ ok: true, delivered: r.delivered, skipped: r.skipped, errors: r.errors, counts: payload.counts });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message });
   }
 });
 
+// In-app notification feed (the board polls this + shows a bell with an unread count).
+app.get('/api/notifications', (req, res) => {
+  const feed = readJsonSafe(P.notifications, { items: [] });
+  const items = (feed.items || []).slice(0, 50);
+  res.json({ ok: true, items, unread: items.filter(i => !i.read).length });
+});
+app.post('/api/notifications/read', (req, res) => {
+  const feed = readJsonSafe(P.notifications, { items: [] });
+  const ids = Array.isArray((req.body || {}).ids) ? new Set(req.body.ids) : null;
+  (feed.items || []).forEach(i => { if (!ids || ids.has(i.id)) i.read = true; });
+  writeJsonPretty(P.notifications, feed);
+  res.json({ ok: true, unread: (feed.items || []).filter(i => !i.read).length });
+});
+
 // In-server scheduler: once a minute, if enabled and the local HH:MM matches and we haven't
 // sent today, compose + deliver. Runs only while the server is up (launchd keeps it up).
-let digestLastTick = '';
 function digestScheduler() {
   try {
-    if (!digestEnabled()) return;
     const now = new Date();
     const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-    const want = digestTime().padStart(5, '0');
     const today = now.toISOString().slice(0, 10);
-    if (hhmm !== want) return;
-    const st = readJsonSafe(DIGEST_STATE, {});
-    if ((st.lastSent || '').slice(0, 10) === today) return;   // already sent today
-    if (digestLastTick === today + hhmm) return;
-    digestLastTick = today + hhmm;
-    composeDigestAndDeliver();
+    // Runs inside a tenant context; digestEnabled()/digestTime() resolve THAT user's settings via cfg().
+    const sendIfDue = () => {
+      if (!digestEnabled()) return;
+      if (digestTime().padStart(5, '0') !== hhmm) return;       // each user's own scheduled time
+      const st = readJsonSafe(P.digestState, {});
+      if ((st.lastSent || '').slice(0, 10) === today) return;   // once-a-day guard (per-user file)
+      composeDigestAndDeliver();
+    };
+    if (MULTIUSER()) {
+      for (const u of users.list().filter(x => !x.disabled)) store.runAs(u.id, sendIfDue);   // per-user schedule + content
+    } else {
+      sendIfDue();   // owner / single-user (shared .env config)
+    }
   } catch (e) { console.error('[digest]', e.message); }
 }
 async function composeDigestAndDeliver() {
+  const job = jobs.create('digest', { label: 'Morning digest' });
   try {
     const payload = composeDigest();
-    const r = await deliverDigest(digestChannel(), payload);
-    const st = readJsonSafe(DIGEST_STATE, {});
-    st.lastSent = new Date().toISOString(); st.lastChannel = r.channel; st.lastCounts = payload.counts;
-    writeJsonPretty(DIGEST_STATE, st);
-    console.log('[digest] sent via ' + r.channel, payload.counts);
-    // WP-0 push hook: digest summary incl. follow-ups due (FR-SRV-5)
-    const c = payload.counts || {};
-    sendPush({ title: 'Morning digest',
-      body: `${c.newFinds || 0} new · ${c.followUps || 0} follow-ups due · ${c.closed || 0} closed`,
-      eventKey: 'digest-' + new Date().toISOString().slice(0, 10) }).catch(() => {});
-  } catch (e) { console.error('[digest] delivery failed:', e.message); }
+    const r = await deliverDigest(digestChannels(), payload);   // push is now just another channel
+    const st = readJsonSafe(P.digestState, {});
+    st.lastSent = new Date().toISOString(); st.lastChannel = r.delivered.join('+'); st.lastCounts = payload.counts;
+    writeJsonPretty(P.digestState, st);
+    console.log('[digest] delivered:', r.delivered.join(', ') || '(none)', r.errors.length ? 'errors:' + JSON.stringify(r.errors) : '', payload.counts);
+    jobs.finish(job.id, { delivered: r.delivered, counts: payload.counts });
+  } catch (e) { jobs.fail(job.id, e.message); console.error('[digest] delivery failed:', e.message); }
 }
 
 // ---------- enrichment queue (Tier 2 infra) ----------
@@ -1393,6 +2075,37 @@ app.get('/api/reqs/needing-enrichment', (req, res) => {
 // diff, writes an append-only audit-log entry, and (if fit/prob changed without an explicit tier)
 // auto-derives tier. Pass result/sourceUrl/note for the log. conf=verified must be set explicitly
 // by the caller — and ONLY when the live posting was confirmed this run.
+// Per-role timeline (P2.5) — "how this role got here", reconstructed from the row's timestamped
+// fields + its enrichment-log entries (tenant-scoped). Read-only, deterministic.
+function enrichEntriesForKey(key) {
+  const out = [];
+  try {
+    const txt = fs.readFileSync(P.enrichLog, 'utf8');
+    for (const line of txt.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      let e; try { e = JSON.parse(line); } catch (_) { continue; }
+      if (e && String(e.key || '').toLowerCase().trim() === key) out.push(e);
+    }
+  } catch (_) { /* no log yet */ }
+  return out;
+}
+app.get('/api/reqs/:key/timeline', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const row = readStore().find(r => reqKey(r) === key);
+  if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
+  const events = buildTimeline(row, enrichEntriesForKey(key));
+  res.json({ ok: true, key, company: row.company, role: row.role, events, count: events.length });
+});
+
+// Deterministic follow-up recommendation for a role (P2.8) — state/channel/timing/contact. The
+// message itself is drafted on demand via POST /api/assist {kind:'followup'}. Read-only.
+app.get('/api/reqs/:key/followup', (req, res) => {
+  const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
+  const row = readStore().find(r => reqKey(r) === key);
+  if (!row) return res.status(404).json({ ok: false, error: 'no row matches key', key });
+  res.json({ ok: true, key, ...computeFollowup(row, new Date().toISOString().slice(0, 10)) });
+});
+
 app.patch('/api/reqs/:key', (req, res) => {
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
   const body = req.body || {};
@@ -1407,7 +2120,7 @@ app.patch('/api/reqs/:key', (req, res) => {
   const apply = Object.assign({}, fields);
   // auto-derive tier when scoring changed but tier wasn't explicitly provided (AUTO-promote/demote)
   if ((('fit' in apply) || ('prob' in apply)) && !('tier' in apply)) {
-    apply.tier = computeTier(apply.fit != null ? apply.fit : before.fit, apply.prob != null ? apply.prob : before.prob, tierThresholds(readJsonSafe(BOARDS_FILE, {})));
+    apply.tier = computeTier(apply.fit != null ? apply.fit : before.fit, apply.prob != null ? apply.prob : before.prob, tierThresholds(readJsonSafe(P.boards, {})));
   }
   const changes = {};
   for (const k of Object.keys(apply)) {
@@ -1435,7 +2148,7 @@ app.patch('/api/reqs/:key', (req, res) => {
 
   // Auto-create the interview prep guide the first time a role enters an interview stage (manual
   // move OR mail-ingest advance both land here). Fire-and-forget so the PATCH stays fast.
-  if (changes.status && INTERVIEW_STAGES.has(after.status) && !after.guideAt && process.env.OPENAI_API_KEY && assistEnabled()) {
+  if (changes.status && INTERVIEW_STAGES.has(after.status) && !after.guideAt && aiKey() && assistEnabled()) {
     buildAndStoreGuide(key).catch((e) => console.error('[interview-guide]', e.message));
   }
 
@@ -1579,7 +2292,7 @@ function guessSector(text) {
   return 'Enterprise SaaS';
 }
 async function scoreLead(company, role, jd) {
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!aiKey()) return null;
   try {
     const prof = readJsonSafe(PROFILE_JSON, {});
     const kws = (prof.keywords || []).slice(0, 30).map(k => k.kw).join(', ');
@@ -1615,7 +2328,7 @@ async function computeEnrichFields(row, opts) {
   fields.sector = sector;
   fields.conf = 'boardonly';
   fields.needsEnrichment = false;
-  if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob, tierThresholds(readJsonSafe(BOARDS_FILE, {})));
+  if (('fit' in fields) || ('prob' in fields)) fields.tier = computeTier(fields.fit != null ? fields.fit : row.fit, fields.prob != null ? fields.prob : row.prob, tierThresholds(readJsonSafe(P.boards, {})));
   return { fields, scored };
 }
 // Apply enriched fields to rows[idx], but if the corrected company+role now matches a DIFFERENT
@@ -1642,21 +2355,24 @@ function applyEnrichedRow(rows, idx, fields) {
 // scored row on its own. Re-reads the store after the (slow) fetch so a concurrent save isn't lost.
 // Never throws; logs to the enrichment audit log.
 async function backgroundEnrich(key) {
+  const job = jobs.create('enrichment', { label: 'Enrich · ' + key });
   try {
     let rows = readStore();
     let idx = rows.findIndex(r => reqKey(r) === key);
-    if (idx < 0) return;
+    if (idx < 0) { jobs.fail(job.id, 'row not found'); return; }
+    jobs.phase(job.id, 'fetching posting', 30);
     const ce = await computeEnrichFields(rows[idx], { score: true });
-    if (!ce) return;
+    if (!ce) { jobs.fail(job.id, 'could not fetch posting'); return; }
     rows = readStore();                                   // re-read post-fetch
     idx = rows.findIndex(r => reqKey(r) === key);
-    if (idx < 0) return;
+    if (idx < 0) { jobs.fail(job.id, 'row removed during enrich'); return; }
     const res = applyEnrichedRow(rows, idx, ce.fields);
     writeStore(rows);
     logEnrichment({ ts: new Date().toISOString(), run: 'auto-enrich', key, action: 'enrich',
       result: res.action === 'merged' ? 'merged' : 'pass', changes: res.changes,
       note: res.action === 'merged' ? ('resolved to already-tracked ' + res.into + '; duplicate lead removed') : ('auto-enrich on capture' + (ce.scored ? ' + AI score' : '')) });
-  } catch (e) { console.error('[auto-enrich]', e.message); }
+    jobs.finish(job.id, { action: res.action, scored: !!ce.scored });
+  } catch (e) { jobs.fail(job.id, e.message); console.error('[auto-enrich]', e.message); }
 }
 // POST /api/enrich/run  body: {key?: "company|role"} single, or {all:true}/none => all needsEnrichment leads.
 // Full-auth only. Fetches each posting, extracts real fields, optionally AI-scores, audits, snapshots first.
@@ -1691,7 +2407,6 @@ app.post('/api/enrich/run', async (req, res) => {
 // ---------- push (WP-0): APNs sender + device registry ----------
 // Token-based APNs (.p8 / ES256 JWT over HTTP/2, zero deps). INERT until the four APNS_* env
 // vars are set — same gating pattern as SMTP/Slack. Outbound-only: works behind NAT, no tunnel.
-const PUSH_TOKENS = path.join(ROOT, 'agent', 'push-tokens.json');
 const apnsConfigured = () => !!(process.env.APNS_KEY_P8_PATH && process.env.APNS_KEY_ID && process.env.APNS_TEAM_ID && process.env.APNS_BUNDLE_ID);
 let apnsJwtCache = { token: '', iat: 0 };
 function apnsAuthToken() {
@@ -1704,7 +2419,7 @@ function apnsAuthToken() {
   apnsJwtCache = { token: unsigned + '.' + sig, iat: now };
   return apnsJwtCache.token;
 }
-const pushDevices = () => readJsonSafe(PUSH_TOKENS, []);
+const pushDevices = () => readJsonSafe(P.pushTokens, []);
 // payload: {title, body, eventKey} — eventKey lets the app dedupe vs its own local notifications.
 async function sendPush(payload) {
   if (!apnsConfigured()) return { ok: false, skipped: 'apns-not-configured' };
@@ -1739,7 +2454,7 @@ app.post('/api/push/register', (req, res) => {
   const list = pushDevices();
   if (!list.some(d => d.token === token)) {
     list.push({ token, platform: b.platform || 'ios', registeredAt: nowIso() });
-    writeJsonPretty(PUSH_TOKENS, list);
+    writeJsonPretty(P.pushTokens, list);
   }
   res.json({ ok: true, devices: list.length, apnsConfigured: apnsConfigured() });
 });
@@ -1797,7 +2512,6 @@ app.post('/api/push/config', (req, res) => {
 //   returns immediately. GET /api/scout/status -> live progress from agent/scout-status.json.
 // The child inherits the server env, so OPENAI_API_KEY / OPENAI_MODEL (if set) enable the
 // LLM rescoring layer. One run at a time; killed after a hard timeout.
-const SCOUT_STATUS = path.join(ROOT, 'agent', 'scout-status.json');
 const SCOUT_RUNNER = path.join(ROOT, 'agent', 'scout_run.py');
 const SCOUT_TIMEOUT_MS = 6 * 60 * 1000;
 let scoutChild = null;     // current child process, or null when idle
@@ -1811,16 +2525,16 @@ function resolvePython() {
   return 'python3'; // last resort: PATH lookup
 }
 function writeScoutStatus(obj) {
-  try { fs.writeFileSync(SCOUT_STATUS, JSON.stringify(obj, null, 2)); } catch (e) {}
+  try { fs.writeFileSync(P.scoutStatus, JSON.stringify(obj, null, 2)); } catch (e) {}
 }
 
 app.get('/api/scout/status', (req, res) => {
   let last = null;
-  try { last = JSON.parse(fs.readFileSync(SCOUT_STATUS, 'utf8')); } catch (e) {}
-  const llmEnabled = !!process.env.OPENAI_API_KEY;
+  try { last = JSON.parse(fs.readFileSync(P.scoutStatus, 'utf8')); } catch (e) {}
+  const llmEnabled = !!aiKey();
   res.json({
     ok: true, running: !!scoutChild, current: scoutMeta, last,
-    llmEnabled, llmModel: llmEnabled ? (process.env.OPENAI_MODEL || 'gpt-5.4-mini') : null
+    llmEnabled, llmModel: llmEnabled ? (cfg('OPENAI_MODEL') || 'gpt-5.4-mini') : null
   });
 });
 
@@ -1830,13 +2544,13 @@ app.get('/api/scout/status', (req, res) => {
 // spawns agent/mail_ingest.py and returns its report (the user's own pipeline data, not secrets).
 const mailConfigPayload = () => ({
   ok: true,
-  configured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD),
-  user: process.env.GMAIL_USER || '',
-  passSet: !!process.env.GMAIL_APP_PASSWORD,
-  passLast4: last4(process.env.GMAIL_APP_PASSWORD || ''),
-  label: process.env.GMAIL_LABEL || 'INBOX',
-  ai: process.env.MAIL_AI === 'true',
-  sinceDays: parseInt(process.env.MAIL_SINCE_DAYS || '14', 10) || 14,
+  configured: !!(cfg('GMAIL_USER') && cfg('GMAIL_APP_PASSWORD')),
+  user: cfg('GMAIL_USER') || '',
+  passSet: !!cfg('GMAIL_APP_PASSWORD'),
+  passLast4: last4(cfg('GMAIL_APP_PASSWORD') || ''),
+  label: cfg('GMAIL_LABEL') || 'INBOX',
+  ai: cfg('MAIL_AI') === 'true',
+  sinceDays: parseInt(cfg('MAIL_SINCE_DAYS') || '14', 10) || 14,
 });
 app.get('/api/mail/config', (req, res) => res.json(mailConfigPayload()));
 app.post('/api/mail/config', (req, res) => {
@@ -1853,78 +2567,108 @@ app.post('/api/mail/config', (req, res) => {
       upd.MAIL_SINCE_DAYS = String(d);
     }
   }
-  try { if (Object.keys(upd).length) setEnvVars(upd); }
+  try { if (Object.keys(upd).length) { if (perUserScope()) setUserCfg(upd); else setEnvVars(upd); } }   // Gmail ingest is per-user
   catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   res.json(mailConfigPayload());
 });
 let mailChild = null;
 app.post('/api/mail/run', (req, res) => {
   if (mailChild) return res.status(409).json({ ok: false, error: 'A mail run is already in progress.' });
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+  if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) {
     return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
   }
   const apply = (req.body || {}).apply === true;   // default: dry-run (writes nothing)
   const argv = [path.join(ROOT, 'agent', 'mail_ingest.py')];
   if (apply) argv.push('--apply');
-  if (process.env.MAIL_AI === 'true') argv.push('--ai');
+  if (cfg('MAIL_AI') === 'true') argv.push('--ai');
   let child, out = '', err = '', done = false;
-  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; res.status(status).json(payload); };
-  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: process.env }); }
+  const uid = store.currentUser();   // capture tenant for the async exit handler (per-user notifications)
+  const job = jobs.create('gmail_ingest', { label: 'Gmail ingest' + (apply ? ' (apply)' : ' (dry-run)') });
+  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
+  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
   catch (e) { return finish(500, { ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
   mailChild = child;
+  jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 90000);
   child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
   child.stderr && child.stderr.on('data', d => { err += d; });
   child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
-  child.once('exit', code => {
+  child.once('exit', code => store.runAs(uid, () => {
     clearTimeout(killer);
     if (code !== 0) return finish(500, { ok: false, error: (err.trim() || ('exit ' + code)).slice(0, 800), report: out });
-    finish(200, { ok: true, applied: apply, report: out });
-  });
+    // Parse the machine-readable summary line and fire per-event notifications (rejection/interview/
+    // offer) on the channels the user picked — only on a real --apply run, not a dry run.
+    let summary = null;
+    try { const m = out.match(/SUMMARY_JSON (\{.*\})\s*$/m); if (m) summary = JSON.parse(m[1]); } catch (e) {}
+    if (apply && summary && Array.isArray(summary.events)) {
+      const want = { rejection: cfg('MAIL_NOTIFY_REJECTION') === 'true', interview: cfg('MAIL_NOTIFY_INTERVIEW') === 'true', offer: cfg('MAIL_NOTIFY_OFFER') === 'true' };
+      const channels = parseChannels(cfg('MAIL_NOTIFY_CHANNELS'), ['inapp']);
+      const emoji = { rejection: '✖', interview: '📞', offer: '★' };
+      for (const ev of summary.events) {
+        if (!want[ev.kind]) continue;
+        dispatchNotify({ title: `${emoji[ev.kind] || ''} ${ev.kind[0].toUpperCase() + ev.kind.slice(1)}: ${ev.company || ''}`,
+          body: `${ev.role || ''} — detected in your inbox.`, channels, kind: ev.kind, eventKey: `mail-${ev.kind}-${ev.company}-${new Date().toISOString().slice(0, 10)}` }).catch(() => {});
+      }
+    }
+    finish(200, { ok: true, applied: apply, report: out, summary });
+  }));
 });
 
-app.post('/api/scout/run', (req, res) => {
-  if (scoutChild) return res.status(409).json({ ok: false, running: true, error: 'A scout run is already in progress.' });
-  const body = req.body || {};
-  const mode = ['find', 'validate', 'both', 'source-backfill'].includes(body.mode) ? body.mode : 'both';
-  // optional source scoping: array or comma string of source names
-  let sources = body.sources;
-  if (Array.isArray(sources)) sources = sources.filter(s => typeof s === 'string' && /^[a-z0-9_-]+$/i.test(s)).join(',');
-  else if (typeof sources === 'string') sources = sources.split(',').map(s => s.trim()).filter(s => /^[a-z0-9_-]+$/i.test(s)).join(',');
-  else sources = '';
+// Start a scout in the CURRENT tenant context (used by /api/scout/run and the admin force-scout op).
+// Returns a result object; the caller responds. Captures the uid so async handlers stay tenant-scoped.
+function triggerScout(mode, sources) {
+  if (scoutChild) return { ok: false, status: 409, running: true, error: 'A scout run is already in progress.' };
   const startedAt = new Date().toISOString();
   scoutMeta = { mode, startedAt, sources: sources || 'all' };
   writeScoutStatus({ state: 'running', phase: 'starting', mode, startedAt, sources: sources || 'all' });
+  const job = jobs.create('scout', { label: 'Scout · ' + mode + (sources ? ' (' + sources + ')' : ''), meta: { mode, sources: sources || 'all' } });
 
   const argv = [SCOUT_RUNNER, '--mode', mode, '--quiet'];
   if (sources) argv.push('--sources', sources);
+  // Multi-user: point the scout subprocess at THIS tenant's namespace (file-mode, since loopback is
+  // no longer auto-trusted to the server API). Capture the uid so the async exit handler resolves
+  // P.* + digest to the right user. Single-user -> plain process.env (legacy paths), unchanged.
+  const uid = store.currentUser();
+  const scoutEnv = MULTIUSER()
+    ? { ...tenantEnv(), REQON_FILE_MODE: '1', REQON_DATA_FILE: P.data, REQON_BOARDS_FILE: P.boards,
+        REQON_WATCHLIST_FILE: P.watchlist, REQON_STATUS_FILE: P.scoutStatus, REQON_SOURCE_HEALTH_FILE: P.sourceHealth }
+    : process.env;
   let child;
   try {
-    child = spawn(resolvePython(), argv, { cwd: ROOT, env: process.env });
+    child = spawn(resolvePython(), argv, { cwd: ROOT, env: scoutEnv });
   } catch (e) {
     scoutChild = null; scoutMeta = null;
     writeScoutStatus({ state: 'error', mode, error: 'spawn failed: ' + (e.message || e) });
-    return res.status(500).json({ ok: false, error: 'Could not start scout: ' + (e.message || e) });
+    jobs.fail(job.id, 'spawn failed: ' + (e.message || e));
+    return { ok: false, status: 500, error: 'Could not start scout: ' + (e.message || e) };
   }
   scoutChild = child;
+  jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
+  jobs.phase(job.id, 'searching boards', 10);
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, SCOUT_TIMEOUT_MS);
   if (child.stderr) child.stderr.on('data', d => console.error('[scout]', String(d).trim()));
-  child.once('error', (err) => {            // e.g. python not found
+  child.once('error', (err) => store.runAs(uid, () => {   // e.g. python not found
     clearTimeout(killer); scoutChild = null; scoutMeta = null;
     writeScoutStatus({ state: 'error', mode, error: 'python launch failed: ' + (err.message || err) });
+    jobs.fail(job.id, 'python launch failed: ' + (err.message || err));
     console.error('[scout] launch error:', err.message || err);
-  });
-  child.once('exit', (code) => {
+  }));
+  child.once('exit', (code) => store.runAs(uid, () => {
     clearTimeout(killer); scoutChild = null; scoutMeta = null;
+    let summary = null;
     try {
-      const s = JSON.parse(fs.readFileSync(SCOUT_STATUS, 'utf8'));
+      const s = JSON.parse(fs.readFileSync(P.scoutStatus, 'utf8'));
       if (s.state === 'running') { s.state = code === 0 ? 'done' : 'error'; if (code !== 0) s.error = 'exited ' + code; writeScoutStatus(s); }
+      summary = { added: (s.find && s.find.added) || 0, matches: (s.find && s.find.newMatches) || 0, refreshed: (s.validate && s.validate.refreshed) || 0 };
     } catch (e) {}
+    // close the job — unless it was already cancelled (kill triggers a non-zero exit)
+    const jb = jobs.get(job.id);
+    if (jb && jb.status === 'running') { code === 0 ? jobs.finish(job.id, summary) : jobs.fail(job.id, 'scout exited ' + code); }
     console.log('[scout] run finished (mode=' + mode + ', code=' + code + ')');
     // WP-0 push hook: notify registered devices when a successful run lands results
     if (code === 0) {
       try {
-        const s = JSON.parse(fs.readFileSync(SCOUT_STATUS, 'utf8'));
+        const s = JSON.parse(fs.readFileSync(P.scoutStatus, 'utf8'));
         const added = (s.find && s.find.added) || 0, matches = (s.find && s.find.newMatches) || 0;
         const refreshed = (s.validate && s.validate.refreshed) || 0;
         if (added > 0 || matches > 0 || refreshed > 0) {
@@ -1933,14 +2677,34 @@ app.post('/api/scout/run', (req, res) => {
             eventKey: 'scout-' + (s.run || Date.now()) }).catch(() => {});
         }
       } catch (e) {}
+      // Fire the digest on the FIRST successful scout run of the day, if opted in — so the digest
+      // reflects the freshest data. Guarded by digest-state so it runs at most once per day.
+      try {
+        if (cfg('DIGEST_AFTER_SCOUT') === 'true' && digestEnabled()) {
+          const today = new Date().toISOString().slice(0, 10);
+          const st = readJsonSafe(P.digestState, {});
+          if ((st.lastSent || '').slice(0, 10) !== today) {
+            console.log('[digest] firing post-scout (first run of the day)');
+            composeDigestAndDeliver();
+          }
+        }
+      } catch (e) {}
     }
-  });
-  res.json({ ok: true, started: true, mode, sources: sources || 'all', llmEnabled: !!process.env.OPENAI_API_KEY });
+  }));
+  return { ok: true, status: 200, started: true, mode, sources: sources || 'all', llmEnabled: !!aiKey() };
+}
+app.post('/api/scout/run', (req, res) => {
+  const body = req.body || {};
+  const mode = ['find', 'validate', 'both', 'source-backfill'].includes(body.mode) ? body.mode : 'both';
+  let sources = body.sources;
+  if (Array.isArray(sources)) sources = sources.filter(s => typeof s === 'string' && /^[a-z0-9_-]+$/i.test(s)).join(',');
+  else if (typeof sources === 'string') sources = sources.split(',').map(s => s.trim()).filter(s => /^[a-z0-9_-]+$/i.test(s)).join(',');
+  else sources = '';
+  const r = triggerScout(mode, sources);
+  res.status(r.status || 200).json(r);
 });
 
 // ---------- settings (sources on/off, keywords, OpenAI key/model) ----------
-const BOARDS_FILE = path.join(ROOT, 'agent', 'boards.json');
-const WATCHLIST_FILE = path.join(ROOT, 'agent', 'watchlist.json');
 const ENV_FILE = path.join(ROOT, '.env');
 // Source catalog (kept in sync with agent/sources/__init__.py CATALOG).
 const SOURCE_CATALOG = [
@@ -2011,11 +2775,113 @@ const rowSourceServer = r => (r.source && String(r.source).trim()) || inferSourc
 function applyModeMapMerged(boards) {
   return Object.assign({}, DEFAULT_APPLY_MODE_MAP, (boards.applyModeMap && typeof boards.applyModeMap === 'object') ? boards.applyModeMap : {});
 }
+function hostOf(link) { try { return new URL(String(link || '')).hostname.toLowerCase().replace(/^www\./, ''); } catch (e) { return ''; } }
 function inferApplyMode(row, boards) {
+  // Learned host→mode mappings (from the fillability probe) take precedence — they're specific to a
+  // real page we actually inspected, and let novel/custom portals get classified once and reused.
+  const learned = (boards.applyModeHosts && typeof boards.applyModeHosts === 'object') ? boards.applyModeHosts : {};
+  const h = hostOf(row.link);
+  if (h && learned[h] && APPLY_MODES.includes(learned[h].mode)) return learned[h].mode;
   const m = applyModeMapMerged(boards);
   const s = rowSourceServer(row);
   return m[s] || m.other || 'manual';
 }
+// Deterministic ATS fingerprint from page HTML — catches white-labeled boards on a custom domain
+// (e.g. jobs.acme.com that's really Greenhouse). Returns {source, mode} or null.
+function fingerprintHtml(html) {
+  const h = String(html || '').toLowerCase();
+  const hit = (src) => ({ source: src, mode: DEFAULT_APPLY_MODE_MAP[src] || 'manual' });
+  if (/boards\.greenhouse\.io|grnhse|greenhouse\.io\/embed|data-mapped-source-name|gh_jid/.test(h)) return hit('greenhouse');
+  if (/jobs\.ashbyhq\.com|ashby_embed|ashbyhq/.test(h)) return hit('ashby');
+  if (/jobs\.lever\.co|lever-co|postings\.lever/.test(h)) return hit('lever');
+  if (/apply\.workable\.com|workable\.com\/embed|workable/.test(h)) return hit('workable');
+  if (/smartrecruiters\.com|smartrecruiters/.test(h)) return hit('smartrecruiters');
+  if (/myworkdayjobs\.com|workday|wd\d+\.myworkday/.test(h)) return hit('workday');
+  if (/icims\.com|icims/.test(h)) return hit('icims');
+  if (/taleo\.net|taleo/.test(h)) return hit('taleo');
+  if (/successfactors|sapsf/.test(h)) return hit('successfactors');
+  if (/recruitee\.com|recruitee/.test(h)) return hit('recruitee');
+  if (/teamtailor\.com|teamtailor/.test(h)) return hit('teamtailor');
+  if (/jobvite\.com|jobvite/.test(h)) return hit('jobvite');
+  // A bare HTML form with a file/résumé upload is usually self-host fillable; a "sign in to apply"
+  // wall is gated. These are weak signals — only used when no ATS fingerprint matched.
+  if (/type=["']?file["']?|upload your (resume|résumé|cv)|name=["']?resume/.test(h)) return { source: 'other', mode: 'fillable', weak: true };
+  if (/sign in to apply|log in to apply|create an account to apply/.test(h)) return { source: 'other', mode: 'gated', weak: true };
+  return null;
+}
+async function fetchPage(url, maxBytes = 400000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'reqon-applymode-probe/1.0' } });
+    const buf = await r.arrayBuffer();
+    return { ok: r.ok, status: r.status, finalUrl: r.url, html: Buffer.from(buf).toString('utf8').slice(0, maxBytes) };
+  } finally { clearTimeout(t); }
+}
+function persistLearnedHost(host, source, mode, by) {
+  if (!host) return;
+  const boards = readJsonSafe(P.boards, {});
+  boards.applyModeHosts = boards.applyModeHosts || {};
+  boards.applyModeHosts[host] = { mode, source, by, at: new Date().toISOString() };
+  writeJsonPretty(P.boards, boards);
+}
+
+// Probe a posting URL for its apply mode: deterministic first (URL + page fingerprint). If that's
+// inconclusive, returns needsAI:true so the UI can ASK before spending a token. A confident verdict
+// is persisted by host so it's reused next time (no re-probe). See user guide → apply modes.
+app.post('/api/applymode/probe', async (req, res) => {
+  const url = String((req.body || {}).url || '').trim();
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ ok: false, error: 'A job URL is required.' });
+  const host = hostOf(url);
+  // 1) URL-based detection (known ATS domains)
+  const src = inferSourceFromLink(url);
+  if (src && src !== 'other') {
+    const mode = DEFAULT_APPLY_MODE_MAP[src] || 'manual';
+    persistLearnedHost(host, src, mode, 'url');
+    return res.json({ ok: true, mode, source: src, method: 'url', confident: true });
+  }
+  // 2) Fetch the page and fingerprint its HTML (catches white-labeled boards on custom domains)
+  let page;
+  try { page = await fetchPage(url); } catch (e) { return res.json({ ok: true, confident: false, needsAI: true, reason: 'Could not fetch the page (' + e.message + ').' }); }
+  const fp = fingerprintHtml(page.html);
+  if (fp && !fp.weak) {
+    persistLearnedHost(host, fp.source, fp.mode, 'fingerprint');
+    return res.json({ ok: true, mode: fp.mode, source: fp.source, method: 'fingerprint', confident: true });
+  }
+  if (fp && fp.weak) {
+    return res.json({ ok: true, mode: fp.mode, source: fp.source, method: 'fingerprint-weak', confident: false, needsAI: true, reason: 'Only a weak signal found — AI can confirm.' });
+  }
+  return res.json({ ok: true, confident: false, needsAI: true, reason: 'No known ATS fingerprint on the page.' });
+});
+
+// AI fallback for the probe — only called after the user opts in. Classifies fillable/gated/manual
+// from the page text, then persists the learned host→mode mapping for reuse.
+app.post('/api/applymode/probe-ai', async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled.' });
+  const url = String((req.body || {}).url || '').trim();
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ ok: false, error: 'A job URL is required.' });
+  const host = hostOf(url);
+  let page;
+  try { page = await fetchPage(url, 60000); } catch (e) { return res.status(502).json({ ok: false, error: 'Fetch failed: ' + e.message }); }
+  const text = page.html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 6000);
+  const tool = {
+    type: 'function', name: 'classify_apply_mode',
+    description: 'Classify how a candidate applies on this job page.',
+    parameters: { type: 'object', additionalProperties: false, required: ['mode', 'confidence', 'reason'], properties: {
+      mode: { type: 'string', enum: ['fillable', 'gated', 'manual'], description: 'fillable = an on-page application form (incl. résumé upload) with no login; gated = must sign in / create an account to apply; manual = apply elsewhere / email / no clear form' },
+      confidence: { type: 'number', description: '0-1' },
+      reason: { type: 'string', description: 'one short sentence' } } }
+  };
+  try {
+    const { args, tokens } = await callTool({ system: 'You classify job application pages. Be strict: only "fillable" when an application form is present on the page without a login wall.', user: 'Page URL: ' + url + '\n\nVisible page text:\n' + text, tool, maxTokens: 200 });
+    const u = assistUsage(); u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+    const mode = APPLY_MODES.includes(args.mode) ? args.mode : 'manual';
+    persistLearnedHost(host, 'ai', mode, 'ai');
+    logAssist({ ts: new Date().toISOString(), key: host, kind: 'applymode', model: assistModel(), tokens });
+    res.json({ ok: true, mode, method: 'ai', confident: (args.confidence || 0) >= 0.6, confidence: args.confidence, reason: args.reason, tokens });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
+});
 
 function hygieneSettings(boards) {
   const h = (boards.hygiene && typeof boards.hygiene === 'object') ? boards.hygiene : {};
@@ -2054,8 +2920,8 @@ function setEnvVars(updates) {
 const last4 = s => (s && s.length >= 4) ? s.slice(-4) : '';
 
 function settingsPayload() {
-  const boards = readJsonSafe(BOARDS_FILE, {});
-  const watch = readJsonSafe(WATCHLIST_FILE, {});
+  const boards = readJsonSafe(P.boards, {});
+  const watch = readJsonSafe(P.watchlist, {});
   const disabled = new Set(boards.disabledSources || []);
   const st = (watch.searchTerms || {});
   return {
@@ -2069,6 +2935,7 @@ function settingsPayload() {
     titles: st.titles || [],
     minFit: st.minFitToAdd != null ? st.minFitToAdd : 6.0,
     salaryFloor: st.minSalary != null && !isNaN(+st.minSalary) ? +st.minSalary : 0,
+    salaryTarget: st.salaryTarget != null && !isNaN(+st.salaryTarget) ? +st.salaryTarget : 0,
     remoteOnly: boards.remoteOnly !== false,
     minDelaySeconds: boards.minDelaySeconds != null ? boards.minDelaySeconds : 0.4,
     analyticsWindowDays: boards.analyticsWindowDays != null ? boards.analyticsWindowDays : 0,
@@ -2087,29 +2954,43 @@ function settingsPayload() {
       ingestTokenSet: !!process.env.INGEST_TOKEN,
       ingestTokenLast4: last4(process.env.INGEST_TOKEN || '')
     },
-    mail: { configured: !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD), user: process.env.GMAIL_USER || '' },
+    mail: { configured: !!(cfg('GMAIL_USER') && cfg('GMAIL_APP_PASSWORD')), user: cfg('GMAIL_USER') || '' },
     llm: {
-      keySet: !!process.env.OPENAI_API_KEY,
-      keyLast4: last4(process.env.OPENAI_API_KEY || ''),
-      model: process.env.OPENAI_MODEL || 'gpt-5.4-mini'
+      keySet: !!aiKey(),
+      keyLast4: last4(aiKey() || ''),
+      model: cfg('OPENAI_MODEL') || 'gpt-5.4-mini'
     },
     budget: {
-      maxPerRun: +(process.env.AI_ENRICH_MAX_PER_RUN || 40),
-      ttlDays: +(process.env.AI_ENRICH_TTL_DAYS || 14),
-      jdChars: +(process.env.OPENAI_JD_CHARS || 3500),
-      maxTokens: +(process.env.OPENAI_MAX_TOKENS || 400)
+      maxPerRun: +(cfg('AI_ENRICH_MAX_PER_RUN') || 40),
+      ttlDays: +(cfg('AI_ENRICH_TTL_DAYS') || 14),
+      jdChars: +(cfg('OPENAI_JD_CHARS') || 3500),
+      maxTokens: +(cfg('OPENAI_MAX_TOKENS') || 400)
     },
-    digest: (() => { const st = readJsonSafe(DIGEST_STATE, {}); return {
+    digest: (() => { const st = readJsonSafe(P.digestState, {}); return {
       enabled: digestEnabled(), time: digestTime(), channel: digestChannel(), days: digestDays(),
-      to: process.env.DIGEST_TO || '', from: process.env.DIGEST_FROM || '',
-      webhookSet: !!process.env.DIGEST_SLACK_WEBHOOK, smtpSet: !!(process.env.SMTP_HOST && process.env.SMTP_USER),
+      channels: digestChannels(), afterScout: cfg('DIGEST_AFTER_SCOUT') === 'true',
+      channelStatus: Object.fromEntries(ALL_CHANNELS.map(c => [c, channelReady(c)])),
+      to: cfg('DIGEST_TO') || '', from: process.env.DIGEST_FROM || '',
+      webhookSet: !!cfg('DIGEST_SLACK_WEBHOOK'), smtpSet: !!(process.env.SMTP_HOST && process.env.SMTP_USER),
       smtpHost: process.env.SMTP_HOST || '', smtpPort: process.env.SMTP_PORT || '', smtpUser: process.env.SMTP_USER || '',
+      sms: { configured: smsConfigured(), method: smsMethod(),
+        from: cfg('TWILIO_FROM') || '', to: cfg('SMS_TO') || '', sidSet: !!cfg('TWILIO_ACCOUNT_SID'), tokenSet: !!cfg('TWILIO_AUTH_TOKEN'),
+        carrier: cfg('SMS_CARRIER') || '', gatewayNumber: cfg('SMS_GATEWAY_NUMBER') || '', carriers: Object.keys(CARRIER_GATEWAYS) },
       lastSent: st.lastSent || null, lastChannel: st.lastChannel || null, lastCounts: st.lastCounts || null
     }; })(),
-    assist: (() => { const u = assistUsage(); return {
+    mailNotify: {
+      rejection: cfg('MAIL_NOTIFY_REJECTION') === 'true',
+      interview: cfg('MAIL_NOTIFY_INTERVIEW') === 'true',
+      offer: cfg('MAIL_NOTIFY_OFFER') === 'true',
+      channels: parseChannels(cfg('MAIL_NOTIFY_CHANNELS'), ['inapp'])
+    },
+    assist: (() => { const u = assistUsage(); const w30 = assistWindowStats(30); const rate = assistRatePer1M(); const budget = assistMonthlyBudget(); const cost30 = estCost(w30.tokens, rate); return {
       enabled: assistEnabled(), model: assistModel(),
       dailyCalls: assistDailyCalls(), maxTokens: assistMaxTokens(),
-      callsToday: u.calls, tokensToday: u.tokens
+      callsToday: u.calls, tokensToday: u.tokens,
+      pricePer1M: rate, monthlyBudget: budget,
+      tokens30d: w30.tokens, estCost30d: cost30,
+      budgetUsedPct: (budget && cost30 != null) ? Math.min(100, Math.round((cost30 / budget) * 100)) : null
     }; })(),
     backup: {
       retention: backupRetention(),
@@ -2118,17 +2999,90 @@ function settingsPayload() {
     remote: {
       publicUrl: (process.env.PUBLIC_URL || '').trim(),
       lanUrl: lanBase()
-    }
+    },
+    profile: (() => { const p = readProfile(); const a = p.applicant || {}; return {
+      applicantName: a.name || '', hasResume: !!(p.resumeText || p.resumeFile || (p.keywords || []).length || (p.narratives || []).length)
+    }; })()
   };
 }
 
 app.get('/api/settings', (req, res) => res.json(settingsPayload()));
 
+// Does the server actually have HTTPS in front of it (Tailscale Funnel / Caddy)? We can't run those
+// for the user, but we CAN report what we observe on the live request + whether PUBLIC_URL is set.
+app.get('/api/https-status', (req, res) => {
+  const https = secureReq(req);
+  const proxied = tunneled(req);
+  const publicUrl = (process.env.PUBLIC_URL || '').trim();
+  let state, detail;
+  if (https && publicUrl) { state = 'https'; detail = `Serving over HTTPS via a reverse proxy; pairing QR uses ${publicUrl}.`; }
+  else if (https) { state = 'https'; detail = 'Request arrived over HTTPS (reverse proxy detected). Set a Remote access URL so the pairing QR uses it.'; }
+  else if (publicUrl) { state = 'configured'; detail = `Remote access URL set (${publicUrl}) but this request came in over plain HTTP — start the tunnel (agent/run-tunnel.sh) so external/iOS access works.`; }
+  else { state = 'lan'; detail = 'LAN / localhost over HTTP only. iOS blocks plaintext, so for remote/app access run Tailscale Funnel or Caddy and set the Remote access URL below.'; }
+  res.json({ ok: true, state, https, proxied, publicUrl, detail, hint: 'See agent/run-tunnel.sh and MOBILE-SETUP.md.' });
+});
+
+// Read-only inventory of every environment variable the app uses, grouped, with secrets masked.
+// "Expose all env vars appropriately": non-secret values are shown; secrets show set/last4 only.
+const ENV_INVENTORY = [
+  ['AI / OpenAI', [
+    ['OPENAI_API_KEY', 1, 'Powers scout rescoring + the draft assistant'],
+    ['OPENAI_MODEL', 0, 'Scoring/enrichment model (Settings → AI assistant)'],
+    ['OPENAI_BASE_URL', 0, 'Custom API endpoint (Azure/proxy)'],
+    ['OPENAI_USE_CHAT', 0, 'Force legacy /chat/completions'],
+    ['ASSIST_WEB_SEARCH', 0, 'Enable web_search tool in drafts'],
+    ['OPENAI_VECTOR_STORE_ID', 0, 'file_search store for résumé grounding'],
+    ['OPENAI_PRICE_PER_1M', 0, 'USD per 1M tokens for cost estimate (Settings → AI assistant)'],
+    ['ASSIST_MONTHLY_BUDGET', 0, 'USD monthly budget for the cost bar'],
+  ]],
+  ['Digest & mail', [
+    ['DIGEST_ENABLED', 0, 'Run the in-server digest scheduler'],
+    ['DIGEST_TIME', 0, 'HH:MM to send (server local time)'],
+    ['DIGEST_CHANNEL', 0, 'file / slack / email'],
+    ['DIGEST_SLACK_WEBHOOK', 1, 'Slack incoming webhook'],
+    ['SMTP_HOST', 0, 'SMTP server'], ['SMTP_USER', 0, 'SMTP username'], ['SMTP_PASS', 1, 'SMTP app password'],
+    ['GMAIL_USER', 0, 'Gmail address for response ingest'], ['GMAIL_APP_PASSWORD', 1, '16-char app password'],
+  ]],
+  ['Aggregators & push', [
+    ['THEIRSTACK_API_KEY', 1, 'TheirStack aggregator key'],
+    ['APIFY_TOKEN', 1, 'Apify / Fantastic.jobs token'],
+    ['APNS_KEY_ID', 0, 'APNs Key ID'], ['APNS_TEAM_ID', 0, 'Apple Team ID'],
+    ['APNS_BUNDLE_ID', 0, 'iOS bundle ID'], ['APNS_ENV', 0, 'sandbox / production'],
+    ['SMS_METHOD', 0, 'SMS backend: twilio | email (free carrier gateway)'],
+    ['SMS_CARRIER', 0, 'Carrier for email-to-SMS (verizon/att/tmobile/…)'],
+    ['SMS_GATEWAY_NUMBER', 0, 'Your mobile number for email-to-SMS'],
+    ['TWILIO_ACCOUNT_SID', 0, 'Twilio SID (SMS)'], ['TWILIO_AUTH_TOKEN', 1, 'Twilio auth token'],
+    ['TWILIO_FROM', 0, 'Twilio from number'], ['SMS_TO', 0, 'SMS recipient'],
+  ]],
+  ['Access & server', [
+    ['APP_TOKEN', 1, 'Passphrase for remote/app access'],
+    ['INGEST_TOKEN', 1, 'Scoped token for /merge + /quickadd'],
+    ['PUBLIC_URL', 0, 'HTTPS origin for pairing QR (Tailscale/Caddy)'],
+    ['PORT', 0, 'Server port (restart to change)'],
+    ['SCOUT_PYTHON', 0, 'Pinned Python binary for the scout'],
+    ['BACKUP_RETENTION', 0, 'Auto-snapshots to keep'],
+    ['PUT_GUARD_PCT', 0, 'Refuse a save dropping > this % of rows'],
+  ]],
+];
+app.get('/api/env-inventory', (req, res) => {
+  const groups = ENV_INVENTORY.map(([group, items]) => ({
+    group,
+    vars: items.map(([key, secret, purpose]) => {
+      const raw = process.env[key];
+      const set = raw != null && String(raw) !== '';
+      return secret
+        ? { key, secret: true, purpose, set, last4: set ? last4(String(raw)) : '' }
+        : { key, secret: false, purpose, set, value: set ? String(raw) : '' };
+    }),
+  }));
+  res.json({ ok: true, groups });
+});
+
 app.put('/api/settings', (req, res) => {
   const b = req.body || {};
   try {
-    const boards = readJsonSafe(BOARDS_FILE, {});
-    const watch = readJsonSafe(WATCHLIST_FILE, {});
+    const boards = readJsonSafe(P.boards, {});
+    const watch = readJsonSafe(P.watchlist, {});
     watch.searchTerms = watch.searchTerms || {};
     let touchedBoards = false, touchedWatch = false;
 
@@ -2185,15 +3139,24 @@ app.put('/api/settings', (req, res) => {
     if (Array.isArray(b.titles)) { watch.searchTerms.titles = b.titles.map(String).filter(Boolean); touchedWatch = true; }
     if (b.minFit != null && !isNaN(+b.minFit)) { watch.searchTerms.minFitToAdd = Math.max(0, Math.min(10, +b.minFit)); touchedWatch = true; }
     if (b.salaryFloor != null && !isNaN(+b.salaryFloor)) { watch.searchTerms.minSalary = Math.max(0, Math.min(2000000, Math.round(+b.salaryFloor))); touchedWatch = true; }
+    if (b.salaryTarget != null && !isNaN(+b.salaryTarget)) { watch.searchTerms.salaryTarget = Math.max(0, Math.min(2000000, Math.round(+b.salaryTarget))); touchedWatch = true; }
 
-    if (touchedWatch) writeJsonPretty(WATCHLIST_FILE, watch);
+    if (touchedWatch) writeJsonPretty(P.watchlist, watch);
 
     // OpenAI + optional aggregator keys -> .env (+ live process.env). Empty string clears.
     const envUpd = {};
     if (typeof b.openaiModel === 'string' && b.openaiModel.trim()) envUpd.OPENAI_MODEL = b.openaiModel.trim();
-    if (typeof b.openaiKey === 'string') envUpd.OPENAI_API_KEY = b.openaiKey.trim();   // '' clears
+    // OpenAI key: in multi-user a non-owner user's key is THEIR secret (per-user namespace, 0600),
+    // so AI cost is billed to them (decision #2). Single-user / owner -> shared .env as before.
+    if (typeof b.openaiKey === 'string') {
+      if (MULTIUSER() && store.currentUser() !== store.OWNER) {
+        const sec = store.readJson(P.secrets, {}); const v = b.openaiKey.trim();
+        if (v) sec.OPENAI_API_KEY = v; else delete sec.OPENAI_API_KEY;
+        store.writeJsonAtomic(P.secrets, sec); try { fs.chmodSync(P.secrets, 0o600); } catch (e) {}
+      } else { envUpd.OPENAI_API_KEY = b.openaiKey.trim(); }   // '' clears
+    }
     if (b.envKeys && typeof b.envKeys === 'object') {
-      for (const k of ['THEIRSTACK_API_KEY', 'APIFY_TOKEN', 'OPENAI_BASE_URL']) {
+      for (const k of ['THEIRSTACK_API_KEY', 'APIFY_TOKEN', 'OPENAI_BASE_URL', 'OPENAI_USE_CHAT', 'ASSIST_WEB_SEARCH', 'OPENAI_VECTOR_STORE_ID']) {
         if (typeof b.envKeys[k] === 'string') envUpd[k] = b.envKeys[k].trim();
       }
     }
@@ -2208,15 +3171,35 @@ app.put('/api/settings', (req, res) => {
     if (typeof b.assistModel === 'string' && b.assistModel.trim()) envUpd.ASSIST_MODEL = b.assistModel.trim();
     if (b.assistDailyCalls != null && !isNaN(+b.assistDailyCalls)) envUpd.ASSIST_DAILY_CALLS = String(Math.max(0, Math.min(1000, Math.round(+b.assistDailyCalls))));
     if (b.assistMaxTokens != null && !isNaN(+b.assistMaxTokens)) envUpd.ASSIST_MAX_TOKENS = String(Math.max(64, Math.min(4000, Math.round(+b.assistMaxTokens))));
+    // Cost estimation knobs (were .env-only) — $/1M tokens + monthly budget. Empty string clears.
+    if (typeof b.pricePer1M === 'string' || typeof b.pricePer1M === 'number') { const v = String(b.pricePer1M).trim(); envUpd.OPENAI_PRICE_PER_1M = (v === '' || isNaN(+v)) ? '' : String(Math.max(0, +v)); }
+    if (typeof b.monthlyBudget === 'string' || typeof b.monthlyBudget === 'number') { const v = String(b.monthlyBudget).trim(); envUpd.ASSIST_MONTHLY_BUDGET = (v === '' || isNaN(+v)) ? '' : String(Math.max(0, +v)); }
     // scout politeness delay (boards.json; was file-only)
     if (b.minDelaySeconds != null && !isNaN(+b.minDelaySeconds)) { boards.minDelaySeconds = Math.max(0, Math.min(10, +b.minDelaySeconds)); touchedBoards = true; }
     if (b.analyticsWindowDays != null && !isNaN(+b.analyticsWindowDays)) { boards.analyticsWindowDays = Math.max(0, Math.min(3650, Math.round(+b.analyticsWindowDays))); touchedBoards = true; }
     // write boards.json AFTER all boards mutations above (incl. minDelay/analytics in this block)
-    if (touchedBoards) writeJsonPretty(BOARDS_FILE, boards);
+    if (touchedBoards) writeJsonPretty(P.boards, boards);
     // morning digest (Phase 7)
     if (typeof b.digestEnabled === 'boolean') envUpd.DIGEST_ENABLED = b.digestEnabled ? 'true' : 'false';
     if (typeof b.digestTime === 'string' && /^\d{1,2}:\d{2}$/.test(b.digestTime)) envUpd.DIGEST_TIME = b.digestTime;
     if (['file', 'slack', 'email'].includes(b.digestChannel)) envUpd.DIGEST_CHANNEL = b.digestChannel;
+    // multi-channel digest + post-scout trigger
+    if (Array.isArray(b.digestChannels)) envUpd.DIGEST_CHANNELS = parseChannels(b.digestChannels.join(','), ['file']).join(',');
+    if (typeof b.digestAfterScout === 'boolean') envUpd.DIGEST_AFTER_SCOUT = b.digestAfterScout ? 'true' : 'false';
+    // SMS method + free email-to-SMS gateway config
+    if (b.smsMethod === 'email' || b.smsMethod === 'twilio') envUpd.SMS_METHOD = b.smsMethod;
+    if (typeof b.smsCarrier === 'string') envUpd.SMS_CARRIER = b.smsCarrier.trim().toLowerCase();
+    if (typeof b.smsGatewayNumber === 'string') envUpd.SMS_GATEWAY_NUMBER = b.smsGatewayNumber.replace(/\D/g, '');
+    // Twilio SMS (scaffolded; inert until all four are set)
+    if (typeof b.twilioSid === 'string') envUpd.TWILIO_ACCOUNT_SID = b.twilioSid.trim();
+    if (typeof b.twilioToken === 'string' && b.twilioToken) envUpd.TWILIO_AUTH_TOKEN = b.twilioToken;   // secret: only when provided
+    if (typeof b.twilioFrom === 'string') envUpd.TWILIO_FROM = b.twilioFrom.trim();
+    if (typeof b.smsTo === 'string') envUpd.SMS_TO = b.smsTo.trim();
+    // Gmail per-event notifications
+    if (typeof b.mailNotifyRejection === 'boolean') envUpd.MAIL_NOTIFY_REJECTION = b.mailNotifyRejection ? 'true' : 'false';
+    if (typeof b.mailNotifyInterview === 'boolean') envUpd.MAIL_NOTIFY_INTERVIEW = b.mailNotifyInterview ? 'true' : 'false';
+    if (typeof b.mailNotifyOffer === 'boolean') envUpd.MAIL_NOTIFY_OFFER = b.mailNotifyOffer ? 'true' : 'false';
+    if (Array.isArray(b.mailNotifyChannels)) envUpd.MAIL_NOTIFY_CHANNELS = parseChannels(b.mailNotifyChannels.join(','), ['inapp']).join(',');
     if (b.digestDays != null && !isNaN(+b.digestDays)) envUpd.DIGEST_DAYS = String(Math.max(1, Math.min(60, Math.round(+b.digestDays))));
     if (typeof b.digestTo === 'string') envUpd.DIGEST_TO = b.digestTo.trim();
     if (typeof b.digestFrom === 'string') envUpd.DIGEST_FROM = b.digestFrom.trim();
@@ -2236,7 +3219,19 @@ app.put('/api/settings', (req, res) => {
       const clearable = new Set(['OPENAI_API_KEY', 'DIGEST_SLACK_WEBHOOK', 'SMTP_PASS', 'THEIRSTACK_API_KEY', 'APIFY_TOKEN']);
       for (const k of b.clearSecrets) if (clearable.has(k)) envUpd[k] = '';
     }
-    if (Object.keys(envUpd).length) setEnvVars(envUpd);
+    if (Object.keys(envUpd).length) {
+      if (perUserScope()) {
+        // Per-user keys -> this user's settings.json. Server-level keys (SMTP, PUBLIC_URL, tokens,
+        // aggregator/APNs) only an admin may change, and they stay in shared .env.
+        const perUser = {}, serverLvl = {};
+        for (const [k, v] of Object.entries(envUpd)) (PER_USER_CFG.has(k) ? perUser : serverLvl)[k] = v;
+        if (Object.keys(perUser).length) setUserCfg(perUser);
+        const isAdmin = (sessionUser(req) || {}).role === 'admin';
+        if (isAdmin && Object.keys(serverLvl).length) setEnvVars(serverLvl);
+      } else {
+        setEnvVars(envUpd);   // single-user / owner -> .env, unchanged
+      }
+    }
 
     res.json(settingsPayload());
   } catch (e) {
@@ -2246,9 +3241,8 @@ app.put('/api/settings', (req, res) => {
 });
 
 // ---------- source health + discovery (Phase 9) ----------
-const SOURCE_HEALTH_FILE = path.join(ROOT, 'agent', 'source-health.json');
 app.get('/api/source-health', (req, res) => {
-  res.json({ ok: true, health: readJsonSafe(SOURCE_HEALTH_FILE, { sources: {} }) });
+  res.json({ ok: true, health: readJsonSafe(P.sourceHealth, { sources: {} }) });
 });
 
 // Detect ATS + slug from a pasted careers/job URL (only public, pollable ATSs).
@@ -2281,12 +3275,12 @@ app.post('/api/sources/add', (req, res) => {
   const valid = new Set(SOURCE_CATALOG.map(s => s.name));
   if (!valid.has(ats)) return res.status(400).json({ ok: false, error: 'Unknown/unsupported ATS: ' + ats });
   if (!slug) return res.status(400).json({ ok: false, error: 'Missing slug.' });
-  const boards = readJsonSafe(BOARDS_FILE, {});
+  const boards = readJsonSafe(P.boards, {});
   boards.companies = boards.companies || [];
   const dup = boards.companies.find(c => String(c.ats).toLowerCase() === ats && String(c.slug).toLowerCase() === slug.toLowerCase());
   if (dup) return res.json({ ok: true, added: 0, duplicate: true, name: dup.name, total: boards.companies.length });
   boards.companies.push({ name, ats, slug });
-  writeJsonPretty(BOARDS_FILE, boards);
+  writeJsonPretty(P.boards, boards);
   res.json({ ok: true, added: 1, name, ats, slug, total: boards.companies.length });
 });
 
@@ -2328,8 +3322,10 @@ app.post('/api/auth/passphrase', (req, res) => {
 
 // Timestamped, keep-forever snapshot of the current store ("Snapshot now").
 app.post('/api/backup', (req, res) => {
+  const job = jobs.create('backup', { label: 'Manual backup' });
   const file = snapshotData('manual');
-  if (!file) return res.status(500).json({ ok: false, error: 'snapshot failed (no data file?)' });
+  if (!file) { jobs.fail(job.id, 'snapshot failed (no data file?)'); return res.status(500).json({ ok: false, error: 'snapshot failed (no data file?)' }); }
+  jobs.finish(job.id, { file });
   res.json({ ok: true, file });
 });
 
@@ -2337,8 +3333,8 @@ app.post('/api/backup', (req, res) => {
 app.get('/api/backups', (req, res) => {
   try {
     ensureBackupDir();
-    const list = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.json')).map(f => {
-      const fp = path.join(BACKUP_DIR, f);
+    const list = fs.readdirSync(P.backups).filter(f => f.endsWith('.json')).map(f => {
+      const fp = path.join(P.backups, f);
       let st; try { st = fs.statSync(fp); } catch (e) { return null; }
       let rows = null;
       try { const j = JSON.parse(fs.readFileSync(fp, 'utf8')); if (Array.isArray(j)) rows = j.length; } catch (e) {}
@@ -2350,13 +3346,14 @@ app.get('/api/backups', (req, res) => {
   }
 });
 
-// Restore a snapshot — snapshots the CURRENT store first, validates the backup, then replaces.
-app.post('/api/restore', (req, res) => {
-  const fp = resolveBackup((req.body || {}).file);
-  if (!fp) return res.status(400).json({ ok: false, error: 'Unknown or invalid backup file.' });
+// Restore a snapshot in the CURRENT tenant — snapshots first, validates, then replaces. Returns a
+// result object so both /api/restore and the admin restore-a-user op can use it.
+function restoreData(file) {
+  const fp = resolveBackup(file);
+  if (!fp) return { ok: false, status: 400, error: 'Unknown or invalid backup file.' };
   let restored;
-  try { restored = JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) { return res.status(400).json({ ok: false, error: 'Backup is not valid JSON.' }); }
-  if (!Array.isArray(restored)) return res.status(400).json({ ok: false, error: 'Backup is not a requisition array.' });
+  try { restored = JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) { return { ok: false, status: 400, error: 'Backup is not valid JSON.' }; }
+  if (!Array.isArray(restored)) return { ok: false, status: 400, error: 'Backup is not a requisition array.' };
   try {
     const before = readStore().length;
     const pre = snapshotData('auto');           // safety snapshot of the about-to-be-replaced state
@@ -2364,11 +3361,10 @@ app.post('/api/restore', (req, res) => {
     pruneAutoBackups();
     const guidesRestored = restoreGuides(path.basename(fp));   // bring back attached guides, if bundled
     logChange({ ts: new Date().toISOString(), action: 'restore', file: path.basename(fp), before, after: restored.length, guidesRestored, preSnapshot: pre });
-    res.json({ ok: true, restored: restored.length, from: path.basename(fp), guidesRestored, preSnapshot: pre });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
+    return { ok: true, status: 200, restored: restored.length, from: path.basename(fp), guidesRestored, preSnapshot: pre };
+  } catch (e) { return { ok: false, status: 500, error: e.message }; }
+}
+app.post('/api/restore', (req, res) => { const r = restoreData((req.body || {}).file); res.status(r.status || 200).json(r); });
 
 // Download a snapshot file (attachment).
 app.get('/api/backups/:file', (req, res) => {
@@ -2528,14 +3524,31 @@ module.exports = { postingId, sameReq, reqKey, computeTier, reconcileSync, ensur
 
 if (require.main !== module) return;   // imported for tests — stop before side effects
 
-// WP-0 one-time identity migration: backfill id/updatedAt on legacy rows (snapshot first).
-try {
-  const rows = readStore();
-  const n = ensureRowIdentity(rows);
-  if (n > 0) { snapshotData('phase'); writeStore(rows); console.log(`[migrate] backfilled id/updatedAt (${n} field(s) across ${rows.length} rows)`); }
-} catch (e) { console.error('[migrate] identity backfill failed:', e.message); }
+// ROADMAP-V3 PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
+// migrate the existing single-user board into that admin's namespace (Q1: "your current board
+// becomes your user"). Migration is once-only + reversible (legacy root files are left intact).
+// Backend-only boot work (data bootstrap, migrations, schedulers). The cloud role is a thin UI +
+// proxy and owns no data, so it skips all of this — it just serves the UI and listens.
+if (SERVE_API) {
+  // ROADMAP-V3 PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
+  // migrate the existing single-user board into that admin's namespace (Q1: "your current board
+  // becomes your user"). Migration is once-only + reversible (legacy root files are left intact).
+  if (MULTIUSER()) {
+    try {
+      const admin = users.ensureBootstrapAdmin();
+      if (admin) { const m = store.migrateLegacyToUser(admin.id); if (m.migrated) console.log(`[migrate] adopted legacy board into "${admin.id}" (${m.files} file(s))`); }
+    } catch (e) { console.error('[users] bootstrap/migrate failed:', e.message); }
+  }
 
-setInterval(digestScheduler, 60 * 1000);   // morning-digest scheduler (Phase 7)
+  // WP-0 one-time identity migration: backfill id/updatedAt on legacy rows (snapshot first).
+  try {
+    const rows = readStore();
+    const n = ensureRowIdentity(rows);
+    if (n > 0) { snapshotData('phase'); writeStore(rows); console.log(`[migrate] backfilled id/updatedAt (${n} field(s) across ${rows.length} rows)`); }
+  } catch (e) { console.error('[migrate] identity backfill failed:', e.message); }
+
+  setInterval(digestScheduler, 60 * 1000);   // morning-digest scheduler (Phase 7)
+}
 app.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces();
   const lan = Object.values(nets).flat().find(n => n && n.family === 'IPv4' && !n.internal);
@@ -2543,7 +3556,7 @@ app.listen(PORT, HOST, () => {
   console.log(`    Local:   http://localhost:${PORT}`);
   if (lan) console.log(`    LAN:     http://${lan.address}:${PORT}`);
   console.log(`    Mobile:  http://localhost:${PORT}/m`);
-  console.log(`    Data:    ${DATA_FILE}`);
+  console.log(`    Data:    ${P.data}`);
   if (APP_TOKEN) {
     console.log(`    Auth:    ON — passphrase required for /m, the board, and the API from any non-localhost client.`);
   } else {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { rolesInLane, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
@@ -18,6 +18,8 @@ import { RoleDetailScreen } from './src/screens/RoleDetailScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { AddRoleModal } from './src/components/AddRoleModal';
 import { SettingsModal } from './src/screens/SettingsModal';
+import { NotificationsModal } from './src/screens/NotificationsModal';
+import { fetchNotifications } from './src/sync/notifications';
 import { BrowserScreen } from './src/screens/BrowserScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { SearchCriteriaScreen } from './src/screens/SearchCriteriaScreen';
@@ -67,6 +69,9 @@ function AppInner() {
   const [filter, setFilter] = useState<RoleFilter>(EMPTY_FILTER);
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [todayRoleId, setTodayRoleId] = useState<string | null>(null); // role opened from Today → swipe-dismiss sheet
+  const [unread, setUnread] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -130,6 +135,15 @@ function AppInner() {
     });
     return () => sub.remove();
   }, [autoSync]);
+
+  // Refresh the notification-bell unread badge when a server is configured + after each sync (P1.8).
+  useEffect(() => {
+    if (!serverUrl) { setUnread(0); return; }
+    let alive = true;
+    fetchNotifications().then((r) => { if (alive) setUnread(r.unread); }).catch(() => {});
+    return () => { alive = false; };
+  }, [serverUrl, syncState.at]);
+
 
   const scoutOn = scoutEnabled(scoutMode, !!serverUrl);
 
@@ -339,6 +353,7 @@ function AppInner() {
         onRefresh={onRefresh}
         serverConfigured={!!serverUrl}
         syncState={syncState}
+        onOpenRole={setTodayRoleId}
       />
     ) : lane === 'analytics' ? (
       <AnalyticsScreen roles={roles} refreshing={refreshing} onRefresh={onRefresh} />
@@ -379,7 +394,7 @@ function AppInner() {
     <SafeAreaView style={styles.safe}>
       {wide ? (
         <View style={styles.wideShell}>
-          <NavRail active={lane} counts={counts} onChange={setLane} onAdd={() => setShowAdd(true)} onSettings={() => setShowSettings(true)} />
+          <NavRail active={lane} counts={counts} onChange={setLane} onAdd={() => setShowAdd(true)} onSettings={() => setShowSettings(true)} onNotifications={() => setShowNotifs(true)} unread={unread} />
           <View style={styles.wideContent}>
             <Text style={styles.wideTitle}>{VIEW_TITLE[lane]}</Text>
             {isPipeline ? (
@@ -406,6 +421,12 @@ function AppInner() {
               </View>
             </View>
             <View style={styles.brandRight}>
+              <Pressable style={styles.iconBtn} onPress={() => setShowNotifs(true)} hitSlop={22} accessibilityLabel="Notifications">
+                <Text style={styles.bell}>🔔</Text>
+                {unread > 0 ? (
+                  <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>
+                ) : null}
+              </Pressable>
               <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={22} accessibilityLabel="Settings & sync">
                 <SettingsIcon size={18} color={c.textBase} />
               </Pressable>
@@ -466,6 +487,34 @@ function AppInner() {
           setShowGuide(true);
         }}
       />
+      <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} onUnreadChange={setUnread} />
+      {/* Role opened from Today → a swipe-to-dismiss sheet over Today, so Back (or swipe down on iOS)
+          returns you exactly where you were instead of switching lanes. */}
+      <Modal
+        visible={!!todayRoleId && !!roles.find((r) => r.id === todayRoleId)}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setTodayRoleId(null)}
+      >
+        <SafeAreaView style={styles.safe}>
+          {(() => {
+            const r = roles.find((x) => x.id === todayRoleId);
+            if (!r) return null;
+            return (
+              <RoleDetailScreen
+                key={r.id}
+                role={r}
+                onBack={() => setTodayRoleId(null)}
+                onStatusChange={(s: Status) => setStatus(r.id, s)}
+                onUpdate={(patch) => update(r.id, patch)}
+                onDelete={() => { remove(r.id); setTodayRoleId(null); }}
+                onOpenPosting={(u) => setBrowserUrl(u)}
+                onBuildCv={(role) => { setCvTarget({ role: role.role, company: role.company, jd: role.notes ?? '' }); setShowCv(true); setTodayRoleId(null); }}
+              />
+            );
+          })()}
+        </SafeAreaView>
+      </Modal>
       <StatusBar style={statusBar} />
     </SafeAreaView>
   );
@@ -487,6 +536,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bell: { fontSize: 16 },
+  badge: { position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', color: '#fff' },
   iconBtn: {
     width: 42,
     height: 42,

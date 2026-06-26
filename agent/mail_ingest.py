@@ -347,6 +347,19 @@ def main():
                         % (TODAY, acted, len(positives)))
     else:
         print("\n[dry-run] nothing written. Re-run with --apply once this looks right.")
+
+    # Machine-readable summary for the server (per-event notifications). One line, JSON after a tag.
+    offers = [(r, label) for kind, matches, label in positives if kind == "offer" for r in matches]
+    summary = {
+        "applied": bool(args.apply),
+        "counts": {"rejection": len(rejected), "interview": len(advanced), "offer": len(offers)},
+        "events": (
+            [{"kind": "rejection", "company": r.get("company"), "role": r.get("role")} for r, _ in rejected]
+            + [{"kind": "interview", "company": r.get("company"), "role": r.get("role")} for r, _ in advanced]
+            + [{"kind": "offer", "company": r.get("company"), "role": r.get("role")} for r, _ in offers]
+        ),
+    }
+    print("SUMMARY_JSON " + json.dumps(summary))
     return 0
 
 

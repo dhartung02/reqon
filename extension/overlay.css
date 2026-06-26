@@ -22,6 +22,30 @@
 .jpcrm-primary:hover{border-color:#00df8f}
 .jpcrm-toast{margin-top:8px;background:#16240f;border:1px solid #345a32;color:#69c57e;border-radius:8px;padding:7px 10px;font-size:.78rem}
 .jpcrm-toast.jpcrm-warn{background:#2f1a16;border-color:#54322b;color:#e8755f}
+/* fillability hint (P1.11) */
+.jpcrm-fill{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:.74rem;color:#aab6c2;cursor:default}
+.jpcrm-fill-dot{width:8px;height:8px;border-radius:50%;background:#5a6470;flex:0 0 auto}
+.jpcrm-fl-ok .jpcrm-fill-dot{background:#00df8f}.jpcrm-fl-ok{color:#69c57e}
+.jpcrm-fl-mid .jpcrm-fill-dot{background:#c8ff49}.jpcrm-fl-mid{color:#bcd86b}
+.jpcrm-fl-warn .jpcrm-fill-dot{background:#e8755f}.jpcrm-fl-warn{color:#e8a08f}
+.jpcrm-fl-dim .jpcrm-fill-dot{background:#5a6470}
+/* clip confirmation panel (P1.10/P1.12) */
+.jpcrm-clip{flex-basis:100%;display:flex;flex-direction:column;gap:7px}
+.jpcrm-clip-h{font-weight:600;font-size:.82rem;color:#e8eef5}
+.jpcrm-clip-conf{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.jpcrm-c-hi{color:#00df8f}.jpcrm-c-mid{color:#c8ff49}.jpcrm-c-lo{color:#e8755f}
+.jpcrm-clip-meta{font-size:.74rem;color:#aab6c2}
+.jpcrm-clip-warn{color:#e8a08f}
+.jpcrm-in{width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #333c47;color:#e8eef5;border-radius:7px;padding:6px 8px;font:inherit;font-size:.78rem}
+.jpcrm-in:focus{outline:none;border-color:#00df8f}
+.jpcrm-clip-acts{display:flex;gap:7px}
+.jpcrm-clip-acts .jpcrm-btn{margin-top:2px;flex:1}
+/* autofill summary (P1.13) */
+.jpcrm-summary{margin-top:9px;border-top:1px solid #28323d;padding-top:9px;flex-basis:100%}
+.jpcrm-sum-line{font-size:.76rem;color:#aab6c2;padding:2px 0}
+.jpcrm-sum-line.jpcrm-ok{color:#69c57e}
+.jpcrm-sum-line.jpcrm-warn-line{color:#e8755f}
+.jpcrm-sum-line.jpcrm-dim{color:#7c8794;font-style:italic}
 @media (prefers-color-scheme: light){
   .jpcrm-box{background:#fff;color:#1a1f29;border-color:#d0d1d8}
   .jpcrm-status,.jpcrm-metric,.jpcrm-pill{color:#5a5d77}
@@ -30,4 +54,8 @@
   /* The ghost (outline) buttons need a dark label on the white card — was near-white = invisible. */
   .jpcrm-btn{color:#1a1f29;border-color:#d0d1d8}
   .jpcrm-primary{background:#00df8f;color:#08130d;border-color:#00df8f}
+  .jpcrm-clip-h{color:#1a1f29}
+  .jpcrm-clip-meta,.jpcrm-fill,.jpcrm-sum-line{color:#5a5d77}
+  .jpcrm-in{background:#f4f6f9;border-color:#d0d1d8;color:#1a1f29}
+  .jpcrm-summary{border-top-color:#d0d1d8}
 }

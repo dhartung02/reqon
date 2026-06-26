@@ -145,6 +145,8 @@ curl https://cloud.reqon.app/health         # → {"ok":true,"service":"reqon-cl
 **Data resets after each deploy**
 - The api service needs the **persistent disk** at `/var/reqon-data` **and** `REQON_DATA_DIR=/var/reqon-data`. Without the disk, Render's filesystem is ephemeral and `data.json` reverts to the seed on redeploy.
 - Verify: `curl https://api.reqon.app/api/health` (with token) shows `dataFile` under `/var/reqon-data`.
+- With `REQON_DATA_DIR` set, **everything persistent lives on the disk**: `data.json`, `backups/`, all of `agent/` (profile, guides, logos, jobs, etc.), the user registry **`users.json`** (accounts + session-signing secret), the settings **`.env`** written by the Settings UI, and the uploaded **APNs key**. A legacy root `users.json` is migrated onto the disk once on first boot (never overwriting an existing one).
+- **Secrets precedence:** the Render dashboard env vars always win over the disk `.env`. So `APP_TOKEN`/`OPENAI_API_KEY` set in the dashboard are authoritative; settings that exist only in the app (model, toggles, etc.) persist via the disk `.env` and survive redeploys.
 
 **CORS / token-capture issues** (extension or bookmarklet can't write; or cloud gets CORS errors)
 - The board itself uses the proxy (same-origin) and shouldn't hit CORS. If it does, you're calling the api host directly from the browser — add that origin to `CORS_ALLOWED_ORIGINS` on the api service.

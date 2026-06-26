@@ -113,6 +113,15 @@ digest features. Nothing requires hand-editing a file.
 
 On macOS you can register auto-start (launchd) with `./install.sh`.
 
+## Production (Render)
+
+For a hosted deployment, Reqon splits into three services from this one repo — `api.reqon.app`
+(backend), `cloud.reqon.app` (board UI, proxies to the API), and `reqon.app` (marketing) — selected
+by `REQON_ROLE`. A `render.yaml` blueprint defines all three. See **[DEPLOY.md](DEPLOY.md)** for the
+step-by-step Render dashboard walkthrough (env vars, secrets, disk, custom domains, deploy order,
+smoke tests, and troubleshooting). Running locally is unaffected — `npm start` stays the single-process
+monolith.
+
 ## Configuration
 
 | Where it's stored | What | How you set it |

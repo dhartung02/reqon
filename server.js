@@ -25,12 +25,17 @@ const users = require('./lib/users');   // user registry + auth (multi-user mode
 const MULTIUSER = () => store.multiUserEnabled();   // read live (env MULTIUSER=true)
 
 // --- minimal .env loader (no dependency) ---------------------------------------
-// Loads <project>/.env into process.env on boot so secrets (e.g. OPENAI_API_KEY)
-// live in a gitignored file rather than the code or the launchd plist. Existing
-// environment values always win (so plist/exported vars override the file).
-(function loadDotenv() {
+// Loads .env files into process.env on boot so secrets (e.g. OPENAI_API_KEY) live in a gitignored
+// file rather than the code or the launchd plist. Precedence (highest first):
+//   1. the REAL environment (Render dashboard / launchd / shell exports) — never overwritten
+//   2. the disk-backed .env under REQON_DATA_DIR — where the Settings UI persists changes, so
+//      in-app edits survive a redeploy (loaded after, overrides the repo file)
+//   3. the committed repo .env — base/local defaults
+// We snapshot the real-env keys BEFORE loading any file so a file can override another file but
+// never the real environment.
+const REAL_ENV_KEYS = new Set(Object.keys(process.env));
+function loadDotenv(envPath, label) {
   try {
-    const envPath = path.join(__dirname, '.env');
     if (!fs.existsSync(envPath)) return;
     let n = 0;
     for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
@@ -41,11 +46,14 @@ const MULTIUSER = () => store.multiUserEnabled();   // read live (env MULTIUSER=
       const k = s.slice(0, eq).trim();
       let v = s.slice(eq + 1).trim();
       if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-      if (!(k in process.env)) { process.env[k] = v; n++; }
+      if (REAL_ENV_KEYS.has(k)) continue;   // real environment always wins; file never overrides it
+      process.env[k] = v; n++;              // file value applies (a later file may override an earlier one)
     }
-    if (n) console.log(`[env] loaded ${n} var(s) from .env`);
-  } catch (e) { console.error('[env] .env load failed:', e.message); }
-})();
+    if (n) console.log(`[env] loaded ${n} var(s) from ${label}`);
+  } catch (e) { console.error('[env] load failed:', e.message); }
+}
+loadDotenv(path.join(__dirname, '.env'), 'repo .env');
+// The disk-backed .env is loaded just below, once REQON_DATA_DIR / DATA_DIR is resolved.
 
 const PORT = process.env.PORT || 8787;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = reachable on the LAN
@@ -56,6 +64,10 @@ const ROOT = __dirname;
 const DATA_DIR = process.env.REQON_DATA_DIR ? path.resolve(process.env.REQON_DATA_DIR) : ROOT;
 // Ensure the persisted-data dirs exist before anything writes (a fresh mounted disk starts empty).
 try { for (const d of ['', 'agent', 'backups']) require('fs').mkdirSync(path.join(DATA_DIR, d), { recursive: true }); } catch (e) { console.error('[data-dir]', e.message); }
+// Now that the data root is known, load the disk-backed .env (where the Settings UI persists changes
+// on an ephemeral host). Loaded after the repo .env so in-app edits override committed defaults; the
+// real environment still wins (see REAL_ENV_KEYS above). No-op locally where DATA_DIR === ROOT.
+if (DATA_DIR !== ROOT) loadDotenv(path.join(DATA_DIR, '.env'), 'disk .env');
 // Per-user file paths resolve through the tenant store (lib/store.js). With multi-user OFF
 // (default) every key maps to the legacy location (root data.json, agent/*.json, backups/) so
 // single-user behavior is unchanged; P.data / P.backups env overrides still apply (in store.js).
@@ -150,10 +162,20 @@ function ensureStore() {
 // Personal config (boards.json / watchlist.json) is gitignored; on a fresh clone, seed each from
 // its shipped *.example.json so the app + scout boot with sample config and zero personal data.
 function ensureConfig() {
+  // Seed into the disk-aware owner store path (where the app + scout actually read boards/watchlist),
+  // from the shipped *.example.json that always lives in the repo. Previously seeded into ROOT/agent,
+  // which the app never reads when REQON_DATA_DIR points elsewhere.
+  const owner = store.pathsFor(store.OWNER);
   for (const base of ['boards', 'watchlist']) {
-    const real = path.join(ROOT, 'agent', base + '.json');
+    const real = owner[base];
     const example = path.join(ROOT, 'agent', base + '.example.json');
-    try { if (!fs.existsSync(real) && fs.existsSync(example)) { fs.copyFileSync(example, real); console.log(`[config] seeded ${base}.json from ${base}.example.json`); } } catch (e) {}
+    try {
+      if (!fs.existsSync(real) && fs.existsSync(example)) {
+        fs.mkdirSync(path.dirname(real), { recursive: true });
+        fs.copyFileSync(example, real);
+        console.log(`[config] seeded ${base}.json from ${base}.example.json`);
+      }
+    } catch (e) {}
   }
 }
 function readStore() {
@@ -2357,7 +2379,6 @@ app.post('/api/maintenance/purge-tombstones', (req, res) => {
 });
 
 // ---------- lead enrichment worker (fetch posting → JSON-LD/OG → real fields) ----------
-const PROFILE_JSON = path.join(ROOT, 'agent', 'profile.json');
 async function fetchHtml(url) {
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
@@ -2450,7 +2471,7 @@ function guessSector(text) {
 async function scoreLead(company, role, jd) {
   if (!aiKey()) return null;
   try {
-    const prof = readJsonSafe(PROFILE_JSON, {});
+    const prof = readProfile();   // disk-aware + tenant-scoped (was a stale ROOT/agent/profile.json read)
     const kws = (prof.keywords || []).slice(0, 30).map(k => k.kw).join(', ');
     const system = 'You score job fit for a Principal/Director-level Product Manager who is remote-only (US). Priority domains (fit 8-10): data platform, AI/LLM/agentic platform, CDP, martech/identity, API/developer platform, IAM/SSO. Secondary (~7): usage-billing, catalog/commerce, enterprise SaaS. Penalize on-site heavily. Return ONLY compact JSON: {"fit":<0-10>,"prob":<0-10>,"sector":"<CDP / Customer Data|Martech / Engagement|Data Infra|Identity / Data|Enterprise SaaS|AI Platform>"}.';
     const user = 'Candidate keywords: ' + kws + '\n\nCompany: ' + company + '\nRole: ' + role + '\nJD:\n' + String(jd || '').slice(0, 3000);
@@ -2622,7 +2643,10 @@ app.post('/api/push/test', async (req, res) => {
 // APNs config (board-managed; mirrors the env-only setup). NEVER echoes the .p8 contents — only
 // whether each piece is set + non-secret IDs. The key can be a server path OR a pasted .p8 body
 // (written to a 0600 file under agent/, which is gitignored).
-const APNS_KEY_FILE = path.join(ROOT, 'agent', 'apns-AuthKey.p8');
+// Uploaded APNs signing key — under the persistent data dir so it survives redeploys. Consumers
+// resolve APNS_KEY_P8_PATH via path.resolve(ROOT, ...), which passes an absolute path through
+// unchanged, so we store an absolute path when disk-backed and a ROOT-relative path locally.
+const APNS_KEY_FILE = path.join(DATA_DIR, 'agent', 'apns-AuthKey.p8');
 const pushConfigPayload = () => {
   let keySet = false;
   try { keySet = !!(process.env.APNS_KEY_P8_PATH && fs.existsSync(path.resolve(ROOT, process.env.APNS_KEY_P8_PATH))); } catch (e) {}
@@ -2651,9 +2675,10 @@ app.post('/api/push/config', (req, res) => {
     if (typeof b.env === 'string') upd.APNS_ENV = b.env === 'production' ? 'production' : 'sandbox';
     // Key: either a pasted .p8 body (written to a 0600 file) or an explicit server path. Blank = keep.
     if (typeof b.keyP8 === 'string' && b.keyP8.includes('BEGIN PRIVATE KEY')) {
-      try { fs.writeFileSync(APNS_KEY_FILE, b.keyP8.trim() + '\n', { mode: 0o600 }); }
+      try { fs.mkdirSync(path.dirname(APNS_KEY_FILE), { recursive: true }); fs.writeFileSync(APNS_KEY_FILE, b.keyP8.trim() + '\n', { mode: 0o600 }); }
       catch (e) { return res.status(500).json({ ok: false, error: 'could not save key: ' + e.message }); }
-      upd.APNS_KEY_P8_PATH = path.relative(ROOT, APNS_KEY_FILE);
+      // Absolute when disk-backed (resolves regardless of CWD); ROOT-relative locally (unchanged).
+      upd.APNS_KEY_P8_PATH = DATA_DIR === ROOT ? path.relative(ROOT, APNS_KEY_FILE) : APNS_KEY_FILE;
     } else if (typeof b.keyPath === 'string' && b.keyPath.trim()) {
       upd.APNS_KEY_P8_PATH = b.keyPath.trim();
     }
@@ -2861,7 +2886,10 @@ app.post('/api/scout/run', (req, res) => {
 });
 
 // ---------- settings (sources on/off, keywords, OpenAI key/model) ----------
-const ENV_FILE = path.join(ROOT, '.env');
+// Settings saved from the app are upserted here. Under REQON_DATA_DIR this is the disk-backed .env
+// (loaded at boot above), so owner/server-level changes survive a redeploy; locally it's the repo
+// .env, exactly as before.
+const ENV_FILE = path.join(DATA_DIR, '.env');
 // Source catalog (kept in sync with agent/sources/__init__.py CATALOG).
 const SOURCE_CATALOG = [
   { name: 'greenhouse', label: 'Greenhouse', kind: 'public' },
@@ -3068,6 +3096,7 @@ function setEnvVars(updates) {
     return line;
   });
   for (const k of keys) if (!seen[k]) lines.push(`${k}=${updates[k]}`);
+  fs.mkdirSync(path.dirname(ENV_FILE), { recursive: true });   // disk mount may start empty
   const tmp = ENV_FILE + '.tmp';
   fs.writeFileSync(tmp, lines.join('\n'));
   fs.renameSync(tmp, ENV_FILE);

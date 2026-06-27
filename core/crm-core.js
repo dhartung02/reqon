@@ -127,4 +127,22 @@ function reconcileSync(serverRows, clientRows, deps) {
   return { rows: out, applied, conflicts, idRemaps };
 }
 
-module.exports = { reqKey, postingId, sameReq, expectedValue, computeTier, reconcileSync, DEFAULT_TIER_THRESHOLDS, encodePairing, decodePairing };
+// ---- entitlements (freemium tier model) ----
+// Re-exported here so every surface shares ONE catalog via `@reqon/core`. See core/entitlements.js.
+const entitlements = require('./entitlements');
+
+module.exports = {
+  reqKey, postingId, sameReq, expectedValue, computeTier, reconcileSync, DEFAULT_TIER_THRESHOLDS,
+  encodePairing, decodePairing,
+  // entitlements
+  PACKAGES: entitlements.PACKAGES,
+  PACKAGE_LABELS: entitlements.PACKAGE_LABELS,
+  FEATURES: entitlements.FEATURES,
+  FEATURE_LABELS: entitlements.FEATURE_LABELS,
+  parseLicense: entitlements.parseLicense,
+  resolvePlan: entitlements.resolvePlan,
+  requiredPackage: entitlements.requiredPackage,
+  hasFeature: entitlements.hasFeature,
+  featureMap: entitlements.featureMap,
+  tierLabel: entitlements.tierLabel,
+};

@@ -2330,6 +2330,8 @@ app.patch('/api/reqs/:key', (req, res) => {
   }
   const before = rows[idx];
   const apply = Object.assign({}, fields);
+  // advancing to a new interview stage means a new round — clear the previous thank-you flag
+  if (apply.status && (apply.status === 'Hiring Manager' || apply.status === 'Panel')) apply.thankYouSent = '';
   // auto-derive tier when scoring changed but tier wasn't explicitly provided (AUTO-promote/demote)
   if ((('fit' in apply) || ('prob' in apply)) && !('tier' in apply)) {
     apply.tier = computeTier(apply.fit != null ? apply.fit : before.fit, apply.prob != null ? apply.prob : before.prob, tierThresholds(readJsonSafe(P.boards, {})));

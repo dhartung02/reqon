@@ -2641,6 +2641,8 @@ window.upd=function(i,field,val){
   rows[i][field]=val;stampRow(i);
   // moving to Applied auto-stamps today's applied date (only if not already set — never overwrites)
   if(field==='status'&&val==='Applied'&&!rows[i].applied){rows[i].applied=new Date().toISOString().slice(0,10);}
+  // advancing to a new interview stage means a new round — clear the previous thank-you flag
+  if(field==='status'&&(val==='Hiring Manager'||val==='Panel')){rows[i].thankYouSent='';}
   persist();
   if(['status','company','role','sector','tier'].includes(field))render();   // refresh header/rationale on overrides
 };

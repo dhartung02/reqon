@@ -193,6 +193,13 @@
   .userchip{font-size:.78rem;color:var(--text-2);font-family:"Spline Sans Mono",monospace;white-space:nowrap}
   .userchip a{color:var(--gold);text-decoration:none} .userchip a:hover{text-decoration:underline}
   .userchip .urole{font-size:.6rem;background:var(--accent);color:var(--bg);border-radius:4px;padding:1px 5px;font-weight:700;text-transform:uppercase}
+  /* freemium plan badge + locked-control affordance (entitlements) */
+  .planbadge{font:700 .6rem "Spline Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:3px 8px;border:1px solid var(--line,#2c2f4a);color:var(--muted,#7b7fa5);white-space:nowrap}
+  .planbadge.is-owner,.planbadge.is-pro{background:rgba(112,108,255,.14);border-color:rgba(112,108,255,.4);color:var(--accent,#706cff)}
+  .planbadge.is-free{color:var(--muted,#7b7fa5)}
+  .ent-locked{position:relative;opacity:.55;cursor:not-allowed!important}
+  .ent-locked::after{content:"🔒";font-size:.7em;margin-left:4px;opacity:.8}
+  .ent-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:10000;background:var(--card,#181926);color:var(--text,#dde0f5);border:1px solid var(--accent,#706cff);border-radius:8px;padding:10px 16px;font:600 .82rem "Spline Sans",sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:min(92vw,380px)}
   .bellwrap{position:relative;display:inline-block}
   .bellbtn{background:transparent;border:1px solid var(--line-2);color:var(--text-2);border-radius:10px;padding:8px 11px;cursor:pointer;font-size:.95rem;font-family:inherit}
   .bellbtn:hover{color:var(--text);border-color:var(--accent)}
@@ -757,6 +764,7 @@
         </div>
       </div>
       <span class="userchip" id="userChip" style="display:none"></span>
+      <span class="planbadge" id="planBadge" style="display:none" title="Your Reqon plan"></span>
       <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
     </div>
   </header>
@@ -802,7 +810,7 @@
     <div class="spacer"></div>
     <span class="scoutstatus" id="scoutStatus"></span>
     <div class="scoutctl">
-      <button class="btn ghost" id="scoutBtn">⟳ Run Scout ▾</button>
+      <button class="btn ghost" id="scoutBtn" data-feature="scout">⟳ Run Scout ▾</button>
       <div class="scoutmenu" id="scoutMenu">
         <div class="scoutmenu-lbl">Run mode</div>
         <button data-mode="find">Find new matches</button>
@@ -958,7 +966,7 @@
     <h2>AI application assistant</h2>
     <p class="hint" id="assistCtx">—</p>
     <div class="ahintrow" id="assistActions" style="flex-wrap:wrap;gap:6px">
-      <button class="mini" type="button" data-aiact="score" title="AI re-scores fit/prob/tier and explains why — review before applying">⟳ Re-score &amp; explain fit</button>
+      <button class="mini" type="button" data-aiact="score" data-feature="ai_score" title="AI re-scores fit/prob/tier and explains why — review before applying">⟳ Re-score &amp; explain fit</button>
       <button class="mini" type="button" data-aiact="tailor" title="AI suggests how to position the candidate for this role">✦ Tailor positioning</button>
     </div>
     <p class="setmuted" id="assistProfWarn" style="display:none;color:var(--warning)">No candidate profile yet — scoring/tailoring will be weak. Add one in Settings → Candidate profile.</p>
@@ -1169,7 +1177,7 @@
           </div>
           <div class="field"><label>Location</label><input id="profLocation" type="text"></div>
           <div class="field"><label>Professional summary
-              <button class="mini" id="draftSummaryBtn" type="button" style="float:right">✨ AI draft from résumé</button></label>
+              <button class="mini" id="draftSummaryBtn" data-feature="profile_summary" type="button" style="float:right">✨ AI draft from résumé</button></label>
             <textarea id="profSummary" rows="4" placeholder="A 2–4 sentence positioning statement. Used in cover notes and as application 'about me' text. Leave blank and click AI draft to generate one from your résumé."></textarea>
             <span id="summaryMsg" class="setmuted"></span>
           </div>
@@ -1327,7 +1335,7 @@
               <div class="field"><label>To number (your mobile)</label><input id="setSmsTo" type="text" placeholder="+1555…"></div>
             </div>
           </div>
-          <div class="ahintrow"><button class="mini" id="sendDigestBtn" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
+          <div class="ahintrow"><button class="mini" id="sendDigestBtn" data-feature="digest_delivery" type="button">✉ Send test digest now</button> <span id="digestStatus" class="setmuted"></span></div>
           <p class="hint" style="margin:8px 0 0">Test sends to <b>all enabled channels</b>. Save settings before sending. Gmail with 2-Step Verification needs an <b>App Password</b> (Google Account → Security → App passwords), not your account password.</p>
 
           <div style="font-weight:600;font-size:.9rem;margin:16px 0 8px;padding-top:14px;border-top:1px solid var(--line)">Gmail response ingest (IMAP)</div>
@@ -1828,12 +1836,12 @@ function reqCardHTML(x,i){
     <div class="rowacts">
       ${x.link?`<a class="applylink" href="${x.link}" target="_blank" rel="noopener"><span class="mini link">Open ↗</span></a>`:""}
       <button class="mini" onclick="editRow(${i})">Edit details</button>
-      ${x.link?`<button class="mini" onclick="enrichRow(${i})" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
-      <button class="mini" onclick="openAssist(${i})" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
+      ${x.link?`<button class="mini" onclick="enrichRow(${i})" data-feature="ai_score" title="Fetch the posting and fill company/role/location/sector (+AI score)">✨ Enrich</button>`:""}
+      <button class="mini" onclick="openAssist(${i})" data-feature="ai_draft" title="Draft a cover note or screening answer with AI">✍ AI draft</button>
       <button class="mini" onclick="openCv(${i})" title="Build a CV tailored to this role (preloads company/role/JD)">📄 Tailored CV</button>
       <button class="mini" onclick="openTimeline(${i})" title="See how this role got here — capture, scoring, status changes">📜 Timeline</button>
       ${/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(x.status||'')?`<button class="mini" onclick="openFollowup(${i})" title="Follow-up recommendation + AI-drafted message">💬 Follow-up</button>`:''}
-      ${/^(Recruiter Screen|Hiring Manager|Panel)$/.test(x.status||'')?`<button class="mini" onclick="openThankYou(${i})" title="AI-draft a thank-you note after your interview">✉ Thank-you</button>`:''}
+      ${/^(Recruiter Screen|Hiring Manager|Panel)$/.test(x.status||'')?`<button class="mini" onclick="openThankYou(${i})" data-feature="ai_draft" title="AI-draft a thank-you note after your interview">✉ Thank-you</button>`:''}
       ${guideBtnHTML(x,i)}
       <button class="mini danger" onclick="delRow(${i})">Delete</button>
     </div>
@@ -1847,9 +1855,9 @@ const guideKey=x=>encodeURIComponent(((x.company||'')+'|'+(x.role||'')).toLowerC
 function guideBtnHTML(x,i){
   // "Research this company" runs an opt-in web-search pass (real interview questions + the company's
   // own careers/how-we-hire page, with sources). Shown both before and after a guide exists.
-  const research=`<button class="mini" onclick="genGuide(${i},true)" title="Generate a researched guide — searches the web for this company's interview process &amp; questions and cites sources (uses more AI credit)">🔎 Research company</button>`;
+  const research=`<button class="mini" onclick="genGuide(${i},true)" data-feature="guide_research" title="Generate a researched guide — searches the web for this company's interview process &amp; questions and cites sources (uses more AI credit)">🔎 Research company</button>`;
   if(x.guideAt) return `<button class="mini" onclick="openGuide(${i})" title="Open the AI interview prep guide">📋 Interview guide</button> ${research}`;
-  if(INTERVIEW_STATUSES.includes(x.status)) return `<button class="mini" onclick="genGuide(${i})" title="Generate an AI interview prep guide grounded in your narratives">📋 Generate guide</button> ${research}`;
+  if(INTERVIEW_STATUSES.includes(x.status)) return `<button class="mini" onclick="genGuide(${i})" data-feature="guide_generate" title="Generate an AI interview prep guide grounded in your narratives">📋 Generate guide</button> ${research}`;
   return '';
 }
 function openGuide(i){ const x=rows[i]; if(x) window.open('/api/reqs/'+guideKey(x)+'/guide','_blank','noopener'); }
@@ -3905,6 +3913,42 @@ async function completeOnboarding(runScout){
 F('obSave').onclick=()=>completeOnboarding(true);
 F('obSkip').onclick=()=>completeOnboarding(false);
 checkMe();
+
+// ---- entitlements (freemium tier gating) ----
+// Mirrors core/entitlements.js / GET /api/entitlements. Owner & self-hosted Local Pro see every
+// control unlocked; lower tiers get gated controls disabled with an upgrade tooltip + a plan badge.
+// Gating is declarative: tag any control `data-feature="ai_draft"` (etc.) and it auto-locks.
+let ENT={plan:{tier:'owner',owner:true},features:{},labels:{}};
+const entHas=f=>ENT.features[f]!==false; // unknown/true => allowed (fail-open, matches server)
+function entToast(msg){ const t=document.createElement('div'); t.className='ent-toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';},2200); setTimeout(()=>t.remove(),2700); }
+function applyEntitlementGates(root){
+  (root||document).querySelectorAll('[data-feature]').forEach(el=>{
+    const f=el.getAttribute('data-feature'); const allowed=entHas(f);
+    el.classList.toggle('ent-locked',!allowed);
+    if(!allowed){
+      const pkg=(ENT.labels&&ENT.labels[f])||f; const req=ENT.reqLabel&&ENT.reqLabel(f);
+      const note='Requires the '+(req||'paid')+' package'; el.title=note;
+      if(el.tagName==='BUTTON'||el.tagName==='INPUT') el.disabled=true;
+      if(!el._entWired){ el._entWired=true; el.addEventListener('click',ev=>{ if(!entHas(f)){ ev.preventDefault(); ev.stopImmediatePropagation(); entToast((pkg)+' — '+note+'. Upgrade in Settings.'); } },true); }
+    } else if(el._entWired){ if(el.tagName==='BUTTON'||el.tagName==='INPUT') el.disabled=false; el.title=el._entTitle||''; }
+  });
+}
+async function loadEntitlements(){
+  try{
+    const j=await (await fetch('/api/entitlements',{cache:'no-store'})).json();
+    if(!j||!j.ok) return;
+    ENT={plan:j.plan||{},features:j.features||{},labels:j.featureLabels||{},packages:j.packages||[]};
+    const reqMap=j.requires||{}; // feature -> 'cloud' | 'ai'; names the package the tooltip should mention
+    ENT.reqLabel=f=>reqMap[f]?(reqMap[f][0].toUpperCase()+reqMap[f].slice(1)):'paid';
+    const badge=F('planBadge'); const tier=(j.plan&&j.plan.tier)||'free';
+    if(badge){ badge.textContent=j.tierLabel||tier; badge.className='planbadge is-'+(j.plan&&(j.plan.owner?'owner':j.plan.pro?'pro':tier==='free'?'free':'paid')); badge.style.display=''; }
+    applyEntitlementGates();
+    // re-apply whenever the board repaints (rows / today / analytics / lanes all reset #board)
+    const board=document.getElementById('board');
+    if(board&&!board._entObserved){ board._entObserved=true; let raf=0; new MutationObserver(()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>applyEntitlementGates()); }).observe(board,{childList:true,subtree:true}); }
+  }catch(e){}
+}
+loadEntitlements();
 
 // ---- Settings → Users (admin) ----
 const _kfmt=n=>{n=+n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1)+'k':String(n);};

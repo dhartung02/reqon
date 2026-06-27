@@ -721,7 +721,7 @@ app.get('/api/me', (req, res) => {
 // load and gates its UI against `features` (owner/self-host -> all true). Read-only & always JSON.
 app.get('/api/entitlements', (req, res) => {
   const plan = planFor(req);
-  res.json({ ok: true, plan, features: ent.featureMap(plan), packages: ent.PACKAGES, featureLabels: ent.FEATURE_LABELS, tierLabel: ent.tierLabel(plan.tier) });
+  res.json({ ok: true, plan, features: ent.featureMap(plan), packages: ent.PACKAGES, featureLabels: ent.FEATURE_LABELS, requires: ent.FEATURES, tierLabel: ent.tierLabel(plan.tier) });
 });
 app.post('/api/me/password', (req, res) => {
   if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Multi-user is disabled.' });

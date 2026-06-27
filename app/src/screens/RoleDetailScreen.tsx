@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
-import { statusColor, type Role, type Status } from '../model';
+import { statusColor, SECTORS, REMOTE_MODES, type Role, type Status } from '../model';
 import { explainScore, type RationaleTone } from '../scout/explain';
 import { DraftModal } from './DraftModal';
 import { GuideModal } from './GuideModal';
@@ -20,7 +20,12 @@ const STATUSES: Status[] = [
   'Archived',
 ];
 
-type EditablePatch = Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'>>;
+type EditablePatch = Partial<Pick<Role,
+  | 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'
+  | 'interview' | 'followup' | 'thankYouSent' | 'cover' | 'resume' | 'referral'
+  | 'recruiterEmail' | 'sector' | 'remote' | 'rejectionStage' | 'rejectionReason' | 'rejectionFeedback'>>;
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
 
 // Read-only fact row.
 function Field({ label, value }: { label: string; value?: string }) {
@@ -41,12 +46,14 @@ function EditField({
   field,
   onSave,
   multiline,
+  placeholder,
 }: {
   label: string;
   value?: string;
   field: keyof EditablePatch;
   onSave: (patch: EditablePatch) => void;
   multiline?: boolean;
+  placeholder?: string;
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const [v, setV] = useState(value ?? '');
@@ -57,12 +64,67 @@ function EditField({
         value={v}
         onChangeText={setV}
         onEndEditing={() => onSave({ [field]: v.trim() || undefined } as EditablePatch)}
-        placeholder="—"
+        placeholder={placeholder ?? '—'}
         placeholderTextColor={c.muted}
         multiline={multiline}
+        autoCapitalize={field === 'recruiterEmail' ? 'none' : 'sentences'}
         style={[styles.input, multiline && styles.inputMultiline]}
       />
     </View>
+  );
+}
+
+// Enum picker (sector / remote) — tap a chip to set, tap the active one to clear.
+function ChipPicker({
+  label,
+  value,
+  field,
+  options,
+  onSave,
+}: {
+  label: string;
+  value?: string;
+  field: keyof EditablePatch;
+  options: readonly string[];
+  onSave: (patch: EditablePatch) => void;
+}) {
+  const { c, styles } = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.pickRow}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.pickChips}>
+        {options.map((o) => {
+          const on = (value || '').toLowerCase() === o.toLowerCase();
+          return (
+            <Pressable
+              key={o}
+              onPress={() => onSave({ [field]: on ? undefined : o } as EditablePatch)}
+              style={[styles.pick, on && { borderColor: c.active, backgroundColor: alpha(c.active, 0.12) }]}
+            >
+              <Text style={[styles.pickText, on && { color: c.active }]}>{o}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// Thank-you-sent toggle — stamps today's date when checked (suppresses the thank-you action item),
+// clears it when unchecked. Mirrors the web board's checkbox + date stamp.
+function ThankYouToggle({ value, onSave }: { value?: string; onSave: (patch: EditablePatch) => void }) {
+  const { c, styles } = useThemedStyles(makeStyles);
+  const sent = !!value;
+  return (
+    <Pressable style={styles.editRow} onPress={() => onSave({ thankYouSent: sent ? undefined : todayIso() })}>
+      <Text style={styles.fieldLabel}>Thank-you sent</Text>
+      <View style={styles.toggleRow}>
+        <View style={[styles.checkbox, sent && { backgroundColor: c.emerald, borderColor: c.emerald }]}>
+          {sent ? <Text style={styles.checkmark}>✓</Text> : null}
+        </View>
+        <Text style={styles.toggleText}>{sent ? `Sent ${value}` : 'Not sent — tap to stamp today'}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -148,14 +210,46 @@ export function RoleDetailScreen({
         <Text style={styles.sectionLabel}>TRACKING</Text>
         <View style={styles.card}>
           <EditField label="Recruiter" value={role.recruiter} field="recruiter" onSave={onUpdate} />
+          <EditField label="Recruiter email" value={role.recruiterEmail} field="recruiterEmail" onSave={onUpdate} />
+          <EditField label="Referral" value={role.referral} field="referral" onSave={onUpdate} />
           <EditField label="Next action" value={role.next} field="next" onSave={onUpdate} />
           <EditField label="Notes" value={role.notes} field="notes" onSave={onUpdate} multiline />
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>DATES</Text>
+        <View style={styles.card}>
+          <EditField label="Follow-up due" value={role.followup} field="followup" onSave={onUpdate} placeholder="YYYY-MM-DD" />
+          <EditField label="Interview date" value={role.interview} field="interview" onSave={onUpdate} placeholder="YYYY-MM-DD" />
+          {INTERVIEW_STATUSES.includes(role.status) ? <ThankYouToggle value={role.thankYouSent} onSave={onUpdate} /> : null}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>DETAILS</Text>
+        <View style={styles.card}>
+          <ChipPicker label="Sector" value={role.sector} field="sector" options={SECTORS} onSave={onUpdate} />
+          <ChipPicker label="Remote" value={role.remote} field="remote" options={REMOTE_MODES} onSave={onUpdate} />
+          <EditField label="Cover letter" value={role.cover} field="cover" onSave={onUpdate} />
+          <EditField label="Résumé version" value={role.resume} field="resume" onSave={onUpdate} />
+          <EditField label="Salary" value={role.salary} field="salary" onSave={onUpdate} />
+          <EditField label="Location" value={role.location} field="location" onSave={onUpdate} />
+        </View>
+      </View>
+
+      {role.status === 'Rejected' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>REJECTION FEEDBACK</Text>
+          <View style={styles.card}>
+            <EditField label="Stage" value={role.rejectionStage} field="rejectionStage" onSave={onUpdate} />
+            <EditField label="Reason" value={role.rejectionReason} field="rejectionReason" onSave={onUpdate} />
+            <EditField label="Feedback" value={role.rejectionFeedback} field="rejectionFeedback" onSave={onUpdate} multiline />
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.card}>
-        <Field label="Salary" value={role.salary} />
-        <Field label="Location" value={role.location} />
         <Field label="Applied" value={role.applied} />
         <Field label="Added" value={role.age} />
       </View>
@@ -250,6 +344,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   editRow: { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: alpha(c.canvas, 0.5), gap: 4 },
   input: { fontFamily: fonts.sans, fontSize: 14, color: c.textHigh, padding: 0 },
   inputMultiline: { minHeight: 54, textAlignVertical: 'top' },
+  pickRow: { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: alpha(c.canvas, 0.5), gap: 8 },
+  pickChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pick: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: c.canvas, borderWidth: 1, borderColor: c.element },
+  pickText: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: c.muted, alignItems: 'center', justifyContent: 'center' },
+  checkmark: { color: c.canvas, fontSize: 13, fontWeight: '800' },
+  toggleText: { fontFamily: fonts.sans, fontSize: 13, color: c.textBase, flexShrink: 1 },
   linkBtn: { backgroundColor: c.emerald, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   linkBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: c.canvas },
   draftBtn: {

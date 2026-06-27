@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { computeTier, expectedValue } from '@reqon/core';
+import { SECTORS, REMOTE_MODES } from '../model';
 import type { NewRole } from '../db/store';
 
 // Minimal create form. Company + role required; fit/prob (0–10) drive the live tier/score preview.
@@ -22,6 +23,8 @@ export function AddRoleModal({
   const [salary, setSalary] = useState('');
   const [location, setLocation] = useState('');
   const [link, setLink] = useState('');
+  const [sector, setSector] = useState('');
+  const [remote, setRemote] = useState('');
 
   const f = clamp(parseFloat(fit));
   const p = clamp(parseFloat(prob));
@@ -30,7 +33,7 @@ export function AddRoleModal({
   const ev = expectedValue({ fit: f, prob: p });
 
   const reset = () => {
-    setCompany(''); setRole(''); setFit(''); setProb(''); setSalary(''); setLocation(''); setLink('');
+    setCompany(''); setRole(''); setFit(''); setProb(''); setSalary(''); setLocation(''); setLink(''); setSector(''); setRemote('');
   };
   const save = () => {
     if (!valid) return;
@@ -42,6 +45,8 @@ export function AddRoleModal({
       salary: salary.trim() || undefined,
       location: location.trim() || undefined,
       link: link.trim() || undefined,
+      sector: sector || undefined,
+      remote: remote || undefined,
     });
     reset();
     onClose();
@@ -81,6 +86,30 @@ export function AddRoleModal({
             </Labeled>
             <Labeled label="Location (optional)" styles={styles}>
               <TextInput value={location} onChangeText={setLocation} placeholder="Remote" placeholderTextColor={c.muted} style={styles.input} />
+            </Labeled>
+            <Labeled label="Remote (optional)" styles={styles}>
+              <View style={styles.chipWrap}>
+                {REMOTE_MODES.map((m) => {
+                  const on = remote === m;
+                  return (
+                    <Pressable key={m} onPress={() => setRemote(on ? '' : m)} style={[styles.chip, on && { borderColor: c.active, backgroundColor: alpha(c.active, 0.12) }]}>
+                      <Text style={[styles.chipText, on && { color: c.active }]}>{m}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Labeled>
+            <Labeled label="Sector (optional)" styles={styles}>
+              <View style={styles.chipWrap}>
+                {SECTORS.map((s) => {
+                  const on = sector === s;
+                  return (
+                    <Pressable key={s} onPress={() => setSector(on ? '' : s)} style={[styles.chip, on && { borderColor: c.active, backgroundColor: alpha(c.active, 0.12) }]}>
+                      <Text style={[styles.chipText, on && { color: c.active }]}>{s}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </Labeled>
             <Labeled label="Link (optional)" styles={styles}>
               <TextInput value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://…" placeholderTextColor={c.muted} style={styles.input} />
@@ -139,6 +168,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   twoCol: { flexDirection: 'row', gap: 12 },
   col: { flex: 1 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 8, backgroundColor: c.element, borderWidth: 1, borderColor: c.element },
+  chipText: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
   preview: { fontFamily: fonts.sans, fontSize: 13, color: c.emerald, fontWeight: '500' },
   save: { backgroundColor: c.emerald, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
   saveDisabled: { backgroundColor: alpha(c.emerald, 0.35) },

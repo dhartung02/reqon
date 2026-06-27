@@ -1485,6 +1485,7 @@ let ANALYTICS_WINDOW=0;   // days; 0 = all-time (from settings)
 let TAB_MAP={...TAB_MAP_DEFAULT};
 let activeTab="today", applyNextOnly=true;
 let scoutLast=null;                 // computed summary of the last scout run (for the Today strip)
+let ccLoaded=false;                 // true once loadCommandCenter() has populated the cmdCenter box
 let recentOnly=false, recentCutoff="";  // "New since last run" transient filter
 // ---- hygiene lanes (Phase 3) ----
 const HYGIENE_DEFAULT={followupDays:7,followupStatuses:["Applied","Recruiter Screen","Hiring Manager","Panel"],needsVerifyIncludeBoardonly:false,closedHandling:"suggest"};
@@ -1503,10 +1504,12 @@ function daysSince(d){ // local date-only delta; "YYYY-MM-DD" parsed as LOCAL mi
 function needsVerify(x){return x.status==="Not Applied"&&(x.conf==="unverified"||x.reqCheck==="lead"||(HYGIENE.needsVerifyIncludeBoardonly&&x.conf==="boardonly"));}
 function followUpDue(x){if(!(HYGIENE.followupStatuses||[]).includes(x.status))return false;const d=daysSince(x.lastcontact||x.applied);return d!=null&&d>=(HYGIENE.followupDays||7);}
 function closedReq(x){return (x.reqCheck||"")==="closed";}
+function thankyouDue(x){if(!["Recruiter Screen","Hiring Manager","Panel"].includes(x.status)||x.thankYouSent)return false;const d=daysSince(x.interview);return d!=null&&d<=2;}
 const LANE_DEFS=[
   {key:"verify",label:"⚠ Needs verify",pred:needsVerify,desc:"Not-applied leads with an unverified link — confirm the live posting before applying.",reason:x=>x.reqCheck==="lead"?"lead":x.conf},
   {key:"followup",label:"⏰ Follow-up due",pred:followUpDue,desc:"Active applications with no contact past your follow-up threshold — nudge or log an update.",reason:x=>{const d=daysSince(x.lastcontact||x.applied);return d!=null?d+"d quiet":"stale";}},
   {key:"closed",label:"✖ Closed reqs",pred:closedReq,desc:"Postings detected closed. Archive them (snapshots first) — never auto-deleted.",reason:x=>"req closed"},
+  {key:"thankyou",label:"🙏 Thank-you due",pred:thankyouDue,desc:"Interview was in the last 2 days — send a thank-you note while it's fresh.",reason:x=>{const d=daysSince(x.interview);return d===0?"today":d+"d ago";}},
 ];
 function laneDef(k){return LANE_DEFS.find(d=>d.key===k);}
 // ---- apply-mode (Phase 4) ----
@@ -1676,7 +1679,8 @@ async function loadCommandCenter(){
   if(!j||!j.ok){ box.hidden=true; return; }
   const items=(j.items||[]).filter(it=>!ccDismissed.has(it.id));
   if(!items.length){ box.hidden=true; return; }
-  box.hidden=false;
+  ccLoaded=true;
+  box.hidden=(activeTab==='today');
   box.classList.toggle('collapsed', ccCollapsed);
   const c=j.counts||{};
   document.getElementById('ccCounts').innerHTML=['high','medium','low'].filter(k=>c[k]).map(k=>`<span class="cc-pill ${k}">${c[k]} ${k}</span>`).join('');
@@ -1989,10 +1993,14 @@ function render(){
   [...selected].forEach(i=>{if(!visSet.has(i))selected.delete(i);});
 
   const board=document.getElementById("board");
-  // #4: on the Today tab the Today cards are the primary content — relocate the "What needs action"
-  // command center to sit BELOW them so expanding it never displaces the cards. Above the list elsewhere.
+  // On the Today tab, the cards ARE the action surface — hide the command center to avoid duplication.
+  // On all other tabs it sits above the board as before. ccLoaded guards against flashing it before
+  // loadCommandCenter() has run (it starts hidden in the HTML).
   const cc=document.getElementById("cmdCenter");
-  if(cc&&board){ if(today){ if(board.nextElementSibling!==cc) board.after(cc); } else if(cc.nextElementSibling!==board) board.before(cc); }
+  if(cc&&board){
+    if(today){ cc.hidden=true; }
+    else{ if(ccLoaded) cc.hidden=false; if(cc.nextElementSibling!==board) board.before(cc); }
+  }
   let html="";
   if(today){
     board.innerHTML=renderToday();
@@ -2149,12 +2157,13 @@ function renderToday(){
   const closed=all.filter(closedReq);
   const interview=all.filter(x=>["Recruiter Screen","Hiring Manager","Panel"].includes(x.status));
   const offers=all.filter(x=>x.status==="Offer");
+  const thankyou=all.filter(thankyouDue);
   const card=(n,title,desc,cls,action)=>{
     const empty=n===0;
     return `<button class="today-card ${cls} ${empty?'empty':''}" ${empty?'disabled':`onclick="${action}"`}>`+
       `<span class="tc-n">${n}</span><span class="tc-meta"><span class="tc-t">${title}</span><span class="tc-d">${desc}</span></span></button>`;
   };
-  const actionTotal=newSince.length+verify.length+applyNext.length+tierAOpen.length+followup.length+closed.length;
+  const actionTotal=newSince.length+verify.length+applyNext.length+tierAOpen.length+followup.length+closed.length+thankyou.length;
   const queue=actionTotal===0
     ? `<div class="today-clear">✓ You're all caught up — nothing needs action right now. Run Scout to pull fresh matches.</div>`
     : `<div class="today-grid">
@@ -2165,8 +2174,12 @@ function renderToday(){
         ${card(followup.length,"Follow-up due","Active applications gone quiet past your threshold","danger","todoGo('followup')")}
         ${card(closed.length,"Recently closed","Postings detected closed — review and archive","muted","todoGo('closed')")}
       </div>`;
-  const pipeline=(interview.length||offers.length)
-    ? `<div class="today-grid">${card(interview.length,"In interviews","Active interview-stage conversations","active","setTab('interviewing')")}${offers.length?card(offers.length,"Offers","Open offers — see the Interviewing tab","active","setTab('interviewing')"):""}</div>`
+  const pipeline=(interview.length||offers.length||thankyou.length)
+    ? `<div class="today-grid">
+        ${interview.length?card(interview.length,"In interviews","Active interview-stage conversations","active","setTab('interviewing')"):""}
+        ${offers.length?card(offers.length,"Offers","Open offers — review and respond","active","setTab('interviewing')"):""}
+        ${thankyou.length?card(thankyou.length,"Thank-you overdue","Interview was recent — send a note before it goes cold","warning","todoGo('thankyou')"):""}
+       </div>`
     : "";
   return `<div class="today-wrap">
     ${scoutRunStripHTML()}
@@ -2185,6 +2198,7 @@ window.todoGo=function(view){
   else if(view==="verify"){activeTab="open";activeLane="verify";}
   else if(view==="followup"){activeTab="open";activeLane="followup";}
   else if(view==="closed"){activeTab="open";activeLane="closed";}
+  else if(view==="thankyou"){activeTab="open";activeLane="thankyou";}
   else if(view==="tierA"){activeTab="open";F("tierFilter").value="A";F("statusFilter").value="Not Applied";}
   else if(view==="review"){activeTab="open";recentOnly=true;recentCutoff=(scoutLast&&scoutLast.when)?scoutLast.when.slice(0,10):"";}
   render();

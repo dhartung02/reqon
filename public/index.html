@@ -67,6 +67,12 @@
   .kpi.sec .kpi-v{font-weight:600;font-size:1rem;color:var(--text-2)}
   .kpi.sec .kpi-k{font-size:.62rem}
   @media (max-width:680px){.kpi-div{display:none}}
+  /* #3 KPI boxes act as lifecycle filters — clickable + selected state */
+  .kpi[role="button"]{cursor:pointer;transition:border-color .12s,background .12s}
+  .kpi[role="button"]:hover{border-color:var(--line-2);background:var(--panel-2)}
+  .kpi[role="button"]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .kpi.kpi-active{border-color:var(--accent);background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--accent)}
+  .kpi.sec.kpi-active{border-color:var(--accent);background:var(--panel)}
 
   .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px}
   .controls input[type=text], .controls select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.88rem;outline:none}
@@ -553,6 +559,23 @@
   @media (max-width:680px){
     .crow{grid-template-columns:18px 34px minmax(0,1fr) auto 14px;gap:9px}
     .crow-src{display:none}
+  }
+  /* #1 phone: two-line compact rows so company/role stay legible; score+badges+status+Open wrap below */
+  @media (max-width:560px){
+    .crow{grid-template-columns:26px minmax(0,1fr) 16px;
+      grid-template-areas:"chk main caret" "ev tail caret";gap:3px 9px;align-items:center;padding:9px 11px}
+    .crow-chk{grid-area:chk;align-self:center}
+    .crow-ev{grid-area:ev;text-align:left;font-size:.74rem}
+    .crow-main{grid-area:main;flex-wrap:wrap;gap:1px 7px}
+    .crow-co{max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
+    .crow-role{flex-basis:100%;white-space:normal;overflow:visible;text-overflow:clip;font-size:.82rem}
+    .crow-tail{grid-area:tail;justify-content:flex-start;flex-wrap:wrap;gap:6px;white-space:normal}
+    .crow-caret{grid-area:caret;align-self:center}
+    /* expanded full card: stack fields full-width, reclaim the indent */
+    .req{margin-left:0!important;padding:13px 14px}
+    .crm{grid-template-columns:1fr}
+    .scoresrow{flex-wrap:wrap;gap:14px;justify-content:flex-start}
+    .fitrat .fr{flex:1 1 auto;min-width:88px}
   }
 
   .req{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;margin-bottom:9px;transition:border-color .15s,background .15s;border-left:3px solid var(--line-2);border-right:3px solid transparent}
@@ -1498,6 +1521,7 @@ function tabKeyForStatus(status){for(const d of TAB_DEFS){if(statusesForTab(d.ke
 // apply-next queue: tier A/B · verified · req still open · not yet applied
 function isApplyNext(x){return ["A","B"].includes(x.tier)&&x.conf==="verified"&&!["closed","lead","unknown"].includes(x.reqCheck||"")&&x.status==="Not Applied";}
 const tierOpen={A:true,B:false,C:false};   // accordion state — Tier A open by default
+const tierTouched={A:false,B:false,C:false};  // user manually toggled this tier (overrides filter auto-expand)
 const expanded=new Set();                  // compact rows expanded into full cards (by row index)
 const selected=new Set();                  // checkbox selection (by row index)
 let visibleIdx=[];                         // row indices currently shown post-filter (for "select all visible")
@@ -1787,6 +1811,7 @@ function reqCardHTML(x,i){
       <div class="cell"><label>Referral</label><select onchange="upd(${i},'referral',this.value)"><option ${x.referral==='No'?'selected':''}>No</option><option ${x.referral==='Yes'?'selected':''}>Yes</option></select></div>
       <div class="cell"><label>Resume ver.</label><select onchange="upd(${i},'resume',this.value)">${["—","PM","Director","Principal","Platform","AI"].map(o=>`<option ${o===x.resume?'selected':''}>${o}</option>`).join("")}</select></div>
       <div class="cell"><label>Cover letter</label><select onchange="upd(${i},'cover',this.value)"><option ${x.cover==='No'?'selected':''}>No</option><option ${x.cover==='Yes'?'selected':''}>Yes</option></select></div>
+      <div class="cell"><label>Thank-you sent</label><span style="display:flex;align-items:center;gap:7px;padding-top:2px"><input type="checkbox" ${x.thankYouSent?'checked':''} style="width:auto;accent-color:var(--accent);cursor:pointer" onchange="upd(${i},'thankYouSent',this.checked?new Date().toISOString().slice(0,10):'')" title="Check to mark thank-you note sent (captures today's date)">${x.thankYouSent?`<span style="font-size:.78rem;color:var(--dim)">${x.thankYouSent}</span>`:''}</span></div>
       <div class="cell"><label>Last contact</label><span class="dpw"><input type="date" value="${x.lastcontact||''}" onchange="upd(${i},'lastcontact',this.value)"><button class="dp-icon" onclick="event.preventDefault();this.previousElementSibling.showPicker?.()" tabindex="-1" title="Pick date">📅</button></span></div>
       <div class="cell"><label>Apply mode ${x.link?`<button class="microbtn" onclick="detectApplyMode(${i})" title="Detect how this posting can be applied to (inspects the live page)">🔎 detect</button>`:''}</label><select onchange="upd(${i},'applyMode',this.value)">${APPLY_MODES.map(o=>`<option ${o===applyModeOf(x)?'selected':''}>${o}</option>`).join("")}</select></div>
       <div class="cell full"><label>Next action</label><input type="text" value="${(x.next||'').replace(/"/g,'&quot;')}" placeholder="e.g. tailor Principal resume, ask for referral" onchange="upd(${i},'next',this.value)"></div>
@@ -1885,7 +1910,10 @@ function render(){
   base.forEach(x=>{tabCounts[tabKeyForStatus(x.status)]++;});
   tabCounts.analytics=base.length;   // analytics isn't a status bucket
   tabCounts.today=base.filter(needsVerify).length+base.filter(followUpDue).length+base.filter(closedReq).length; // action items needing attention
-  F("lifecycleTabs").innerHTML=TAB_DEFS.map(d=>`<div class="tab ${d.key===activeTab?'active':''}" onclick="setTab('${d.key}')"><span>${d.label}</span><span class="tcnt">${tabCounts[d.key]}</span></div>`).join("");
+  // Only the tabs WITHOUT a KPI equivalent stay as tabs (#3); Open/Applied/Interviewing/Rejected
+  // are reached by clicking their KPI box instead.
+  const SHOWN_TABS=new Set(["today","analytics"]);
+  F("lifecycleTabs").innerHTML=TAB_DEFS.filter(d=>SHOWN_TABS.has(d.key)).map(d=>`<div class="tab ${d.key===activeTab?'active':''}" onclick="setTab('${d.key}')"><span>${d.label}</span><span class="tcnt">${tabCounts[d.key]}</span></div>`).join("");
   // hygiene lane bar (counts over the global-filtered base); a lane overrides the tab view
   const analytics=activeTab==="analytics";
   const today=activeTab==="today";
@@ -1923,17 +1951,25 @@ function render(){
   const rejected=live.filter(x=>x.status==="Rejected").length;
   const rejRate=applied?Math.round(rejected/applied*1000)/10:0;
   const am=anMetrics(live);
-  const kpi=(k,v,cls="",extra="")=>`<div class="kpi ${cls}"><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
+  // KPI boxes are the primary lifecycle filters (#3): `act` = kpiGo key, `on` = reflects current view.
+  const isOpen=activeTab==="open"&&activeLane==="all"&&tf!=="A";
+  const isFollow=activeTab==="open"&&activeLane==="followup";
+  const isTierA=activeTab==="open"&&activeLane==="all"&&tf==="A";
+  const isOffers=activeTab==="interviewing"&&sf==="Offer";
+  const isInterview=activeTab==="interviewing"&&sf!=="Offer";
+  const kpi=(k,v,cls="",extra="",act="",on=false)=>`<div class="kpi ${cls}${on?' kpi-active':''}"`
+    +(act?` role="button" tabindex="0" data-k="${act}" onclick="kpiGo('${act}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kpiGo('${act}')}" title="Filter to ${k}"`:'')
+    +`><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
   document.getElementById("stats").innerHTML=
-    kpi("Open",openCount,"accent")+
-    kpi("Applied",applied,"positive")+
-    kpi("Follow-up due",followups,followups?"warning":"")+
-    kpi("Rejected",rejected,rejected?"danger":"",`<small>${rejRate}%</small>`)+
-    kpi("Interviews",inInterview,"active")+
-    kpi("Offers",offers,offers?"active":"")+
+    kpi("Open",openCount,"accent","","open",isOpen)+
+    kpi("Applied",applied,"positive","","applied",activeTab==="applied")+
+    kpi("Follow-up due",followups,followups?"warning":"","","followup",isFollow)+
+    kpi("Rejected",rejected,rejected?"danger":"",`<small>${rejRate}%</small>`,"closed",activeTab==="closed")+
+    kpi("Interviews",inInterview,"active","","interviewing",isInterview)+
+    kpi("Offers",offers,offers?"active":"","","offers",isOffers)+
     `<div class="kpi-div"></div>`+
     kpi("Total roles",total,"sec")+
-    kpi("Tier A",tierA,"sec")+
+    kpi("Tier A",tierA,"sec","","tierA",isTierA)+
     kpi("Response rate",am.responseRate+"%","sec")+
     kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");
 
@@ -1953,6 +1989,10 @@ function render(){
   [...selected].forEach(i=>{if(!visSet.has(i))selected.delete(i);});
 
   const board=document.getElementById("board");
+  // #4: on the Today tab the Today cards are the primary content — relocate the "What needs action"
+  // command center to sit BELOW them so expanding it never displaces the cards. Above the list elsewhere.
+  const cc=document.getElementById("cmdCenter");
+  if(cc&&board){ if(today){ if(board.nextElementSibling!==cc) board.after(cc); } else if(cc.nextElementSibling!==board) board.before(cc); }
   let html="";
   if(today){
     board.innerHTML=renderToday();
@@ -2013,10 +2053,14 @@ function render(){
       list.forEach(x=>{(tiers[x.tier]||tiers.C).push(x);});
       const totals={A:0,B:0,C:0}; tabBase.forEach(x=>{totals[x.tier]=(totals[x.tier]||0)+1;});
       ["A","B","C"].forEach(t=>tiers[t].sort(cmp));
-      const filterActive=!!(qy||sf||tf||srcf||remoteOnly||activeOnly||notAppliedOnly||applyNextOnly);
+      // apply-next is the DEFAULT lane on Open (always on) — it must NOT count as an explicit filter,
+      // or the auto-expand branch below would permanently override manual tier toggles (#2).
+      const filterActive=!!(qy||sf||tf||srcf||remoteOnly||activeOnly||notAppliedOnly);
       ["A","B","C"].forEach(t=>{
         const items=tiers[t];
-        const isC = filterActive ? items.length===0 : !tierOpen[t];
+        // honor manual toggles always; auto-expand non-empty tiers only under an explicit filter
+        // and only until the user taps the tier themselves (tierTouched).
+        const isC = (filterActive && !tierTouched[t]) ? items.length===0 : !tierOpen[t];
         const ofN = items.length!==totals[t] ? `<span class="of"> of ${totals[t]}</span>` : "";
         const tsum = applied ? `${items.length} applied` : (t==='A'?'apply now':(t==='B'?'strong':'monitor'));
         html+=`<div class="tier-sec tier${t} ${isC?'collapsed':''}">
@@ -2045,7 +2089,22 @@ function render(){
   board.innerHTML=html;
   renderSelbar();
 }
-window.setTab=function(k){activeTab=k;recentOnly=false;if(k==="today")loadScoutSummary();render();};
+window.setTab=function(k){activeTab=k;recentOnly=false;tierTouched.A=tierTouched.B=tierTouched.C=false;if(k==="today")loadScoutSummary();render();};
+// KPI boxes double as the primary lifecycle filters (#3): each jumps to the matching view.
+window.kpiGo=function(which){
+  activeLane="all"; recentOnly=false;
+  const setF=(id,v)=>{const e=F(id);if(e)e.value=v;};
+  setF("statusFilter","");setF("tierFilter","");
+  if(which==="open"){activeTab="open";}
+  else if(which==="applied"){activeTab="applied";}
+  else if(which==="interviewing"){activeTab="interviewing";}
+  else if(which==="closed"){activeTab="closed";}
+  else if(which==="offers"){activeTab="interviewing";setF("statusFilter","Offer");}
+  else if(which==="followup"){activeTab="open";activeLane="followup";}
+  else if(which==="tierA"){activeTab="open";setF("tierFilter","A");}
+  tierTouched.A=tierTouched.B=tierTouched.C=false;
+  render();
+};
 window.setLane=function(k){activeLane=k;render();};
 // ---------- Today / command center ----------
 const dateNDaysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
@@ -2425,7 +2484,7 @@ async function archiveAllClosed(){
 }
 window.archiveRow=archiveRow; window.archiveAllClosed=archiveAllClosed;
 
-window.toggleTier=function(t){tierOpen[t]=!tierOpen[t];render();};
+window.toggleTier=function(t){tierOpen[t]=!tierOpen[t];tierTouched[t]=true;render();};
 window.toggleCard=function(i){if(expanded.has(i))expanded.delete(i);else expanded.add(i);render();};
 
 // Row click: plain = expand; ⌘/Ctrl = toggle-select; Shift = range-select (over the visible order).
@@ -2582,6 +2641,8 @@ window.upd=function(i,field,val){
   rows[i][field]=val;stampRow(i);
   // moving to Applied auto-stamps today's applied date (only if not already set — never overwrites)
   if(field==='status'&&val==='Applied'&&!rows[i].applied){rows[i].applied=new Date().toISOString().slice(0,10);}
+  // advancing to a new interview stage means a new round — clear the previous thank-you flag
+  if(field==='status'&&(val==='Hiring Manager'||val==='Panel')){rows[i].thankYouSent='';}
   persist();
   if(['status','company','role','sector','tier'].includes(field))render();   // refresh header/rationale on overrides
 };
@@ -2609,8 +2670,8 @@ F('rejectionOverlay').onclick=e=>{if(e.target.id==='rejectionOverlay')commitReje
 F("remoteOnly").onchange=render;F("activeOnly").onchange=render;F("notAppliedOnly").onchange=render;F("applyNextOnly").onchange=render;F("groupBy").onchange=render;
 
 // Accordion expand/collapse-all + selection toolbar wiring
-F("expandAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=true;render();};
-F("collapseAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=false;render();};
+F("expandAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=true;tierTouched.A=tierTouched.B=tierTouched.C=true;render();};
+F("collapseAllBtn").onclick=()=>{tierOpen.A=tierOpen.B=tierOpen.C=false;tierTouched.A=tierTouched.B=tierTouched.C=true;render();};
 F("openTabsBtn").onclick=openSelectedTabs;
 F("copyLinksBtn").onclick=copySelectedLinks;
 F("markAppliedBtn").onclick=markSelectedApplied;

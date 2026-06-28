@@ -11,7 +11,8 @@
  *            Slack delivery, Gmail ingest, server-side scout, cloud backups, QR pairing.
  *   ai     — the AI enhancement package: AI drafts, AI auto-score, map-fields autofill,
  *            interview-guide generation + company research, follow-up recommendations,
- *            profile-summary draft.
+ *            profile-summary draft. Sold as a SUPERSET of Cloud ("Reqon AI = everything in
+ *            Cloud, plus AI"), so holding `ai` also grants every `cloud` feature.
  *
  * Grants (who unlocks what):
  *   owner  — the account owner (single-user self-host, or a user with role 'owner'/'admin' in
@@ -118,8 +119,11 @@ function resolvePlan(sig) {
   const owner = !!sig.isOwner || lic.owner;
   // A self-hosted single-user instance implicitly gets Local Pro — you run the box, you get it all.
   const pro = owner ? true : !!sig.localProUnlock || lic.pro || !!sig.selfHostSingleUser;
-  const cloud = owner || pro || lic.cloud;
   const ai = owner || pro || lic.ai;
+  // AI is sold as a SUPERSET of Cloud ("Reqon AI = Everything in Cloud, plus an AI corner man"):
+  // there is no AI-without-Cloud SKU, and AI drafts/guides act on a synced board anyway. So AI
+  // implies Cloud. The two paid plans resolve to license "cloud" and "ai" (== Cloud + AI).
+  const cloud = owner || pro || lic.cloud || ai;
   const packages = ['free'].concat(cloud ? ['cloud'] : [], ai ? ['ai'] : []);
   const tier = owner
     ? 'owner'

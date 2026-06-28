@@ -133,13 +133,11 @@ export function SettingsModal({
   const planNote =
     ent.plan.owner || ent.plan.pro
       ? 'All features unlocked (self-hosted / owner).'
-      : ent.plan.cloud && ent.plan.ai
-        ? 'Cloud + AI packages active.'
+      : ent.plan.ai
+        ? 'Reqon AI active — Cloud sync, scout & delivery plus AI drafts, scoring & guides.'
         : ent.plan.cloud
-          ? 'Cloud package active — add AI for drafts, scoring & guides.'
-          : ent.plan.ai
-            ? 'AI package active — add Cloud for sync, scout & delivery.'
-            : 'Free plan — core CRM. AI & Cloud features need a package or your own server.';
+          ? 'Reqon Cloud active — sync, scout & reminders. Upgrade to Reqon AI for drafts, scoring & guides.'
+          : 'Free plan — core CRM. Reqon Cloud and Reqon AI add sync + AI, or run your own server.';
   const syncTop = (
     <>
       <View style={styles.planRow}>

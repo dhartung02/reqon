@@ -43,11 +43,13 @@ ok('free plan: core yes, cloud/ai no', () => {
   assert.ok(!ent.hasFeature(p, 'scout'));
 });
 
-ok('AI package unlocks only AI features', () => {
+ok('AI package is a superset of Cloud (Reqon AI = Cloud + AI)', () => {
   const p = ent.resolvePlan({ license: 'ai' });
-  assert.strictEqual(p.tier, 'ai');
+  assert.strictEqual(p.tier, 'cloud+ai');
   assert.ok(ent.hasFeature(p, 'ai_draft') && ent.hasFeature(p, 'guide_generate'));
-  assert.ok(!ent.hasFeature(p, 'cloud_sync') && !ent.hasFeature(p, 'scout'));
+  // AI implies Cloud — there is no AI-without-sync SKU
+  assert.ok(ent.hasFeature(p, 'cloud_sync') && ent.hasFeature(p, 'scout'));
+  assert.deepStrictEqual(p.packages, ['free', 'cloud', 'ai']);
 });
 
 ok('Cloud package unlocks only cloud features', () => {

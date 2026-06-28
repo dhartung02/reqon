@@ -1,6 +1,11 @@
 # Surface parity + freemium tiering — implementation plan
 
-Status: in progress · Branch `feat/surface-parity-tiering` · One PR, multiple commits.
+Status: COMPLETE (commits 1–8) · Branch `feat/surface-parity-tiering` · One PR, multiple commits.
+
+Shipped: shared entitlements core + tests; server enforcement + `/api/entitlements`;
+web-board gating + plan badge; app full tracking-field parity; app extended action items;
+app entitlements context + AI gating + plan badge; extension tracking editor + AI gating;
+docs. All suites green except a pre-existing, unrelated `test_marketing_role.js` assertion.
 
 Source: cross-surface gap analysis (artifact `0939bac9`) + live code recon (2026-06-27).
 

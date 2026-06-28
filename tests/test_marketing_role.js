@@ -47,13 +47,13 @@ async function main() {
     ok('/health payload has role:marketing', () => assert.strictEqual(j.role, 'marketing'));
   }
 
-  // /  (placeholder page)
+  // /  (marketing landing page — marketing/index.html)
   {
     const r = await get('/');
     ok('/ returns 200', () => assert.strictEqual(r.status, 200));
     ok('/ content-type is html', () => assert.ok(r.headers['content-type'].includes('html')));
-    ok('/ body contains Reqon heading', () => assert.ok(r.body.includes('<h1>Reqon</h1>')));
-    ok('/ body contains coming soon text', () => assert.ok(r.body.toLowerCase().includes('coming soon')));
+    ok('/ serves the Reqon marketing page', () => assert.ok(r.body.includes('Reqon')));
+    ok('/ body contains the hero', () => assert.ok(r.body.includes('slip away') || r.body.includes('run like an operation')));
     ok('/ body contains cloud link', () => assert.ok(r.body.includes('cloud.reqon.app')));
   }
 

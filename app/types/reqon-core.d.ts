@@ -64,6 +64,40 @@ declare module '@reqon/core' {
   /** Parse a pairing code/QR string; returns null if it isn't a valid Reqon pairing code. */
   export function decodePairing(code: string): PairingInfo | null;
 
+  // ── entitlements (freemium tier model) ──────────────────────────────────────
+  /** À-la-carte package an account can hold. */
+  export type Package = 'free' | 'cloud' | 'ai';
+  /** A feature's required package, or a grant label. */
+  export type Grant = Package | 'pro' | 'owner';
+  /** Catalog: feature key → the package that unlocks it. */
+  export const FEATURES: Record<string, Package>;
+  export const PACKAGES: Package[];
+  export const PACKAGE_LABELS: Record<string, string>;
+  export const FEATURE_LABELS: Record<string, string>;
+
+  /** Raw signals the server resolves a plan from. */
+  export interface PlanSignals {
+    isOwner?: boolean;
+    selfHostSingleUser?: boolean;
+    localProUnlock?: boolean;
+    license?: string;
+  }
+  /** An effective, normalized plan. */
+  export interface Plan {
+    owner: boolean;
+    pro: boolean;
+    cloud: boolean;
+    ai: boolean;
+    packages: Package[];
+    tier: 'free' | 'cloud' | 'ai' | 'cloud+ai' | 'pro' | 'owner';
+  }
+  export function parseLicense(license?: string | null): { owner: boolean; pro: boolean; cloud: boolean; ai: boolean };
+  export function resolvePlan(sig?: PlanSignals): Plan;
+  export function requiredPackage(feature: string): Package | null;
+  export function hasFeature(plan: Plan | null | undefined, feature: string): boolean;
+  export function featureMap(plan: Plan | null | undefined): Record<string, boolean>;
+  export function tierLabel(tier: string): string;
+
   const core: {
     reqKey: typeof reqKey;
     postingId: typeof postingId;
@@ -74,6 +108,16 @@ declare module '@reqon/core' {
     encodePairing: typeof encodePairing;
     decodePairing: typeof decodePairing;
     DEFAULT_TIER_THRESHOLDS: Required<TierThresholds>;
+    FEATURES: typeof FEATURES;
+    PACKAGES: typeof PACKAGES;
+    PACKAGE_LABELS: typeof PACKAGE_LABELS;
+    FEATURE_LABELS: typeof FEATURE_LABELS;
+    parseLicense: typeof parseLicense;
+    resolvePlan: typeof resolvePlan;
+    requiredPackage: typeof requiredPackage;
+    hasFeature: typeof hasFeature;
+    featureMap: typeof featureMap;
+    tierLabel: typeof tierLabel;
   };
   export default core;
 }

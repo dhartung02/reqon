@@ -9,11 +9,14 @@ import { needsVerify, followUpDue, isApplyNext, daysSince } from './today';
 export type AppActionType =
   | 'review_offer'
   | 'review_interview'
+  | 'thankyou_due'
   | 'follow_up_due'
   | 'apply_next'
   | 'verify_role'
   | 'needs_scoring'
-  | 'duplicate_review';
+  | 'duplicate_review'
+  | 'closed_posting'
+  | 'review_rejection';
 
 export type Severity = 'high' | 'medium' | 'low';
 
@@ -53,6 +56,12 @@ export function computeActions(roles: Role[]): AppAction[] {
     } else if (INTERVIEW.includes(r.status)) {
       push({ id: 'interview-' + r.id, type: 'review_interview', severity: 'high', priority: 88, reason: r.status + ' — prep and track next steps.', ...base });
     }
+    // thank-you due — interview within the last 2 days, not yet sent (suppressed once thankYouSent set)
+    const ivd = daysSince(r.interview);
+    if (INTERVIEW.includes(r.status) && ivd != null && ivd >= 0 && ivd <= 2 && !r.thankYouSent) {
+      push({ id: 'ty-' + r.id, type: 'thankyou_due', severity: ivd === 0 ? 'high' : 'medium', priority: 92,
+        reason: ivd === 0 ? 'Interview today — send a thank-you note.' : 'Interview ' + ivd + ' day' + (ivd === 1 ? '' : 's') + ' ago — send a thank-you note.', ...base });
+    }
     if (followUpDue(r)) {
       const n = daysSince(r.lastcontact || r.applied);
       push({ id: 'followup-' + r.id, type: 'follow_up_due', severity: n != null && n > 10 ? 'high' : 'medium', priority: 80 + Math.min(15, n ?? 0), reason: 'Follow-up due — quiet for ' + (n ?? '?') + ' day' + (n === 1 ? '' : 's') + '.', ...base });
@@ -73,6 +82,15 @@ export function computeActions(roles: Role[]): AppAction[] {
         dupSeen.add(k);
         push({ id: 'dup-' + k, type: 'duplicate_review', severity: 'low', priority: 34, reason: (keyCount.get(k) || 0) + ' rows look like the same posting — merge or delete extras.', ...base });
       }
+      // closed posting detected while still in an open lane — review & archive
+      if (r.reqCheck === 'closed') {
+        push({ id: 'closed-' + r.id, type: 'closed_posting', severity: 'low', priority: 30, reason: 'Posting detected closed — review and archive.', ...base });
+      }
+    }
+    // recently logged rejection — FYI, note any learnings
+    const rej = daysSince(r.lastcontact);
+    if (r.status === 'Rejected' && rej != null && rej <= 7) {
+      push({ id: 'rej-' + r.id, type: 'review_rejection', severity: 'low', priority: 22, reason: 'Rejection logged' + (rej === 0 ? ' today' : ' ' + rej + 'd ago') + ' — note any learnings.', ...base });
     }
   }
   items.sort((a, b) => b.priority - a.priority || a.type.localeCompare(b.type));
@@ -85,11 +103,12 @@ export interface ActionSection {
 }
 // Section grouping, in priority order — mirrors the web command center.
 export const ACTION_SECTIONS: ActionSection[] = [
-  { title: 'Needs review', types: ['review_offer', 'review_interview'] },
+  { title: 'Needs review', types: ['review_offer', 'review_interview', 'thankyou_due'] },
   { title: 'Follow-ups due', types: ['follow_up_due'] },
   { title: 'Apply next', types: ['apply_next'] },
   { title: 'Lead inbox', types: ['needs_scoring', 'verify_role'] },
   { title: 'Duplicates', types: ['duplicate_review'] },
+  { title: 'Closed & rejections', types: ['closed_posting', 'review_rejection'] },
 ];
 
 /** Group a computed action list into the display sections (empty sections dropped). */

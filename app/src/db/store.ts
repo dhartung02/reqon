@@ -115,8 +115,29 @@ const toRole = (r: Row & { raw?: string | null }): Role => {
     reqCheck: (x.reqCheck as string) ?? undefined,
     lastcontact: (x.lastcontact as string) ?? undefined,
     added: (x.added as string) ?? undefined,
+    // Full tracking-field parity — sourced from the raw server JSON (round-trips on sync).
+    interview: (x.interview as string) ?? undefined,
+    followup: (x.followup as string) ?? undefined,
+    thankYouSent: (x.thankYouSent as string) ?? undefined,
+    cover: (x.cover as string) ?? undefined,
+    resume: (x.resume as string) ?? undefined,
+    referral: (x.referral as string) ?? undefined,
+    recruiterEmail: (x.recruiterEmail as string) ?? undefined,
+    sector: (x.sector as string) ?? undefined,
+    remote: (x.remote as string) ?? undefined,
+    rejectionStage: (x.rejectionStage as string) ?? undefined,
+    rejectionReason: (x.rejectionReason as string) ?? undefined,
+    rejectionFeedback: (x.rejectionFeedback as string) ?? undefined,
   }) as Role;
 };
+
+// Fields backed by real SQL columns vs. fields stored inside the `raw` JSON blob (full web-board
+// parity without a migration per field — getRowsForSync spreads `raw` first, so they round-trip).
+const COLUMN_FIELDS = new Set(['next', 'recruiter', 'notes', 'salary', 'location', 'fit', 'prob', 'applied', 'status']);
+const RAW_FIELDS = new Set([
+  'interview', 'followup', 'thankYouSent', 'cover', 'resume', 'referral', 'recruiterEmail',
+  'sector', 'remote', 'rejectionStage', 'rejectionReason', 'rejectionFeedback',
+]);
 
 /** All live (non-tombstoned) roles, tier + score derived. */
 export async function getAllRoles(): Promise<Role[]> {
@@ -139,14 +160,38 @@ export async function setRoleStatus(id: string, status: Status): Promise<void> {
   }
 }
 
-/** Patch arbitrary editable fields (bumps updatedAt). */
-export async function updateRole(id: string, patch: Partial<Pick<Role, 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'>>): Promise<void> {
-  const keys = Object.keys(patch) as (keyof typeof patch)[];
+type EditableField =
+  | 'next' | 'recruiter' | 'notes' | 'salary' | 'location' | 'fit' | 'prob'
+  | 'interview' | 'followup' | 'thankYouSent' | 'cover' | 'resume' | 'referral'
+  | 'recruiterEmail' | 'sector' | 'remote' | 'rejectionStage' | 'rejectionReason' | 'rejectionFeedback';
+
+/**
+ * Patch editable fields (bumps updatedAt). Column-backed fields update their column; the rest are
+ * merged into the row's `raw` JSON so full-parity tracking fields persist locally AND round-trip on
+ * sync (getRowsForSync spreads `raw` first). Setting a raw field to '' / null removes it.
+ */
+export async function updateRole(id: string, patch: Partial<Record<EditableField, string | number | null>>): Promise<void> {
+  const keys = Object.keys(patch) as EditableField[];
   if (keys.length === 0) return;
   const d = await db();
-  const sets = keys.map((k) => `${k} = ?`).join(', ');
-  const values = keys.map((k) => patch[k] ?? null);
-  await d.runAsync(`UPDATE roles SET ${sets}, updatedAt = ? WHERE id = ?`, [...values, nowIso(), id]);
+  const sets: string[] = [];
+  const values: (string | number | null)[] = [];
+  for (const k of keys) {
+    if (COLUMN_FIELDS.has(k)) { sets.push(`${k} = ?`); values.push(patch[k] ?? null); }
+  }
+  const rawKeys = keys.filter((k) => RAW_FIELDS.has(k));
+  if (rawKeys.length) {
+    const cur = await d.getFirstAsync<{ raw: string | null }>('SELECT raw FROM roles WHERE id = ?', [id]);
+    const base = cur && typeof cur.raw === 'string' ? JSON.parse(cur.raw) : {};
+    for (const k of rawKeys) {
+      const v = patch[k];
+      if (v === null || v === undefined || v === '') delete base[k];
+      else base[k] = v;
+    }
+    sets.push('raw = ?'); values.push(JSON.stringify(base));
+  }
+  if (sets.length === 0) return;
+  await d.runAsync(`UPDATE roles SET ${sets.join(', ')}, updatedAt = ? WHERE id = ?`, [...values, nowIso(), id]);
 }
 
 /** Tombstone a role (soft delete — never spliced, per the sync model). */
@@ -277,19 +322,25 @@ export interface NewRole {
   salary?: string;
   location?: string;
   link?: string;
+  sector?: string;
+  remote?: string;
 }
 
 /** Insert a new role (status 'Not Applied'). Returns the generated id. */
 export async function addRole(input: NewRole): Promise<string> {
   const d = await db();
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  // sector/remote (and the source stamp) live in raw so they round-trip on sync like the web row.
+  const raw: Record<string, unknown> = { id, source: 'app', added: nowIso().slice(0, 10) };
+  if (input.sector) raw.sector = input.sector;
+  if (input.remote) raw.remote = input.remote;
   await d.runAsync(
-    `INSERT INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    `INSERT INTO roles (id, role, company, status, fit, prob, salary, location, link, applied, recruiter, next, notes, age, updatedAt, deleted, raw)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
     [
       id, input.role, input.company, 'Not Applied', input.fit, input.prob,
       input.salary ?? null, input.location ?? null, input.link ?? null,
-      null, null, null, null, 'just now', nowIso(),
+      null, null, null, null, 'just now', nowIso(), JSON.stringify(raw),
     ],
   );
   return id;

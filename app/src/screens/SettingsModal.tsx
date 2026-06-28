@@ -4,6 +4,7 @@ import { alpha, fonts, useThemedStyles, useScheme, type Palette, type SchemePref
 import { useLayout } from '../useLayout';
 import { getConfig, setConfig, getScoutMode, setScoutMode, type ScoutMode } from '../sync/config';
 import { testConnection, syncTwoWay } from '../sync/sync';
+import { useEntitlements } from '../entitlements';
 import { decodePairing } from '@reqon/core';
 import { PairScanModal } from './PairScanModal';
 import { MailIngestPanel } from './MailIngestPanel';
@@ -54,6 +55,7 @@ export function SettingsModal({
   const { c, styles } = useThemedStyles(makeStyles);
   const { wide } = useLayout();
   const { pref, setScheme } = useScheme();
+  const ent = useEntitlements();
   const [section, setSection] = useState<Section>('sync');
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
@@ -117,6 +119,7 @@ export function SettingsModal({
       const { pushed, pulled, remaps } = await syncTwoWay();
       setStatus({ kind: 'ok', text: `Synced · pushed ${pushed}, pulled ${pulled}${remaps ? `, ${remaps} merged` : ''}` });
       onSynced();
+      ent.refresh();                 // server may grant cloud/AI — refresh the plan + feature gates
       setMailReload((n) => n + 1);   // re-pull server-side settings (Gmail ingest config, etc.)
     } catch (e) {
       setStatus({ kind: 'err', text: e instanceof Error ? e.message : 'sync failed' });
@@ -127,8 +130,21 @@ export function SettingsModal({
   const statusColorFor = (k: string) => (k === 'ok' ? c.emerald : k === 'err' ? c.danger : c.muted);
 
   // Sync-config controls (shared by the phone sheet + the wide "Sync & device" pane).
+  const planNote =
+    ent.plan.owner || ent.plan.pro
+      ? 'All features unlocked (self-hosted / owner).'
+      : ent.plan.ai
+        ? 'Reqon AI active — Cloud sync, scout & delivery plus AI drafts, scoring & guides.'
+        : ent.plan.cloud
+          ? 'Reqon Cloud active — sync, scout & reminders. Upgrade to Reqon AI for drafts, scoring & guides.'
+          : 'Free plan — core CRM. Reqon Cloud and Reqon AI add sync + AI, or run your own server.';
   const syncTop = (
     <>
+      <View style={styles.planRow}>
+        <Text style={styles.label}>Plan</Text>
+        <Text style={[styles.planBadge, (ent.plan.owner || ent.plan.pro) && styles.planBadgePro]}>{ent.tierLabel}</Text>
+      </View>
+      <Text style={styles.help}>{planNote}</Text>
       <Text style={styles.help}>Connect to your self-hosted Reqon Sync server. When configured, sync runs automatically on launch and foreground (push local edits + pull server changes, last-writer-wins); the button below forces it now.</Text>
       <View style={styles.labeled}>
         <Text style={styles.label}>Server URL</Text>
@@ -322,6 +338,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   labeled: { gap: 6 },
   label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.muted },
   fieldHint: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, lineHeight: 15 },
+  planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  planBadge: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, color: c.textBase, backgroundColor: c.element, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, overflow: 'hidden' },
+  planBadgePro: { color: c.active, backgroundColor: alpha(c.active, 0.14) },
   seg: { flexDirection: 'row', gap: 8 },
   segBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, backgroundColor: c.element, borderWidth: 1, borderColor: c.element, alignItems: 'center' },
   segBtnOn: { borderColor: alpha(c.emerald, 0.5), backgroundColor: alpha(c.emerald, 0.1) },

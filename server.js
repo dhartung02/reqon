@@ -486,6 +486,41 @@ function authed(req) {
 }
 const secureReq = req => (req.headers['x-forwarded-proto'] || '').includes('https');
 
+// ---------- entitlements (freemium tier model) ----------
+// core/entitlements.js is the single shared catalog (tags each feature free | cloud | ai), used
+// identically by the app + extension. The server resolves the effective plan per request and
+// enforces it on paid endpoints; surfaces fetch GET /api/entitlements to gate their UI.
+const ent = require('./core/entitlements');
+// Is this request the account owner? Single-user self-host = the operator owns the box (unless an
+// explicit REQON_LICENSE downgrade is set, for demoing the free/cloud/ai tiers). Multi-user = an
+// admin/owner-role user. Per-user license lives on the user record (admin-set), never self-serve.
+function isOwnerReq(req) {
+  if (!MULTIUSER()) {
+    const lic = String(process.env.REQON_LICENSE || '').trim().toLowerCase();
+    return !lic || lic === 'owner';
+  }
+  const u = sessionUser(req) || tokenUser(req);
+  return !!(u && (u.role === 'admin' || u.role === 'owner'));
+}
+function planFor(req) {
+  let license = '';
+  if (MULTIUSER()) { const u = sessionUser(req) || tokenUser(req); license = (u && u.license) || process.env.REQON_LICENSE || ''; }
+  else { license = String(process.env.REQON_LICENSE || '').trim(); }
+  return ent.resolvePlan({
+    isOwner: isOwnerReq(req),
+    selfHostSingleUser: !MULTIUSER() && !license,   // your own box, no explicit downgrade -> Local Pro (full)
+    localProUnlock: String(process.env.LOCAL_PRO || '').toLowerCase() === 'true',
+    license,
+  });
+}
+// Route guard: 402 (with the package needed) when the resolved plan lacks `feature`.
+function requireFeature(feature) {
+  return (req, res, next) => {
+    if (ent.hasFeature(planFor(req), feature)) return next();
+    res.status(402).json({ ok: false, error: 'upgrade_required', feature, requires: ent.requiredPackage(feature), tier: planFor(req).tier });
+  };
+}
+
 function loginPage(nextUrl, msg, multi) {
   const nxt = String(nextUrl || (multi ? '/' : '/m')).replace(/"/g, '');
   const userField = multi ? `<input type="text" name="username" placeholder="Username" autofocus autocapitalize="none" autocomplete="username" style="margin-bottom:10px">` : '';
@@ -676,11 +711,17 @@ function requireAdmin(req, res, next) {
 }
 // Who am I + onboarding state (drives the user menu + the first-run prompts).
 app.get('/api/me', (req, res) => {
-  if (!MULTIUSER()) return res.json({ ok: true, multiUser: false, user: { id: store.OWNER, displayName: 'Owner', role: 'admin', useSharedKey: true } });
+  if (!MULTIUSER()) return res.json({ ok: true, multiUser: false, user: { id: store.OWNER, displayName: 'Owner', role: 'admin', useSharedKey: true }, plan: planFor(req) });
   const u = sessionUser(req); if (!u) return res.status(401).json({ ok: false, error: 'not signed in' });
   const impId = users.verifySession(parseCookies(req)[IMP_COOKIE]);
   const imp = impId && users.getById(impId);
-  res.json({ ok: true, multiUser: true, user: { id: u.id, username: u.username, displayName: u.displayName, role: u.role, useSharedKey: !!u.useSharedKey }, onboarded: readProfile().onboarded === true, impersonatedBy: (imp && imp.role === 'admin') ? imp.displayName || imp.username : null });
+  res.json({ ok: true, multiUser: true, user: { id: u.id, username: u.username, displayName: u.displayName, role: u.role, useSharedKey: !!u.useSharedKey, license: u.license || '' }, plan: planFor(req), onboarded: readProfile().onboarded === true, impersonatedBy: (imp && imp.role === 'admin') ? imp.displayName || imp.username : null });
+});
+// The effective plan + per-feature gate map for the current request. Every surface fetches this on
+// load and gates its UI against `features` (owner/self-host -> all true). Read-only & always JSON.
+app.get('/api/entitlements', (req, res) => {
+  const plan = planFor(req);
+  res.json({ ok: true, plan, features: ent.featureMap(plan), packages: ent.PACKAGES, featureLabels: ent.FEATURE_LABELS, requires: ent.FEATURES, tierLabel: ent.tierLabel(plan.tier) });
 });
 app.post('/api/me/password', (req, res) => {
   if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Multi-user is disabled.' });
@@ -694,7 +735,7 @@ app.get('/api/users', requireAdmin, (req, res) => res.json({ ok: true, users: us
 app.post('/api/users', requireAdmin, async (req, res) => {
   const b = req.body || {};
   try {
-    const u = users.create({ username: b.username, displayName: b.displayName, email: b.email, password: b.password, role: b.role, useSharedKey: !!b.useSharedKey });
+    const u = users.create({ username: b.username, displayName: b.displayName, email: b.email, password: b.password, role: b.role, useSharedKey: !!b.useSharedKey, license: b.license });
     store.seedNewUser(u.id);
     let welcome = { skipped: 'not-requested' };
     if (b.sendWelcome !== false && u.email) { try { welcome = await sendWelcomeEmail(u, b.password); } catch (e) { welcome = { ok: false, error: e.message }; } }
@@ -703,7 +744,7 @@ app.post('/api/users', requireAdmin, async (req, res) => {
 });
 app.patch('/api/users/:id', requireAdmin, (req, res) => {
   const b = req.body || {}; const patch = {};
-  for (const k of ['displayName', 'role', 'disabled', 'useSharedKey', 'password']) if (k in b) patch[k] = b[k];
+  for (const k of ['displayName', 'role', 'disabled', 'useSharedKey', 'password', 'license']) if (k in b) patch[k] = b[k];
   try { const u = users.update(req.params.id, patch); if (!u) return res.status(404).json({ ok: false, error: 'no such user' }); res.json({ ok: true, user: u }); }
   catch (e) { res.status(400).json({ ok: false, error: e.message }); }
 });
@@ -826,7 +867,7 @@ function pairBase(req) {
   }
   return lanBase();
 }
-app.get('/api/pair', async (req, res) => {
+app.get('/api/pair', requireFeature('pairing'), async (req, res) => {
   // Fully guarded: the synchronous prep (lanBase + encodePairing) used to sit OUTSIDE the
   // promise's .catch, so any sync throw (e.g. an older core/crm-core.js missing encodePairing)
   // escaped to Express's default handler, which replies with an HTML error page — the board then
@@ -1371,7 +1412,7 @@ async function callTool({ system, user, tool, maxTokens }) {
   return { args, tokens };
 }
 
-app.post('/api/assist', async (req, res) => {
+app.post('/api/assist', requireFeature('ai_draft'), async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
@@ -1425,7 +1466,7 @@ app.post('/api/assist', async (req, res) => {
 // Draft a professional summary from the candidate's own résumé/profile (work history, education,
 // narratives, keywords). Honest, grounded — never invents employers/metrics. Returns text only;
 // the user reviews and saves it. Reuses the assistant key + daily cap.
-app.post('/api/profile/draft-summary', async (req, res) => {
+app.post('/api/profile/draft-summary', requireFeature('profile_summary'), async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const cap = assistDailyCalls();
@@ -1548,7 +1589,7 @@ app.post('/api/transcribe', async (req, res) => {
 
 // Structured role scoring via function calling (T1.1). Returns fit/prob/tier/rationale — no prose
 // parsing. The caller decides whether to write it back to the row.
-app.post('/api/assist/score', async (req, res) => {
+app.post('/api/assist/score', requireFeature('ai_score'), async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
@@ -1582,7 +1623,7 @@ app.post('/api/assist/score', async (req, res) => {
 // Structured field mapping via function calling (T1.1). Given scanned form fields ({i, sig, type}),
 // returns {i, value, confidence} grounded ONLY in the candidate's factual profile — for the
 // extension's AI smart-fill of fields the deterministic matcher missed. Never invents values.
-app.post('/api/assist/map-fields', async (req, res) => {
+app.post('/api/assist/map-fields', requireFeature('ai_mapfields'), async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
@@ -1809,7 +1850,7 @@ app.get('/api/reqs/:key/guide', (req, res) => {
 });
 
 // Force (re)generate a guide (board "Generate guide" button). Awaits so the card can open it after.
-app.post('/api/reqs/:key/guide', async (req, res) => {
+app.post('/api/reqs/:key/guide', requireFeature('guide_generate'), async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const key = decodeURIComponent(req.params.key || '').toLowerCase().trim();
@@ -2212,7 +2253,7 @@ app.get('/api/digest', (req, res) => {
   res.json({ ok: true, digest: composeDigest(days) });
 });
 
-app.post('/api/digest/send', async (req, res) => {
+app.post('/api/digest/send', requireFeature('digest_delivery'), async (req, res) => {
   const b = req.body || {};
   // accept an explicit channels array (test a specific set) or fall back to the configured set
   const channels = Array.isArray(b.channels) ? parseChannels(b.channels.join(','), digestChannels())
@@ -2374,7 +2415,7 @@ app.patch('/api/reqs/:key', (req, res) => {
 
 // ---------- sync (WP-0): device↔server reconcile ----------
 // Reconcile logic lives in core/crm-core.js (reconcileSync, wrapped above with server uuid/clock).
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', requireFeature('cloud_sync'), (req, res) => {
   const b = req.body || {};
   const clientRows = Array.isArray(b.rows) ? b.rows : [];
   const since = typeof b.since === 'string' ? b.since : '';
@@ -2792,7 +2833,7 @@ app.post('/api/mail/config', (req, res) => {
   res.json(mailConfigPayload());
 });
 let mailChild = null;
-app.post('/api/mail/run', (req, res) => {
+app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
   if (mailChild) return res.status(409).json({ ok: false, error: 'A mail run is already in progress.' });
   if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) {
     return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
@@ -2913,7 +2954,7 @@ function triggerScout(mode, sources) {
   }));
   return { ok: true, status: 200, started: true, mode, sources: sources || 'all', llmEnabled: !!aiKey() };
 }
-app.post('/api/scout/run', (req, res) => {
+app.post('/api/scout/run', requireFeature('scout'), (req, res) => {
   const body = req.body || {};
   const mode = ['find', 'validate', 'both', 'source-backfill'].includes(body.mode) ? body.mode : 'both';
   let sources = body.sources;
@@ -3545,7 +3586,7 @@ app.post('/api/auth/passphrase', (req, res) => {
 });
 
 // Timestamped, keep-forever snapshot of the current store ("Snapshot now").
-app.post('/api/backup', (req, res) => {
+app.post('/api/backup', requireFeature('backups'), (req, res) => {
   const job = jobs.create('backup', { label: 'Manual backup' });
   const file = snapshotData('manual');
   if (!file) { jobs.fail(job.id, 'snapshot failed (no data file?)'); return res.status(500).json({ ok: false, error: 'snapshot failed (no data file?)' }); }

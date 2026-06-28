@@ -42,7 +42,32 @@ export interface Role {
   reqCheck?: string; // open | closed | lead | unknown | open-applied
   lastcontact?: string; // ISO date
   added?: string; // ISO date the row was added
+  // Full tracking parity with the web board (M3). Persisted in the row's `raw` JSON so they sync
+  // back to the server verbatim; field names match the server exactly.
+  interview?: string; // ISO date of the (next) interview
+  followup?: string; // ISO date a follow-up is due
+  thankYouSent?: string; // ISO date a thank-you was sent ('' / undefined = not sent)
+  cover?: string; // cover-letter version/filename, or 'No'
+  resume?: string; // résumé version/filename used
+  referral?: string; // referral source
+  recruiterEmail?: string;
+  sector?: string; // sector enum (CDP / Customer Data, etc.)
+  remote?: string; // remote | flex | onsite
+  rejectionStage?: string; // stage the rejection happened at
+  rejectionReason?: string; // short reason
+  rejectionFeedback?: string; // free-text feedback/notes
 }
+
+// Sector enum (mirrors the server) + remote modes — used by the Add/Detail pickers.
+export const SECTORS = [
+  'CDP / Customer Data',
+  'Martech / Engagement',
+  'Data Infra',
+  'Identity / Data',
+  'Enterprise SaaS',
+  'AI Platform',
+] as const;
+export const REMOTE_MODES = ['remote', 'flex', 'onsite'] as const;
 
 // Lane → statuses, mirroring the server's TAB_MAP_DEFAULT.
 export const LANE_STATUS: Record<StatusLane, Status[]> = {

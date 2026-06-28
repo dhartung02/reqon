@@ -1,546 +1,614 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reqon — your job search, run like an operation</title>
-<meta name="description" content="Reqon is the command center for a serious job search. Discover roles from real ATS boards, prioritize by fit and expected value, and track every one through to offer. AI assists — you stay in control. No auto-apply.">
-<meta property="og:title" content="Reqon — your job search, run like an operation">
-<meta property="og:description" content="A job-search command center: discover, prioritize, and track roles in one disciplined pipeline. Human-in-the-loop AI, no auto-apply.">
+<title>Reqon — stop letting good roles slip away</title>
+<meta name="description" content="Reqon finds jobs that actually fit you, ranks them so you know what to do first, and keeps every one moving — from saved role to offer. Human-in-the-loop AI, no auto-apply, your data stays yours.">
+<meta property="og:title" content="Stop letting good roles slip away. | Reqon">
+<meta property="og:description" content="Discover roles, rank them by fit, track every follow-up, and move every opportunity from saved to offer. Your job search, organized.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://reqon.app">
 <meta name="theme-color" content="#0B0C0E">
 <link rel="icon" href="images/glyph.svg" type="image/svg+xml">
 <style>
-  /* Self-hosted brand fonts — no external dependency. Files live in marketing/fonts/ next to this page. */
-  @font-face{
-    font-family:"Fraunces";
-    src:url("fonts/Fraunces.ttf") format("truetype");
-    font-weight:100 900;font-style:normal;font-display:swap;
-  }
-  @font-face{
-    font-family:"Spline Sans";
-    src:url("fonts/SplineSans.ttf") format("truetype");
-    font-weight:100 900;font-style:normal;font-display:swap;
-  }
-  @font-face{
-    font-family:"Spline Sans Mono";
-    src:url("fonts/SplineSansMono.ttf") format("truetype");
-    font-weight:100 900;font-style:normal;font-display:swap;
-  }
-  :root{
-    --canvas:#0B0C0E; --elem:#16181C; --elem2:#1B1F25; --line:#232A31;
-    --emerald:#00E5A3; --amber:#FFB800; --teal:#2DD4BF; --coral:#F87171; --muted:#64748B;
-    --text:#E2E8F0; --text2:#94A3B8;
-    --serif:"Fraunces",Georgia,serif;
-    --sans:"Spline Sans","Inter",-apple-system,system-ui,sans-serif;
-    --mono:"Spline Sans Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-    --maxw:1140px;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
-  body{background:var(--canvas);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden}
-  a{color:inherit;text-decoration:none}
-  img{display:block;max-width:100%}
-  ::selection{background:rgba(0,229,163,.25);color:#fff}
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
-  h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em}
-  .eyebrow{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)}
-  .mono{font-family:var(--mono)}
-
-  /* buttons */
-  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:13px 22px;font-family:var(--sans);font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .14s ease,background .14s ease,border-color .14s ease;white-space:nowrap}
-  .btn:hover{transform:translateY(-1px)}
-  .btn-primary{background:var(--emerald);color:#06211a}
-  .btn-primary:hover{background:#26efb3}
-  .btn-ghost{border:1px solid var(--line);color:var(--text);background:transparent}
-  .btn-ghost:hover{border-color:#33414b;background:rgba(255,255,255,.02)}
-  .btn-sm{padding:9px 16px;font-size:.88rem;border-radius:9px}
-
-  /* nav */
-  header.nav{position:sticky;top:0;z-index:50;border-bottom:1px solid transparent;transition:background .25s ease,border-color .25s ease,backdrop-filter .25s ease}
-  header.nav.scrolled{background:rgba(11,12,14,.82);backdrop-filter:blur(14px);border-bottom-color:var(--line)}
-  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px}
-  .brand{display:flex;align-items:center;gap:10px}
-  .brand .mark{width:26px;height:26px;flex:none}
-  .brand .word{font-family:var(--mono);font-weight:600;letter-spacing:.22em;font-size:.82rem;text-transform:uppercase;color:var(--emerald)}
-  .nav-links{display:flex;align-items:center;gap:30px}
-  .nav-links a.lnk{font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);transition:color .14s ease}
-  .nav-links a.lnk:hover{color:var(--text)}
-  .nav-actions{display:flex;align-items:center;gap:12px}
-  .nav-actions a.signin{font-weight:600;font-size:.9rem;color:var(--text);padding:9px 6px}
-  .nav-actions a.signin:hover{color:var(--emerald)}
-
-  /* hero */
-  .hero{position:relative;padding:60px 0 0;text-align:center;overflow:hidden}
-  .hero::before{content:"";position:absolute;inset:-20% 0 auto;height:560px;background:radial-gradient(60% 70% at 50% 0%,rgba(0,229,163,.13),transparent 70%);pointer-events:none}
-  .badge{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:7px 15px}
-  .dot{position:relative;width:7px;height:7px;flex:none}
-  .dot span{position:absolute;inset:0;border-radius:50%;background:var(--emerald)}
-  .dot span.ping{animation:ping 2.4s ease-out infinite}
-  @keyframes ping{0%{transform:scale(1);opacity:.55}80%,100%{transform:scale(2.6);opacity:0}}
-  .hero h1{font-size:clamp(2.5rem,6.2vw,4.3rem);margin:24px auto 0;max-width:16ch}
-  .hero h1 .ac{color:var(--emerald)}
-  .hero .lede{font-size:clamp(1.05rem,2.1vw,1.35rem);color:var(--text2);max-width:60ch;margin:22px auto 0}
-  .hero .cta{margin-top:32px;display:flex;gap:13px;justify-content:center;flex-wrap:wrap}
-  .hero .trust{margin-top:18px;font-family:var(--mono);font-size:.76rem;letter-spacing:.04em;color:var(--muted)}
-
-  /* product window */
-  .stage{position:relative;margin-top:46px}
-  .metric-ribbon{position:relative;z-index:3;max-width:920px;margin:0 auto -26px;display:flex;flex-wrap:wrap;justify-content:center;gap:0;background:var(--elem);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px -30px rgba(0,0,0,.8)}
-  .metric{flex:1;min-width:130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left}
-  .metric:last-child{border-right:none}
-  .metric .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-  .metric .v{font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1}
-  .v.em{color:var(--emerald)} .v.am{color:var(--amber)} .v.te{color:var(--teal)}
-  .window{position:relative;max-width:1040px;margin:0 auto;border:1px solid var(--line);border-radius:16px 16px 0 0;overflow:hidden;background:var(--elem);box-shadow:0 50px 110px -50px rgba(0,229,163,.28)}
-  .winbar{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);background:#101216}
-  .lights{display:flex;gap:7px}
-  .lights i{width:11px;height:11px;border-radius:50%;display:block}
-  .url{flex:1;text-align:center;font-family:var(--mono);font-size:.74rem;color:var(--muted);letter-spacing:.03em}
-  .window .shot{width:100%;display:block}
-  .stage::after{content:"";position:absolute;left:0;right:0;bottom:0;height:160px;background:linear-gradient(to bottom,transparent,var(--canvas));pointer-events:none}
-
-  /* callouts */
-  .callout{position:absolute;z-index:4;font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;color:var(--text);background:rgba(11,12,14,.86);border:1px solid var(--line);border-radius:9px;padding:7px 11px;backdrop-filter:blur(6px);box-shadow:0 10px 30px -12px rgba(0,0,0,.7)}
-  .callout b{font-family:var(--sans)}
-  .callout .tag{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:7px;vertical-align:middle}
-  .co1{top:30%;left:-2%} .co2{top:54%;right:-3%} .co3{bottom:24%;left:4%}
-
-  /* sections */
-  section.band{padding:84px 0}
-  .sec-head{max-width:62ch}
-  .sec-h{font-size:clamp(1.7rem,3.6vw,2.6rem);margin-top:12px}
-  .sec-sub{color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:60ch}
-
-  /* source strip */
-  .sources{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--elem)}
-  .sources .wrap{display:flex;align-items:center;gap:26px;flex-wrap:wrap;justify-content:center;padding:22px 28px}
-  .sources .lbl{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-  .sources .src{font-family:var(--mono);font-size:.84rem;letter-spacing:.04em;color:var(--text2);opacity:.85}
-
-  /* problem */
-  .problem-h{font-size:clamp(1.8rem,4.4vw,3rem);max-width:18ch;letter-spacing:-.02em}
-  .scatter{display:flex;flex-wrap:wrap;gap:9px;margin-top:30px}
-  .scatter .chip{font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px}
-  .scatter .chip:nth-child(n+5){opacity:.55} .scatter .chip:nth-child(n+7){opacity:.3}
-
-  /* steps */
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:46px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem)}
-  .step{padding:30px 28px;border-right:1px solid var(--line);position:relative}
-  .step:last-child{border-right:none}
-  .step .n{display:flex;align-items:center;gap:12px}
-  .step .num{font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none}
-  .step .line{flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)}
-  .step h3{font-size:1.3rem;margin-top:18px}
-  .step p{color:var(--text2);margin-top:8px;font-size:.95rem}
-
-  /* capability grid */
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:46px}
-  .card{background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px;transition:border-color .16s ease,transform .16s ease}
-  .card:hover{border-color:#2c3640;transform:translateY(-2px)}
-  .card .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px}
-  .card h3{font-size:1.18rem}
-  .card p{color:var(--text2);margin-top:8px;font-size:.94rem}
-
-  /* feature rows */
-  .feat{display:grid;grid-template-columns:1fr 1.05fr;gap:56px;align-items:center;margin-top:64px}
-  .feat:first-of-type{margin-top:52px}
-  .feat.rev .ftext{order:2}
-  .feat .ftext .eyebrow{font-size:.72rem}
-  .feat h3{font-size:clamp(1.5rem,2.6vw,2rem);margin-top:12px}
-  .feat p{color:var(--text2);margin-top:14px;font-size:1.02rem}
-  .feat ul{list-style:none;margin-top:18px;display:flex;flex-direction:column;gap:10px}
-  .feat li{display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem}
-  .feat li svg{flex:none;margin-top:3px}
-  .framed{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 70px -40px rgba(0,0,0,.75)}
-  .framed.glow{box-shadow:0 30px 80px -40px rgba(0,229,163,.22)}
-  .device{max-width:300px;margin:0 auto;border:1px solid var(--line);border-radius:26px;padding:10px;background:var(--elem);box-shadow:0 30px 70px -40px rgba(0,0,0,.8)}
-  .device img{border-radius:18px}
-
-  /* philosophy */
-  .control{background:var(--elem);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-  .control .inner{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;padding:84px 0}
-  .control .eyebrow{color:var(--teal)}
-  .control h2{font-size:clamp(1.8rem,3.6vw,2.7rem);margin-top:12px}
-  .control .lead{color:var(--text2);margin-top:16px;font-size:1.08rem}
-  .twolist{display:grid;gap:14px}
-  .li{display:flex;gap:13px;align-items:flex-start;background:var(--canvas);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
-  .li .mk{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px}
-  .li .mk.yes{background:rgba(45,212,191,.14);color:var(--teal)}
-  .li .mk.no{background:rgba(100,116,139,.16);color:var(--muted)}
-  .li .t{font-weight:600;font-size:.96rem}
-  .li .d{color:var(--text2);font-size:.88rem;margin-top:2px}
-
-  /* who */
-  .who{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
-  .who .p{font-family:var(--sans);font-size:.95rem;color:var(--text);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:10px 18px}
-
-  /* trust */
-  .trustgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:46px}
-  .tcard{background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px}
-  .tcard .th{display:flex;align-items:center;gap:10px;color:var(--emerald);font-weight:600}
-  .tcard p{color:var(--text2);margin-top:10px;font-size:.93rem}
-
-  /* final */
-  .final{position:relative;text-align:center;padding:110px 0;overflow:hidden}
-  .final::before{content:"";position:absolute;inset:0;background:radial-gradient(55% 80% at 50% 50%,rgba(0,229,163,.12),transparent 70%);pointer-events:none}
-  .final .glyphbg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:440px;height:440px;opacity:.05;pointer-events:none}
-  .final h2{font-size:clamp(2rem,4.6vw,3.2rem);max-width:18ch;margin:0 auto;position:relative}
-  .final p{color:var(--text2);max-width:54ch;margin:18px auto 0;font-size:1.08rem;position:relative}
-  .final .cta{margin-top:34px;position:relative}
-
-  /* footer */
-  footer.ft{border-top:1px solid var(--line);padding:34px 0 56px}
-  footer.ft .wrap{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px}
-  footer.ft .lks{display:flex;gap:24px;font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;color:var(--muted)}
-  footer.ft .lks a:hover{color:var(--text)}
-  footer.ft .cp{font-family:var(--mono);font-size:.74rem;color:var(--muted)}
-
-  /* responsive */
-  @media(max-width:1000px){
-    .feat{grid-template-columns:1fr;gap:30px}
-    .feat.rev .ftext{order:0}
-    .control .inner{grid-template-columns:1fr;gap:34px;padding:64px 0}
-    .grid{grid-template-columns:repeat(2,1fr)}
-    .trustgrid{grid-template-columns:repeat(2,1fr)}
-    .callout{display:none}
-    .metric-ribbon{max-width:680px}
-  }
-  @media(max-width:680px){
-    section.band{padding:60px 0}
-    .nav-links{display:none}
-    .steps{grid-template-columns:1fr}
-    .step{border-right:none;border-bottom:1px solid var(--line)}
-    .step:last-child{border-bottom:none}
-    .grid{grid-template-columns:1fr}
-    .trustgrid{grid-template-columns:1fr}
-    .metric{min-width:50%;border-bottom:1px solid var(--line)}
-    .metric:nth-child(3),.metric:nth-child(4){border-bottom:none}
-    .metric:nth-child(2){border-right:none}
-    .hero .cta .btn{flex:1;justify-content:center}
-    .winbar .url{display:none}
-  }
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Spline Sans";src:url("fonts/SplineSans.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Spline Sans Mono";src:url("fonts/SplineSansMono.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{margin:0;background:#0B0C0E}
+img{display:block;max-width:100%}
+::selection{background:rgba(0,229,163,.25);color:#fff}
+@keyframes ping{0%{transform:scale(1);opacity:.55}80%,100%{transform:scale(2.6);opacity:0}}
+sc-if{display:contents}
+a{text-decoration:none;color:inherit}
+/* Mobile nav: the design's header has a fixed height with a wrapping flex row,
+   which overflows on narrow screens. Let it grow and drop the links to their
+   own full-width row under the logo + actions. */
+@media (max-width:720px){
+  header>div{height:auto!important;padding-top:13px!important;padding-bottom:13px!important;row-gap:12px}
+  header>div>nav{order:3;width:100%;gap:12px 20px!important}
+}
 </style>
 </head>
 <body>
+<div id="dc-root" style="--canvas:#0B0C0E;--elem:#16181C;--elem2:#1B1F25;--line:#232A31;--emerald:#00E5A3;--amber:#FFB800;--teal:#2DD4BF;--coral:#F87171;--muted:#64748B;--text:#E2E8F0;--text2:#94A3B8;--serif:'Fraunces',Georgia,serif;--sans:'Spline Sans',-apple-system,system-ui,sans-serif;--mono:'Spline Sans Mono',ui-monospace,Menlo,monospace;background:var(--canvas);color:var(--text);font-family:var(--sans);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:clip">
 
 <!-- ============ NAV ============ -->
-<header class="nav" id="nav">
-  <div class="wrap">
-    <a class="brand" href="#top" aria-label="Reqon home">
-      <svg class="mark" viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="10" stroke-dasharray="70 15 70 15"/><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="10" stroke-linecap="round"/></svg>
-      <span class="word">Reqon</span>
+<header style="position:sticky;top:0;z-index:50;background:rgba(11,12,14,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:18px;height:68px;flex-wrap:wrap">
+    <a href="#/home" data-route="home" onclick="{{ go }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <svg viewBox="0 0 100 100" fill="none" style="width:26px;height:26px;flex:none"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="10" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="10" stroke-linecap="round"></line></svg>
+      <span style="font-family:var(--mono);font-weight:600;letter-spacing:.22em;font-size:.82rem;text-transform:uppercase;color:var(--emerald)">Reqon</span>
     </a>
-    <nav class="nav-links" aria-label="Primary">
-      <a class="lnk" href="#product">Product</a>
-      <a class="lnk" href="#how">How it works</a>
-      <a class="lnk" href="#control">Philosophy</a>
+    <nav style="display:flex;align-items:center;gap:30px;flex-wrap:wrap">
+      <a href="#/home" data-route="home" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Home<sc-if value="{{ isHome }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/how" data-route="how" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">How it works<sc-if value="{{ isHow }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/apps" data-route="apps" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Apps<sc-if value="{{ isApps }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Pricing<sc-if value="{{ isPricing }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/about" data-route="about" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">About<sc-if value="{{ isAbout }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
     </nav>
-    <div class="nav-actions">
-      <a class="signin" href="https://cloud.reqon.app">Sign in</a>
-      <a class="btn btn-primary btn-sm" href="https://cloud.reqon.app">Launch Reqon Cloud</a>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="https://cloud.reqon.app" style="font-weight:600;font-size:.9rem;color:var(--text);padding:9px 6px;cursor:pointer" style-hover="color:var(--emerald)">Sign in</a>
+      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.88rem;background:var(--emerald);color:#06211a;cursor:pointer;white-space:nowrap" style-hover="background:#26efb3">Get started</a>
     </div>
   </div>
 </header>
 
-<a id="top"></a>
-
-<!-- ============ HERO ============ -->
-<section class="hero">
-  <div class="wrap">
-    <span class="badge"><span class="dot"><span></span><span class="ping"></span></span>Now in private preview</span>
-    <h1>Your job search, <span class="ac">run like an operation.</span></h1>
-    <p class="lede">Reqon is the command center for a serious search — discover roles from real ATS boards, rank them by fit and expected value, and carry every one through to offer.</p>
-    <div class="cta">
-      <a class="btn btn-primary" href="https://cloud.reqon.app">Launch Reqon Cloud →</a>
-      <a class="btn btn-ghost" href="#how">See how it works</a>
+<!-- ================= HOME ================= -->
+<sc-if value="{{ isHome }}">
+<section style="position:relative;padding:64px 0 0;text-align:center;overflow:hidden">
+  <div style="position:absolute;inset:-20% 0 auto;height:560px;background:radial-gradient(60% 70% at 50% 0%,rgba(0,229,163,.13),transparent 70%);pointer-events:none"></div>
+  <div style="position:relative;max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:7px 15px"><span style="position:relative;width:7px;height:7px;flex:none"><span style="position:absolute;inset:0;border-radius:50%;background:var(--emerald)"></span><span style="position:absolute;inset:0;border-radius:50%;background:var(--emerald);animation:ping 2.4s ease-out infinite"></span></span>Now in private preview</span>
+    <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.5rem,6.4vw,4.4rem);margin:24px auto 0;max-width:17ch">Stop letting <span style="color:var(--emerald)">good roles</span> slip away.</h1>
+    <p style="font-size:clamp(1.05rem,2.1vw,1.32rem);color:var(--text2);max-width:60ch;margin:22px auto 0">Reqon finds jobs that actually fit you, ranks them so you know what to do first, and keeps every one moving — from the day you save it to the day you land an offer.</p>
+    <div style="margin-top:32px;display:flex;gap:13px;justify-content:center;flex-wrap:wrap">
+      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Start your free trial →</a>
+      <a href="#/how" data-route="how" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">See how it works</a>
     </div>
-    <div class="trust">No auto-apply · you review every action · your search data stays yours</div>
+    <div style="margin-top:18px;font-family:var(--mono);font-size:.76rem;letter-spacing:.04em;color:var(--muted)">No auto-apply · you review every action · your data stays yours</div>
+    <div style="margin-top:10px;font-family:var(--serif);font-style:italic;font-size:.98rem;color:var(--text2);opacity:.8">Your job search, run like an operation.</div>
   </div>
 
-  <div class="wrap">
-    <div class="stage" id="product">
-      <div class="metric-ribbon" aria-hidden="true">
-        <div class="metric"><div class="k">Roles tracked</div><div class="v">159</div></div>
-        <div class="metric"><div class="k">Tier A · top fit</div><div class="v em">50</div></div>
-        <div class="metric"><div class="k">Apply-next queue</div><div class="v te">27</div></div>
-        <div class="metric"><div class="k">Follow-up due</div><div class="v am">52</div></div>
+  <!-- product window -->
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="position:relative;margin-top:46px">
+      <div style="position:relative;z-index:3;max-width:920px;margin:0 auto -26px;display:flex;flex-wrap:wrap;justify-content:center;background:var(--elem);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px -30px rgba(0,0,0,.8)">
+        <div style="flex:1 1 130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Jobs tracked</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1">159</div></div>
+        <div style="flex:1 1 130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Strong matches</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1;color:var(--emerald)">50</div></div>
+        <div style="flex:1 1 130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Ready to apply</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1;color:var(--teal)">27</div></div>
+        <div style="flex:1 1 130px;padding:14px 18px;text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Time to follow up</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1;color:var(--amber)">52</div></div>
       </div>
-      <div class="window">
-        <div class="winbar">
-          <span class="lights"><i style="background:#F87171"></i><i style="background:#FFB800"></i><i style="background:#00E5A3"></i></span>
-          <span class="url">cloud.reqon.app — requisition pipeline</span>
+      <div style="position:relative;max-width:1040px;margin:0 auto;border:1px solid var(--line);border-radius:16px 16px 0 0;overflow:hidden;background:var(--elem);box-shadow:0 50px 110px -50px rgba(0,229,163,.28)">
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);background:#101216">
+          <span style="display:flex;gap:7px"><i style="width:11px;height:11px;border-radius:50%;display:block;background:#F87171"></i><i style="width:11px;height:11px;border-radius:50%;display:block;background:#FFB800"></i><i style="width:11px;height:11px;border-radius:50%;display:block;background:#00E5A3"></i></span>
+          <span style="flex:1;text-align:center;font-family:var(--mono);font-size:.74rem;color:var(--muted);letter-spacing:.03em">cloud.reqon.app — your job board</span>
         </div>
-        <img class="shot" src="images/dashboard-overview.png" alt="The Reqon requisition pipeline: roles scored by fit, prioritized into tiers, and tracked through follow-ups, interviews, and offers.">
+        <img src="images/dashboard-overview.png" alt="The Reqon job board: roles ranked by fit and tracked through follow-ups, interviews, and offers." style="width:100%;display:block">
       </div>
-      <div class="callout co1"><span class="tag" style="background:var(--emerald)"></span><b>Tier A</b> · scored by fit</div>
-      <div class="callout co2"><span class="tag" style="background:var(--teal)"></span>Sorted by <b>expected value</b></div>
-      <div class="callout co3"><span class="tag" style="background:var(--amber)"></span><b>52</b> follow-ups due</div>
+      <div style="position:absolute;left:0;right:0;bottom:0;height:160px;background:linear-gradient(to bottom,transparent,var(--canvas));pointer-events:none"></div>
     </div>
   </div>
 </section>
 
-<!-- ============ SOURCE STRIP ============ -->
-<div class="sources">
-  <div class="wrap">
-    <span class="lbl">Sources roles from</span>
-    <span class="src">Greenhouse</span>
-    <span class="src">Ashby</span>
-    <span class="src">Lever</span>
-    <span class="src">+ more boards</span>
-    <span class="lbl" style="opacity:.7">· via official board APIs — no scraping</span>
+<!-- source strip -->
+<div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--elem)">
+  <div style="max-width:1140px;margin:0 auto;padding:22px 28px;display:flex;align-items:center;gap:18px 26px;flex-wrap:wrap;justify-content:center">
+    <span style="font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Jobs come straight from</span>
+    <span style="font-family:var(--mono);font-size:.84rem;color:var(--text2)">Greenhouse</span>
+    <span style="font-family:var(--mono);font-size:.84rem;color:var(--text2)">Ashby</span>
+    <span style="font-family:var(--mono);font-size:.84rem;color:var(--text2)">Lever</span>
+    <span style="font-family:var(--mono);font-size:.84rem;color:var(--text2)">+ more</span>
+    <span style="font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;color:var(--muted);opacity:.8">· real company career pages, no scraping</span>
   </div>
 </div>
 
-<!-- ============ PROBLEM ============ -->
-<section class="band">
-  <div class="wrap sec-head">
-    <span class="eyebrow">The problem</span>
-    <h2 class="problem-h">A serious search gets scattered across fifteen surfaces.</h2>
-    <p class="sec-sub">Spreadsheets, browser tabs, email threads, saved postings, recruiter DMs, and personal notes. The hard part isn’t finding more roles — it’s keeping the right ones moving without the whole thing going stale.</p>
-    <div class="scatter">
-      <span class="chip">Spreadsheets</span>
-      <span class="chip">Browser tabs</span>
-      <span class="chip">Email threads</span>
-      <span class="chip">Saved postings</span>
-      <span class="chip">Recruiter DMs</span>
-      <span class="chip">Sticky notes</span>
-      <span class="chip">Calendar reminders</span>
+<!-- problem -->
+<section style="padding:84px 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">The problem</span>
+    <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.02em;font-size:clamp(1.8rem,4.4vw,3rem);max-width:20ch;margin-top:12px">A real job search ends up scattered across a dozen places.</h2>
+    <p style="color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:62ch">Spreadsheets, browser tabs, email threads, saved postings, recruiter messages, sticky notes. The hard part isn't finding more jobs — it's keeping the right ones moving before they go stale.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:9px;margin-top:30px">
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px">Spreadsheets</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px">Browser tabs</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.8">Email threads</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.7">Saved postings</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.55">Recruiter DMs</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.4">Sticky notes</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.3">Calendar reminders</span>
     </div>
   </div>
 </section>
 
-<!-- ============ HOW IT WORKS ============ -->
-<section class="band" id="how" style="padding-top:24px">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">How it works</span>
-      <h2 class="sec-h">Discover. Prioritize. Track.</h2>
-      <p class="sec-sub">One disciplined loop instead of a dozen open tabs — built to protect your attention, not inflate your activity.</p>
-    </div>
-    <div class="steps">
-      <div class="step">
-        <div class="n"><span class="num">1</span><span class="line"></span></div>
-        <h3>Discover</h3>
-        <p>Reqon scouts real ATS boards for roles that match your profile and surfaces them in one place — fresh links, no rotting aggregator noise.</p>
+<!-- 3 step overview -->
+<section style="padding:0 0 84px">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">How it works</span>
+    <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.7rem,3.6vw,2.6rem);margin-top:12px">Find. Focus. Follow through.</h2>
+    <p style="color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:58ch">One simple loop instead of a dozen open tabs — built to protect your attention, not pad your activity.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;margin-top:40px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem)">
+      <div style="padding:30px 28px;border-right:1px solid var(--line)">
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">1</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.3rem;margin-top:18px">Find</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.96rem">Reqon pulls jobs that match you straight from company career pages — so the right roles come to you instead of you hunting for them.</p>
       </div>
-      <div class="step">
-        <div class="n"><span class="num">2</span><span class="line"></span></div>
-        <h3>Prioritize</h3>
-        <p>Every role is scored for fit and interview probability, then tiered by expected value — so your effort goes to the few that count.</p>
+      <div style="padding:30px 28px;border-right:1px solid var(--line)">
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">2</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.3rem;margin-top:18px">Focus</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.96rem">Every job is ranked best-first — by how well it fits and how likely you are to hear back — so you always know what to do next.</p>
       </div>
-      <div class="step">
-        <div class="n"><span class="num">3</span><span class="line"></span></div>
-        <h3>Track</h3>
-        <p>A structured pipeline carries each role from lead to offer, with follow-up nudges, interview prep, and recruiter activity in view.</p>
+      <div style="padding:30px 28px">
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">3</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.3rem;margin-top:18px">Follow through</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.96rem">Each job moves through one clear track from saved to offer, with reminders so a promising lead never quietly goes cold.</p>
       </div>
     </div>
+    <div style="margin-top:26px"><a href="#/how" data-route="how" onclick="{{ go }}" style="font-family:var(--mono);font-size:.82rem;letter-spacing:.04em;color:var(--emerald);cursor:pointer" style-hover="text-decoration:underline">See how it works in detail →</a></div>
+  </div>
+</section>
+</sc-if>
+
+<!-- ================= HOW IT WORKS ================= -->
+<sc-if value="{{ isHow }}">
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">How it works</span>
+    <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:18ch">One simple loop instead of a dozen open tabs.</h1>
+    <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:60ch">Reqon turns a messy search into three repeatable steps you can run in a few minutes a day.</p>
   </div>
 </section>
 
-<!-- ============ CAPABILITY GRID ============ -->
-<section class="band" style="padding-top:24px">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">What’s inside</span>
-      <h2 class="sec-h">A command center, not a spreadsheet.</h2>
-    </div>
-    <div class="grid">
-      <div class="card">
-        <div class="ico" style="background:rgba(0,229,163,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
-        <h3>Requisition pipeline</h3>
-        <p>Track every opportunity through a structured flow — open, applied, interviewing, offer, archived — with status and history on each.</p>
+<!-- 3 steps detailed -->
+<section style="padding:46px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem)">
+      <div style="padding:30px 28px;border-right:1px solid var(--line)">
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">1</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.3rem;margin-top:18px">Find</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.96rem">Set your criteria once. Reqon checks company career pages and brings back fresh, real jobs that match — no endless searching, no dead aggregator links.</p>
       </div>
-      <div class="card">
-        <div class="ico" style="background:rgba(0,229,163,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke-linecap="round"/></svg></div>
-        <h3>Role scouting</h3>
-        <p>Discover and scout roles from multiple ATS sources via their official board APIs — so your shortlist comes to you.</p>
+      <div style="padding:30px 28px;border-right:1px solid var(--line)">
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">2</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.3rem;margin-top:18px">Focus</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.96rem">Each job is scored on how well it fits and how likely you are to hear back, then sorted best-first — so your energy goes to the few that count.</p>
       </div>
-      <div class="card">
-        <div class="ico" style="background:rgba(255,184,0,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="1.7"><line x1="6" y1="20" x2="6" y2="13" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="8" stroke-linecap="round"/><line x1="18" y1="20" x2="18" y2="4" stroke-linecap="round"/></svg></div>
-        <h3>Prioritization</h3>
-        <p>Rank roles by fit, interview probability, tier, and expected value — a transparent model you can read and tune, not a black box.</p>
-      </div>
-      <div class="card">
-        <div class="ico" style="background:rgba(255,184,0,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="1.7"><path d="M3 12a9 9 0 1 1 3 6.7"/><polyline points="3 20 3 14 9 14" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Follow-ups &amp; activity</h3>
-        <p>Surface follow-ups gone quiet, recruiter replies, interviews to prep, offers, and rejections — nothing slips through.</p>
-      </div>
-      <div class="card">
-        <div class="ico" style="background:rgba(45,212,191,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="1.7"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2"/><circle cx="12" cy="12" r="5"/></svg></div>
-        <h3>Screen &amp; interview prep</h3>
-        <p>Prepare for screens and interviews with role-specific guides, saved answers, and notes kept right alongside each requisition.</p>
-      </div>
-      <div class="card">
-        <div class="ico" style="background:rgba(45,212,191,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="1.7"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z" stroke-linejoin="round"/></svg></div>
-        <h3>AI assist — optional</h3>
-        <p>Optional help with scoring, tailoring, notes, and prep. Every suggestion is grounded, reviewable, and editable — you stay in control.</p>
+      <div style="padding:30px 28px">
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">3</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.3rem;margin-top:18px">Follow through</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.96rem">One clear track carries every job from saved to offer — with reminders for follow-ups, recruiter replies, and interviews to prep.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ FEATURE DEEP-DIVES ============ -->
-<section class="band" style="padding-top:24px">
-  <div class="wrap">
-
-    <div class="feat">
-      <div class="ftext">
-        <span class="eyebrow">The daily loop</span>
-        <h3>See what needs action today.</h3>
-        <p>Open the board and the work is already triaged: high-value roles to apply to, follow-ups gone quiet, interviews to prep, leads to verify — each one a click from the detail.</p>
-        <ul>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Sorted by expected value, not recency</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Tier A · B · C colour-coded at a glance</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Live counts for every stage of the pipeline</li>
+<!-- deep dive 1: daily loop (text left, image right) -->
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
+      <div style="flex:1 1 320px">
+        <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Your daily loop</span>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.6vw,2rem);margin-top:12px">See exactly what needs doing today.</h2>
+        <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">Open Reqon and the work is already sorted: top jobs to apply to, follow-ups gone quiet, interviews to prep, links to double-check. Each one is a click from the detail.</p>
+        <ul style="list-style:none;margin-top:18px;display:flex;flex-direction:column;gap:10px">
+          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Sorted by what's worth your time, not just what's newest</li>
+          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Best matches flagged at a glance</li>
+          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Live count at every stage, from saved to offer</li>
         </ul>
       </div>
-      <div class="framed glow"><img src="images/dashboard-overview.png" alt="Reqon’s daily action board showing roles grouped by what needs attention today."></div>
+      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 80px -40px rgba(0,229,163,.22)"><img src="images/dashboard-overview.png" alt="Reqon's daily board showing jobs grouped by what needs attention today." loading="lazy" style="width:100%;display:block"></div>
     </div>
+  </div>
+</section>
 
-    <div class="feat rev">
-      <div class="ftext">
-        <span class="eyebrow">Prioritization &amp; analytics</span>
-        <h3>Prioritize by expected value, not gut feel.</h3>
-        <p>Fit and interview probability are scored separately, then combined into expected value so you can spend real effort where it pays off. Source-ROI shows which boards actually reply.</p>
-        <ul>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Transparent, tunable scoring — never a black box</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Conversion funnel and response-rate tracking</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Honest caveats surfaced, not hidden</li>
+<!-- deep dive 2: ranking (image left, text right) -->
+<section style="padding:64px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
+      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 70px -40px rgba(0,0,0,.75)"><img src="images/analytics.png" alt="Reqon's insights: response rate, conversion funnel, and which job sources actually reply." loading="lazy" style="width:100%;display:block"></div>
+      <div style="flex:1 1 320px">
+        <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">Ranking &amp; insights</span>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.6vw,2rem);margin-top:12px">Know which jobs are worth your time.</h2>
+        <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">Reqon scores how well each job fits you and how likely you are to hear back, then puts the best bets up top. You'll also see which sources actually reply — so you stop pouring effort into the ones that don't.</p>
+        <ul style="list-style:none;margin-top:18px;display:flex;flex-direction:column;gap:10px">
+          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Clear, adjustable ranking — never a black box</li>
+          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>See your response rate and where you're getting stuck</li>
+          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Honest caveats shown, not hidden</li>
         </ul>
       </div>
-      <div class="framed"><img src="images/analytics.png" alt="Reqon analytics: conversion funnel, response rate, and source ROI for a job search."></div>
     </div>
+  </div>
+</section>
 
-    <div class="feat">
-      <div class="ftext">
-        <span class="eyebrow">On the job page</span>
-        <h3>Clip a role from anywhere.</h3>
-        <p>A browser companion clips roles from any posting straight into your pipeline and can pre-fill the factual fields from your profile. It never submits, never touches passwords or consent — you review and apply yourself.</p>
-        <ul>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Save to pipeline from any ATS or job board</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Fit overlay so you can triage in-page</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Pre-fills factual fields only — never auto-submits</li>
+<!-- what's inside grid -->
+<section style="padding:84px 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">What's inside</span>
+    <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.7rem,3.6vw,2.6rem);margin-top:12px">Everything in one place, not ten.</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:40px">
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px" style-hover="border-color:#2c3640;transform:translateY(-2px)">
+        <div style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;background:rgba(0,229,163,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.18rem">Your whole search in one board</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.94rem">Every job, from saved to offer, with status and history on each. No more spreadsheet to babysit.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px" style-hover="border-color:#2c3640;transform:translateY(-2px)">
+        <div style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;background:rgba(0,229,163,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.7"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21" stroke-linecap="round"></line></svg></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.18rem">Jobs come to you</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.94rem">Reqon watches company career pages for roles that fit and brings them in — fresh links, no stale aggregator noise.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px" style-hover="border-color:#2c3640;transform:translateY(-2px)">
+        <div style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;background:rgba(255,184,0,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="1.7"><line x1="6" y1="20" x2="6" y2="13" stroke-linecap="round"></line><line x1="12" y1="20" x2="12" y2="8" stroke-linecap="round"></line><line x1="18" y1="20" x2="18" y2="4" stroke-linecap="round"></line></svg></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.18rem">Sorted best-first</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.94rem">Ranked by fit and your odds of a reply, so you start with the jobs most likely to pay off — and you can see why.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px" style-hover="border-color:#2c3640;transform:translateY(-2px)">
+        <div style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;background:rgba(255,184,0,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="1.7"><path d="M3 12a9 9 0 1 1 3 6.7"></path><polyline points="3 20 3 14 9 14" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.18rem">Nothing slips</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.94rem">Follow-ups gone quiet, recruiter replies, interviews, offers — all surfaced before they fall through the cracks.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px" style-hover="border-color:#2c3640;transform:translateY(-2px)">
+        <div style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;background:rgba(45,212,191,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="1.7"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2"></path><circle cx="12" cy="12" r="5"></circle></svg></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.18rem">Interview prep on hand</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.94rem">Role-specific prep, saved answers, and notes kept right next to each job — ready when the call comes.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px" style-hover="border-color:#2c3640;transform:translateY(-2px)">
+        <div style="width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;background:rgba(45,212,191,.12)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="1.7"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"></path><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z" stroke-linejoin="round"></path></svg></div>
+        <h3 style="font-family:var(--serif);font-weight:600;font-size:1.18rem">AI when you want it</h3>
+        <p style="color:var(--text2);margin-top:8px;font-size:.94rem">Optional help drafting notes, answers, and prep. Every suggestion is editable and grounded — you decide what to use.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<!-- ================= APPS ================= -->
+<sc-if value="{{ isApps }}">
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Apps</span>
+    <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:16ch">Reqon, wherever your search is.</h1>
+    <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:60ch">The same search on your desktop, in your browser, and in your pocket — always in sync.</p>
+  </div>
+</section>
+
+<!-- Cloud (text left, image right) -->
+<section style="padding:52px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
+      <div style="flex:1 1 320px">
+        <span style="display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:6px;padding:3px 9px">Reqon Cloud · web</span>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.8vw,2.1rem);margin-top:14px">Your home base in the browser.</h2>
+        <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">The full picture: every job ranked and tracked, today's actions sorted, and your progress at a glance. This is where you run the search.</p>
+        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap"><a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Launch Reqon Cloud →</a><a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b">See plans →</a></div>
+      </div>
+      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 80px -40px rgba(0,229,163,.22)"><img src="images/dashboard-overview.png" alt="Reqon Cloud, the web app, showing the job board." loading="lazy" style="width:100%;display:block"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Extension + Mobile side by side -->
+<section style="padding:64px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+      <!-- extension -->
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:30px;display:flex;flex-direction:column">
+        <span style="display:inline-block;align-self:flex-start;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--teal);border:1px solid rgba(45,212,191,.35);border-radius:6px;padding:3px 9px">Browser extension</span>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;font-size:1.5rem;margin-top:14px">Save a job from anywhere.</h2>
+        <p style="color:var(--text2);margin-top:12px;font-size:.98rem">See a role you like on any site? Clip it into your board in one click. Reqon can pre-fill the basic facts from your profile — but it never submits anything for you.</p>
+        <ul style="list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:9px">
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Save from any job board or career page</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>See how well it fits before you apply</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Fills facts only — never auto-submits</li>
+        </ul>
+        <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:center"><div style="width:230px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--canvas);box-shadow:0 30px 60px -36px rgba(0,0,0,.8)"><img src="images/chrome-extension.png" alt="The Reqon browser extension clipping a job into the board." loading="lazy" style="width:100%;display:block"></div></div>
+      </div>
+      <!-- mobile -->
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:30px;display:flex;flex-direction:column">
+        <span style="display:inline-block;align-self:flex-start;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);border:1px solid rgba(255,184,0,.35);border-radius:6px;padding:3px 9px">Mobile companion</span>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;font-size:1.5rem;margin-top:14px">Check in on the go.</h2>
+        <p style="color:var(--text2);margin-top:12px;font-size:.98rem">Your board, today's actions, and alerts in your pocket — so you can keep the search moving between meetings, fully in sync with the web app.</p>
+        <ul style="list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:9px">
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Today's actions, ready to tap</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Get pinged when a recruiter replies</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Always in sync with your board</li>
+        </ul>
+        <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:center"><div style="width:200px;border:1px solid var(--line);border-radius:26px;padding:8px;background:var(--canvas);box-shadow:0 30px 60px -36px rgba(0,0,0,.8)"><img src="images/mobile-companion.png" alt="The Reqon mobile companion showing today's actions." loading="lazy" style="width:100%;display:block;border-radius:18px"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:40px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <p style="font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;color:var(--muted)">Cloud is live in private preview. The extension and mobile companion are rolling out to preview users.</p>
+  </div>
+</section>
+</sc-if>
+
+<!-- ================= PRICING ================= -->
+<sc-if value="{{ isPricing }}">
+<section style="padding:72px 0 0;text-align:center;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:-30% 0 auto;height:480px;background:radial-gradient(55% 70% at 50% 0%,rgba(0,229,163,.10),transparent 70%);pointer-events:none"></div>
+  <div style="position:relative;max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Plans</span>
+    <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:16ch;margin-left:auto;margin-right:auto">Two ways to run your search.</h1>
+    <p style="color:var(--text2);margin:16px auto 0;font-size:1.1rem;max-width:60ch">Start with everything you need to run a focused search. Add an AI corner man when you want the extra edge. Both work across web, browser, and mobile — switch or cancel anytime.</p>
+    <div style="display:flex;justify-content:center;margin-top:30px">
+      <div style="display:inline-flex;align-items:center;gap:4px;background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:4px">
+        <sc-if value="{{ billingMonthly }}"><button onclick="{{ setMonthly }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.85rem;padding:9px 18px;border-radius:999px;background:var(--emerald);color:#06211a">Monthly</button></sc-if>
+        <sc-if value="{{ billingAnnual }}"><button onclick="{{ setMonthly }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.85rem;padding:9px 18px;border-radius:999px;background:transparent;color:var(--text2)">Monthly</button></sc-if>
+        <sc-if value="{{ billingAnnual }}"><button onclick="{{ setAnnual }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.85rem;padding:9px 18px;border-radius:999px;background:var(--emerald);color:#06211a">Annual <span style="opacity:.7">· 2 months free</span></button></sc-if>
+        <sc-if value="{{ billingMonthly }}"><button onclick="{{ setAnnual }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.85rem;padding:9px 18px;border-radius:999px;background:transparent;color:var(--text2)">Annual <span style="opacity:.7">· 2 months free</span></button></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:40px 0 0">
+  <div style="max-width:980px;margin:0 auto;padding:0 28px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start">
+
+      <!-- Reqon Cloud -->
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:32px;text-align:left;display:flex;flex-direction:column">
+        <div style="font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--teal)">Reqon Cloud</div>
+        <div style="font-family:var(--serif);font-size:1.35rem;font-weight:600;margin-top:8px;line-height:1.2">Run your whole search in one place.</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:20px">
+          <sc-if value="{{ billingMonthly }}"><span style="font-family:var(--serif);font-size:3rem;font-weight:600;line-height:1">$18</span></sc-if>
+          <sc-if value="{{ billingAnnual }}"><span style="font-family:var(--serif);font-size:3rem;font-weight:600;line-height:1">$15</span></sc-if>
+          <span style="color:var(--text2);font-size:1rem">/mo</span>
+        </div>
+        <sc-if value="{{ billingMonthly }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">billed monthly</div></sc-if>
+        <sc-if value="{{ billingAnnual }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">$180 billed yearly</div></sc-if>
+        <a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer;margin-top:22px" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">Start 14-day free trial</a>
+        <div style="height:1px;background:var(--line);margin:24px 0"></div>
+        <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">What's included</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:11px">
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Jobs pulled from company career pages, automatically</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>One synced board across web, extension &amp; iOS</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Ranked best-first, with response-rate insights</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Automated background searches</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Follow-up reminders &amp; interview tracking</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Browser clipper + mobile companion</li>
         </ul>
       </div>
-      <div class="framed"><img src="images/chrome-extension.png" alt="Reqon browser companion overlaying fit information on a job posting."></div>
-    </div>
 
-    <div class="feat rev">
-      <div class="ftext">
-        <span class="eyebrow">Anywhere</span>
-        <h3>Review and act on the go.</h3>
-        <p>A companion app mirrors your pipeline, today’s actions, analytics, and notifications — so you can keep the search moving between meetings, fully in sync with the board.</p>
-        <ul>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Today’s actions in your pocket</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Push notifications for replies and follow-ups</li>
-          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>Fully synced with your pipeline</li>
+      <!-- Reqon AI (featured) -->
+      <div style="position:relative;background:linear-gradient(180deg,rgba(0,229,163,.06),var(--elem) 120px);border:1px solid var(--emerald);border-radius:18px;padding:32px;text-align:left;display:flex;flex-direction:column;box-shadow:0 30px 80px -42px rgba(0,229,163,.35)">
+        <span style="position:absolute;top:-12px;right:24px;font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#06211a;background:var(--emerald);border-radius:999px;padding:5px 12px">Most popular</span>
+        <div style="font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--emerald)">Reqon AI</div>
+        <div style="font-family:var(--serif);font-size:1.35rem;font-weight:600;margin-top:8px;line-height:1.2">Everything in Cloud, plus an AI corner man.</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:20px">
+          <sc-if value="{{ billingMonthly }}"><span style="font-family:var(--serif);font-size:3rem;font-weight:600;line-height:1;color:var(--emerald)">$36</span></sc-if>
+          <sc-if value="{{ billingAnnual }}"><span style="font-family:var(--serif);font-size:3rem;font-weight:600;line-height:1;color:var(--emerald)">$30</span></sc-if>
+          <span style="color:var(--text2);font-size:1rem">/mo</span>
+        </div>
+        <sc-if value="{{ billingMonthly }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">billed monthly</div></sc-if>
+        <sc-if value="{{ billingAnnual }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">$360 billed yearly</div></sc-if>
+        <a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer;margin-top:22px" style-hover="background:#26efb3;transform:translateY(-1px)">Start 14-day free trial</a>
+        <div style="height:1px;background:var(--line);margin:24px 0"></div>
+        <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Everything in Reqon Cloud, plus</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:11px">
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>AI interview prep guides, tailored to each role</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>AI answer help + a reusable narrative library</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Thank-you note generation</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>AI-drafted notes &amp; messages — editable and grounded</li>
+          <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:.93rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Priority access to new AI features</li>
         </ul>
       </div>
-      <div class="device"><img src="images/mobile-companion.png" alt="Reqon mobile companion app showing the pipeline and today’s actions."></div>
-    </div>
 
+    </div>
+    <p style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:22px">Preview pricing — we're finalizing plans for launch.</p>
   </div>
 </section>
 
-<!-- ============ PHILOSOPHY / CONTROL ============ -->
-<section class="control" id="control">
-  <div class="wrap">
-    <div class="inner">
-      <div>
-        <span class="eyebrow">Philosophy</span>
-        <h2>AI assists. You stay in control.</h2>
-        <p class="lead">Reqon is a disciplined job-search operating system — not an auto-apply spam tool. Scoring, recommendations, cover notes, and screening answers are always reviewable, editable, and grounded. The goal is quality over quantity: optimize your time for maximum value, and keep every decision yours.</p>
-      </div>
-      <div class="twolist">
-        <div class="li"><span class="mk yes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="t">Reqon assists</div><div class="d">Scores roles, drafts notes, prepares interview answers — all reviewable and editable before you use them.</div></div></div>
-        <div class="li"><span class="mk yes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="t">You decide</div><div class="d">You choose what to apply to, what to send, and when. Nothing leaves your hands without your review.</div></div></div>
-        <div class="li"><span class="mk no"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="12" x2="18" y2="12" stroke-linecap="round"/></svg></span><div><div class="t">Reqon never auto-applies</div><div class="d">No mass submissions, no bots filling applications on your behalf. It’s built to protect your attention and your accounts.</div></div></div>
-        <div class="li"><span class="mk no"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="12" x2="18" y2="12" stroke-linecap="round"/></svg></span><div><div class="t">Reqon never replaces you</div><div class="d">It organizes and accelerates a search you run. The judgment — and the credit — stays with you.</div></div></div>
-      </div>
+<section style="padding:40px 0 0">
+  <div style="max-width:980px;margin:0 auto;padding:0 28px">
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px 22px;border-top:1px solid var(--line);padding-top:28px">
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--text2)">14-day free trial</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">·</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--text2)">No auto-apply</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">·</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--text2)">Your data stays yours</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">·</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--text2)">Cancel anytime</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">·</span>
+      <span style="font-family:var(--mono);font-size:.74rem;color:var(--text2)">Secure payments via Stripe</span>
     </div>
   </div>
 </section>
+</sc-if>
 
-<!-- ============ WHO IT'S FOR ============ -->
-<section class="band">
-  <div class="wrap sec-head">
-    <span class="eyebrow">Who it’s for</span>
-    <h2 class="sec-h">Built for people running a deliberate search.</h2>
-    <p class="sec-sub">Reqon suits professionals who want structure, prioritization, and follow-through — not a chaotic spreadsheet workflow.</p>
-    <div class="who">
-      <span class="p">Product managers</span>
-      <span class="p">Technical leaders</span>
-      <span class="p">Senior &amp; principal ICs</span>
-      <span class="p">People managing a high-volume search</span>
-      <span class="p">Anyone running a strategic, remote-focused search</span>
-    </div>
+<!-- ================= ABOUT ================= -->
+<sc-if value="{{ isAbout }}">
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">Our philosophy</span>
+    <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:16ch">AI helps. You stay in charge.</h1>
+    <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:62ch">Reqon is built to organize and speed up a search you run — not to blast out applications on your behalf. Scoring, drafts, and prep are always reviewable and editable. The goal is quality over quantity, and every decision stays yours.</p>
   </div>
 </section>
 
-<!-- ============ TRUST ============ -->
-<section class="band" style="padding-top:24px">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Why trust it</span>
-      <h2 class="sec-h">Honest by design.</h2>
-    </div>
-    <div class="trustgrid">
-      <div class="tcard">
-        <div class="th"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.8"><path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z" stroke-linejoin="round"/></svg>Your data stays yours</div>
-        <p>Your pipeline, résumé, and notes aren’t sold or shared. You review every action Reqon takes on your behalf.</p>
-      </div>
-      <div class="tcard">
-        <div class="th"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>No ToS-risk sourcing</div>
-        <p>Roles come from official ATS board APIs — no scraping and no automation that puts your accounts at risk.</p>
-      </div>
-      <div class="tcard">
-        <div class="th"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13" stroke-linecap="round"/><circle cx="12" cy="16.3" r="1" fill="#00E5A3" stroke="none"/></svg>Honest early access</div>
-        <p>Reqon is in private preview, built by one person during a real search. We say what works today and under-promise the rest.</p>
-      </div>
+<!-- yes/no -->
+<section style="padding:40px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+      <div style="display:flex;gap:13px;align-items:flex-start;background:var(--elem);border:1px solid var(--line);border-radius:12px;padding:18px 19px"><span style="flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px;background:rgba(45,212,191,.14);color:var(--teal)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></span><div><div style="font-weight:600;font-size:.98rem">Reqon helps</div><div style="color:var(--text2);font-size:.9rem;margin-top:2px">Ranks jobs, drafts notes, preps interview answers — all editable before you ever use them.</div></div></div>
+      <div style="display:flex;gap:13px;align-items:flex-start;background:var(--elem);border:1px solid var(--line);border-radius:12px;padding:18px 19px"><span style="flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px;background:rgba(45,212,191,.14);color:var(--teal)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></span><div><div style="font-weight:600;font-size:.98rem">You decide</div><div style="color:var(--text2);font-size:.9rem;margin-top:2px">You choose what to apply to, what to send, and when. Nothing leaves your hands without your review.</div></div></div>
+      <div style="display:flex;gap:13px;align-items:flex-start;background:var(--elem);border:1px solid var(--line);border-radius:12px;padding:18px 19px"><span style="flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px;background:rgba(100,116,139,.16);color:var(--muted)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="12" x2="18" y2="12" stroke-linecap="round"></line></svg></span><div><div style="font-weight:600;font-size:.98rem">Never auto-applies</div><div style="color:var(--text2);font-size:.9rem;margin-top:2px">No mass submissions, no bots filling out applications for you. It protects your attention and your accounts.</div></div></div>
+      <div style="display:flex;gap:13px;align-items:flex-start;background:var(--elem);border:1px solid var(--line);border-radius:12px;padding:18px 19px"><span style="flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px;background:rgba(100,116,139,.16);color:var(--muted)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="12" x2="18" y2="12" stroke-linecap="round"></line></svg></span><div><div style="font-weight:600;font-size:.98rem">Never replaces you</div><div style="color:var(--text2);font-size:.9rem;margin-top:2px">It organizes and speeds up a search you run. The judgment — and the credit — stay yours.</div></div></div>
     </div>
   </div>
 </section>
 
-<!-- ============ FINAL CTA ============ -->
-<section class="final">
-  <svg class="glyphbg" viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="6" stroke-dasharray="70 15 70 15"/><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="6" stroke-linecap="round"/></svg>
-  <div class="wrap">
-    <h2>Bring order to your search.</h2>
-    <p>Set your criteria once, let Reqon surface a ranked shortlist, and work the few roles that matter — with everything in one place.</p>
-    <div class="cta"><a class="btn btn-primary" href="https://cloud.reqon.app">Launch Reqon Cloud →</a></div>
-    <div class="trust" style="margin-top:18px;font-family:var(--mono);font-size:.76rem;color:var(--muted)">Private preview · no auto-apply · you stay in control</div>
+<!-- who it's for -->
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Who it's for</span>
+    <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.6rem,3.4vw,2.4rem);margin-top:12px;max-width:20ch">Built for people running a deliberate search.</h2>
+    <p style="color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:58ch">If you want structure, focus, and follow-through instead of a chaotic spreadsheet, Reqon is for you.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:28px">
+      <span style="font-size:.95rem;color:var(--text);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:10px 18px">Product managers</span>
+      <span style="font-size:.95rem;color:var(--text);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:10px 18px">Engineering &amp; technical leaders</span>
+      <span style="font-size:.95rem;color:var(--text);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:10px 18px">Senior &amp; principal individual contributors</span>
+      <span style="font-size:.95rem;color:var(--text);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:10px 18px">Anyone juggling a lot of applications</span>
+      <span style="font-size:.95rem;color:var(--text);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:10px 18px">People running a focused remote search</span>
+    </div>
   </div>
 </section>
 
-<!-- ============ FOOTER ============ -->
-<footer class="ft">
-  <div class="wrap">
-    <a class="brand" href="#top">
-      <svg class="mark" viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="10" stroke-dasharray="70 15 70 15"/><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="10" stroke-linecap="round"/></svg>
-      <span class="word">Reqon</span>
+<!-- why trust it -->
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Why trust it</span>
+    <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.6rem,3.4vw,2.4rem);margin-top:12px">Honest by design.</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:32px">
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px">
+        <div style="display:flex;align-items:center;gap:10px;color:var(--emerald);font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.8"><path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z" stroke-linejoin="round"></path></svg>Your data stays yours</div>
+        <p style="color:var(--text2);margin-top:10px;font-size:.93rem">Your jobs, résumé, and notes are never sold or shared. You review every action Reqon takes for you.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px">
+        <div style="display:flex;align-items:center;gap:10px;color:var(--emerald);font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"></path></svg>Sourced the safe way</div>
+        <p style="color:var(--text2);margin-top:10px;font-size:.93rem">Jobs come straight from official company career-page feeds — no scraping, nothing that puts your accounts at risk.</p>
+      </div>
+      <div style="background:var(--elem);border:1px solid var(--line);border-radius:14px;padding:24px">
+        <div style="display:flex;align-items:center;gap:10px;color:var(--emerald);font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="13" stroke-linecap="round"></line><circle cx="12" cy="16.3" r="1" fill="#00E5A3" stroke="none"></circle></svg>Honest about where we are</div>
+        <p style="color:var(--text2);margin-top:10px;font-size:.93rem">Reqon is in private preview, built by one person during a real search. We say what works today and under-promise the rest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- story -->
+<section style="padding:72px 0 0">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+    <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:clamp(28px,5vw,52px);max-width:760px">
+      <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">The story</span>
+      <p style="font-family:var(--serif);font-size:clamp(1.3rem,2.6vw,1.7rem);line-height:1.4;margin-top:16px;color:var(--text)">Reqon started as one person's job search that had outgrown a spreadsheet. It's built to solve a real problem the hard way — quietly, honestly, and with the candidate always in control.</p>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<!-- ============ FINAL CTA (persistent) ============ -->
+<section style="position:relative;text-align:center;padding:104px 0;overflow:hidden;margin-top:84px">
+  <div style="position:absolute;inset:0;background:radial-gradient(55% 80% at 50% 50%,rgba(0,229,163,.12),transparent 70%);pointer-events:none"></div>
+  <svg viewBox="0 0 100 100" fill="none" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:440px;height:440px;opacity:.05;pointer-events:none"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="6" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="6" stroke-linecap="round"></line></svg>
+  <div style="position:relative;max-width:1140px;margin:0 auto;padding:0 28px">
+    <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.02em;font-size:clamp(2rem,4.6vw,3.2rem);max-width:18ch;margin:0 auto">Bring order to your search.</h2>
+    <p style="color:var(--text2);max-width:54ch;margin:18px auto 0;font-size:1.08rem">Set your criteria once, let Reqon surface a ranked shortlist, and work the few jobs that matter — with everything in one place.</p>
+    <div style="margin-top:32px"><a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Get started — free trial →</a></div>
+    <div style="margin-top:18px;font-family:var(--mono);font-size:.76rem;color:var(--muted)">Private preview · no auto-apply · you stay in control</div>
+  </div>
+</section>
+
+<!-- ============ FOOTER (persistent) ============ -->
+<footer style="border-top:1px solid var(--line);padding:34px 0 56px">
+  <div style="max-width:1140px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px">
+    <a href="#/home" data-route="home" onclick="{{ go }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <svg viewBox="0 0 100 100" fill="none" style="width:26px;height:26px;flex:none"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="10" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="10" stroke-linecap="round"></line></svg>
+      <span style="font-family:var(--mono);font-weight:600;letter-spacing:.22em;font-size:.82rem;text-transform:uppercase;color:var(--emerald)">Reqon</span>
     </a>
-    <div class="lks">
-      <a href="#product">Product</a>
-      <a href="#how">How it works</a>
-      <a href="#control">Philosophy</a>
-      <a href="https://cloud.reqon.app">Launch app</a>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;color:var(--muted)">
+      <a href="#/home" data-route="home" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">Home</a>
+      <a href="#/how" data-route="how" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">How it works</a>
+      <a href="#/apps" data-route="apps" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">Apps</a>
+      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">Pricing</a>
+      <a href="#/about" data-route="about" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">About</a>
+      <a href="https://cloud.reqon.app" style="cursor:pointer" style-hover="color:var(--text)">Launch app</a>
     </div>
-    <div class="cp">© 2026 Reqon · job-search command center · private preview</div>
+    <div style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">© 2026 Reqon · private preview</div>
   </div>
 </footer>
 
+</div>
 <script>
-  // Condense the nav on scroll — only JS on the page, no dependencies.
-  (function(){
-    var nav = document.getElementById('nav');
-    var onScroll = function(){
-      if (window.scrollY > 12) nav.classList.add('scrolled');
-      else nav.classList.remove('scrolled');
+(function () {
+  "use strict";
+  var ROUTES = ["home", "how", "apps", "pricing", "about"];
+  var state = { route: "home", billing: "monthly" };
+
+  function vals() {
+    var r = state.route, b = state.billing;
+    return {
+      isHome: r === "home", isHow: r === "how", isApps: r === "apps",
+      isPricing: r === "pricing", isAbout: r === "about",
+      billingMonthly: b === "monthly", billingAnnual: b === "annual"
     };
-    window.addEventListener('scroll', onScroll, {passive:true});
-    onScroll();
-  })();
+  }
+
+  // Read the boolean token out of value="{{ isHome }}" / value="{{ true }}"
+  function condFor(el) {
+    var raw = (el.getAttribute("value") || "").replace(/[{}]/g, "").trim();
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    var v = vals();
+    return !!v[raw];
+  }
+
+  function render() {
+    var nodes = document.querySelectorAll("sc-if");
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].style.display = condFor(nodes[i]) ? "contents" : "none";
+    }
+  }
+
+  function syncFromHash() {
+    var h = (location.hash || "").replace(/^#\/?/, "");
+    state.route = ROUTES.indexOf(h) !== -1 ? h : "home";
+  }
+
+  function navTo(route) {
+    if (ROUTES.indexOf(route) === -1) return;
+    state.route = route;
+    if (location.hash !== "#/" + route) location.hash = "/" + route;
+    render();
+    try { window.scrollTo({ top: 0, behavior: "auto" }); } catch (e) { window.scrollTo(0, 0); }
+  }
+
+  // Click handlers wired off the placeholder onclick tokens the design ships with.
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[onclick]");
+    if (!t) return;
+    var tok = (t.getAttribute("onclick") || "");
+    if (tok.indexOf("go") !== -1) {
+      e.preventDefault();
+      navTo(t.dataset.route);
+    } else if (tok.indexOf("setMonthly") !== -1) {
+      e.preventDefault(); state.billing = "monthly"; render();
+    } else if (tok.indexOf("setAnnual") !== -1) {
+      e.preventDefault(); state.billing = "annual"; render();
+    }
+  });
+
+  // style-hover -> apply on hover, revert on leave (preserves original inline values)
+  function parseDecls(s) {
+    var out = [];
+    (s || "").split(";").forEach(function (d) {
+      var i = d.indexOf(":"); if (i === -1) return;
+      var prop = d.slice(0, i).trim(), val = d.slice(i + 1).trim();
+      if (prop) out.push([prop, val]);
+    });
+    return out;
+  }
+  document.querySelectorAll("[style-hover]").forEach(function (el) {
+    var decls = parseDecls(el.getAttribute("style-hover"));
+    el.addEventListener("mouseenter", function () {
+      el._prev = decls.map(function (d) { return [d[0], el.style.getPropertyValue(d[0])]; });
+      decls.forEach(function (d) { el.style.setProperty(d[0], d[1]); });
+    });
+    el.addEventListener("mouseleave", function () {
+      (el._prev || []).forEach(function (d) {
+        if (d[1]) el.style.setProperty(d[0], d[1]); else el.style.removeProperty(d[0]);
+      });
+    });
+  });
+
+  window.addEventListener("hashchange", function () { syncFromHash(); render(); });
+  syncFromHash();
+  render();
+})();
 </script>
 </body>
 </html>

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking, Alert } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
 import { statusColor, SECTORS, REMOTE_MODES, type Role, type Status } from '../model';
 import { explainScore, type RationaleTone } from '../scout/explain';
+import { useEntitlements } from '../entitlements';
 import { DraftModal } from './DraftModal';
 import { GuideModal } from './GuideModal';
 import { ScoreModal } from './ScoreModal';
@@ -149,10 +150,20 @@ export function RoleDetailScreen({
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
+  const ent = useEntitlements();
   const [showDraft, setShowDraft] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showScore, setShowScore] = useState(false);
   const toneColor: Record<RationaleTone, string> = { good: c.emerald, bad: c.danger, neutral: c.muted };
+  // AI features are gated by the AI package; tap a locked one → an upgrade prompt instead.
+  const gateAI = (feature: string, open: () => void) => () => {
+    if (ent.has(feature)) open();
+    else Alert.alert('AI package required', `This uses AI — available on the ${ent.requires(feature)} package. Upgrade in Settings.`);
+  };
+  const canScore = ent.has('ai_score');
+  const canDraft = ent.has('ai_draft');
+  const canGuide = ent.has('guide_generate');
+  const lockTag = (ok: boolean) => (ok ? '' : ' 🔒');
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       {embedded ? null : (
@@ -177,7 +188,7 @@ export function RoleDetailScreen({
       <View style={styles.section}>
         <View style={styles.scoreHead}>
           <Text style={styles.sectionLabel}>WHY THIS SCORE</Text>
-          <Pressable onPress={() => setShowScore(true)} hitSlop={8}><Text style={styles.rescore}>Re-score · AI</Text></Pressable>
+          <Pressable onPress={gateAI('ai_score', () => setShowScore(true))} hitSlop={8}><Text style={[styles.rescore, !canScore && styles.lockedText]}>Re-score · AI{lockTag(canScore)}</Text></Pressable>
         </View>
         {explainScore(role).map((line) => (
           <View key={line.text} style={styles.whyRow}>
@@ -265,13 +276,13 @@ export function RoleDetailScreen({
         </>
       ) : null}
 
-      <Pressable style={styles.draftBtn} onPress={() => setShowDraft(true)}>
-        <Text style={styles.draftBtnText}>Draft application text · AI</Text>
+      <Pressable style={[styles.draftBtn, !canDraft && styles.draftBtnLocked]} onPress={gateAI('ai_draft', () => setShowDraft(true))}>
+        <Text style={styles.draftBtnText}>Draft application text · AI{lockTag(canDraft)}</Text>
       </Pressable>
 
       {INTERVIEW_STATUSES.includes(role.status) ? (
-        <Pressable style={styles.draftBtn} onPress={() => setShowGuide(true)}>
-          <Text style={styles.draftBtnText}>Interview prep guide · AI</Text>
+        <Pressable style={[styles.draftBtn, !canGuide && styles.draftBtnLocked]} onPress={gateAI('guide_generate', () => setShowGuide(true))}>
+          <Text style={styles.draftBtnText}>Interview prep guide · AI{lockTag(canGuide)}</Text>
         </Pressable>
       ) : null}
 
@@ -316,6 +327,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted },
   scoreHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   rescore: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
+  lockedText: { color: c.muted },
+  draftBtnLocked: { opacity: 0.5 },
   whyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   whyDot: { width: 7, height: 7, borderRadius: 4, marginTop: 6 },
   whyText: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: c.textBase, lineHeight: 19 },

@@ -5,6 +5,7 @@ import { useFonts } from 'expo-font';
 import { rolesInLane, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
 import { todayActionCount } from './src/today';
 import { fonts, useThemedStyles, useScheme, ThemeProvider, type Palette } from './src/theme';
+import { EntitlementsProvider } from './src/entitlements';
 import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
 import { SettingsIcon } from './src/components/SettingsIcon';
@@ -523,7 +524,9 @@ function AppInner() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppInner />
+      <EntitlementsProvider>
+        <AppInner />
+      </EntitlementsProvider>
     </ThemeProvider>
   );
 }

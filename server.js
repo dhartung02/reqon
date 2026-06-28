@@ -220,6 +220,7 @@ const { buildTimeline } = require('./lib/timeline');            // P2.5 per-role
 const { computePipelineHealth } = require('./lib/pipeline-health'); // P2.6 pipeline health score
 const { computeFollowup } = require('./lib/followup');           // P2.8 follow-up recommendation
 const jobs = require('./lib/jobs');                              // P2.9 unified background-job registry
+const brevo = require('./lib/brevo');                            // early-access waitlist + beta invites (email/contacts)
 const { computeAnalytics } = require('./lib/analytics');         // shared analytics (web + app parity)
 // Tunable tier thresholds (Reqon "Tiers & rules" setting), persisted in boards.json. Merged over the
 // canonical defaults so a partial override is fine and tiering stays consistent server-side.
@@ -685,7 +686,11 @@ app.post('/api/auth/login', (req, res) => {
 // Every /api request requires auth when APP_TOKEN is set — write endpoints are never open remotely.
 // The scoped INGEST_TOKEN is accepted ONLY for append-only ingest routes (merge/quickadd), so an
 // automated ingester (ChatGPT Action) can add roles but can't read PII, change settings, or wipe data.
+// Public, unauthenticated API surface — the early-access funnel must work for signed-out visitors:
+// join the waitlist, validate an invite token, and accept an invite (which CREATES the account).
+const PUBLIC_API_PATHS = new Set(['/waitlist', '/auth/invite', '/auth/accept-invite']);
 app.use('/api', (req, res, next) => {
+  if (PUBLIC_API_PATHS.has(req.path)) return next();
   if (authed(req)) return next();
   const ih = ingestHash();
   if (ih && req.method === 'POST' && INGEST_PATHS.has(req.path)) {
@@ -752,6 +757,243 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
   const me = sessionUser(req); if (me && me.id === req.params.id) return res.status(400).json({ ok: false, error: "can't delete yourself" });
   res.json({ ok: users.remove(req.params.id) });
 });
+
+// ---------- early access: waitlist → invite → create-account (Phase 0 private beta) ----------
+// Public funnel: a signed-out visitor joins the waitlist (captured in Brevo), an admin invites them,
+// and the invite link opens a create-account page that provisions a beta account (license "ai" =
+// full Cloud+AI, free). No billing involved — the beta runs entirely on the entitlements grant.
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const waitlistPath = () => path.join(path.dirname(store.pathsFor(store.OWNER).notifications), 'waitlist.json');
+const inviteBase = (req) => (process.env.PUBLIC_URL || (req.protocol + '://' + req.get('host')) || '').replace(/\/$/, '');
+const _wlHits = new Map();   // naive per-IP throttle for the public waitlist endpoint
+function wlThrottle(ip) {
+  const now = Date.now();
+  const arr = (_wlHits.get(ip) || []).filter((t) => now - t < 3600000);
+  arr.push(now); _wlHits.set(ip, arr);
+  return arr.length <= 8;   // 8 / hour / IP
+}
+
+// Join the waitlist (public). Stores locally + best-effort Brevo contact + confirmation email.
+app.post('/api/waitlist', async (req, res) => {
+  const b = req.body || {};
+  if (b.company_url) return res.json({ ok: true });   // honeypot — silently accept bots, store nothing
+  const email = String(b.email || '').toLowerCase().trim();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ ok: false, error: 'A valid email is required.' });
+  if (b.consent !== true && b.consent !== 'true') return res.status(400).json({ ok: false, error: 'Please accept the privacy notice to join.' });
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
+  if (!wlThrottle(ip)) return res.status(429).json({ ok: false, error: 'Too many requests — please try again later.' });
+  const name = String(b.name || '').trim().slice(0, 120);
+  const role = String(b.role || '').trim().slice(0, 120);
+  const pain = String(b.pain || '').trim().slice(0, 500);
+  const file = waitlistPath();
+  const list = store.readJson(file, []);
+  let entry = list.find((e) => e.email === email);
+  if (!entry) { entry = { email, name, role, pain, status: 'waiting', at: nowIso() }; list.push(entry); }
+  else { entry.name = name || entry.name; entry.role = role || entry.role; entry.pain = pain || entry.pain; }
+  store.writeJsonAtomic(file, list);
+  (async () => {   // never block the signup on Brevo
+    try { await brevo.upsertContact({ email, attributes: { FIRSTNAME: name, ROLE: role }, listIds: [brevo.waitlistListId()] }); }
+    catch (e) { console.error('[waitlist] brevo contact:', e.message); }
+    try {
+      if (process.env.BREVO_TPL_CONFIRM) await brevo.sendEmail({ to: email, toName: name, templateId: process.env.BREVO_TPL_CONFIRM, params: { name } });
+      else await brevo.sendEmail({ to: email, toName: name, subject: "You're on the Reqon early-access list", htmlContent: waitlistConfirmHtml(name) });
+    } catch (e) { console.error('[waitlist] brevo email:', e.message); }
+  })();
+  res.json({ ok: true });
+});
+
+// Admin: view the waitlist + counts.
+app.get('/api/waitlist', requireAdmin, (req, res) => {
+  const list = store.readJson(waitlistPath(), []);
+  const counts = list.reduce((a, e) => { a[e.status] = (a[e.status] || 0) + 1; return a; }, {});
+  res.json({ ok: true, total: list.length, counts, entries: list.slice().sort((a, b) => String(b.at).localeCompare(String(a.at))) });
+});
+
+// Admin: invite a waitlisted email — mints a signed invite token and emails the create-account link.
+app.post('/api/waitlist/invite', requireAdmin, async (req, res) => {
+  const email = String((req.body || {}).email || '').toLowerCase().trim();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ ok: false, error: 'A valid email is required.' });
+  const link = inviteBase(req) + '/join?token=' + encodeURIComponent(users.makeInvite(email, 14));
+  const file = waitlistPath();
+  const list = store.readJson(file, []);
+  let entry = list.find((e) => e.email === email);
+  if (!entry) { entry = { email, status: 'waiting', at: nowIso() }; list.push(entry); }
+  entry.status = 'invited'; entry.invitedAt = nowIso();
+  store.writeJsonAtomic(file, list);
+  try {
+    if (process.env.BREVO_TPL_INVITE) await brevo.sendEmail({ to: email, templateId: process.env.BREVO_TPL_INVITE, params: { link } });
+    else await brevo.sendEmail({ to: email, subject: 'Your Reqon early-access invite', htmlContent: inviteEmailHtml(link) });
+  } catch (e) { return res.status(502).json({ ok: false, error: 'Invite email failed: ' + e.message, link }); }
+  res.json({ ok: true, link });
+});
+
+// Validate an invite token for the create-account page (public).
+app.get('/api/auth/invite', (req, res) => {
+  const inv = users.verifyInvite(req.query.token || '');
+  if (!inv) return res.status(400).json({ ok: false, error: 'This invite link is invalid or has expired.' });
+  const exists = users.list().some((u) => String(u.email || '').toLowerCase() === inv.email);
+  res.json({ ok: true, email: inv.email, exists });
+});
+
+// Accept an invite → create the beta account (license "ai") and sign in (public).
+app.post('/api/auth/accept-invite', async (req, res) => {
+  if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Accounts are not enabled on this server.' });
+  const b = req.body || {};
+  const inv = users.verifyInvite(b.token || '');
+  if (!inv) return res.status(400).json({ ok: false, error: 'This invite link is invalid or has expired.' });
+  const email = inv.email;
+  const pw = String(b.password || '');
+  if (pw.length < 8) return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters.' });
+  if (users.list().some((u) => String(u.email || '').toLowerCase() === email)) {
+    return res.status(409).json({ ok: false, error: 'An account with this email already exists — sign in instead.' });
+  }
+  let username = users.slug(email.split('@')[0]) || 'user';
+  let base = username, n = 1;
+  while (users.getByUsername(username)) username = base + ++n;
+  let u;
+  try { u = users.create({ username, displayName: String(b.displayName || '').trim() || email.split('@')[0], email, password: pw, role: 'user', license: 'ai' }); }
+  catch (e) { return res.status(400).json({ ok: false, error: e.message }); }
+  store.seedNewUser(u.id);
+  try { const file = waitlistPath(); const list = store.readJson(file, []); const e = list.find((x) => x.email === email); if (e) { e.status = 'joined'; e.joinedAt = nowIso(); store.writeJsonAtomic(file, list); } } catch (e) {}
+  (async () => { try { await brevo.addToList(email, brevo.betaListId()); } catch (e) { console.error('[invite] brevo beta list:', e.message); } })();
+  const flags = ['HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=2592000'];
+  if (secureReq(req)) flags.push('Secure');
+  res.setHeader('Set-Cookie', `${COOKIE}=${users.makeSession(u.id)}; ${flags.join('; ')}`);
+  res.json({ ok: true, user: { id: u.id, displayName: u.displayName }, redirect: '/' });
+});
+
+// Public funnel pages — served wherever the board UI lives (cloud + local). The marketing site
+// links its CTAs here; the form posts same-origin to /api/waitlist (proxied to the API on cloud).
+if (SERVE_UI) {
+  app.get('/early-access', (req, res) => res.type('html').send(earlyAccessPage()));
+  app.get('/join', (req, res) => res.type('html').send(joinPage()));
+  app.get('/privacy', (req, res) => res.type('html').send(legalPage('Privacy notice', PRIVACY_DRAFT)));
+  app.get('/terms', (req, res) => res.type('html').send(legalPage('Terms of service', TERMS_DRAFT)));
+}
+// Shared chrome for the funnel pages (dark Reqon theme, self-contained — no external deps).
+function funnelShell(title, inner) {
+  return `<!doctype html><html lang=en><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>${title}</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;
+background:#0d0e15;color:#dde0f5;font:15px/1.5 -apple-system,'Helvetica Neue',system-ui,sans-serif}
+.card{width:100%;max-width:440px;background:#12131e;border:1px solid #21233a;border-radius:14px;padding:28px}
+.eyebrow{font:700 11px/1 system-ui;letter-spacing:.16em;text-transform:uppercase;color:#706cff;margin-bottom:10px}
+h1{font-size:23px;letter-spacing:-.02em;margin:0 0 6px}p.sub{color:#7b7fa5;font-size:13.5px;margin:0 0 20px}
+label{display:block;font-size:12px;color:#9fa3c9;margin:14px 0 5px}
+input,textarea{width:100%;background:#0d0e15;border:1px solid #2c2f4a;color:#dde0f5;border-radius:9px;padding:11px 12px;font:inherit}
+input:focus,textarea:focus{outline:none;border-color:#706cff}input:disabled{color:#7b7fa5}
+textarea{min-height:66px;resize:vertical}
+.row{display:flex;gap:9px;align-items:flex-start;margin-top:16px}.row input{width:auto;margin-top:3px}
+.row label{margin:0;font-size:12px;color:#9fa3c9}
+button{width:100%;margin-top:20px;background:#00df8f;color:#08130d;border:0;border-radius:10px;padding:13px;font:700 15px system-ui;cursor:pointer}
+button:disabled{opacity:.55;cursor:default}
+.msg{margin-top:14px;font-size:13px;min-height:18px}.msg.ok{color:#00df8f}.msg.err{color:#f0a34e}
+a{color:#706cff;text-decoration:none}.brand{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+.brand b{font-weight:700;letter-spacing:.04em}.fine{margin-top:16px;font-size:11.5px;color:#5a5d77;line-height:1.5}
+.dot{width:22px;height:22px;border-radius:50%;border:3px solid #00df8f;border-right-color:transparent;display:inline-block}
+</style></head><body><div class=card><div class=brand><span class=dot></span><b>Reqon</b></div>${inner}</div></body></html>`;
+}
+function earlyAccessPage() {
+  return funnelShell('Reqon — request early access', `
+<div class=eyebrow>Early access</div>
+<h1>Run your job search like an operation.</h1>
+<p class=sub>We're inviting a first group into the private beta. Drop your email and we'll reach out with an invite.</p>
+<form id=f autocomplete=on>
+  <label for=email>Email</label><input id=email type=email required placeholder="you@email.com" autocomplete=email>
+  <label for=name>Name</label><input id=name type=text placeholder="First name" autocomplete=given-name>
+  <label for=role>What role are you searching for?</label><input id=role type=text placeholder="e.g. Principal PM, data platform">
+  <label for=pain>Biggest job-search frustration? (optional)</label><textarea id=pain placeholder="What's slowing you down right now?"></textarea>
+  <input type=text id=company_url name=company_url style="position:absolute;left:-9999px" tabindex=-1 autocomplete=off aria-hidden=true>
+  <div class=row><input id=consent type=checkbox><label for=consent>I agree to be contacted about the Reqon beta and accept the <a href="/privacy" target=_blank>privacy notice</a>. No spam; unsubscribe anytime.</label></div>
+  <button id=btn type=submit>Request early access</button>
+  <div class=msg id=msg></div>
+</form>
+<div class=fine>We store your email to send your invite and beta updates, captured via Brevo. We never sell or share it.</div>
+<script>
+const $=id=>document.getElementById(id),msg=$('msg');
+$('f').addEventListener('submit',async e=>{e.preventDefault();$('btn').disabled=true;msg.className='msg';msg.textContent='Sending…';
+ try{const r=await fetch('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   email:$('email').value,name:$('name').value,role:$('role').value,pain:$('pain').value,consent:$('consent').checked,company_url:$('company_url').value})});
+  const j=await r.json();
+  if(j.ok){msg.className='msg ok';msg.textContent="You're on the list — we'll email your invite soon.";$('f').reset();}
+  else{msg.className='msg err';msg.textContent=j.error||'Something went wrong.';$('btn').disabled=false;}
+ }catch(_){msg.className='msg err';msg.textContent='Network error — please try again.';$('btn').disabled=false;}
+});
+</script>`);
+}
+function joinPage() {
+  return funnelShell('Reqon — create your account', `
+<div class=eyebrow>Create your account</div>
+<h1>Welcome to the Reqon beta.</h1>
+<p class=sub id=lede>Validating your invite…</p>
+<form id=f style=display:none>
+  <label for=email>Email</label><input id=email type=email disabled>
+  <label for=name>Your name</label><input id=name type=text placeholder="First name" autocomplete=name>
+  <label for=pw>Password</label><input id=pw type=password required placeholder="At least 8 characters" autocomplete=new-password minlength=8>
+  <div class=row><input id=terms type=checkbox><label for=terms>I accept the <a href="/terms" target=_blank>terms</a> and <a href="/privacy" target=_blank>privacy notice</a>.</label></div>
+  <button id=btn type=submit>Create account &amp; sign in</button>
+  <div class=msg id=msg></div>
+</form>
+<div class=msg id=gate></div>
+<script>
+const $=id=>document.getElementById(id),token=new URLSearchParams(location.search).get('token')||'';
+(async()=>{
+ try{const r=await fetch('/api/auth/invite?token='+encodeURIComponent(token));const j=await r.json();
+  if(!j.ok){$('lede').textContent='';$('gate').className='msg err';$('gate').textContent=j.error||'Invalid invite link.';return;}
+  if(j.exists){$('lede').textContent='';$('gate').className='msg err';$('gate').innerHTML='This email already has an account. <a href="/login">Sign in</a>.';return;}
+  $('lede').textContent='Set a password to finish creating your account.';$('email').value=j.email;$('f').style.display='';
+ }catch(_){$('lede').textContent='';$('gate').className='msg err';$('gate').textContent='Could not validate the invite. Try the link again.';}
+})();
+$('f').addEventListener('submit',async e=>{e.preventDefault();const msg=$('msg');
+ if(!$('terms').checked){msg.className='msg err';msg.textContent='Please accept the terms to continue.';return;}
+ $('btn').disabled=true;msg.className='msg';msg.textContent='Creating your account…';
+ try{const r=await fetch('/api/auth/accept-invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   token,displayName:$('name').value,password:$('pw').value})});const j=await r.json();
+  if(j.ok){msg.className='msg ok';msg.textContent='Account created — taking you in…';location.href=j.redirect||'/';}
+  else{msg.className='msg err';msg.textContent=j.error||'Could not create your account.';$('btn').disabled=false;}
+ }catch(_){msg.className='msg err';msg.textContent='Network error — please try again.';$('btn').disabled=false;}
+});
+</script>`);
+}
+// Minimal legal pages (DRAFT — for counsel review before public launch; see MVP-WORKPLAN.md A2/A3).
+// Good enough to back the beta's email-consent + the App Store privacy-URL requirement.
+function legalPage(title, bodyHtml) {
+  return funnelShell('Reqon — ' + title, `<div class=eyebrow>Legal · draft</div><h1>${title}</h1>
+<div style="font-size:13.5px;color:#9fa3c9;line-height:1.65">${bodyHtml}</div>
+<div class=fine>Draft for the private beta — final versions reviewed by counsel before public launch. Questions: <a href="mailto:privacy@reqon.app">privacy@reqon.app</a>.</div>`);
+}
+const PRIVACY_DRAFT = `
+<p>This notice explains what Reqon collects and how it's used during the private beta.</p>
+<p><b>What we collect.</b> The email (and optional name/role) you give us to join the waitlist and create an account; the job-search data you enter (roles, notes, résumé/profile); and basic usage logs.</p>
+<p><b>How it's used.</b> To run the product for you, send your invite and beta updates, and improve Reqon. We do <b>not</b> sell or rent your data.</p>
+<p><b>Processors.</b> Email/contacts via <b>Brevo</b>; hosting via <b>Render</b>; optional AI features send the relevant text to <b>OpenAI</b> (which may retain it briefly for abuse monitoring). AI features are optional and never auto-submit anything on your behalf.</p>
+<p><b>Your choices.</b> Unsubscribe from emails anytime; request access, export, or deletion of your account and data by emailing privacy@reqon.app (account self-deletion is coming in-app).</p>
+<p><b>Retention.</b> We keep your data while your account is active and delete it on request.</p>`;
+const TERMS_DRAFT = `
+<p>By using the Reqon private beta you agree to these terms.</p>
+<p><b>Beta software.</b> Reqon is pre-release and provided "as is", without warranty; features may change and occasional issues are expected.</p>
+<p><b>Acceptable use.</b> Reqon organizes a job search <i>you</i> run. It never mass-applies or submits applications on your behalf, and you agree not to use it to scrape sites in violation of their terms.</p>
+<p><b>Your data &amp; account.</b> You own your data. You're responsible for your account credentials. We may suspend accounts that abuse the service.</p>
+<p><b>AI output.</b> AI-assisted drafts, scores, and prep are suggestions you review and edit before use; you're responsible for what you send.</p>
+<p><b>Changes.</b> We'll update these terms before charging for paid plans; continued use means acceptance.</p>`;
+// Transactional email bodies (fallback when no Brevo template id is configured).
+function waitlistConfirmHtml(name) {
+  const safe = String(name || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  return `<div style="font-family:Helvetica,Arial,sans-serif;color:#1F1E5D;max-width:480px">
+<h2 style="color:#1F1E5D">You're on the list 🎉</h2>
+<p>Hi${safe ? ' ' + safe : ''}, thanks for your interest in <b>Reqon</b> — your job search, run like an operation.</p>
+<p>You're on the early-access waitlist. We're inviting people in small groups; you'll get a personal invite link to create your account soon.</p>
+<p style="color:#5A5D77;font-size:13px">If you didn't request this, you can ignore this email and you won't hear from us again.</p>
+<p style="color:#5A5D77;font-size:13px">— The Reqon team</p></div>`;
+}
+function inviteEmailHtml(link) {
+  return `<div style="font-family:Helvetica,Arial,sans-serif;color:#1F1E5D;max-width:480px">
+<h2 style="color:#1F1E5D">Your Reqon invite is here</h2>
+<p>You're in. Click below to create your account and start running your search in one place — with AI prep, scoring, and follow-ups included for the beta.</p>
+<p style="margin:22px 0"><a href="${link}" style="background:#00DF8F;color:#08130d;font-weight:700;text-decoration:none;padding:12px 20px;border-radius:9px;display:inline-block">Create your account</a></p>
+<p style="color:#5A5D77;font-size:13px">Or paste this link: ${link}</p>
+<p style="color:#5A5D77;font-size:13px">This invite expires in 14 days. — The Reqon team</p></div>`;
+}
 // Admin console (P0.7): per-user usage + server stats. Each user's numbers are read inside their
 // own tenant context so the per-user namespaces stay the source of truth.
 function dirSizeBytes(d) { let n = 0; try { for (const f of fs.readdirSync(d)) { const fp = path.join(d, f); const st = fs.statSync(fp); n += st.isDirectory() ? dirSizeBytes(fp) : st.size; } } catch (e) {} return n; }

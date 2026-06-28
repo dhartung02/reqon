@@ -81,6 +81,16 @@
   #msg { font-size: .78rem; min-height: 1em; margin-top: 8px; }
   .ok { color: #69c57e; } .err { color: #e8755f; }
   a.link { color: #706cff; text-decoration: none; font-size: .76rem; }
+  /* tracking-field editor (parity with the board's expanded-card tracking strip) */
+  .tk { margin-top: 10px; border: 1px solid #28323d; border-radius: 8px; background: #0d1117; }
+  .tk > summary { cursor: pointer; padding: 8px 10px; font-size: .78rem; color: #9fb0c0; list-style: none; }
+  .tk > summary::-webkit-details-marker { display: none; }
+  .tk-body { padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 7px; }
+  .tk-row { display: flex; align-items: center; gap: 8px; }
+  .tk-lbl { flex: 0 0 108px; font-size: .73rem; color: #7f8b98; }
+  .tk-in { flex: 1; background: #161b22; border: 1px solid #333c47; color: #e8eef5; border-radius: 6px; padding: 5px 7px; font: inherit; font-size: .78rem; }
+  .tk-in:focus { outline: none; border-color: #00df8f; }
+  .tk-note { font-size: .72rem; color: #7f8b98; }
 </style>
 <div class="wrap">
   <div class="head">

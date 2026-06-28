@@ -31,12 +31,32 @@ async function api(path, opts = {}) {
   } catch (e) {
     throw new Error('Network error reaching CRM (' + (e && e.message ? e.message : e) + ')');
   }
-  if (!res.ok) throw new Error('HTTP ' + res.status);
+  if (!res.ok) {
+    // Surface the server's freemium gate (402 upgrade_required) with the package name, instead of a
+    // bare "HTTP 402" — so the side panel can show a meaningful upgrade message.
+    if (res.status === 402) {
+      let body = null; try { body = await res.json(); } catch (e) {}
+      const pkg = body && body.requires ? body.requires[0].toUpperCase() + body.requires.slice(1) : 'paid';
+      const err = new Error('Requires the ' + pkg + ' package');
+      err.upgrade = body || { error: 'upgrade_required' };
+      throw err;
+    }
+    throw new Error('HTTP ' + res.status);
+  }
   try {
     return await res.json();
   } catch (e) {
     throw new Error('CRM returned a non-JSON response');
   }
+}
+
+// ---- entitlements cache (the freemium plan + feature gate map; 60s like rows/profile) ----
+let entCache = { ent: null, at: 0 };
+async function getEntitlements(force) {
+  if (!force && entCache.ent && Date.now() - entCache.at < 60000) return entCache.ent;
+  const j = await api('/api/entitlements');
+  entCache = { ent: j, at: Date.now() };
+  return j;
 }
 
 // ---- row cache (overlay lookups shouldn't hammer the server) ----
@@ -210,6 +230,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'assistUsage') {
         try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
+      } else if (msg.type === 'entitlements') {
+        try { sendResponse(await getEntitlements(!!msg.force)); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'profile') {
         sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
       } else if (msg.type === 'queueStatus') {

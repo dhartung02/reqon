@@ -11,6 +11,11 @@ const daysAgo = (d) => { const t = Date.parse(d); return isNaN(t) ? Infinity : (
 
 let activeTab = null;
 let currentRow = null;
+let ENT = null; // freemium plan + feature gate map from GET /api/entitlements (null until loaded)
+
+// Fail-open: until entitlements load (or if the server is old), treat features as available.
+const entHas = (f) => !ENT || !ENT.features || ENT.features[f] !== false;
+const entReq = (f) => { const p = ENT && ENT.requires && ENT.requires[f]; return p ? p[0].toUpperCase() + p.slice(1) : 'paid'; };
 
 function setMsg(t, k) { $('msg').textContent = t || ''; $('msg').className = k || ''; }
 const reqKeyOf = (typeof reqKey === 'function') ? reqKey : (x) => ((x.company || '') + '|' + (x.role || '')).toLowerCase().trim();
@@ -49,10 +54,13 @@ async function renderPage() {
     `<span class="chip">prob <b>${esc(row.prob ?? '—')}</b></span>` +
     `<span class="chip">EV <b>${ev(row)}</b></span>`;
   const interview = INTERVIEW_STATUSES.includes(row.status);
+  const canScore = entHas('ai_score');
+  const canGuide = entHas('guide_generate');
+  const lock = (ok) => (ok ? '' : ' 🔒');
   const guideBtn = interview
     ? (row.guideAt
         ? '<button id="guideOpen" class="btn btn-ghost">📋 Interview guide</button>'
-        : '<button id="guideGen" class="btn btn-ghost">📋 Generate interview guide</button>')
+        : `<button id="guideGen" class="btn btn-ghost"${canGuide ? '' : ' data-locked="guide_generate"'}>📋 Generate interview guide${lock(canGuide)}</button>`)
     : '';
   $('page').innerHTML =
     `<div class="role">${esc(row.role || '—')}</div>` +
@@ -62,14 +70,59 @@ async function renderPage() {
       STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
     `</select>` +
     autofillBtn +
-    '<button id="score" class="btn btn-ghost">✨ Score with AI</button>' +
+    `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✨ Score with AI${lock(canScore)}</button>` +
     guideBtn +
-    '<div id="scoreOut"></div>';
+    '<div id="scoreOut"></div>' +
+    trackingEditorHTML(row);
   $('autofill').onclick = doAutofill;
   $('statusSel').onchange = (e) => doSetStatus(e.target.value);
-  $('score').onclick = doScore;
+  $('score').onclick = canScore ? doScore : () => setMsg(`AI scoring needs the ${entReq('ai_score')} package.`, 'err');
   if ($('guideOpen')) $('guideOpen').onclick = () => openGuide(row);
-  if ($('guideGen')) $('guideGen').onclick = (e) => doGuide(row, e && e.target);
+  if ($('guideGen')) $('guideGen').onclick = canGuide ? (e) => doGuide(row, e && e.target) : () => setMsg(`Interview guides need the ${entReq('guide_generate')} package.`, 'err');
+  wireTrackingEditor(row);
+}
+
+// Compact tracking-field editor — parity with the web board's expanded-card tracking strip. Edits
+// PATCH the row via bg.js (free; no AI). Rejection fields appear only when the row is closed/rejected.
+function trackingEditorHTML(row) {
+  const v = (k) => esc(row[k] || '');
+  const sent = !!row.thankYouSent;
+  const closed = isClosed(row.status);
+  const fieldRow = (id, label, val, ph) =>
+    `<label class="tk-row"><span class="tk-lbl">${label}</span><input id="${id}" class="tk-in" value="${esc(val)}" placeholder="${ph || ''}"></label>`;
+  return (
+    '<details class="tk" style="margin-top:10px"><summary>Tracking</summary>' +
+    '<div class="tk-body">' +
+    fieldRow('tkFollowup', 'Follow-up due', v('followup'), 'YYYY-MM-DD') +
+    fieldRow('tkInterview', 'Interview date', v('interview'), 'YYYY-MM-DD') +
+    fieldRow('tkReferral', 'Referral', v('referral'), '') +
+    fieldRow('tkRecruiterEmail', 'Recruiter email', v('recruiterEmail'), '') +
+    `<label class="tk-row"><span class="tk-lbl">Thank-you sent</span>` +
+      `<input id="tkThankYou" type="checkbox" ${sent ? 'checked' : ''}> <span class="tk-note">${sent ? esc(row.thankYouSent) : 'not sent'}</span></label>` +
+    (closed
+      ? fieldRow('tkRejStage', 'Rejection stage', v('rejectionStage'), '') +
+        fieldRow('tkRejReason', 'Rejection reason', v('rejectionReason'), '') +
+        fieldRow('tkRejFeedback', 'Rejection feedback', v('rejectionFeedback'), '')
+      : '') +
+    '</div></details>'
+  );
+}
+function wireTrackingEditor(row) {
+  const save = async (fields) => {
+    const r = await send({ type: 'patchFields', row, fields });
+    if (r && r.ok) { setMsg('Saved.', 'ok'); setTimeout(refresh, 600); }
+    else setMsg((r && r.error) || 'Save failed.', 'err');
+  };
+  const bindText = (id, key) => { const el = $(id); if (el) el.onchange = () => save({ [key]: el.value.trim() }); };
+  bindText('tkFollowup', 'followup');
+  bindText('tkInterview', 'interview');
+  bindText('tkReferral', 'referral');
+  bindText('tkRecruiterEmail', 'recruiterEmail');
+  bindText('tkRejStage', 'rejectionStage');
+  bindText('tkRejReason', 'rejectionReason');
+  bindText('tkRejFeedback', 'rejectionFeedback');
+  const ty = $('tkThankYou');
+  if (ty) ty.onchange = () => save({ thankYouSent: ty.checked ? new Date().toISOString().slice(0, 10) : '' });
 }
 const STATUSES = ['Not Applied', 'Applied', 'Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer', 'Rejected', 'Archived'];
 const INTERVIEW_STATUSES = ['Recruiter Screen', 'Hiring Manager', 'Panel', 'Offer'];
@@ -326,11 +379,26 @@ const urow = (l, v) => `<div class="urow"><span class="muted">${esc(l)}</span><s
 
 async function refresh() {
   setMsg('');
+  try { const e = await send({ type: 'entitlements' }); ENT = (e && e.ok) ? e : null; } catch (_) { ENT = null; }
+  applyDraftGate();
   await renderPage();
   await Promise.all([renderCoverage(), renderPipeline(), loadUsage()]);
 }
 
-$('aiDraft').onclick = doDraft;
+// Gate the open-ended AI draft button on the AI package (it calls /api/assist).
+function applyDraftGate() {
+  const b = $('aiDraft');
+  if (!b) return;
+  const ok = entHas('ai_draft');
+  b.disabled = false; // keep clickable so the upgrade message can show
+  b.style.opacity = ok ? '' : '0.55';
+  b.title = ok ? '' : `Requires the ${entReq('ai_draft')} package`;
+}
+
+$('aiDraft').onclick = () => {
+  if (!entHas('ai_draft')) { setMsg(`AI drafts need the ${entReq('ai_draft')} package. Upgrade in the board settings.`, 'err'); return; }
+  doDraft();
+};
 $('refresh').onclick = () => { send({ type: 'reqs', force: true }); refresh(); };
 $('board').onclick = async (e) => { e.preventDefault(); const o = await getOrigin(); if (o) chrome.tabs.create({ url: o }); };
 

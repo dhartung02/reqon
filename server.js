@@ -3187,24 +3187,34 @@ app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
     return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
   }
   const apply = (req.body || {}).apply === true;   // default: dry-run (writes nothing)
-  const argv = [path.join(ROOT, 'agent', 'mail_ingest.py')];
+  const argv = ['-u', path.join(ROOT, 'agent', 'mail_ingest.py')];   // -u: unbuffered so logs survive a kill
   if (apply) argv.push('--apply');
   if (cfg('MAIL_AI') === 'true') argv.push('--ai');
-  let child, out = '', err = '', done = false;
+  let child, out = '', err = '', done = false, killedByTimeout = false;
+  const t0 = Date.now(), TAG = '[gmail-ingest]';
   const uid = store.currentUser();   // capture tenant for the async exit handler (per-user notifications)
   const job = jobs.create('gmail_ingest', { label: 'Gmail ingest' + (apply ? ' (apply)' : ' (dry-run)') });
   const finish = (status, payload) => { if (done) return; done = true; mailChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
   try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
-  catch (e) { return finish(500, { ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
+  catch (e) { console.error(TAG, 'spawn threw:', e.message || e); return finish(500, { ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
   mailChild = child;
+  console.log(TAG, (apply ? 'apply' : 'dry-run'), 'started pid=' + child.pid);
   jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
-  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 90000);
-  child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
-  child.stderr && child.stderr.on('data', d => { err += d; });
-  child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
-  child.once('exit', code => store.runAs(uid, () => {
+  const killer = setTimeout(() => { killedByTimeout = true; console.error(TAG, 'hard timeout (120s) reached — killing pid=' + child.pid); try { child.kill('SIGKILL'); } catch (e) {} }, 120000);
+  child.stdout && child.stdout.on('data', d => { const s = String(d); out += s; if (out.length > 20000) out = out.slice(-20000); process.stdout.write(TAG + ' ' + s); });
+  child.stderr && child.stderr.on('data', d => { const s = String(d); err += s; process.stderr.write(TAG + '! ' + s); });
+  child.once('error', e => { clearTimeout(killer); console.error(TAG, 'launch failed:', e.message || e); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
+  child.once('exit', (code, signal) => store.runAs(uid, () => {
     clearTimeout(killer);
-    if (code !== 0) return finish(500, { ok: false, error: (err.trim() || ('exit ' + code)).slice(0, 800), report: out });
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log(TAG, 'exit code=' + code + ' signal=' + signal + ' killedByTimeout=' + killedByTimeout + ' elapsed=' + secs + 's');
+    if (code !== 0 || signal) {
+      let msg;
+      if (killedByTimeout) msg = `Gmail ingest timed out after 120s on a large mailbox. Last output: ${out.trim().slice(-300) || '(none)'}`;
+      else if (signal) msg = `Gmail ingest killed by ${signal} after ${secs}s${signal === 'SIGKILL' ? ' (possible out-of-memory on this instance)' : ''}. Last output: ${(out.trim() || err.trim()).slice(-300) || '(none)'}`;
+      else msg = (err.trim() || ('exit ' + code)).slice(0, 800);
+      return finish(500, { ok: false, error: msg, report: out });
+    }
     // Parse the machine-readable summary line and fire per-event notifications (rejection/interview/
     // offer) on the channels the user picked — only on a real --apply run, not a dry run.
     let summary = null;

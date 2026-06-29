@@ -3454,10 +3454,11 @@ async function mailConnTest(){
     await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
     SET("mailPass").value="";
     const j=await (await fetch("/api/mail/test",{method:"POST",headers:{"Content-Type":"application/json"}})).json();
-    if(j.report){SET("mailReport").textContent=j.report;SET("mailReport").style.display="block";}
-    if(!j.ok)throw new Error(j.error||"connection failed");
+    if(!j.ok){ if(j.report){SET("mailReport").textContent=j.report;SET("mailReport").style.display="block";} throw new Error(j.error||"connection failed"); }
+    // Success: clean one-liner only — no raw stdout / SUMMARY_JSON dump.
+    SET("mailReport").style.display="none";
     const s=j.summary||{};
-    SET("mailStatus").textContent=`✓ Connected as ${s.user||"Gmail"} — ${s.mailbox||"INBOX"} has ${s.count||0} message(s).`;
+    SET("mailStatus").textContent=`✓ Connected as ${s.user||"Gmail"} — ${s.mailbox||"INBOX"} has ${(s.count||0).toLocaleString()} messages.`;
     loadMailConfig();
   }catch(e){SET("mailStatus").textContent="✖ "+e.message;}
 }

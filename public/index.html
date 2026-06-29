@@ -840,7 +840,11 @@
         <div class="scoutmenu-lbl">Run mode</div>
         <button data-mode="find">Find new matches</button>
         <button data-mode="validate">Validate + refresh existing</button>
-        <button data-mode="both">Run all (validate, then find)</button>
+        <button data-mode="both">Run all (validate, find + scan email)</button>
+        <div class="scoutmenu-sep"></div>
+        <div class="scoutmenu-lbl">Email recommendations</div>
+        <button data-mode="email">📥 Scan email for new leads</button>
+        <div class="scoutmenu-hint" id="emailScoutMenuHint" style="padding:2px 10px 4px">Included in “Find” &amp; “Run all” when enabled in Sources.</div>
         <div class="scoutmenu-lbl">Scope to sources <span id="scoutScopeHint" class="scoutmenu-hint">(all)</span></div>
         <div class="scoutsources" id="scoutSources"></div>
         <div class="scoutmenu-sep"></div>
@@ -2916,9 +2920,24 @@ async function triggerScout(mode){
     startScoutPoll();
   }catch(e){scoutBusy(false);setScoutStatus("⚠ network error starting scout",false);}
 }
+// Run JUST the email scout (recommendation emails → leads) on demand, regardless of the Sources
+// toggle. Synchronous on the server (bounded by the resolution budget); show the funnel inline.
+async function triggerEmailScout(){
+  F("scoutMenu").classList.remove("open");scoutBusy(true);setScoutStatus("scanning your inbox…",true);
+  try{
+    const r=await fetch("/api/mail/scout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply:true})});
+    const j=await r.json().catch(()=>({}));
+    scoutBusy(false);
+    if(r.status===409){setScoutStatus("an email scan is already running…",true);return;}
+    if(!r.ok||!j.ok){setScoutStatus("⚠ "+(j.error||"email scan failed"),false);return;}
+    const c=(j.summary&&j.summary.counts)||{}; const n=(x)=>(x||0).toLocaleString();
+    setScoutStatus(`📥 Email: added ${n(c.added)} new lead(s) — scanned ${n(c.scanned)}, ${n(c.fromJobSites)} from job sites → ${n(c.cards)} posting(s).`,false);
+    if((c.added||0)>0&&typeof load==="function")load();
+  }catch(e){scoutBusy(false);setScoutStatus("⚠ network error scanning email",false);}
+}
 F("scoutBtn").onclick=(e)=>{e.stopPropagation();F("scoutMenu").classList.toggle("open");};
 document.addEventListener("click",(e)=>{if(!e.target.closest(".scoutctl"))F("scoutMenu").classList.remove("open");});
-F("scoutMenu").querySelectorAll("button[data-mode]").forEach(b=>b.onclick=()=>triggerScout(b.dataset.mode));
+F("scoutMenu").querySelectorAll("button[data-mode]").forEach(b=>b.onclick=()=> b.dataset.mode==="email"?triggerEmailScout():triggerScout(b.dataset.mode));
 
 // ---------- source scope (in Run Scout menu) + Settings panel ----------
 function buildScoutSources(j){

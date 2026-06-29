@@ -3239,7 +3239,10 @@ function startEmailScout(apply, uid, cb) {
   // stdout would otherwise be lost on SIGKILL, leaving only an opaque "exit null").
   const argv = ['-u', path.join(ROOT, 'agent', 'scout_email.py')];
   if (apply) argv.push('--apply');
-  if (cfg('EMAIL_SCOUT_NO_RESOLVE') === 'true') argv.push('--no-resolve');
+  // A dry run is a fast inbox preview: download + parse + score only. The slow part (resolving each
+  // lead to the employer's real req via live board probes) is skipped here and runs only on a real
+  // apply — where it's bounded by EMAIL_SCOUT_RESOLVE_BUDGET_S. Also honors the global no-resolve pref.
+  if (!apply || cfg('EMAIL_SCOUT_NO_RESOLVE') === 'true') argv.push('--no-resolve');
   if (cfg('EMAIL_SCOUT_SOURCES')) argv.push('--sources', String(cfg('EMAIL_SCOUT_SOURCES')));
   if (cfg('EMAIL_SCOUT_MIN_FIT')) argv.push('--min-fit', String(cfg('EMAIL_SCOUT_MIN_FIT')));
   let child, out = '', err = '', done = false, killedByTimeout = false;

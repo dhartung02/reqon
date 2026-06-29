@@ -507,7 +507,8 @@ def main():
 
     if not cands or not args.apply:
         if not args.apply:
-            print("\n[dry-run] nothing written. Re-run with --apply once this looks right.")
+            note = " Live-req resolution runs on the real Run." if args.no_resolve else ""
+            print("\n[dry-run] nothing written. Re-run with --apply once this looks right." + note)
         _emit_summary(args, cands, stats, added=0)
         return 0
 

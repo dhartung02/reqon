@@ -418,8 +418,10 @@
   .mailreport{margin-top:10px;padding:10px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:200px;overflow:auto;font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);white-space:pre-wrap;line-height:1.45}
   .histedit{border:1px solid var(--line-2);border-radius:9px;padding:10px;margin-bottom:8px;background:var(--bg)}
   .histedit .grid2{margin-bottom:6px}
-  .histedit input,.histedit textarea{margin-bottom:6px}
-  .histedit textarea{width:100%;resize:vertical}
+  .histedit input,.histedit textarea{width:100%;background:var(--panel-2);border:1px solid var(--line-2);color:var(--text);border-radius:8px;padding:9px 12px;font-family:inherit;font-size:.86rem;outline:none;margin-bottom:6px}
+  .histedit input::placeholder,.histedit textarea::placeholder{color:var(--dim)}
+  .histedit input:focus,.histedit textarea:focus{border-color:var(--gold)}
+  .histedit textarea{resize:vertical;line-height:1.5}
   .histedit .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
   /* analytics */
   .an-wrap{display:flex;flex-direction:column;gap:14px}
@@ -1438,6 +1440,19 @@
             <div class="field"><label>…on these channels</label><div id="setMailNotifyChannels" class="chanchips"></div>
               <p class="hint" style="margin:6px 0 0">Fires only on a real ingest run (not a dry run), for the event types you tick. Uses the same channels as the digest.</p>
             </div>
+          </div>
+
+          <div class="sgrp">
+            <div class="sgrp-h">Email job-scout (recommendation emails → leads)</div>
+            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site req</b> when possible. Uses the Gmail connection above.</p>
+            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutEnable" type="checkbox" style="width:auto"> Run automatically with the daily scout</label></div>
+            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutResolve" type="checkbox" style="width:auto"> Resolve leads to the real employer req (Greenhouse/Ashby/Lever)</label></div>
+            <div class="grid2">
+              <div class="field"><label>Limit to sources (optional)</label><input id="emailScoutSources" type="text" placeholder="e.g. linkedin,indeed (blank = all)" autocomplete="off"></div>
+              <div class="field"><label>Min fit to add (optional)</label><input id="emailScoutMinFit" type="number" min="0" max="10" step="0.5" placeholder="from watchlist (e.g. 6)"></div>
+            </div>
+            <div class="ahintrow"><button class="mini" id="emailScoutSaveBtn" type="button">Save</button> <button class="mini" id="emailScoutTestBtn" type="button">Test (dry run)</button> <button class="mini" id="emailScoutRunBtn" type="button">▶ Run now</button> <span id="emailScoutStatus" class="setmuted"></span></div>
+            <pre id="emailScoutReport" class="mailreport" style="display:none"></pre>
           </div>
         </section>
 
@@ -3396,9 +3411,12 @@ async function loadMailConfig(){
     SET("mailUser").value=m.user||""; SET("mailLabel").value=m.label||"INBOX";
     SET("mailSince").value=m.sinceDays||14; SET("mailAi").checked=!!m.ai; SET("mailPass").value="";
     SET("mailState").textContent=m.passSet?`(set ····${m.passLast4||""})`:"(not set)";
+    SET("emailScoutEnable").checked=!!m.emailScout; SET("emailScoutResolve").checked=m.emailScoutResolve!==false;
+    SET("emailScoutSources").value=m.emailScoutSources||""; SET("emailScoutMinFit").value=m.emailScoutMinFit||"";
   }catch(e){}
 }
-function mailBody(){return {user:SET("mailUser").value.trim(),password:SET("mailPass").value,label:SET("mailLabel").value.trim()||"INBOX",ai:SET("mailAi").checked,sinceDays:SET("mailSince").value};}
+function mailBody(){return {user:SET("mailUser").value.trim(),password:SET("mailPass").value,label:SET("mailLabel").value.trim()||"INBOX",ai:SET("mailAi").checked,sinceDays:SET("mailSince").value,
+  emailScout:SET("emailScoutEnable").checked,emailScoutResolve:SET("emailScoutResolve").checked,emailScoutSources:SET("emailScoutSources").value.trim(),emailScoutMinFit:SET("emailScoutMinFit").value};}
 async function mailSave(){
   SET("mailStatus").textContent="Saving…";
   try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())})).json();
@@ -3422,6 +3440,22 @@ async function mailRun(apply){
 SET("mailSaveBtn").onclick=mailSave;
 SET("mailTestBtn").onclick=()=>mailRun(false);
 SET("mailRunBtn").onclick=()=>mailRun(true);
+async function emailScoutRun(apply){
+  SET("emailScoutStatus").textContent=apply?"Running…":"Dry run…"; SET("emailScoutReport").style.display="none";
+  try{
+    await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
+    SET("mailPass").value="";
+    const j=await (await fetch("/api/mail/scout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})})).json();
+    if(j.report){SET("emailScoutReport").textContent=j.report;SET("emailScoutReport").style.display="block";}
+    if(!j.ok)throw new Error(j.error||"run failed");
+    const c=(j.summary&&j.summary.counts)||{};
+    SET("emailScoutStatus").textContent=apply?`Added ${c.added||0} lead(s) (${c.resolved||0} resolved to live reqs).`:`Dry run: ${c.leads||0} lead(s) found — nothing changed.`;
+    if(apply&&(c.added||0)>0&&typeof load==="function")load();
+  }catch(e){SET("emailScoutStatus").textContent="Failed: "+e.message;}
+}
+SET("emailScoutSaveBtn").onclick=mailSave;
+SET("emailScoutTestBtn").onclick=()=>emailScoutRun(false);
+SET("emailScoutRunBtn").onclick=()=>emailScoutRun(true);
 SET("mailClearBtn").onclick=async()=>{
   if(!confirm("Clear the saved Gmail address + app password on the server?"))return;
   SET("mailStatus").textContent="Clearing…";

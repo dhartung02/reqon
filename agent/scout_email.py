@@ -259,7 +259,9 @@ def _html_body(msg):
 
 
 def fetch_messages(user, pw, label, since_days):
-    box = imaplib.IMAP4_SSL("imap.gmail.com")
+    # 30s timeout so a blocked/stalled connection fails fast with a clear error instead of hanging
+    # until the server's hard kill (which surfaces as an opaque "exit null").
+    box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
     box.login(user, pw)
     box.select('"%s"' % label, readonly=True)
     since = (datetime.date.today() - datetime.timedelta(days=since_days)).strftime("%d-%b-%Y")
@@ -431,13 +433,17 @@ def main():
                     print("  ! could not read", os.path.basename(path), "-", e)
     else:
         user = os.environ.get("GMAIL_USER", "").strip()
-        pw = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
+        # Strip ALL whitespace — Google displays app passwords grouped ("abcd efgh ijkl mnop") but the
+        # spaces are visual only; a pasted value with spaces would otherwise fail to authenticate.
+        pw = re.sub(r"\s+", "", os.environ.get("GMAIL_APP_PASSWORD", ""))
         if not user or not pw:
             raise SystemExit("Set GMAIL_USER and GMAIL_APP_PASSWORD in .env (or use --dir for offline files).")
         try:
             messages = fetch_messages(user, pw, args.label, args.since_days)
         except imaplib.IMAP4.error as e:
-            raise SystemExit("Gmail login/IMAP failed: %s (check the App Password + that IMAP is on)." % e)
+            raise SystemExit("Gmail login/IMAP failed: %s (check the App Password is correct and has no typos)." % e)
+        except (OSError, TimeoutError) as e:
+            raise SystemExit("Couldn't reach Gmail IMAP (imap.gmail.com:993): %s — this host may block outbound IMAP." % e)
 
     # Skip already-processed emails (live only; --dir always reprocesses).
     fresh = [m for m in messages if args.dir or m["id"] not in seen_ids]

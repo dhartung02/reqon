@@ -3158,7 +3158,9 @@ app.post('/api/mail/config', (req, res) => {
   if (b.clear === true) { upd.GMAIL_USER = ''; upd.GMAIL_APP_PASSWORD = ''; }
   else {
     if (typeof b.user === 'string') upd.GMAIL_USER = b.user.trim();
-    if (typeof b.password === 'string' && b.password) upd.GMAIL_APP_PASSWORD = b.password.trim(); // blank = keep current
+    // Google shows app passwords grouped as "abcd efgh ijkl mnop" — the spaces are visual only and
+    // are not part of the value. Strip ALL whitespace so a copy-paste with spaces still authenticates.
+    if (typeof b.password === 'string' && b.password.replace(/\s+/g, '')) upd.GMAIL_APP_PASSWORD = b.password.replace(/\s+/g, ''); // blank = keep current
     if (typeof b.label === 'string') upd.GMAIL_LABEL = b.label.trim() || 'INBOX';
     if (typeof b.ai === 'boolean') upd.MAIL_AI = b.ai ? 'true' : 'false';
     if (b.sinceDays != null && b.sinceDays !== '') {

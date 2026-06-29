@@ -3226,23 +3226,23 @@ app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
 // direction (mail/run tracks responses to applied jobs; this adds newly-recommended jobs). Same
 // dry-run-by-default safety: writes nothing unless {apply:true}.
 let emailScoutChild = null;
-app.post('/api/mail/scout', requireFeature('gmail_ingest'), (req, res) => {
-  if (emailScoutChild) return res.status(409).json({ ok: false, error: 'An email scout run is already in progress.' });
-  if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) {
-    return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
-  }
-  const apply = (req.body || {}).apply === true;       // default: dry-run (writes nothing)
+// Spawn the email job-scout (scout_email.py) in the CURRENT tenant context. Shared by the
+// "Run now" endpoint below AND by triggerScout() so a manual board "Run Scout" also consults the
+// inbox when the Sources → Email recommendations toggle is on. cb(status, payload) reports the
+// outcome; pass a no-op cb for fire-and-forget. Returns false if it couldn't start (cb still fires).
+function startEmailScout(apply, uid, cb) {
+  if (emailScoutChild) { cb(409, { ok: false, error: 'An email scout run is already in progress.' }); return false; }
+  if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) { cb(400, { ok: false, error: 'Gmail isn’t configured yet.' }); return false; }
   const argv = [path.join(ROOT, 'agent', 'scout_email.py')];
   if (apply) argv.push('--apply');
   if (cfg('EMAIL_SCOUT_NO_RESOLVE') === 'true') argv.push('--no-resolve');
   if (cfg('EMAIL_SCOUT_SOURCES')) argv.push('--sources', String(cfg('EMAIL_SCOUT_SOURCES')));
   if (cfg('EMAIL_SCOUT_MIN_FIT')) argv.push('--min-fit', String(cfg('EMAIL_SCOUT_MIN_FIT')));
   let child, out = '', err = '', done = false;
-  const uid = store.currentUser();
   const job = jobs.create('gmail_scout', { label: 'Email scout' + (apply ? ' (apply)' : ' (dry-run)') });
-  const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
+  const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); cb(status, payload); };
   try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
-  catch (e) { return finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); }
+  catch (e) { finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); return false; }
   emailScoutChild = child;
   jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 180000);  // resolution adds board calls
@@ -3264,6 +3264,12 @@ app.post('/api/mail/scout', requireFeature('gmail_ingest'), (req, res) => {
     }
     finish(200, { ok: true, applied: apply, report: out, summary });
   }));
+  return true;
+}
+app.post('/api/mail/scout', requireFeature('gmail_ingest'), (req, res) => {
+  const apply = (req.body || {}).apply === true;       // default: dry-run (writes nothing)
+  const uid = store.currentUser();
+  startEmailScout(apply, uid, (status, payload) => res.status(status).json(payload));
 });
 
 // Start a scout in the CURRENT tenant context (used by /api/scout/run and the admin force-scout op).
@@ -3297,6 +3303,13 @@ function triggerScout(mode, sources) {
   scoutChild = child;
   jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
   jobs.phase(job.id, 'searching boards', 10);
+  // Email recommendations are a source too: when the Sources → Email recommendations toggle is on
+  // (and Gmail is configured), a manual Run Scout also ingests the inbox alongside the board APIs —
+  // matching the daily runner. Fire-and-forget; it registers its own job + notifies on new leads.
+  if ((mode === 'find' || mode === 'both') && cfg('EMAIL_SCOUT') === 'true'
+      && cfg('GMAIL_USER') && cfg('GMAIL_APP_PASSWORD') && !emailScoutChild) {
+    startEmailScout(true, uid, () => {});
+  }
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, SCOUT_TIMEOUT_MS);
   if (child.stderr) child.stderr.on('data', d => console.error('[scout]', String(d).trim()));
   child.once('error', (err) => store.runAs(uid, () => {   // e.g. python not found

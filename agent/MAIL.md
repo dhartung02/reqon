@@ -72,8 +72,70 @@ or cron entry pointing at `agent/run-mail.sh`:
   `_OFFER`) on the channels in `MAIL_NOTIFY_CHANNELS` (in-app/file/slack/email/sms/push) — set these
   under Settings → Digest & notifications. Dry runs never notify.
 
+## The other direction — email job-scout (`scout_email.py`)
+
+`mail_ingest.py` tracks **responses** to jobs you applied to. `scout_email.py` does the opposite
+end: it reads the job-**recommendation / alert** emails the job sites send you (LinkedIn, Indeed,
+Glassdoor, ZipRecruiter, Dice, BuiltIn, Wellfound) and adds the recommended roles to the board as
+**new leads** — scored with the same engine as `scout.py`, deduped append-only, and **resolved to
+the employer's real career-site req** when possible. Same live Gmail connection, no scraping.
+
+```bash
+python3 agent/scout_email.py                 # DRY RUN — parse + report, write nothing
+python3 agent/scout_email.py --apply          # add new leads to the board
+python3 agent/scout_email.py --no-resolve     # skip career-site resolution (faster)
+python3 agent/scout_email.py --sources linkedin,indeed
+python3 agent/scout_email.py --since-days 7 --label "Job Alerts" --min-fit 6.5
+python3 agent/scout_email.py --dir ~/Downloads/alerts   # offline: saved .eml/.html, no Gmail
+```
+
+### Req resolution (`req_resolver.py`) — turn a fuzzy lead into a real apply link
+
+Alert emails hand you a company + title + an *aggregator redirect*. The resolver upgrades each lead
+in three tiers (all ToS-safe — public board APIs only):
+
+1. **Company already in `boards.json`** → fetch its ATS board, fuzzy-match the title → canonical
+   employer apply URL + real location/salary, lead marked `verified`.
+2. **Company not mapped** → derive candidate slugs from the name and probe Greenhouse/Ashby/Lever.
+   On a hit, the company is **appended to `boards.json`** (so the daily ATS scout permanently covers
+   it too), then title-matched as in tier 1.
+3. **No pollable board** (Workday/iCIMS/Phenom/custom) → keep the aggregator link at `unverified`.
+
+Confidence on the resulting row: `verified` (matched a live req), `boardonly` (board found, exact
+req not matched), or `unverified` (aggregator link only, title-only score). The `source` is stamped
+`<site>-email` (e.g. `linkedin-email`) so you can filter leads that came from your inbox.
+
+### Run it automatically
+
+`agent/run-email-scout.sh` is the scheduled runner. It **no-ops unless `EMAIL_SCOUT=true`** (and
+Gmail is configured), so it's safe to leave wired. The daily scout already calls it
+(`run-scout.sh` step 3b). Enable + tune it under **Settings → Digest & notifications → Email
+job-scout**, or in `.env`:
+
+```
+EMAIL_SCOUT=true
+EMAIL_SCOUT_NO_RESOLVE=false        # set true to skip career-site resolution
+EMAIL_SCOUT_SOURCES=linkedin,indeed # optional; blank = all sources
+EMAIL_SCOUT_MIN_FIT=6               # optional; blank = watchlist minFitToAdd
+EMAIL_SCOUT_NOTIFY_CHANNELS=inapp   # where to announce "N new leads added"
+```
+
+The board exposes **Test (dry run)** / **▶ Run now** buttons in the same settings panel
+(`POST /api/mail/scout {apply}`); on a real run that adds leads it drops an in-app notification.
+Processed message-ids are remembered in `agent/email-scout-state.json` so the same alert email
+isn't re-surfaced. Default is **dry-run** everywhere — it writes nothing until you pass `--apply`.
+
+### Caveats (set expectations)
+
+- **Title-only scoring** — there's no JD in an alert email, so fit is scored from the title; the row
+  note says "verify on the listing." Resolution to a live req is what raises confidence.
+- **Parsing is heuristic** — alert-email HTML changes often; a missed company/location degrades
+  gracefully (the role is skipped or kept at lower confidence rather than mis-filed).
+- **Remote-only** still applies — explicitly onsite roles are dropped unless `--include-onsite`.
+
 ## Privacy
 
 Your mailbox credentials and email content stay on your self-hosted server. Nothing leaves except
-what you've configured (the Slack/SMTP alert you set up, or OpenAI snippets if you pass `--ai`).
-`mail-state.json` is gitignored.
+what you've configured (the Slack/SMTP alert you set up, or OpenAI snippets if you pass `--ai`). The
+req resolver only calls public ATS board APIs. `mail-state.json` and `email-scout-state.json` are
+gitignored.

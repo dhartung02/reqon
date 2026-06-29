@@ -3145,6 +3145,11 @@ const mailConfigPayload = () => ({
   label: cfg('GMAIL_LABEL') || 'INBOX',
   ai: cfg('MAIL_AI') === 'true',
   sinceDays: parseInt(cfg('MAIL_SINCE_DAYS') || '14', 10) || 14,
+  // Email job-scout (ingest recommendation emails as new leads) — shares the Gmail connection.
+  emailScout: cfg('EMAIL_SCOUT') === 'true',
+  emailScoutResolve: cfg('EMAIL_SCOUT_NO_RESOLVE') !== 'true',   // resolve to real reqs (default on)
+  emailScoutSources: cfg('EMAIL_SCOUT_SOURCES') || '',
+  emailScoutMinFit: cfg('EMAIL_SCOUT_MIN_FIT') || '',
 });
 app.get('/api/mail/config', (req, res) => res.json(mailConfigPayload()));
 app.post('/api/mail/config', (req, res) => {
@@ -3160,6 +3165,14 @@ app.post('/api/mail/config', (req, res) => {
       const d = Math.max(1, Math.min(90, parseInt(b.sinceDays, 10) || 14));
       upd.MAIL_SINCE_DAYS = String(d);
     }
+    // Email job-scout settings (share the Gmail connection).
+    if (typeof b.emailScout === 'boolean') upd.EMAIL_SCOUT = b.emailScout ? 'true' : 'false';
+    if (typeof b.emailScoutResolve === 'boolean') upd.EMAIL_SCOUT_NO_RESOLVE = b.emailScoutResolve ? 'false' : 'true';
+    if (typeof b.emailScoutSources === 'string') upd.EMAIL_SCOUT_SOURCES = b.emailScoutSources.trim();
+    if (b.emailScoutMinFit != null && b.emailScoutMinFit !== '') {
+      const f = Math.max(0, Math.min(10, parseFloat(b.emailScoutMinFit) || 0));
+      upd.EMAIL_SCOUT_MIN_FIT = String(f);
+    } else if (b.emailScoutMinFit === '') { upd.EMAIL_SCOUT_MIN_FIT = ''; }
   }
   try { if (Object.keys(upd).length) { if (perUserScope()) setUserCfg(upd); else setEnvVars(upd); } }   // Gmail ingest is per-user
   catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
@@ -3203,6 +3216,51 @@ app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
         dispatchNotify({ title: `${emoji[ev.kind] || ''} ${ev.kind[0].toUpperCase() + ev.kind.slice(1)}: ${ev.company || ''}`,
           body: `${ev.role || ''} — detected in your inbox.`, channels, kind: ev.kind, eventKey: `mail-${ev.kind}-${ev.company}-${new Date().toISOString().slice(0, 10)}` }).catch(() => {});
       }
+    }
+    finish(200, { ok: true, applied: apply, report: out, summary });
+  }));
+});
+
+// Email job-scout — ingest job-RECOMMENDATION emails (LinkedIn/Indeed/Glassdoor/…) as NEW leads,
+// resolved to the real employer req. Shares the Gmail connection with mail_ingest but the opposite
+// direction (mail/run tracks responses to applied jobs; this adds newly-recommended jobs). Same
+// dry-run-by-default safety: writes nothing unless {apply:true}.
+let emailScoutChild = null;
+app.post('/api/mail/scout', requireFeature('gmail_ingest'), (req, res) => {
+  if (emailScoutChild) return res.status(409).json({ ok: false, error: 'An email scout run is already in progress.' });
+  if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) {
+    return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
+  }
+  const apply = (req.body || {}).apply === true;       // default: dry-run (writes nothing)
+  const argv = [path.join(ROOT, 'agent', 'scout_email.py')];
+  if (apply) argv.push('--apply');
+  if (cfg('EMAIL_SCOUT_NO_RESOLVE') === 'true') argv.push('--no-resolve');
+  if (cfg('EMAIL_SCOUT_SOURCES')) argv.push('--sources', String(cfg('EMAIL_SCOUT_SOURCES')));
+  if (cfg('EMAIL_SCOUT_MIN_FIT')) argv.push('--min-fit', String(cfg('EMAIL_SCOUT_MIN_FIT')));
+  let child, out = '', err = '', done = false;
+  const uid = store.currentUser();
+  const job = jobs.create('gmail_scout', { label: 'Email scout' + (apply ? ' (apply)' : ' (dry-run)') });
+  const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
+  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
+  catch (e) { return finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); }
+  emailScoutChild = child;
+  jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
+  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 180000);  // resolution adds board calls
+  child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
+  child.stderr && child.stderr.on('data', d => { err += d; });
+  child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
+  child.once('exit', code => store.runAs(uid, () => {
+    clearTimeout(killer);
+    if (code !== 0) return finish(500, { ok: false, error: (err.trim() || ('exit ' + code)).slice(0, 800), report: out });
+    let summary = null;
+    try { const m = out.match(/SUMMARY_JSON (\{.*\})\s*$/m); if (m) summary = JSON.parse(m[1]); } catch (e) {}
+    // On a real --apply run that added leads, drop one in-app notification (+ any configured channels).
+    if (apply && summary && summary.counts && summary.counts.added > 0) {
+      const channels = parseChannels(cfg('EMAIL_SCOUT_NOTIFY_CHANNELS'), ['inapp']);
+      const n = summary.counts.added, r = summary.counts.resolved || 0;
+      dispatchNotify({ title: `📥 ${n} new lead${n === 1 ? '' : 's'} from your job alerts`,
+        body: `${r} resolved to a live employer req. Review them on the board.`, channels, kind: 'lead',
+        eventKey: `email-scout-${new Date().toISOString().slice(0, 10)}` }).catch(() => {});
     }
     finish(200, { ok: true, applied: apply, report: out, summary });
   }));

@@ -129,7 +129,31 @@ LOC_RE = re.compile(
 
 
 def clean(s):
-    return re.sub(r"\s+", " ", htmllib.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+    s = s or ""
+    s = re.sub(r"<[^>]+>", " ", s)        # strip complete tags
+    s = re.sub(r"<[^>]*$", " ", s)         # drop a tag fragment cut off by the slice boundary
+    s = htmllib.unescape(s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def strip_noise(html):
+    """Remove <style>/<script> block CONTENTS and comments — clean() only strips tags, so CSS
+    text inside a <style> block would otherwise leak into the parsed company/title."""
+    html = re.sub(r"<style\b[^>]*>.*?</style>", " ", html or "", flags=re.I | re.S)
+    html = re.sub(r"<script\b[^>]*>.*?</script>", " ", html, flags=re.I | re.S)
+    html = re.sub(r"<!--.*?-->", " ", html, flags=re.S)
+    return html
+
+
+# A field that still contains markup/CSS artifacts is a parse miss, not a real value.
+_JUNK_FIELD = re.compile(r"[<>{}]|!important|style\s*=|;\s*}|webkit|inline-block", re.I)
+def _is_junk(s):
+    return bool(_JUNK_FIELD.search(s or ""))
+
+# Glassdoor cards pack the whole listing into the link text: "Company 4.0 ★ Title  City, ST $X (est.)".
+_GD_RATING = re.compile(r"^\s*(.+?)\s+\d(?:\.\d)?\s*(?:★|stars?)\s+(.+)$", re.I)
+# Cross-sell / digest anchors that aren't a single real posting.
+_NOT_A_CARD = re.compile(r"^\s*(?:jobs?\s+similar\s+to|jobs?\s+for\s+you|more\s+jobs|recommended\s+jobs|see\s+(?:all|more))", re.I)
 
 
 def detect_source(from_addr, subject):
@@ -184,6 +208,7 @@ def parse_cards(source, html):
     cfg = SOURCES.get(source, {})
     link_re = cfg.get("link")
     pos = cfg.get("company_pos", "after")
+    html = strip_noise(html)              # kill <style>/<script> contents before any slicing
     cards, seen = [], set()
     for m in ANCHOR.finditer(html):
         href = htmllib.unescape(m.group(1)).strip()
@@ -194,6 +219,8 @@ def parse_cards(source, html):
                 continue
         title = clean(m.group(2))
         if not title or len(title) < 4 or title.lower() in CTA_TEXT:
+            continue
+        if _NOT_A_CARD.match(title):       # "Jobs similar to …" / "Jobs for you" digest links
             continue
         url = href
         # de-dupe by URL (LinkedIn repeats the same job as image + text links)
@@ -216,6 +243,21 @@ def parse_cards(source, html):
         company = _company_before(before) if pos == "before" else _company_after(after)
         if not company and pos == "before":
             company = _company_after(after)        # fall back to the other side
+        # Glassdoor packs "Company N.N ★ Title  City, ST $sal (est.)" into the link text itself —
+        # split it so the company isn't whatever happened to sit before the anchor.
+        if source == "glassdoor":
+            gd = _GD_RATING.match(title)
+            if gd:
+                company = gd.group(1).strip(" -–·•|,")
+                rest = SALARY_RE.split(LOC_RE.split(gd.group(2))[0])[0]
+                rest = re.split(r"\(\s*employer est|\bbest-led\b", rest, flags=re.I)[0]
+                rest = re.sub(r"\s*(?:[-–·•|,]|&|\band\b)\s*$", "", rest.strip(), flags=re.I)  # drop dangling conjunction
+                title = rest.strip(" -–·•|,") or title
+        # Markup/CSS that survived slicing isn't a real value — drop the field / card.
+        if _is_junk(company):
+            company = ""
+        if _is_junk(title) or len(title) < 4:
+            continue
         cards.append({
             "title": title,
             "company": company,

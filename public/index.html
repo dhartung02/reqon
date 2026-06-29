@@ -2235,7 +2235,10 @@ window.todoGo=function(view){
   // clean slate so each Today card gives a predictable, isolated view
   F("search").value=""; F("statusFilter").value=""; F("tierFilter").value=""; F("sourceFilter").value=""; F("applyModeFilter").value="";
   F("remoteOnly").checked=false; F("activeOnly").checked=false; F("notAppliedOnly").checked=false; F("applyNextOnly").checked=false;
-  if(view==="applynext"){activeTab="open";F("applyNextOnly").checked=true;}
+  // Apply-next roles only ever live in Tier A/B, so expand both (and reset manual toggles) — all 7
+  // are visible at once instead of 4 hiding behind a collapsed Tier B. (applyNextOnly is excluded
+  // from the auto-expand filter, so without this the board falls back to the A-open/B-closed default.)
+  if(view==="applynext"){activeTab="open";F("applyNextOnly").checked=true;tierOpen.A=tierOpen.B=true;tierOpen.C=false;tierTouched.A=tierTouched.B=tierTouched.C=false;}
   else if(view==="verify"){activeTab="open";activeLane="verify";}
   else if(view==="followup"){activeTab="open";activeLane="followup";}
   else if(view==="closed"){activeTab="open";activeLane="closed";}

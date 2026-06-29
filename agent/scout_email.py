@@ -336,7 +336,7 @@ def build_leads(messages, args, watch, boards):
     cands, seen = [], set()
     stats = {"emails": 0, "skipped_source": 0, "cards": 0, "no_company": 0,
              "not_pm": 0, "below_fit": 0, "already_tracked": 0, "resolved": 0,
-             "resolve_skipped": 0, "by_source": {}}
+             "resolve_skipped": 0, "by_source": {}, "sender_domains": {}, "unmatched_from": []}
     # Resolution makes live board probes (up to a few per unknown company); a big batch could run
     # past the server's hard kill. Cap total resolution wall-time so the run always finishes — any
     # leads past the budget keep their aggregator link (Tier-3 fallback). 0 disables the cap.
@@ -347,10 +347,17 @@ def build_leads(messages, args, watch, boards):
     resolve_start = time.monotonic()
 
     for msg in messages:
+        # Diagnostic: tally the actual sender domains so a "0 from job sites" result is explainable
+        # (it tells us whether the senders are unrecognized vs the IMAP search matched non-alert mail).
+        fa = (msg.get("from_addr") or "").lower()
+        dom = fa.split("@")[-1] if "@" in fa else (fa or "(no from)")
+        stats["sender_domains"][dom] = stats["sender_domains"].get(dom, 0) + 1
         source = (msg.get("source") or detect_source(msg.get("from_addr"), msg.get("subject"))
                   or detect_source_from_html(msg.get("html", "")))
         if not source or (only and source not in only):
             stats["skipped_source"] += 1
+            if len(stats["unmatched_from"]) < 10 and fa:
+                stats["unmatched_from"].append(fa)
             continue
         stats["emails"] += 1
         for card in parse_cards(source, msg.get("html", "")):
@@ -502,6 +509,13 @@ def main():
     print("   (skipped: %d non-PM, %d no-company, %d below-fit, %d already on board; resolved %d to live reqs%s.)"
           % (stats["not_pm"], stats["no_company"], stats["below_fit"], stats["already_tracked"], stats["resolved"],
              (", %d left unresolved at budget" % stats["resolve_skipped"]) if stats.get("resolve_skipped") else ""))
+    # Sender breakdown — the fastest way to see WHY nothing parsed (e.g. unrecognized senders).
+    if stats["sender_domains"]:
+        top = sorted(stats["sender_domains"].items(), key=lambda kv: kv[1], reverse=True)[:12]
+        print("   senders: " + ", ".join("%s×%d" % (d, n) for d, n in top))
+    if stats["skipped_source"] and stats["unmatched_from"]:
+        print("   ⚠ %d email(s) weren't recognized as a job site. Examples: %s"
+              % (stats["skipped_source"], ", ".join(stats["unmatched_from"])))
     for r in cands:
         flag = "✓ live req" if r.pop("_resolved", False) else r["conf"]
         print("  + [%s] %s — %s (fit %.1f / prob %.1f) [%s] %s"

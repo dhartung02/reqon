@@ -110,6 +110,9 @@ def extract_applicant(text):
     m = re.search(r"(?:linkedin\.com/in/[\w-]+)", text, re.I)
     if m:
         a["linkedin"] = "https://" + m.group(0)
+    m = re.search(r"github\.com/[\w-]+", text, re.I)
+    if m:
+        a["github"] = "https://" + m.group(0)
     # name: first non-empty line that's short and has no digits/@
     for line in text.splitlines():
         s = line.strip()
@@ -145,7 +148,34 @@ def weighted_keywords(text):
 
 def detect_seniority(text):
     t = text.lower()
-    return [s for s in SENIORITY if s in t]
+    # word-boundary match so short tokens like "vp" don't match inside other words.
+    return [s for s in SENIORITY if re.search(r"\b" + re.escape(s) + r"\b", t)]
+
+
+_SUMMARY_HEAD = re.compile(r"^(professional\s+summary|summary|profile|professional\s+profile|"
+                           r"objective|about(?:\s+me)?)\s*$", re.I)
+
+
+def extract_summary(text):
+    """Capture the professional-summary paragraph: the lines after a SUMMARY/PROFILE header,
+    stopping at the next section header (CORE COMPETENCIES, EXPERIENCE, …)."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        norm = re.sub(r"[^a-z ]", "", line.strip().lower()).strip()
+        if _SUMMARY_HEAD.match(line.strip()) or norm in ("professional summary", "summary", "profile", "objective"):
+            buf = []
+            for l in lines[i + 1:]:
+                if _header_name(l):          # next real section ends the summary
+                    break
+                s = l.strip()
+                if s:
+                    buf.append(s)
+                elif buf:                    # blank line after we already have content → stop
+                    break
+            out = " ".join(buf).strip()
+            if len(out) >= 40:
+                return out[:1500]
+    return ""
 
 
 # ---- structured work history + education ------------------------------------------------
@@ -335,6 +365,8 @@ def main():
     ap = argparse.ArgumentParser(description="Build a tailored search profile from a resume.")
     ap.add_argument("resume", help="path to resume (.docx/.txt/.md/.pdf)")
     ap.add_argument("--print", action="store_true", help="print profile, don't write")
+    ap.add_argument("--text-out", help="also write the raw extracted résumé text to this path "
+                                       "(lets the server reuse it for an AI extraction pass)")
     args = ap.parse_args()
 
     path = os.path.expanduser(args.resume)
@@ -342,10 +374,17 @@ def main():
         raise SystemExit("Resume not found: " + path)
 
     text = read_resume(path)
+    if args.text_out:
+        try:
+            with open(os.path.expanduser(args.text_out), "w", encoding="utf-8") as f:
+                f.write(text)
+        except OSError:
+            pass
     profile = {
         "generatedFrom": os.path.basename(path),
         "generatedAt": datetime.date.today().isoformat(),
         "applicant": extract_applicant(text),
+        "summary": extract_summary(text),
         "seniority": detect_seniority(text),
         "keywords": weighted_keywords(text),
         "workHistory": extract_experience(text),

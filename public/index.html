@@ -1176,7 +1176,7 @@
           <p class="ssd" id="profMeta">Drives scoring &amp; pre-fill. Re-parse your resume to refresh keywords.</p>
           <div class="field"><label>Resume (.docx / .txt / .md / .pdf)</label>
             <input id="resumeFile" type="file" accept=".docx,.txt,.md,.pdf">
-            <div class="ahintrow"><button class="mini" id="uploadResumeBtn" type="button">⬆ Upload &amp; re-parse</button> <span class="setmuted">Re-extracts keywords + applicant info; your narratives &amp; manual prefs are kept.</span></div>
+            <div class="ahintrow"><button class="mini" id="uploadResumeBtn" type="button">↻ Re-parse</button> <span class="setmuted">Parses automatically when you choose a file. Re-extracts keywords + applicant info; your narratives &amp; manual prefs are kept.</span></div>
             <div class="ahintrow"><span id="resumeMsg" class="setmsg"></span></div>
           </div>
           <div class="grid2">
@@ -3558,7 +3558,7 @@ SET("kwAddBtn").onclick=()=>{
   KW_REMOVED.delete(name.toLowerCase()); SET("kwAddName").value=""; renderKeywords();
 };
 SET("saveProfileBtn").onclick=saveProfile;
-SET("uploadResumeBtn").onclick=async()=>{
+async function runResumeParse(){
   const msg=SET("resumeMsg"), btn=SET("uploadResumeBtn");
   const f=SET("resumeFile").files[0];
   if(!f){msg.className="setmsg err";msg.textContent="Choose a resume file first.";return;}
@@ -3568,10 +3568,15 @@ SET("uploadResumeBtn").onclick=async()=>{
     const j=await (await fetch("/api/profile/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f.name,dataBase64})})).json();
     if(!j.ok)throw new Error(j.error||"failed"); fillProfile(j.profile);
     const kw=(j.profile&&Array.isArray(j.profile.keywords))?j.profile.keywords.length:0;
-    msg.className="setmsg ok";msg.textContent="✓ Parsed "+f.name+" — "+kw+" keywords refreshed.";
+    const how=j.parsedBy==='ai'?' with AI':'';
+    msg.className="setmsg ok";msg.textContent="✓ Parsed "+f.name+how+" — "+kw+" keywords refreshed.";
   }catch(e){msg.className="setmsg err";msg.textContent="Upload failed: "+e.message;}
   finally{btn.disabled=false;}
-};
+}
+// Choosing a file is the whole intent — parse immediately, no second click. The button stays as an
+// explicit "re-parse" for the already-selected file.
+SET("resumeFile").onchange=()=>{ if(SET("resumeFile").files[0]) runResumeParse(); };
+SET("uploadResumeBtn").onclick=runResumeParse;
 
 // ---------- AI application assistant (Phase 6) ----------
 let assistRow=null, assistIdx=-1, lastScore=null;

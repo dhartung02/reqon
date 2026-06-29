@@ -1502,7 +1502,7 @@ app.put('/api/profile', (req, res) => {
 
 // Resume upload (base64 JSON; no multipart dep). Snapshots profile, regenerates via
 // profile-from-resume.py, then re-merges the user's manual fields + narratives.
-app.post('/api/profile/resume', (req, res) => {
+app.post('/api/profile/resume', async (req, res) => {
   const b = req.body || {};
   const fn = String(b.filename || '').trim();
   if (!/\.(docx|txt|md|pdf)$/i.test(fn)) return res.status(400).json({ ok: false, error: 'Use a .docx / .txt / .md / .pdf resume.' });
@@ -1510,8 +1510,26 @@ app.post('/api/profile/resume', (req, res) => {
   let buf; try { buf = Buffer.from(b.dataBase64, 'base64'); } catch (e) { return res.status(400).json({ ok: false, error: 'Bad base64.' }); }
   if (!buf.length || buf.length > 8 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'Empty or too-large file (8MB max).' });
   ensureBackupDir();
-  const tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + path.extname(fn).toLowerCase());
-  try { fs.writeFileSync(tmpPath, buf); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  // PDF text is extracted here in Node (pure JS via pdf-parse) and handed to the Python parser as a
+  // plain .txt file — so PDF support needs NO Python PDF library (none ships on the Node-only Render
+  // build). docx/txt/md pass straight through to the stdlib parser unchanged.
+  let tmpPath;
+  if (/\.pdf$/i.test(fn)) {
+    let text = '';
+    try {
+      const pdfParse = require('pdf-parse/lib/pdf-parse.js');   // inner lib avoids index.js debug-path crash
+      const out = await pdfParse(buf);
+      text = String((out && out.text) || '');
+    } catch (e) { return res.status(400).json({ ok: false, error: 'Could not read this PDF: ' + (e.message || e) }); }
+    if (text.replace(/\s+/g, '').length < 30) {
+      return res.status(400).json({ ok: false, error: 'No selectable text in this PDF — it looks scanned/image-only. Export a text-based PDF, or upload .docx / .txt.' });
+    }
+    tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + '.txt');
+    try { fs.writeFileSync(tmpPath, text, 'utf8'); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  } else {
+    tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + path.extname(fn).toLowerCase());
+    try { fs.writeFileSync(tmpPath, buf); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  }
   const preserved = readProfile();
   snapshotProfile();
   let child, done = false;

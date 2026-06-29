@@ -305,9 +305,18 @@
   .cc-pill.low{background:rgba(148,163,184,.14);color:var(--text-2)}
   .cc-toggle{background:none;border:0;color:var(--dim);font-size:1rem;cursor:pointer;transition:transform .15s}
   .cmdcenter.collapsed .cc-toggle{transform:rotate(-90deg)}
-  .cmdcenter.collapsed .cc-body{display:none}
-  .cc-body{padding:2px 14px 12px}
+  .cmdcenter.collapsed .cc-body,.cmdcenter.collapsed .cc-nav{display:none}
+  /* section chips — jump between the action groups instead of scrolling one long list */
+  .cc-nav{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px;border-bottom:1px solid var(--line)}
+  .cc-chip{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;padding:4px 11px;border-radius:20px;border:1px solid var(--line);background:var(--panel-2);color:var(--text-2);cursor:pointer;white-space:nowrap}
+  .cc-chip:hover{border-color:var(--dim);color:var(--text)}
+  .cc-chip.active{background:var(--accent);border-color:var(--accent);color:#04110b}
+  .cc-chip-n{font-size:.7rem;opacity:.75;font-variant-numeric:tabular-nums}
+  .cc-body{padding:2px 14px 12px;max-height:46vh;overflow:auto}
   .cc-sec{margin-top:10px}
+  .cc-sec:first-child{margin-top:4px}
+  .cc-more{font-size:.74rem;color:var(--accent);padding:6px 9px 2px;cursor:pointer}
+  .cc-more:hover{text-decoration:underline}
   .cc-sec-h{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 5px;font-weight:700}
   .cc-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;cursor:pointer;border:1px solid transparent}
   .cc-item:hover{background:var(--panel-2);border-color:var(--line)}
@@ -864,6 +873,7 @@
       <span class="cc-counts" id="ccCounts"></span>
       <button class="cc-toggle" id="ccToggle" title="Collapse / expand">▾</button>
     </div>
+    <div class="cc-nav" id="ccNav"></div>
     <div class="cc-body" id="ccBody"></div>
   </section>
 
@@ -1167,6 +1177,7 @@
           <div class="field"><label>Resume (.docx / .txt / .md / .pdf)</label>
             <input id="resumeFile" type="file" accept=".docx,.txt,.md,.pdf">
             <div class="ahintrow"><button class="mini" id="uploadResumeBtn" type="button">⬆ Upload &amp; re-parse</button> <span class="setmuted">Re-extracts keywords + applicant info; your narratives &amp; manual prefs are kept.</span></div>
+            <div class="ahintrow"><span id="resumeMsg" class="setmsg"></span></div>
           </div>
           <div class="grid2">
             <div class="field"><label>Name</label><input id="profName" type="text"></div>
@@ -1681,37 +1692,59 @@ const CC_SECTIONS = [
 ];
 const ccDismissed = new Set();   // session-only (no localStorage per project rule); deterministic items recompute on reload
 let ccCollapsed = false;
+let ccFilter = 'all';            // active section chip — 'all' or a CC_SECTIONS title
+let ccItems = [];                // last-fetched action items (cached so re-scoping needs no refetch)
+let ccCounts = {};
 async function loadCommandCenter(){
   const box=document.getElementById('cmdCenter'); if(!box) return;
   let j; try{ j=await (await fetch('/api/action-items?surface=web',{cache:'no-store'})).json(); }catch(e){ box.hidden=true; return; }
   if(!j||!j.ok){ box.hidden=true; return; }
-  const items=(j.items||[]).filter(it=>!ccDismissed.has(it.id));
+  ccItems=j.items||[]; ccCounts=j.counts||{};
+  ccRender();
+}
+// Render the command center from the cached items (no network) — used on load, dismiss, and re-scope.
+function ccRender(){
+  const box=document.getElementById('cmdCenter'); if(!box) return;
+  const items=ccItems.filter(it=>!ccDismissed.has(it.id));
   if(!items.length){ box.hidden=true; return; }
   ccLoaded=true;
   box.hidden=(activeTab==='today');
   box.classList.toggle('collapsed', ccCollapsed);
-  const c=j.counts||{};
-  document.getElementById('ccCounts').innerHTML=['high','medium','low'].filter(k=>c[k]).map(k=>`<span class="cc-pill ${k}">${c[k]} ${k}</span>`).join('');
+  document.getElementById('ccCounts').innerHTML=['high','medium','low'].filter(k=>ccCounts[k]).map(k=>`<span class="cc-pill ${k}">${ccCounts[k]} ${k}</span>`).join('');
   const byType=new Map(); items.forEach(it=>{ if(!byType.has(it.type))byType.set(it.type,[]); byType.get(it.type).push(it); });
+  // sections that actually have items (the chips + the rendered groups derive from this)
+  const live=CC_SECTIONS.map(sec=>({sec,items:sec.types.flatMap(t=>byType.get(t)||[])})).filter(s=>s.items.length);
+  const total=items.length;
+  if(ccFilter!=='all' && !live.some(s=>s.sec.title===ccFilter)) ccFilter='all';  // fell empty → reset
+  // chip nav: All + one per live section
+  const chip=(key,label,n,active)=>`<button class="cc-chip ${active?'active':''}" data-cc="${esc(key)}">${esc(label)}<span class="cc-chip-n">${n}</span></button>`;
+  let nav=chip('all','All',total,ccFilter==='all');
+  live.forEach(s=>{ nav+=chip(s.sec.title,s.sec.title,s.items.length,ccFilter===s.sec.title); });
+  document.getElementById('ccNav').innerHTML=nav;
+  // body: render the selected section, or all of them when 'all'
+  const shown = ccFilter==='all' ? live : live.filter(s=>s.sec.title===ccFilter);
+  const PER = ccFilter==='all' ? 8 : 50;   // when focused on one section, show many more before truncating
   let html='';
-  for(const sec of CC_SECTIONS){
-    const secItems=sec.types.flatMap(t=>byType.get(t)||[]);
-    if(!secItems.length) continue;
+  for(const {sec,items:secItems} of shown){
     html+=`<div class="cc-sec"><p class="cc-sec-h">${esc(sec.title)} · ${secItems.length}</p>`;
-    secItems.slice(0,12).forEach(it=>{
+    secItems.slice(0,PER).forEach(it=>{
       const label=it.roleId||it.company?`${esc(it.company||'')}${it.role?' — '+esc(it.role):''}`:'System';
       html+=`<div class="cc-item" data-id="${esc(it.id)}" data-role="${esc(it.roleId||'')}" data-target="${esc((it.cta&&it.cta.target)||'')}">`
         +`<span class="cc-dot ${esc(it.severity)}"></span>`
         +`<span class="cc-it-main"><span class="cc-it-role">${label}</span><span class="cc-it-reason">${esc(it.reason||'')}</span></span>`
         +`<button class="cc-x" title="Dismiss for this session">✕</button></div>`;
     });
+    if(secItems.length>PER) html+=`<div class="cc-more" data-cc="${esc(sec.title)}">+${secItems.length-PER} more — ${esc(sec.title)}</div>`;
     html+='</div>';
   }
   const body=document.getElementById('ccBody'); body.innerHTML=html||'<div class="cc-empty">All clear.</div>';
   body.querySelectorAll('.cc-item').forEach(el=>{
-    el.querySelector('.cc-x').onclick=(e)=>{ e.stopPropagation(); ccDismissed.add(el.dataset.id); loadCommandCenter(); };
+    el.querySelector('.cc-x').onclick=(e)=>{ e.stopPropagation(); ccDismissed.add(el.dataset.id); ccRender(); };
     el.onclick=()=>ccOpenTarget(el.dataset.role, el.dataset.target);
   });
+  const ccPick=(k)=>{ ccFilter=k; if(ccCollapsed){ ccCollapsed=false; } ccRender(); };
+  document.getElementById('ccNav').querySelectorAll('.cc-chip').forEach(el=>{ el.onclick=()=>ccPick(el.dataset.cc); });
+  body.querySelectorAll('.cc-more').forEach(el=>{ el.onclick=()=>ccPick(el.dataset.cc); });
 }
 function ccOpenTarget(roleId, target){
   if(roleId){
@@ -2209,7 +2242,10 @@ window.todoGo=function(view){
   else if(view==="thankyou"){activeTab="open";activeLane="thankyou";}
   else if(view==="tierA"){activeTab="open";F("tierFilter").value="A";F("statusFilter").value="Not Applied";}
   else if(view==="review"){activeTab="open";recentOnly=true;recentCutoff=(scoutLast&&scoutLast.when)?scoutLast.when.slice(0,10):"";}
-  render();
+  // scope the command center to the matching action group so you land on it, not the full firehose
+  const TODO_CC_SECTION={applynext:'Apply next',followup:'Follow-ups due',thankyou:'Thank-you notes due',verify:'Lead inbox',review:'Needs review'};
+  ccFilter=TODO_CC_SECTION[view]||'all'; ccCollapsed=false;
+  render(); ccRender();
 };
 // ---------- analytics (Phase 8) ----------
 const STAGE_RANK={"Not Applied":0,"Applied":1,"Recruiter Screen":2,"Hiring Manager":3,"Panel":4,"Offer":5};
@@ -3518,15 +3554,18 @@ SET("kwAddBtn").onclick=()=>{
 };
 SET("saveProfileBtn").onclick=saveProfile;
 SET("uploadResumeBtn").onclick=async()=>{
+  const msg=SET("resumeMsg"), btn=SET("uploadResumeBtn");
   const f=SET("resumeFile").files[0];
-  if(!f){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Choose a resume file first.";return;}
-  SET("profMsg").className="setmsg";SET("profMsg").textContent="Uploading & parsing…";
+  if(!f){msg.className="setmsg err";msg.textContent="Choose a resume file first.";return;}
+  msg.className="setmsg";msg.textContent="Uploading & parsing "+f.name+"…";btn.disabled=true;
   try{
     const dataBase64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(",").pop());r.onerror=reject;r.readAsDataURL(f);});
     const j=await (await fetch("/api/profile/resume",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f.name,dataBase64})})).json();
     if(!j.ok)throw new Error(j.error||"failed"); fillProfile(j.profile);
-    SET("profMsg").className="setmsg ok";SET("profMsg").textContent="Parsed "+f.name+" — keywords refreshed.";
-  }catch(e){SET("profMsg").className="setmsg err";SET("profMsg").textContent="Upload failed: "+e.message;}
+    const kw=(j.profile&&Array.isArray(j.profile.keywords))?j.profile.keywords.length:0;
+    msg.className="setmsg ok";msg.textContent="✓ Parsed "+f.name+" — "+kw+" keywords refreshed.";
+  }catch(e){msg.className="setmsg err";msg.textContent="Upload failed: "+e.message;}
+  finally{btn.disabled=false;}
 };
 
 // ---------- AI application assistant (Phase 6) ----------

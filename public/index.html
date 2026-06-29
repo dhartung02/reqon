@@ -3222,11 +3222,17 @@ SET("discoverBtn").onclick=async()=>{
     if(!j.detected){SET("discoverResult").innerHTML=`<span class="setmsg err">${esc(j.note||j.error||"Could not detect a pollable ATS.")}</span>`;return;}
     SET("discoverResult").innerHTML=`Detected <b>${esc(j.ats)}</b> · slug <code>${esc(j.slug)}</code> `+
       `<input id="discoverName" type="text" placeholder="Company name" value="${esc(j.slug)}" style="width:150px;display:inline-block;margin:4px 6px 0">`+
-      `<button class="mini" id="addCompanyBtn" type="button">Add to scout</button>`;
+      `<input id="discoverIndustry" type="text" list="industryList" placeholder="Industry / vertical (optional)" autocomplete="off" style="width:190px;display:inline-block;margin:4px 6px 0">`+
+      `<datalist id="industryList">`+
+        ["AI / ML","Data / Analytics","Developer Tools","Fintech","Healthtech","E-commerce / Retail","Martech / Adtech","Cybersecurity","Enterprise SaaS","Cloud / Infrastructure","Identity / Security","Gaming","Media / Streaming","EdTech","Logistics / Supply Chain","Climate / Energy","Crypto / Web3","Government / Defense"].map(v=>`<option value="${v}">`).join("")+
+      `</datalist> `+
+      `<button class="mini" id="addCompanyBtn" type="button">Add to scout</button>`+
+      `<p class="hint" style="margin:6px 0 0">Tagging the vertical helps Reqon recommend boards to others in your industry later.</p>`;
     SET("addCompanyBtn").onclick=async()=>{
-      try{const r=await (await fetch("/api/sources/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ats:j.ats,slug:j.slug,name:SET("discoverName").value.trim()})})).json();
+      try{const r=await (await fetch("/api/sources/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ats:j.ats,slug:j.slug,name:SET("discoverName").value.trim(),industry:SET("discoverIndustry").value.trim()})})).json();
         if(!r.ok)throw new Error(r.error||"failed");
-        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)):("Added "+esc(r.name)+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs next scout.")}</span>`;
+        const tag=r.industry?(" · "+esc(r.industry)):"";
+        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)+tag+(r.tagged?" (industry saved)":"")):("Added "+esc(r.name)+tag+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs next scout.")}</span>`;
       }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Add failed: ${esc(e.message)}</span>`;}
     };
   }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Failed: ${esc(e.message)}</span>`;}

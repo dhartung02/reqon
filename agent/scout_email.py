@@ -104,6 +104,10 @@ SOURCES = {
     },
 }
 
+# Hard cap on messages fetched per run — a busy inbox over a wide look-back would otherwise download
+# thousands of full bodies and blow past the server's run timeout. Newest are kept.
+MAX_FETCH = 600
+
 # Anchor text that is navigation / CTA, never a job title.
 CTA_TEXT = {
     "view job", "view jobs", "apply", "apply now", "easy apply", "see all jobs",
@@ -258,15 +262,34 @@ def _html_body(msg):
         return ""
 
 
-def fetch_messages(user, pw, label, since_days):
+def fetch_messages(user, pw, label, since_days, only=None):
     # 30s timeout so a blocked/stalled connection fails fast with a clear error instead of hanging
     # until the server's hard kill (which surfaces as an opaque "exit null").
     box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
     box.login(user, pw)
     box.select('"%s"' % label, readonly=True)
-    since = (datetime.date.today() - datetime.timedelta(days=since_days)).strftime("%d-%b-%Y")
-    typ, data = box.search(None, "(SINCE %s)" % since)
-    ids = data[0].split() if data and data[0] else []
+    # Only fetch alert emails from KNOWN job sites. Downloading the full body of every message in the
+    # look-back window doesn't scale — a busy inbox would exceed the run timeout (seen as "exit null").
+    # Filter server-side by sender domain via Gmail's search; fall back to a (capped) SINCE scan only
+    # if that search errors. A legitimately empty result is respected (no fallback to "all mail").
+    domains = sorted({d for name, c in SOURCES.items()
+                      if not only or name in only for d in c.get("domains", [])})
+    ids, filtered = [], False
+    if domains:
+        try:
+            q = "from:(%s) newer_than:%dd" % (" OR ".join(domains), max(1, since_days))
+            typ, data = box.search(None, "X-GM-RAW", '"%s"' % q)
+            if typ == "OK":
+                ids = data[0].split() if data and data[0] else []
+                filtered = True
+        except Exception:
+            filtered = False
+    if not filtered:
+        since = (datetime.date.today() - datetime.timedelta(days=since_days)).strftime("%d-%b-%Y")
+        typ, data = box.search(None, "(SINCE %s)" % since)
+        ids = data[0].split() if data and data[0] else []
+    if len(ids) > MAX_FETCH:        # IMAP returns ids oldest→newest; keep the newest MAX_FETCH
+        ids = ids[-MAX_FETCH:]
     msgs = []
     for mid in ids:
         typ, mdata = box.fetch(mid, "(RFC822)")
@@ -438,12 +461,13 @@ def main():
         pw = re.sub(r"\s+", "", os.environ.get("GMAIL_APP_PASSWORD", ""))
         if not user or not pw:
             raise SystemExit("Set GMAIL_USER and GMAIL_APP_PASSWORD in .env (or use --dir for offline files).")
+        only = set(s.strip() for s in args.sources.split(",")) if args.sources else None
         try:
-            messages = fetch_messages(user, pw, args.label, args.since_days)
+            messages = fetch_messages(user, pw, args.label, args.since_days, only)
         except imaplib.IMAP4.error as e:
             raise SystemExit("Gmail login/IMAP failed: %s (check the App Password is correct and has no typos)." % e)
         except (OSError, TimeoutError) as e:
-            raise SystemExit("Couldn't reach Gmail IMAP (imap.gmail.com:993): %s — this host may block outbound IMAP." % e)
+            raise SystemExit("Couldn't reach Gmail IMAP (imap.gmail.com:993): %s — network/connectivity issue." % e)
 
     # Skip already-processed emails (live only; --dir always reprocesses).
     fresh = [m for m in messages if args.dir or m["id"] not in seen_ids]

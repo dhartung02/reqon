@@ -258,7 +258,7 @@ def _body_text(msg):
 
 
 def fetch_messages(user, pw, label, since_days):
-    box = imaplib.IMAP4_SSL("imap.gmail.com")
+    box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)  # fail fast instead of hanging on a stalled connection
     box.login(user, pw)
     box.select('"%s"' % label, readonly=True)
     since = (datetime.date.today() - datetime.timedelta(days=since_days)).strftime("%d-%b-%Y")
@@ -303,7 +303,9 @@ def main():
     args = ap.parse_args()
 
     user = os.environ.get("GMAIL_USER", "").strip()
-    pw = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
+    # Strip ALL whitespace — Google displays app passwords grouped ("abcd efgh ijkl mnop"); the spaces
+    # are visual only and a pasted value with spaces would otherwise fail to authenticate.
+    pw = re.sub(r"\s+", "", os.environ.get("GMAIL_APP_PASSWORD", ""))
     if not user or not pw:
         raise SystemExit("Set GMAIL_USER and GMAIL_APP_PASSWORD in .env (see this file's header).")
 

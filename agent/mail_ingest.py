@@ -257,6 +257,15 @@ def _body_text(msg):
     return re.sub(r"<[^>]+>", " ", raw) if msg.get_content_type() == "text/html" else raw
 
 
+# Cap messages downloaded per run — recruiter replies come from any domain so we can't pre-filter by
+# sender, but a wide look-back on a busy inbox would download thousands of full bodies and blow past
+# the run timeout (seen as "exit null"). Newest are kept. Override with MAIL_MAX_FETCH.
+try:
+    MAX_FETCH = int(os.environ.get("MAIL_MAX_FETCH", "800") or "800")
+except ValueError:
+    MAX_FETCH = 800
+
+
 def fetch_messages(user, pw, label, since_days):
     box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)  # fail fast instead of hanging on a stalled connection
     box.login(user, pw)
@@ -264,6 +273,10 @@ def fetch_messages(user, pw, label, since_days):
     since = (datetime.date.today() - datetime.timedelta(days=since_days)).strftime("%d-%b-%Y")
     typ, data = box.search(None, "(SINCE %s)" % since)
     ids = data[0].split() if data and data[0] else []
+    if len(ids) > MAX_FETCH:           # IMAP returns ids oldest→newest; keep the newest MAX_FETCH
+        print("  (mailbox has %d msgs in window; capping to newest %d)" % (len(ids), MAX_FETCH), flush=True)
+        ids = ids[-MAX_FETCH:]
+    print("Fetching %d message(s) from Gmail…" % len(ids), flush=True)
     msgs = []
     for mid in ids:
         typ, mdata = box.fetch(mid, "(RFC822)")
@@ -300,6 +313,8 @@ def main():
                     help="don't auto-advance Applied->Recruiter Screen on a confident interview email")
     ap.add_argument("--label", default=os.environ.get("GMAIL_LABEL", "INBOX"))
     ap.add_argument("--since-days", type=int, default=int(os.environ.get("MAIL_SINCE_DAYS", "14")))
+    ap.add_argument("--check", action="store_true",
+                    help="connection test only: log in + select the mailbox + report count, then exit")
     args = ap.parse_args()
 
     user = os.environ.get("GMAIL_USER", "").strip()
@@ -309,14 +324,37 @@ def main():
     if not user or not pw:
         raise SystemExit("Set GMAIL_USER and GMAIL_APP_PASSWORD in .env (see this file's header).")
 
+    if args.check:
+        # Lightweight setup test shared by both features: just verify the credentials authenticate and
+        # the mailbox is selectable. No message download, so it's fast and can't hit volume limits.
+        print("Testing Gmail connection (%s)…" % user, flush=True)
+        try:
+            box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=15)
+            box.login(user, pw)
+            typ, data = box.select('"%s"' % args.label, readonly=True)
+            count = int(data[0]) if typ == "OK" and data and data[0] else 0
+            try: box.logout()
+            except Exception: pass
+        except imaplib.IMAP4.error as e:
+            raise SystemExit("Gmail login failed: %s (check the address + App Password; the password is the 16-char App Password, not your Google password)." % e)
+        except (OSError, TimeoutError) as e:
+            raise SystemExit("Couldn't reach Gmail IMAP (imap.gmail.com:993): %s — network/connectivity issue." % e)
+        print("OK — connected as %s; '%s' has %d message(s)." % (user, args.label, count), flush=True)
+        print("SUMMARY_JSON " + json.dumps({"ok": True, "user": user, "mailbox": args.label, "count": count}), flush=True)
+        return 0
+
     rows = load_json(DATA_FILE, [])
     state = load_json(STATE_FILE, {"seen": []})
     seen = set(state.get("seen", []))
 
+    print("Connecting to Gmail IMAP…", flush=True)
     try:
         msgs = fetch_messages(user, pw, args.label, args.since_days)
+        print("Fetched %d message(s); scanning for recruiter responses…" % len(msgs), flush=True)
     except imaplib.IMAP4.error as e:
-        raise SystemExit("Gmail login/IMAP failed: %s (check the App Password + that IMAP is on)." % e)
+        raise SystemExit("Gmail login/IMAP failed: %s (check the App Password is correct and has no typos)." % e)
+    except (OSError, TimeoutError) as e:
+        raise SystemExit("Couldn't reach Gmail IMAP (imap.gmail.com:993): %s — network/connectivity issue." % e)
 
     rejected, positives, advanced, ambiguous, acted = [], [], [], [], 0
     for m in msgs:

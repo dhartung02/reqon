@@ -399,7 +399,10 @@
   .ammap .amrow select{flex:none;width:auto;padding:5px 8px;font-size:.78rem}
   /* candidate profile + narratives */
   .narr{border:1px solid var(--line-2);border-radius:9px;padding:9px 10px;margin-bottom:8px;background:var(--bg)}
-  .narr input,.narr textarea{margin-bottom:6px}
+  .narr input,.narr textarea{width:100%;background:var(--panel-2);border:1px solid var(--line-2);color:var(--text);border-radius:8px;padding:9px 12px;font-family:inherit;font-size:.86rem;outline:none;margin-bottom:6px}
+  .narr input::placeholder,.narr textarea::placeholder{color:var(--dim)}
+  .narr input:focus,.narr textarea:focus{border-color:var(--gold)}
+  .narr textarea{resize:vertical;line-height:1.5}
   .narr .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
   .profkw{display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:120px;overflow:auto}
   .profkw .kw{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:2px 8px}
@@ -418,8 +421,10 @@
   .mailreport{margin-top:10px;padding:10px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:200px;overflow:auto;font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);white-space:pre-wrap;line-height:1.45}
   .histedit{border:1px solid var(--line-2);border-radius:9px;padding:10px;margin-bottom:8px;background:var(--bg)}
   .histedit .grid2{margin-bottom:6px}
-  .histedit input,.histedit textarea{margin-bottom:6px}
-  .histedit textarea{width:100%;resize:vertical}
+  .histedit input,.histedit textarea{width:100%;background:var(--panel-2);border:1px solid var(--line-2);color:var(--text);border-radius:8px;padding:9px 12px;font-family:inherit;font-size:.86rem;outline:none;margin-bottom:6px}
+  .histedit input::placeholder,.histedit textarea::placeholder{color:var(--dim)}
+  .histedit input:focus,.histedit textarea:focus{border-color:var(--gold)}
+  .histedit textarea{resize:vertical;line-height:1.5}
   .histedit .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
   /* analytics */
   .an-wrap{display:flex;flex-direction:column;gap:14px}

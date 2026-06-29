@@ -313,6 +313,8 @@ def main():
                     help="don't auto-advance Applied->Recruiter Screen on a confident interview email")
     ap.add_argument("--label", default=os.environ.get("GMAIL_LABEL", "INBOX"))
     ap.add_argument("--since-days", type=int, default=int(os.environ.get("MAIL_SINCE_DAYS", "14")))
+    ap.add_argument("--check", action="store_true",
+                    help="connection test only: log in + select the mailbox + report count, then exit")
     args = ap.parse_args()
 
     user = os.environ.get("GMAIL_USER", "").strip()
@@ -321,6 +323,25 @@ def main():
     pw = re.sub(r"\s+", "", os.environ.get("GMAIL_APP_PASSWORD", ""))
     if not user or not pw:
         raise SystemExit("Set GMAIL_USER and GMAIL_APP_PASSWORD in .env (see this file's header).")
+
+    if args.check:
+        # Lightweight setup test shared by both features: just verify the credentials authenticate and
+        # the mailbox is selectable. No message download, so it's fast and can't hit volume limits.
+        print("Testing Gmail connection (%s)…" % user, flush=True)
+        try:
+            box = imaplib.IMAP4_SSL("imap.gmail.com", timeout=15)
+            box.login(user, pw)
+            typ, data = box.select('"%s"' % args.label, readonly=True)
+            count = int(data[0]) if typ == "OK" and data and data[0] else 0
+            try: box.logout()
+            except Exception: pass
+        except imaplib.IMAP4.error as e:
+            raise SystemExit("Gmail login failed: %s (check the address + App Password; the password is the 16-char App Password, not your Google password)." % e)
+        except (OSError, TimeoutError) as e:
+            raise SystemExit("Couldn't reach Gmail IMAP (imap.gmail.com:993): %s — network/connectivity issue." % e)
+        print("OK — connected as %s; '%s' has %d message(s)." % (user, args.label, count), flush=True)
+        print("SUMMARY_JSON " + json.dumps({"ok": True, "user": user, "mailbox": args.label, "count": count}), flush=True)
+        return 0
 
     rows = load_json(DATA_FILE, [])
     state = load_json(STATE_FILE, {"seen": []})

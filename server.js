@@ -3180,6 +3180,31 @@ app.post('/api/mail/config', (req, res) => {
   catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   res.json(mailConfigPayload());
 });
+// Lightweight, feature-agnostic Gmail connection test — verifies the saved credentials authenticate
+// and the mailbox is selectable, without downloading anything. This is the "is my Gmail set up right?"
+// check shared by both the response-ingest and the email-scout (both use the same connection).
+app.post('/api/mail/test', requireFeature('gmail_ingest'), (req, res) => {
+  if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) {
+    return res.status(400).json({ ok: false, error: 'Enter your Gmail address and App Password first.' });
+  }
+  const argv = ['-u', path.join(ROOT, 'agent', 'mail_ingest.py'), '--check'];
+  let child, out = '', err = '', done = false;
+  const TAG = '[gmail-test]';
+  const finish = (status, payload) => { if (done) return; done = true; res.status(status).json(payload); };
+  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
+  catch (e) { return finish(500, { ok: false, error: 'Could not start connection test: ' + (e.message || e) }); }
+  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 30000);
+  child.stdout && child.stdout.on('data', d => { const s = String(d); out += s; if (out.length > 8000) out = out.slice(-8000); process.stdout.write(TAG + ' ' + s); });
+  child.stderr && child.stderr.on('data', d => { const s = String(d); err += s; process.stderr.write(TAG + '! ' + s); });
+  child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
+  child.once('exit', (code, signal) => {
+    clearTimeout(killer);
+    if (code !== 0 || signal) return finish(200, { ok: false, error: (err.trim() || ('connection test exited ' + (signal || code))).slice(0, 600), report: out });
+    let summary = null;
+    try { const m = out.match(/SUMMARY_JSON (\{.*\})\s*$/m); if (m) summary = JSON.parse(m[1]); } catch (e) {}
+    finish(200, { ok: true, summary, report: out });
+  });
+});
 let mailChild = null;
 app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
   if (mailChild) return res.status(409).json({ ok: false, error: 'A mail run is already in progress.' });

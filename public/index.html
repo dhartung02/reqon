@@ -3486,7 +3486,17 @@ async function emailScoutRun(apply){
     if(j.report){SET("emailScoutReport").textContent=j.report;SET("emailScoutReport").style.display="block";}
     if(!j.ok)throw new Error(j.error||"run failed");
     const c=(j.summary&&j.summary.counts)||{};
-    SET("emailScoutStatus").textContent=apply?`Added ${c.added||0} lead(s) (${c.resolved||0} resolved to live reqs).`:`Dry run: ${c.leads||0} lead(s) found — nothing changed.`;
+    const n=(x)=>(x||0).toLocaleString();
+    // Funnel so a "0 new" is explained: scanned -> from job sites -> postings -> new (+ why the rest dropped).
+    const drops=[]; if(c.alreadyTracked)drops.push(`${n(c.alreadyTracked)} already tracked`);
+    if(c.notPm)drops.push(`${n(c.notPm)} not PM`); if(c.belowFit)drops.push(`${n(c.belowFit)} below fit`);
+    const funnel=`scanned ${n(c.scanned)} email(s), ${n(c.fromJobSites)} from job sites → ${n(c.cards)} posting(s)`+
+      (drops.length?` (${drops.join(", ")})`:"");
+    SET("emailScoutStatus").textContent=apply
+      ?`Added ${n(c.added)} new lead(s) (${n(c.resolved)} resolved to live reqs) — ${funnel}.`
+      :`Dry run: ${funnel} → ${n(c.leads)} new. Nothing changed.`;
+    if((c.fromJobSites||0)===0 && (c.scanned||0)>0)
+      SET("emailScoutStatus").textContent+=" ⚠ None of your recent emails are from recognized job sites — your alerts may come from a sender we don't match yet.";
     if(apply&&(c.added||0)>0&&typeof load==="function")load();
   }catch(e){SET("emailScoutStatus").textContent="Failed: "+e.message;}
 }

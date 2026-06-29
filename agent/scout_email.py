@@ -335,7 +335,8 @@ def build_leads(messages, args, watch, boards):
     cache = {}                       # share board fetches across leads within this run
     cands, seen = [], set()
     stats = {"emails": 0, "skipped_source": 0, "cards": 0, "no_company": 0,
-             "not_pm": 0, "below_fit": 0, "resolved": 0, "resolve_skipped": 0, "by_source": {}}
+             "not_pm": 0, "below_fit": 0, "already_tracked": 0, "resolved": 0,
+             "resolve_skipped": 0, "by_source": {}}
     # Resolution makes live board probes (up to a few per unknown company); a big batch could run
     # past the server's hard kill. Cap total resolution wall-time so the run always finishes — any
     # leads past the budget keep their aggregator link (Tier-3 fallback). 0 disables the cap.
@@ -408,6 +409,7 @@ def build_leads(messages, args, watch, boards):
                 continue
             key = scout.norm_key(company, title)
             if key in existing or key in seen:
+                stats["already_tracked"] += 1      # recognized, but already on the board / a dupe this run
                 continue
             seen.add(key)
             prob = scout.score_prob(fit, title, rmode, False)
@@ -497,8 +499,8 @@ def main():
     print("Scanned %d email(s); %d from known job sites; parsed %d card(s); %d new PM lead(s) ≥ fit %.1f."
           % (len(messages), stats["emails"], stats["cards"], len(cands),
              args.min_fit if args.min_fit is not None else watch.get("searchTerms", {}).get("minFitToAdd", 6.0)))
-    print("   (skipped: %d non-PM, %d no-company, %d below-fit; resolved %d to live reqs%s.)"
-          % (stats["not_pm"], stats["no_company"], stats["below_fit"], stats["resolved"],
+    print("   (skipped: %d non-PM, %d no-company, %d below-fit, %d already on board; resolved %d to live reqs%s.)"
+          % (stats["not_pm"], stats["no_company"], stats["below_fit"], stats["already_tracked"], stats["resolved"],
              (", %d left unresolved at budget" % stats["resolve_skipped"]) if stats.get("resolve_skipped") else ""))
     for r in cands:
         flag = "✓ live req" if r.pop("_resolved", False) else r["conf"]
@@ -542,8 +544,13 @@ def _emit_summary(args, cands, stats, added):
     """One-line machine-readable summary the server parses for notifications."""
     summary = {
         "applied": bool(args.apply),
-        "counts": {"emails": stats["emails"], "cards": stats["cards"],
-                   "leads": len(cands), "resolved": stats["resolved"], "added": added},
+        # Full funnel so the UI can explain a "0 new" result instead of leaving it ambiguous.
+        "counts": {"scanned": stats["emails"] + stats["skipped_source"],
+                   "fromJobSites": stats["emails"], "cards": stats["cards"],
+                   "notPm": stats["not_pm"], "noCompany": stats["no_company"],
+                   "belowFit": stats["below_fit"], "alreadyTracked": stats["already_tracked"],
+                   "emails": stats["emails"], "leads": len(cands),
+                   "resolved": stats["resolved"], "added": added},
         "bySource": stats["by_source"],
         "events": [{"kind": "lead", "company": r["company"], "role": r["role"],
                     "source": r["source"], "conf": r["conf"]} for r in cands[:50]],

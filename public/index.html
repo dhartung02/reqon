@@ -2242,9 +2242,11 @@ window.todoGo=function(view){
   else if(view==="thankyou"){activeTab="open";activeLane="thankyou";}
   else if(view==="tierA"){activeTab="open";F("tierFilter").value="A";F("statusFilter").value="Not Applied";}
   else if(view==="review"){activeTab="open";recentOnly=true;recentCutoff=(scoutLast&&scoutLast.when)?scoutLast.when.slice(0,10):"";}
-  // scope the command center to the matching action group so you land on it, not the full firehose
+  // Each Today card already filters the BOARD below (e.g. applynext → the tier-grouped apply-next
+  // list), so the command center would just repeat those same rows. Collapse it on drill-in — the
+  // board is the single view — but pre-scope its section so expanding the panel is still relevant.
   const TODO_CC_SECTION={applynext:'Apply next',followup:'Follow-ups due',thankyou:'Thank-you notes due',verify:'Lead inbox',review:'Needs review'};
-  ccFilter=TODO_CC_SECTION[view]||'all'; ccCollapsed=false;
+  ccFilter=TODO_CC_SECTION[view]||'all'; ccCollapsed=true;
   render(); ccRender();
 };
 // ---------- analytics (Phase 8) ----------

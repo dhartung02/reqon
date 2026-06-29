@@ -3235,25 +3235,42 @@ let emailScoutChild = null;
 function startEmailScout(apply, uid, cb) {
   if (emailScoutChild) { cb(409, { ok: false, error: 'An email scout run is already in progress.' }); return false; }
   if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) { cb(400, { ok: false, error: 'Gmail isn’t configured yet.' }); return false; }
-  const argv = [path.join(ROOT, 'agent', 'scout_email.py')];
+  // -u: run Python unbuffered so progress lines reach our logs *before* any kill (block-buffered
+  // stdout would otherwise be lost on SIGKILL, leaving only an opaque "exit null").
+  const argv = ['-u', path.join(ROOT, 'agent', 'scout_email.py')];
   if (apply) argv.push('--apply');
   if (cfg('EMAIL_SCOUT_NO_RESOLVE') === 'true') argv.push('--no-resolve');
   if (cfg('EMAIL_SCOUT_SOURCES')) argv.push('--sources', String(cfg('EMAIL_SCOUT_SOURCES')));
   if (cfg('EMAIL_SCOUT_MIN_FIT')) argv.push('--min-fit', String(cfg('EMAIL_SCOUT_MIN_FIT')));
-  let child, out = '', err = '', done = false;
+  let child, out = '', err = '', done = false, killedByTimeout = false;
+  const t0 = Date.now(), TAG = '[email-scout]';
   const job = jobs.create('gmail_scout', { label: 'Email scout' + (apply ? ' (apply)' : ' (dry-run)') });
   const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); cb(status, payload); };
-  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
-  catch (e) { finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); return false; }
+  // Faster speculative board probes (resolution) + a resolution wall-time budget so a big batch can't
+  // run past the hard kill below. Both overridable via env.
+  const childEnv = { ...tenantEnv(),
+    BOARD_FETCH_TIMEOUT: cfg('BOARD_FETCH_TIMEOUT') || '8',
+    EMAIL_SCOUT_RESOLVE_BUDGET_S: cfg('EMAIL_SCOUT_RESOLVE_BUDGET_S') || '90' };
+  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: childEnv }); }
+  catch (e) { console.error(TAG, 'spawn threw:', e.message || e); finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); return false; }
   emailScoutChild = child;
+  console.log(TAG, (apply ? 'apply' : 'dry-run'), 'started pid=' + child.pid);
   jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
-  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 180000);  // resolution adds board calls
-  child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
-  child.stderr && child.stderr.on('data', d => { err += d; });
-  child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
-  child.once('exit', code => store.runAs(uid, () => {
+  const killer = setTimeout(() => { killedByTimeout = true; console.error(TAG, 'hard timeout (180s) reached — killing pid=' + child.pid); try { child.kill('SIGKILL'); } catch (e) {} }, 180000);
+  child.stdout && child.stdout.on('data', d => { const s = String(d); out += s; if (out.length > 20000) out = out.slice(-20000); process.stdout.write(TAG + ' ' + s); });
+  child.stderr && child.stderr.on('data', d => { const s = String(d); err += s; process.stderr.write(TAG + '! ' + s); });
+  child.once('error', e => { clearTimeout(killer); console.error(TAG, 'launch failed:', e.message || e); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
+  child.once('exit', (code, signal) => store.runAs(uid, () => {
     clearTimeout(killer);
-    if (code !== 0) return finish(500, { ok: false, error: (err.trim() || ('exit ' + code)).slice(0, 800), report: out });
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log(TAG, 'exit code=' + code + ' signal=' + signal + ' killedByTimeout=' + killedByTimeout + ' elapsed=' + secs + 's');
+    if (code !== 0 || signal) {
+      let msg;
+      if (killedByTimeout) msg = `Email scout timed out after 180s (likely slow lead resolution). Last output: ${out.trim().slice(-300) || '(none)'}`;
+      else if (signal) msg = `Email scout killed by ${signal} after ${secs}s${signal === 'SIGKILL' ? ' (possible out-of-memory on this instance)' : ''}. Last output: ${(out.trim() || err.trim()).slice(-300) || '(none)'}`;
+      else msg = (err.trim() || ('exit ' + code)).slice(0, 800);
+      return finish(500, { ok: false, error: msg, report: out });
+    }
     let summary = null;
     try { const m = out.match(/SUMMARY_JSON (\{.*\})\s*$/m); if (m) summary = JSON.parse(m[1]); } catch (e) {}
     // On a real --apply run that added leads, drop one in-app notification (+ any configured channels).

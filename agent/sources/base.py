@@ -16,12 +16,18 @@ Stdlib only. Be a good citizen: clear UA, timeouts, tolerate junk.
 """
 
 import json
+import os
 import re
 import urllib.request
 import urllib.error
 
 UA = "job-scout/1.0 (+local CRM; respectful polling)"
-TIMEOUT = 20
+# Per-request board-fetch timeout (seconds). Overridable via BOARD_FETCH_TIMEOUT so speculative
+# resolution probes (req_resolver) can fail fast instead of stalling 20s each on dead boards.
+try:
+    TIMEOUT = int(os.environ.get("BOARD_FETCH_TIMEOUT", "20") or "20")
+except ValueError:
+    TIMEOUT = 20
 MAX_BYTES = 6 * 1024 * 1024   # guard against huge feeds (some shared boards are MBs)
 
 REGISTRY = {}

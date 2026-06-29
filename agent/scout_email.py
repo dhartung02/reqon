@@ -38,6 +38,7 @@ MAIL_SINCE_DAYS, APP_TOKEN, PORT. Stdlib only.
 
 import argparse
 import datetime
+import time
 import email
 import email.utils
 import glob
@@ -334,7 +335,15 @@ def build_leads(messages, args, watch, boards):
     cache = {}                       # share board fetches across leads within this run
     cands, seen = [], set()
     stats = {"emails": 0, "skipped_source": 0, "cards": 0, "no_company": 0,
-             "not_pm": 0, "below_fit": 0, "resolved": 0, "by_source": {}}
+             "not_pm": 0, "below_fit": 0, "resolved": 0, "resolve_skipped": 0, "by_source": {}}
+    # Resolution makes live board probes (up to a few per unknown company); a big batch could run
+    # past the server's hard kill. Cap total resolution wall-time so the run always finishes — any
+    # leads past the budget keep their aggregator link (Tier-3 fallback). 0 disables the cap.
+    try:
+        resolve_budget = float(os.environ.get("EMAIL_SCOUT_RESOLVE_BUDGET_S", "90") or "90")
+    except ValueError:
+        resolve_budget = 90.0
+    resolve_start = time.monotonic()
 
     for msg in messages:
         source = (msg.get("source") or detect_source(msg.get("from_addr"), msg.get("subject"))
@@ -366,11 +375,19 @@ def build_leads(messages, args, watch, boards):
             salary, link, conf = card["salary"], card["url"], "unverified"
             resolved = None
             if not args.no_resolve:
-                try:
-                    resolved = req_resolver.resolve(company, title, boards=boards, cache=cache,
-                                                    write_boards=args.apply)
-                except Exception:
-                    resolved = None
+                if resolve_budget and (time.monotonic() - resolve_start) > resolve_budget:
+                    stats["resolve_skipped"] += 1
+                    if stats["resolve_skipped"] == 1:
+                        print("  … resolution budget (%ds) reached — keeping aggregator links for the rest."
+                              % int(resolve_budget), flush=True)
+                else:
+                    try:
+                        print("  resolving: %s — %s" % (company, title[:60]), flush=True)
+                        resolved = req_resolver.resolve(company, title, boards=boards, cache=cache,
+                                                        write_boards=args.apply)
+                    except Exception as e:
+                        print("  ! resolve failed for %s: %s" % (company, e), flush=True)
+                        resolved = None
             if resolved:
                 stats["resolved"] += 1
                 if resolved.get("url"):
@@ -462,8 +479,10 @@ def main():
         if not user or not pw:
             raise SystemExit("Set GMAIL_USER and GMAIL_APP_PASSWORD in .env (or use --dir for offline files).")
         only = set(s.strip() for s in args.sources.split(",")) if args.sources else None
+        print("Connecting to Gmail IMAP…", flush=True)
         try:
             messages = fetch_messages(user, pw, args.label, args.since_days, only)
+            print("Fetched %d candidate email(s) from job sites." % len(messages), flush=True)
         except imaplib.IMAP4.error as e:
             raise SystemExit("Gmail login/IMAP failed: %s (check the App Password is correct and has no typos)." % e)
         except (OSError, TimeoutError) as e:
@@ -478,8 +497,9 @@ def main():
     print("Scanned %d email(s); %d from known job sites; parsed %d card(s); %d new PM lead(s) ≥ fit %.1f."
           % (len(messages), stats["emails"], stats["cards"], len(cands),
              args.min_fit if args.min_fit is not None else watch.get("searchTerms", {}).get("minFitToAdd", 6.0)))
-    print("   (skipped: %d non-PM, %d no-company, %d below-fit; resolved %d to live reqs.)"
-          % (stats["not_pm"], stats["no_company"], stats["below_fit"], stats["resolved"]))
+    print("   (skipped: %d non-PM, %d no-company, %d below-fit; resolved %d to live reqs%s.)"
+          % (stats["not_pm"], stats["no_company"], stats["below_fit"], stats["resolved"],
+             (", %d left unresolved at budget" % stats["resolve_skipped"]) if stats.get("resolve_skipped") else ""))
     for r in cands:
         flag = "✓ live req" if r.pop("_resolved", False) else r["conf"]
         print("  + [%s] %s — %s (fit %.1f / prob %.1f) [%s] %s"

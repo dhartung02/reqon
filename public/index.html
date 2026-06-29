@@ -1159,6 +1159,12 @@
             </div>
           </div>
           <div class="sgrp">
+            <div class="sgrp-h">Email recommendations <span class="setmuted" style="font-weight:400">new opportunities from your inbox</span></div>
+            <p class="sgrp-d">When the scout runs, also read job-recommendation emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and add the new roles to the board — scored and deduped like board finds, and resolved to the employer's real req when possible.</p>
+            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutEnable" type="checkbox" style="width:auto"> Check email for new opportunities</label></div>
+            <p class="hint" style="margin:6px 0 0">Requires Gmail ingest — set up the connection and tune which sites / fit threshold under <a href="#" id="emailScoutGotoGmail" style="color:var(--gold);text-decoration:none">Digest &amp; notifications</a>. <span id="emailScoutSrcHint" class="setmuted"></span></p>
+          </div>
+          <div class="sgrp">
             <div class="sgrp-h">Source health <button class="mini" id="refreshHealthBtn" type="button" style="margin-left:auto">↻ refresh</button></div>
             <div id="sourceHealth" class="bklist" style="max-height:220px"><div class="setmuted" style="padding:8px">Run the scout to populate.</div></div>
           </div>
@@ -1444,8 +1450,7 @@
 
           <div class="sgrp">
             <div class="sgrp-h">Email job-scout (recommendation emails → leads)</div>
-            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site req</b> when possible. Uses the Gmail connection above.</p>
-            <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutEnable" type="checkbox" style="width:auto"> Run automatically with the daily scout</label></div>
+            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site req</b> when possible. Uses the Gmail connection above. Turn it on under <a href="#" id="emailScoutGotoSources" style="color:var(--gold);text-decoration:none">Sources → Email recommendations</a>; tune the options here.</p>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutResolve" type="checkbox" style="width:auto"> Resolve leads to the real employer req (Greenhouse/Ashby/Lever)</label></div>
             <div class="grid2">
               <div class="field"><label>Limit to sources (optional)</label><input id="emailScoutSources" type="text" placeholder="e.g. linkedin,indeed (blank = all)" autocomplete="off"></div>
@@ -3413,6 +3418,7 @@ async function loadMailConfig(){
     SET("mailState").textContent=m.passSet?`(set ····${m.passLast4||""})`:"(not set)";
     SET("emailScoutEnable").checked=!!m.emailScout; SET("emailScoutResolve").checked=m.emailScoutResolve!==false;
     SET("emailScoutSources").value=m.emailScoutSources||""; SET("emailScoutMinFit").value=m.emailScoutMinFit||"";
+    const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent=m.configured?"Gmail connected ✓":"Gmail not configured yet — enabling has no effect until you connect it.";
   }catch(e){}
 }
 function mailBody(){return {user:SET("mailUser").value.trim(),password:SET("mailPass").value,label:SET("mailLabel").value.trim()||"INBOX",ai:SET("mailAi").checked,sinceDays:SET("mailSince").value,
@@ -3440,6 +3446,17 @@ async function mailRun(apply){
 SET("mailSaveBtn").onclick=mailSave;
 SET("mailTestBtn").onclick=()=>mailRun(false);
 SET("mailRunBtn").onclick=()=>mailRun(true);
+// Canonical email-scout on/off lives in Sources → persist immediately on toggle (the global
+// "Save settings" only writes /api/settings; mail config saves via /api/mail/config).
+SET("emailScoutEnable").onchange=async(e)=>{
+  const on=e.target.checked;
+  try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailScout:on})})).json();
+    const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent=on?(m.configured?"On — runs with the daily scout. Gmail connected ✓":"On, but Gmail isn't configured yet — connect it under Digest & notifications."):"Off.";
+  }catch(err){const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent="Couldn't save: "+err.message;}
+};
+// Cross-links between the Sources toggle and the Gmail/options panel.
+SET("emailScoutGotoGmail")&&(SET("emailScoutGotoGmail").onclick=(e)=>{e.preventDefault();openSettingsTo("digest");});
+SET("emailScoutGotoSources")&&(SET("emailScoutGotoSources").onclick=(e)=>{e.preventDefault();openSettingsTo("sources");});
 async function emailScoutRun(apply){
   SET("emailScoutStatus").textContent=apply?"Running…":"Dry run…"; SET("emailScoutReport").style.display="none";
   try{

@@ -25,6 +25,11 @@ fi
 #    GMAIL_USER/GMAIL_APP_PASSWORD are set in .env (run-mail.sh self-guards + sources .env).
 bash "$DIR/agent/run-mail.sh" || echo "[$STAMP] run-mail.sh failed" >> "$DIR/logs/scout.log"
 
+# 3b) (optional) Email job-scout — ingests recommendation emails (LinkedIn/Indeed/Glassdoor/…)
+#     as NEW leads, resolving each to the real employer req. No-ops unless EMAIL_SCOUT=true and
+#     Gmail is configured (run-email-scout.sh self-guards + sources .env).
+bash "$DIR/agent/run-email-scout.sh" || echo "[$STAMP] run-email-scout.sh failed" >> "$DIR/logs/scout.log"
+
 # 4) refresh the Excel export if the server is up (optional, ignored if down)
 curl -fs "http://localhost:8787/api/export.xlsx" -o "$DIR/Job Search Pipeline.xlsx" 2>/dev/null || true
 

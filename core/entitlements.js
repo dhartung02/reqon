@@ -70,6 +70,7 @@ const FEATURES = {
   guide_research: 'ai', // opt-in web_search company research pass
   followup_reco: 'ai', // stage-aware follow-up recommendation
   profile_summary: 'ai', // AI-draft professional summary
+  resume_ai_parse: 'ai', // AI résumé extraction (structured profile from résumé text)
 };
 
 const FEATURE_LABELS = {

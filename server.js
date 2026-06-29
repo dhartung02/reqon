@@ -1502,7 +1502,7 @@ app.put('/api/profile', (req, res) => {
 
 // Resume upload (base64 JSON; no multipart dep). Snapshots profile, regenerates via
 // profile-from-resume.py, then re-merges the user's manual fields + narratives.
-app.post('/api/profile/resume', (req, res) => {
+app.post('/api/profile/resume', async (req, res) => {
   const b = req.body || {};
   const fn = String(b.filename || '').trim();
   if (!/\.(docx|txt|md|pdf)$/i.test(fn)) return res.status(400).json({ ok: false, error: 'Use a .docx / .txt / .md / .pdf resume.' });
@@ -1510,22 +1510,46 @@ app.post('/api/profile/resume', (req, res) => {
   let buf; try { buf = Buffer.from(b.dataBase64, 'base64'); } catch (e) { return res.status(400).json({ ok: false, error: 'Bad base64.' }); }
   if (!buf.length || buf.length > 8 * 1024 * 1024) return res.status(400).json({ ok: false, error: 'Empty or too-large file (8MB max).' });
   ensureBackupDir();
-  const tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + path.extname(fn).toLowerCase());
-  try { fs.writeFileSync(tmpPath, buf); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  // PDF text is extracted here in Node (pure JS via pdf-parse) and handed to the Python parser as a
+  // plain .txt file — so PDF support needs NO Python PDF library (none ships on the Node-only Render
+  // build). docx/txt/md pass straight through to the stdlib parser unchanged.
+  let tmpPath;
+  if (/\.pdf$/i.test(fn)) {
+    let text = '';
+    try {
+      const pdfParse = require('pdf-parse/lib/pdf-parse.js');   // inner lib avoids index.js debug-path crash
+      const out = await pdfParse(buf);
+      text = String((out && out.text) || '');
+    } catch (e) { return res.status(400).json({ ok: false, error: 'Could not read this PDF: ' + (e.message || e) }); }
+    if (text.replace(/\s+/g, '').length < 30) {
+      return res.status(400).json({ ok: false, error: 'No selectable text in this PDF — it looks scanned/image-only. Export a text-based PDF, or upload .docx / .txt.' });
+    }
+    tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + '.txt');
+    try { fs.writeFileSync(tmpPath, text, 'utf8'); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  } else {
+    tmpPath = path.join(P.backups, 'resume-upload-' + backupStamp() + path.extname(fn).toLowerCase());
+    try { fs.writeFileSync(tmpPath, buf); } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  }
   const preserved = readProfile();
   snapshotProfile();
+  // AI extraction is gated to the AI tier (owner gets it). When entitled, an AI pass over the raw
+  // résumé text replaces the regex parse for the parsed sections — much more robust, and the only
+  // path that fills bare role terms / industries / summary. Deterministic always runs as the free
+  // baseline + fallback, and emits the raw text (--text-out) for the AI pass to reuse.
+  const aiAllowed = !!aiKey() && assistEnabled() && ent.hasFeature(planFor(req), 'resume_ai_parse');
+  const textOut = tmpPath + '.rawtext';
   let child, done = false;
-  const finish = (status, payload) => { if (done) return; done = true; try { fs.unlinkSync(tmpPath); } catch (e) {} res.status(status).json(payload); };
-  try { child = spawn(resolvePython(), [PROFILE_PYTHON, tmpPath], { cwd: ROOT, env: tenantEnv() }); }
+  const finish = (status, payload) => { if (done) return; done = true; for (const p of [tmpPath, textOut]) { try { fs.unlinkSync(p); } catch (e) {} } res.status(status).json(payload); };
+  try { child = spawn(resolvePython(), [PROFILE_PYTHON, tmpPath, '--text-out', textOut], { cwd: ROOT, env: tenantEnv() }); }
   catch (e) { return finish(500, { ok: false, error: 'python launch failed: ' + e.message }); }
   const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 30000);
   let err = '';
   child.stderr && child.stderr.on('data', d => { err += d; });
   child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
-  child.once('exit', code => {
+  child.once('exit', async (code) => {
     clearTimeout(killer);
     if (code !== 0) return finish(500, { ok: false, error: 'resume parse failed: ' + (err.trim() || ('exit ' + code)) });
-    const regen = readProfile();   // profile-from-resume.py rewrote applicant/seniority/keywords
+    const regen = readProfile();   // profile-from-resume.py rewrote applicant/summary/seniority/keywords/work/education
     // Keep manually-curated sections the parser doesn't produce (incl. the Reqon CV + answers library).
     // NOTE: workHistory + education are intentionally NOT preserved — the parser now extracts them,
     // so a résumé re-upload must refresh those sections rather than re-apply the prior (stale) parse.
@@ -1535,6 +1559,40 @@ app.post('/api/profile/resume', (req, res) => {
       if (Array.isArray(preserved[k]) && preserved[k].length) regen[k] = preserved[k];
     }
     if (preserved.eeo && typeof preserved.eeo === 'object') regen.eeo = preserved.eeo;
+
+    // ── AI extraction overlay (AI tier) ────────────────────────────────────────────────────────
+    // Wins over both the regex parse and the preserved-default role terms/industries/sectors for the
+    // parsed sections; manual-only sections (narratives, answers, awards, certs, volunteer, eeo) and
+    // keyword-weight overrides still persist. Any AI failure leaves the deterministic result intact.
+    let parsedBy = 'deterministic', aiError = null;
+    if (aiAllowed) {
+      try {
+        const text = fs.readFileSync(textOut, 'utf8');
+        const { args: ai, tokens } = await aiExtractProfile(text);
+        const ne = (v) => (typeof v === 'string' && v.trim()) ? v.trim() : null;        // non-empty string or null
+        const arr = (v) => Array.isArray(v) ? v : [];
+        regen.applicant = Object.assign({}, regen.applicant, {
+          name: ne(ai.name) || (regen.applicant || {}).name || '',
+          email: ne(ai.email) || (regen.applicant || {}).email || '',
+          phone: ne(ai.phone) || (regen.applicant || {}).phone || '',
+          linkedin: ne(ai.linkedin) || (regen.applicant || {}).linkedin || '',
+          github: ne(ai.github) || (regen.applicant || {}).github || '',
+          location: ne(ai.location) || (regen.applicant || {}).location || '',
+        });
+        if (ne(ai.summary)) regen.summary = ai.summary.trim();
+        if (arr(ai.seniority).length) regen.seniority = ai.seniority;
+        if (arr(ai.roleTerms).length) regen.roleTerms = ai.roleTerms;       // AI wins — fixes the seniority overlap
+        if (arr(ai.industries).length) regen.industries = ai.industries;
+        if (arr(ai.sectors).length) regen.sectors = ai.sectors;
+        if (arr(ai.workHistory).length) regen.workHistory = ai.workHistory;
+        if (arr(ai.education).length) regen.education = ai.education;
+        if (arr(ai.keywords).length) regen.keywords = ai.keywords.map((k) => ({ kw: String(k.kw), weight: +k.weight || 1 }));
+        parsedBy = 'ai';
+        const u = assistUsage(); u.calls += 1; u.tokens += tokens || 0; writeJsonPretty(P.assistUsage, u);
+        logAssist({ ts: new Date().toISOString(), key: 'resume-parse', kind: 'resume_parse', model: assistModel(), tokens });
+      } catch (e) { aiError = e.message || String(e); }   // fall back silently to the deterministic parse
+    }
+
     // Keyword-weight overrides are a durable preference layer: keep the fresh parse as the baseline
     // (parsedKeywords), re-apply the user's overrides on top, and write the folded result to
     // keywords so the scout keeps honoring the tuning after a re-upload.
@@ -1544,7 +1602,7 @@ app.post('/api/profile/resume', (req, res) => {
       regen.keywords = applyKeywordOverrides(regen.parsedKeywords, preserved.keywordOverrides);
     }
     try { writeJsonPretty(P.profile, regen); } catch (e) { return finish(500, { ok: false, error: e.message }); }
-    finish(200, { ok: true, profile: regen });
+    finish(200, { ok: true, profile: regen, parsedBy, aiError });
   });
 });
 
@@ -1652,6 +1710,39 @@ async function callTool({ system, user, tool, maxTokens }) {
   if (!call) throw new Error('model returned no structured result (function calling needs the Responses API)');
   let args; try { args = JSON.parse(call.arguments || '{}'); } catch (e) { throw new Error('could not parse model output'); }
   return { args, tokens };
+}
+
+// AI résumé extraction (gated to the AI tier). Reads the raw résumé text and returns a fully
+// structured profile via function calling — far more robust across layouts than the regex parser,
+// and the only path that reliably fills bare (seniority-stripped) role terms, industries, and a
+// clean summary. Grounded: the prompt forbids inventing contact details, employers, dates, claims.
+async function aiExtractProfile(text) {
+  const tool = { type: 'function', name: 'extract_profile',
+    description: 'Extract a structured candidate profile from résumé text. Use ONLY text present; never invent.',
+    parameters: { type: 'object', additionalProperties: false, properties: {
+      name: { type: 'string' }, email: { type: 'string' }, phone: { type: 'string' },
+      linkedin: { type: 'string' }, github: { type: 'string' }, location: { type: 'string' },
+      summary: { type: 'string', description: '2-4 sentence professional summary, condensed from the résumé' },
+      seniority: { type: 'array', items: { type: 'string' }, description: 'lowercase level tokens present: principal, director, senior, staff, lead, head, vp' },
+      roleTerms: { type: 'array', items: { type: 'string' }, description: 'BARE target role functions WITHOUT seniority words, e.g. "Product Manager", "Product". Seniority is tracked separately — never prefix with principal/senior/staff/director/lead.' },
+      industries: { type: 'array', items: { type: 'string' } },
+      sectors: { type: 'array', items: { type: 'string' }, description: 'product/domain sectors, e.g. "CDP / Customer Data", "AI Platform", "Data Infra"' },
+      keywords: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        kw: { type: 'string' }, weight: { type: 'integer', description: '1-3; 3 = strongly emphasized' } }, required: ['kw', 'weight'] } },
+      workHistory: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        role: { type: 'string' }, company: { type: 'string' }, location: { type: 'string' },
+        start: { type: 'string' }, end: { type: 'string' },
+        description: { type: 'string', description: '1-2 factual sentences; do not invent' } },
+        required: ['role', 'company', 'location', 'start', 'end', 'description'] } },
+      education: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        school: { type: 'string' }, level: { type: 'string' }, field: { type: 'string' },
+        start: { type: 'string' }, end: { type: 'string' } },
+        required: ['school', 'level', 'field', 'start', 'end'] } },
+    }, required: ['name', 'email', 'phone', 'linkedin', 'github', 'location', 'summary', 'seniority',
+      'roleTerms', 'industries', 'sectors', 'keywords', 'workHistory', 'education'] } };
+  const system = 'You extract a structured candidate profile from résumé text. Use ONLY information present in the text — never invent or guess contact details, employers, dates, degrees, or accomplishments. Leave a field as "" or [] when the résumé does not contain it. Keep each work description to 1-2 factual sentences. roleTerms must be bare role functions with NO seniority words (seniority is captured separately).';
+  const user = 'Résumé text:\n\n' + String(text || '').slice(0, 16000);
+  return callTool({ system, user, tool, maxTokens: 2600 });
 }
 
 app.post('/api/assist', requireFeature('ai_draft'), async (req, res) => {
@@ -3054,6 +3145,11 @@ const mailConfigPayload = () => ({
   label: cfg('GMAIL_LABEL') || 'INBOX',
   ai: cfg('MAIL_AI') === 'true',
   sinceDays: parseInt(cfg('MAIL_SINCE_DAYS') || '14', 10) || 14,
+  // Email job-scout (ingest recommendation emails as new leads) — shares the Gmail connection.
+  emailScout: cfg('EMAIL_SCOUT') === 'true',
+  emailScoutResolve: cfg('EMAIL_SCOUT_NO_RESOLVE') !== 'true',   // resolve to real reqs (default on)
+  emailScoutSources: cfg('EMAIL_SCOUT_SOURCES') || '',
+  emailScoutMinFit: cfg('EMAIL_SCOUT_MIN_FIT') || '',
 });
 app.get('/api/mail/config', (req, res) => res.json(mailConfigPayload()));
 app.post('/api/mail/config', (req, res) => {
@@ -3069,6 +3165,14 @@ app.post('/api/mail/config', (req, res) => {
       const d = Math.max(1, Math.min(90, parseInt(b.sinceDays, 10) || 14));
       upd.MAIL_SINCE_DAYS = String(d);
     }
+    // Email job-scout settings (share the Gmail connection).
+    if (typeof b.emailScout === 'boolean') upd.EMAIL_SCOUT = b.emailScout ? 'true' : 'false';
+    if (typeof b.emailScoutResolve === 'boolean') upd.EMAIL_SCOUT_NO_RESOLVE = b.emailScoutResolve ? 'false' : 'true';
+    if (typeof b.emailScoutSources === 'string') upd.EMAIL_SCOUT_SOURCES = b.emailScoutSources.trim();
+    if (b.emailScoutMinFit != null && b.emailScoutMinFit !== '') {
+      const f = Math.max(0, Math.min(10, parseFloat(b.emailScoutMinFit) || 0));
+      upd.EMAIL_SCOUT_MIN_FIT = String(f);
+    } else if (b.emailScoutMinFit === '') { upd.EMAIL_SCOUT_MIN_FIT = ''; }
   }
   try { if (Object.keys(upd).length) { if (perUserScope()) setUserCfg(upd); else setEnvVars(upd); } }   // Gmail ingest is per-user
   catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
@@ -3112,6 +3216,51 @@ app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
         dispatchNotify({ title: `${emoji[ev.kind] || ''} ${ev.kind[0].toUpperCase() + ev.kind.slice(1)}: ${ev.company || ''}`,
           body: `${ev.role || ''} — detected in your inbox.`, channels, kind: ev.kind, eventKey: `mail-${ev.kind}-${ev.company}-${new Date().toISOString().slice(0, 10)}` }).catch(() => {});
       }
+    }
+    finish(200, { ok: true, applied: apply, report: out, summary });
+  }));
+});
+
+// Email job-scout — ingest job-RECOMMENDATION emails (LinkedIn/Indeed/Glassdoor/…) as NEW leads,
+// resolved to the real employer req. Shares the Gmail connection with mail_ingest but the opposite
+// direction (mail/run tracks responses to applied jobs; this adds newly-recommended jobs). Same
+// dry-run-by-default safety: writes nothing unless {apply:true}.
+let emailScoutChild = null;
+app.post('/api/mail/scout', requireFeature('gmail_ingest'), (req, res) => {
+  if (emailScoutChild) return res.status(409).json({ ok: false, error: 'An email scout run is already in progress.' });
+  if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) {
+    return res.status(400).json({ ok: false, error: 'Gmail isn’t configured yet.' });
+  }
+  const apply = (req.body || {}).apply === true;       // default: dry-run (writes nothing)
+  const argv = [path.join(ROOT, 'agent', 'scout_email.py')];
+  if (apply) argv.push('--apply');
+  if (cfg('EMAIL_SCOUT_NO_RESOLVE') === 'true') argv.push('--no-resolve');
+  if (cfg('EMAIL_SCOUT_SOURCES')) argv.push('--sources', String(cfg('EMAIL_SCOUT_SOURCES')));
+  if (cfg('EMAIL_SCOUT_MIN_FIT')) argv.push('--min-fit', String(cfg('EMAIL_SCOUT_MIN_FIT')));
+  let child, out = '', err = '', done = false;
+  const uid = store.currentUser();
+  const job = jobs.create('gmail_scout', { label: 'Email scout' + (apply ? ' (apply)' : ' (dry-run)') });
+  const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
+  try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
+  catch (e) { return finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); }
+  emailScoutChild = child;
+  jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
+  const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 180000);  // resolution adds board calls
+  child.stdout && child.stdout.on('data', d => { out += d; if (out.length > 20000) out = out.slice(-20000); });
+  child.stderr && child.stderr.on('data', d => { err += d; });
+  child.once('error', e => { clearTimeout(killer); finish(500, { ok: false, error: 'python launch failed: ' + (e.message || e) }); });
+  child.once('exit', code => store.runAs(uid, () => {
+    clearTimeout(killer);
+    if (code !== 0) return finish(500, { ok: false, error: (err.trim() || ('exit ' + code)).slice(0, 800), report: out });
+    let summary = null;
+    try { const m = out.match(/SUMMARY_JSON (\{.*\})\s*$/m); if (m) summary = JSON.parse(m[1]); } catch (e) {}
+    // On a real --apply run that added leads, drop one in-app notification (+ any configured channels).
+    if (apply && summary && summary.counts && summary.counts.added > 0) {
+      const channels = parseChannels(cfg('EMAIL_SCOUT_NOTIFY_CHANNELS'), ['inapp']);
+      const n = summary.counts.added, r = summary.counts.resolved || 0;
+      dispatchNotify({ title: `📥 ${n} new lead${n === 1 ? '' : 's'} from your job alerts`,
+        body: `${r} resolved to a live employer req. Review them on the board.`, channels, kind: 'lead',
+        eventKey: `email-scout-${new Date().toISOString().slice(0, 10)}` }).catch(() => {});
     }
     finish(200, { ok: true, applied: apply, report: out, summary });
   }));

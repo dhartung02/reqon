@@ -98,7 +98,16 @@
   .about-pop p{margin:0 0 8px}.about-pop p:last-child{margin:0}
 
   /* KPI pills (#3) — compact operating metrics; secondary health is plainer/muted */
-  .kpibar{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin-bottom:18px}
+  .kpibar{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin-bottom:18px}
+  /* headline stat cards (Jobs tracked / Strong matches / Today's actions / Need a follow-up) */
+  .statcard{flex:1 1 0;min-width:150px;display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px}
+  .statcard[role=button]{cursor:pointer;transition:border-color .12s,background .12s}
+  .statcard[role=button]:hover{border-color:var(--line-2);background:var(--panel-2)}
+  .statcard[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .statcard .sc-k{font-family:"Spline Sans Mono",monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+  .statcard .sc-v{font-family:"Fraunces",serif;font-weight:700;font-size:1.7rem;line-height:1.05;color:var(--text);letter-spacing:-.01em}
+  .statcard.accent .sc-v{color:var(--accent)} .statcard.active .sc-v{color:var(--active)} .statcard.warning .sc-v{color:var(--warning)}
+  .statcard .sc-cap{font-size:.74rem;color:var(--text-2)}
   .kpi{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:78px}
   .kpi .kpi-k{font-size:.66rem;letter-spacing:.03em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
   .kpi .kpi-v{font-weight:700;font-size:1.18rem;line-height:1.15;letter-spacing:-.01em}
@@ -585,7 +594,7 @@
   .tier-empty{color:var(--dim);font-size:.84rem;padding:6px 4px 12px}
 
   /* compact rows (#5,#8) — company/role lead, score de-emphasized, metadata clustered, larger status */
-  .crow{display:grid;grid-template-columns:18px 38px minmax(0,1fr) auto 14px;align-items:center;gap:12px;
+  .crow{display:grid;grid-template-columns:18px 50px minmax(0,1fr) auto 14px;align-items:center;gap:12px;
     background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--line-2);
     border-radius:9px;padding:9px 13px;cursor:pointer;transition:background .12s,border-color .12s;margin-bottom:5px}
   .crow:hover{background:var(--panel-2);border-color:var(--line-2)}
@@ -593,7 +602,11 @@
   .crow.sel{background:#1c2733;border-color:var(--accent)}
   .crow.st-rejected{opacity:.6} .crow.st-archived{opacity:.45}
   .crow-chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
-  .crow-ev{font-family:"Spline Sans Mono",monospace;font-weight:700;font-size:1rem;text-align:center;line-height:1;color:var(--text-2)}
+  /* fit score circle — ringed dial in the match-strength color (the signature element) */
+  .crow-ev{width:46px;height:46px;border-radius:50%;border:2px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-family:"Fraunces",serif;font-weight:600;font-size:1.02rem;line-height:1;color:var(--text-2);background:transparent}
+  .crow.tierA .crow-ev{border-color:var(--accent);color:var(--accent)}
+  .crow.tierB .crow-ev{border-color:var(--info);color:var(--info)}
+  .crow.tierC .crow-ev{border-color:var(--line-2);color:var(--text-2)}
   .crow-main{display:flex;align-items:center;gap:8px;min-width:0}
   .crow-co{font-weight:700;color:var(--text);white-space:nowrap;flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis}
   /* company logo avatar (monogram tile + real logo overlay) */
@@ -622,7 +635,7 @@
   .req.flash{animation:flashfade 1.6s ease-out}
   @keyframes flashfade{0%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:none}}
   @media (max-width:680px){
-    .crow{grid-template-columns:18px 34px minmax(0,1fr) auto 14px;gap:9px}
+    .crow{grid-template-columns:18px 50px minmax(0,1fr) auto 14px;gap:9px}
     .crow-src{display:none}
   }
   /* #1 phone: two-line compact rows so company/role stay legible; score+badges+status+Open wrap below */
@@ -630,7 +643,7 @@
     .crow{grid-template-columns:26px minmax(0,1fr) 16px;
       grid-template-areas:"chk main caret" "ev tail caret";gap:3px 9px;align-items:center;padding:9px 11px}
     .crow-chk{grid-area:chk;align-self:center}
-    .crow-ev{grid-area:ev;text-align:left;font-size:.74rem}
+    .crow-ev{grid-area:ev;width:38px;height:38px;font-size:.86rem;align-self:center}
     .crow-main{grid-area:main;flex-wrap:wrap;gap:1px 7px}
     .crow-co{max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
     .crow-role{flex-basis:100%;white-space:normal;overflow:visible;text-overflow:clip;font-size:.82rem}
@@ -2190,21 +2203,16 @@ function render(){
   const isTierA=activeTab==="open"&&activeLane==="all"&&tf==="A";
   const isOffers=activeTab==="interviewing"&&sf==="Offer";
   const isInterview=activeTab==="interviewing"&&sf!=="Offer";
-  const kpi=(k,v,cls="",extra="",act="",on=false)=>`<div class="kpi ${cls}${on?' kpi-active':''}"`
-    +(act?` role="button" tabindex="0" data-k="${act}" onclick="kpiGo('${act}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kpiGo('${act}')}" title="Filter to ${k}"`:'')
-    +`><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
+  // Four headline stat cards (design move). The displaced lifecycle counts stay reachable in the
+  // Filters dropdown (statusFilter) + quick filters; rate/timing metrics live on the Analytics tab.
+  const statCard=(k,v,cap,cls="",act="")=>`<div class="statcard ${cls}"`
+    +(act?` role="button" tabindex="0" onclick="kpiGo('${act}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kpiGo('${act}')}" title="${k}"`:'')
+    +`><span class="sc-k">${k}</span><span class="sc-v">${v}</span><span class="sc-cap">${cap}</span></div>`;
   document.getElementById("stats").innerHTML=
-    kpi("Open",openCount,"accent","","open",isOpen)+
-    kpi("Applied",applied,"positive","","applied",activeTab==="applied")+
-    kpi("Follow-up due",followups,followups?"warning":"","","followup",isFollow)+
-    kpi("Rejected",rejected,rejected?"danger":"",`<small>${rejRate}%</small>`,"closed",activeTab==="closed")+
-    kpi("Interviews",inInterview,"active","","interviewing",isInterview)+
-    kpi("Offers",offers,offers?"active":"","","offers",isOffers)+
-    `<div class="kpi-div"></div>`+
-    kpi("Jobs tracked",total,"sec")+
-    kpi("Strong matches",tierA,"sec","","tierA",isTierA)+
-    kpi("Response rate",am.responseRate+"%","sec")+
-    kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");
+    statCard("Jobs tracked",total,"across your search")+
+    statCard("Strong matches",tierA,"worth your time","accent","tierA")+
+    statCard("Today's actions",tabCounts.today,"ready when you are","active","today")+
+    statCard("Need a follow-up",followups,"before they go cold",followups?"warning":"","followup");
 
   const cmp=(a,b)=>{
     if(sortKey==="company")return (a.company||"").localeCompare(b.company||"");
@@ -2339,6 +2347,7 @@ window.kpiGo=function(which){
   else if(which==="offers"){activeTab="interviewing";setF("statusFilter","Offer");}
   else if(which==="followup"){activeTab="open";activeLane="followup";}
   else if(which==="tierA"){activeTab="open";setF("tierFilter","A");}
+  else if(which==="today"){activeTab="today";}
   tierTouched.A=tierTouched.B=tierTouched.C=false;
   render();
 };
@@ -2412,7 +2421,7 @@ function renderToday(){
     : "";
   return `<div class="today-wrap">
     ${scoutRunStripHTML()}
-    <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
+    <div class="today-head">What needs you today — discover → verify → apply → follow up</div>
     ${queue}
     ${pipeline}
     <div class="today-foot">${all.length} jobs tracked · Strong: ${all.filter(x=>x.tier==='A').length} · apply next: ${applyNext.length}. Pick a card to jump straight into that work.</div>

@@ -98,7 +98,16 @@
   .about-pop p{margin:0 0 8px}.about-pop p:last-child{margin:0}
 
   /* KPI pills (#3) — compact operating metrics; secondary health is plainer/muted */
-  .kpibar{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin-bottom:18px}
+  .kpibar{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin-bottom:18px}
+  /* headline stat cards (Jobs tracked / Strong matches / Today's actions / Need a follow-up) */
+  .statcard{flex:1 1 0;min-width:150px;display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px}
+  .statcard[role=button]{cursor:pointer;transition:border-color .12s,background .12s}
+  .statcard[role=button]:hover{border-color:var(--line-2);background:var(--panel-2)}
+  .statcard[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .statcard .sc-k{font-family:"Spline Sans Mono",monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+  .statcard .sc-v{font-family:"Fraunces",serif;font-weight:700;font-size:1.7rem;line-height:1.05;color:var(--text);letter-spacing:-.01em}
+  .statcard.accent .sc-v{color:var(--accent)} .statcard.active .sc-v{color:var(--active)} .statcard.warning .sc-v{color:var(--warning)}
+  .statcard .sc-cap{font-size:.74rem;color:var(--text-2)}
   .kpi{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:78px}
   .kpi .kpi-k{font-size:.66rem;letter-spacing:.03em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
   .kpi .kpi-v{font-weight:700;font-size:1.18rem;line-height:1.15;letter-spacing:-.01em}
@@ -448,12 +457,22 @@
   .narr input:focus,.narr textarea:focus{border-color:var(--gold)}
   .narr textarea{resize:vertical;line-height:1.5}
   .narr .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
-  .profkw{display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:120px;overflow:auto}
-  .profkw .kw{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:2px 8px}
+  .profkw{display:flex;flex-wrap:wrap;gap:7px;padding:0;background:transparent;border:0}
+  .profkw .kw{font-family:"Spline Sans",sans-serif;font-size:.78rem;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;display:inline-flex;align-items:center;gap:6px}
+  .profkw .kw .kw-emph{color:var(--accent);font-size:.72rem}
   .profkw .kw b{color:var(--gold)}
-  .profkw .kw.kwedit{display:inline-flex;align-items:center;gap:5px;padding:2px 5px 2px 9px}
-  .profkw .kw.kwedit input{width:38px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--gold);font-family:"Spline Sans Mono",monospace;font-size:.7rem;padding:1px 3px;text-align:center}
+  .profkw .kw.kwedit{padding:3px 6px 3px 12px}
+  .profkw .kw.kwedit input{width:38px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--accent);font-family:"Spline Sans Mono",monospace;font-size:.7rem;padding:1px 3px;text-align:center}
   .profkw .kw .kwrm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.82rem;line-height:1;padding:0 2px}
+  /* read-only display cards (work history / education) + per-section edit toggle */
+  .sgrp-h .grp-edit{margin-left:auto;background:none;border:0;color:var(--accent);font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;padding:0}
+  .sgrp-h .grp-edit:hover{text-decoration:underline}
+  .histcard{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:13px 16px;margin-bottom:8px}
+  .histcard:last-child{margin-bottom:0}
+  .histcard .hc-role{font-weight:700;color:var(--text);font-size:.95rem}
+  .histcard .hc-co{color:var(--text-2);font-size:.85rem;margin-top:1px}
+  .histcard .hc-meta{color:var(--dim);font-family:"Spline Sans Mono",monospace;font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;margin-top:6px}
+  .histcard .hc-desc{color:var(--text-2);font-size:.83rem;line-height:1.55;margin-top:9px;white-space:pre-wrap}
   .profhist{display:flex;flex-direction:column;gap:8px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:260px;overflow:auto}
   .histitem{border-bottom:1px solid var(--line);padding-bottom:7px}
   .histitem:last-child{border-bottom:0;padding-bottom:0}
@@ -585,7 +604,7 @@
   .tier-empty{color:var(--dim);font-size:.84rem;padding:6px 4px 12px}
 
   /* compact rows (#5,#8) — company/role lead, score de-emphasized, metadata clustered, larger status */
-  .crow{display:grid;grid-template-columns:18px 38px minmax(0,1fr) auto 14px;align-items:center;gap:12px;
+  .crow{display:grid;grid-template-columns:18px 50px minmax(0,1fr) auto 14px;align-items:center;gap:12px;
     background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--line-2);
     border-radius:9px;padding:9px 13px;cursor:pointer;transition:background .12s,border-color .12s;margin-bottom:5px}
   .crow:hover{background:var(--panel-2);border-color:var(--line-2)}
@@ -593,7 +612,11 @@
   .crow.sel{background:#1c2733;border-color:var(--accent)}
   .crow.st-rejected{opacity:.6} .crow.st-archived{opacity:.45}
   .crow-chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
-  .crow-ev{font-family:"Spline Sans Mono",monospace;font-weight:700;font-size:1rem;text-align:center;line-height:1;color:var(--text-2)}
+  /* fit score circle — ringed dial in the match-strength color (the signature element) */
+  .crow-ev{width:46px;height:46px;border-radius:50%;border:2px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-family:"Fraunces",serif;font-weight:600;font-size:1.02rem;line-height:1;color:var(--text-2);background:transparent}
+  .crow.tierA .crow-ev{border-color:var(--accent);color:var(--accent)}
+  .crow.tierB .crow-ev{border-color:var(--info);color:var(--info)}
+  .crow.tierC .crow-ev{border-color:var(--line-2);color:var(--text-2)}
   .crow-main{display:flex;align-items:center;gap:8px;min-width:0}
   .crow-co{font-weight:700;color:var(--text);white-space:nowrap;flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis}
   /* company logo avatar (monogram tile + real logo overlay) */
@@ -622,7 +645,7 @@
   .req.flash{animation:flashfade 1.6s ease-out}
   @keyframes flashfade{0%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:none}}
   @media (max-width:680px){
-    .crow{grid-template-columns:18px 34px minmax(0,1fr) auto 14px;gap:9px}
+    .crow{grid-template-columns:18px 50px minmax(0,1fr) auto 14px;gap:9px}
     .crow-src{display:none}
   }
   /* #1 phone: two-line compact rows so company/role stay legible; score+badges+status+Open wrap below */
@@ -630,7 +653,7 @@
     .crow{grid-template-columns:26px minmax(0,1fr) 16px;
       grid-template-areas:"chk main caret" "ev tail caret";gap:3px 9px;align-items:center;padding:9px 11px}
     .crow-chk{grid-area:chk;align-self:center}
-    .crow-ev{grid-area:ev;text-align:left;font-size:.74rem}
+    .crow-ev{grid-area:ev;width:38px;height:38px;font-size:.86rem;align-self:center}
     .crow-main{grid-area:main;flex-wrap:wrap;gap:1px 7px}
     .crow-co{max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
     .crow-role{flex-basis:100%;white-space:normal;overflow:visible;text-overflow:clip;font-size:.82rem}
@@ -772,6 +795,13 @@
   .sgrp:last-child{margin-bottom:0}
   .sgrp-h{font-size:.84rem;font-weight:700;letter-spacing:.01em;color:var(--text);margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .sgrp-h::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--accent);flex:0 0 auto;opacity:.85}
+  /* collapsible group — "Advanced ▾" / private fields tucked away until opened */
+  details.sgrp>summary{cursor:pointer;list-style:none;user-select:none}
+  details.sgrp>summary::-webkit-details-marker{display:none}
+  details.sgrp>summary::after{content:"▾";margin-left:auto;color:var(--dim);font-size:.8rem;transition:transform .15s}
+  details.sgrp[open]>summary::after{transform:rotate(180deg)}
+  details.sgrp:not([open])>summary{margin-bottom:0}
+  details.sgrp:not([open]):hover{border-color:var(--line-2)}
   .sgrp-d{color:var(--dim);font-size:.78rem;line-height:1.5;margin:-6px 0 12px}
   .sgrp .field:last-child{margin-bottom:0}
   .sgrp>.hint:last-child,.sgrp .field .hint:last-child{margin-bottom:0!important}
@@ -1289,8 +1319,8 @@
               <span id="summaryMsg" class="setmuted"></span>
             </div>
           </div>
-          <div class="sgrp">
-            <div class="sgrp-h">Targeting</div>
+          <details class="sgrp adv">
+            <summary class="sgrp-h">Targeting <span class="setmuted" style="font-weight:400">reference levels Reqon ranks loosely</span></summary>
             <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text">
               <p class="hint" style="margin:4px 0 0">Reference levels Reqon treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
             </div>
@@ -1301,26 +1331,26 @@
               <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
               <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
             </div>
-          </div>
+          </details>
           <div class="sgrp">
-            <div class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what Reqon favors</span></div>
+            <div class="sgrp-h">Skills <span class="setmuted" style="font-weight:400">weighted résumé keywords — tune what Reqon favors</span><button class="grp-edit" id="kwEditToggle" type="button">Edit</button></div>
             <div id="profKeywords" class="profkw"></div>
-            <div class="ahintrow" style="margin-top:8px">
-              <input id="kwAddName" type="text" placeholder="add a keyword (e.g. agentic)" style="flex:1;min-width:120px">
+            <div class="ahintrow kwedit-only" id="kwAddRow" style="margin-top:8px;display:none">
+              <input id="kwAddName" type="text" placeholder="add a skill (e.g. agentic)" style="flex:1;min-width:120px">
               <input id="kwAddWeight" type="number" min="1" max="20" step="1" value="5" title="weight" style="width:64px">
               <button class="mini" id="kwAddBtn" type="button">+ Add</button>
             </div>
-            <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server's job finder. <span class="setmuted">The on-device app finder uses Search criteria keywords; it only runs when no server is connected.</span></p>
+            <p class="hint kwedit-only" id="kwHint" style="margin:8px 0 0;display:none">Higher weight = stronger pull. Weight ≥ 3 marks a skill <b>emphasized</b> (★, a fit bonus). Set a weight to 0 (or remove) to suppress. Kept when you re-parse your résumé.</p>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
+            <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span><button class="grp-edit" id="workEditToggle" type="button">Edit</button></div>
             <div id="profWorkHistory"></div>
-            <div class="ahintrow"><button class="mini" id="addWorkBtn" type="button">+ Add role</button></div>
+            <div class="ahintrow workedit-only" id="workAddRow" style="display:none"><button class="mini" id="addWorkBtn" type="button">+ Add role</button></div>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Education <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
+            <div class="sgrp-h">Education <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span><button class="grp-edit" id="eduEditToggle" type="button">Edit</button></div>
             <div id="profEducation"></div>
-            <div class="ahintrow"><button class="mini" id="addEduBtn" type="button">+ Add education</button></div>
+            <div class="ahintrow eduedit-only" id="eduAddRow" style="display:none"><button class="mini" id="addEduBtn" type="button">+ Add education</button></div>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Narrative library</div>
@@ -1334,8 +1364,8 @@
             <div id="answerBox"></div>
             <div class="ahintrow"><button class="mini" id="addAnswerBtn" type="button">+ Add saved answer</button></div>
           </div>
-          <div class="sgrp">
-            <div class="sgrp-h">Demographics (EEO)</div>
+          <details class="sgrp adv">
+            <summary class="sgrp-h">Equal-opportunity info <span class="setmuted" style="font-weight:400">private · never auto-filled</span></summary>
             <p class="sgrp-d">Voluntary self-identification, synced to the app. Stored privately for your reference — the apply-assist never auto-fills or submits these.</p>
             <div class="grid2">
               <div class="field"><label>Pronouns</label><select id="eeoPronouns"></select></div>
@@ -1346,7 +1376,7 @@
               <div class="field"><label>Disability status</label><select id="eeoDisability"></select></div>
               <div class="field"><label>Sexual orientation</label><select id="eeoOrientation"></select></div>
             </div>
-          </div>
+          </details>
           <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
         </section>
 
@@ -2190,21 +2220,16 @@ function render(){
   const isTierA=activeTab==="open"&&activeLane==="all"&&tf==="A";
   const isOffers=activeTab==="interviewing"&&sf==="Offer";
   const isInterview=activeTab==="interviewing"&&sf!=="Offer";
-  const kpi=(k,v,cls="",extra="",act="",on=false)=>`<div class="kpi ${cls}${on?' kpi-active':''}"`
-    +(act?` role="button" tabindex="0" data-k="${act}" onclick="kpiGo('${act}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kpiGo('${act}')}" title="Filter to ${k}"`:'')
-    +`><span class="kpi-k">${k}</span><span class="kpi-v">${v}${extra}</span></div>`;
+  // Four headline stat cards (design move). The displaced lifecycle counts stay reachable in the
+  // Filters dropdown (statusFilter) + quick filters; rate/timing metrics live on the Analytics tab.
+  const statCard=(k,v,cap,cls="",act="")=>`<div class="statcard ${cls}"`
+    +(act?` role="button" tabindex="0" onclick="kpiGo('${act}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kpiGo('${act}')}" title="${k}"`:'')
+    +`><span class="sc-k">${k}</span><span class="sc-v">${v}</span><span class="sc-cap">${cap}</span></div>`;
   document.getElementById("stats").innerHTML=
-    kpi("Open",openCount,"accent","","open",isOpen)+
-    kpi("Applied",applied,"positive","","applied",activeTab==="applied")+
-    kpi("Follow-up due",followups,followups?"warning":"","","followup",isFollow)+
-    kpi("Rejected",rejected,rejected?"danger":"",`<small>${rejRate}%</small>`,"closed",activeTab==="closed")+
-    kpi("Interviews",inInterview,"active","","interviewing",isInterview)+
-    kpi("Offers",offers,offers?"active":"","","offers",isOffers)+
-    `<div class="kpi-div"></div>`+
-    kpi("Jobs tracked",total,"sec")+
-    kpi("Strong matches",tierA,"sec","","tierA",isTierA)+
-    kpi("Response rate",am.responseRate+"%","sec")+
-    kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");
+    statCard("Jobs tracked",total,"across your search")+
+    statCard("Strong matches",tierA,"worth your time","accent","tierA")+
+    statCard("Today's actions",tabCounts.today,"ready when you are","active","today")+
+    statCard("Need a follow-up",followups,"before they go cold",followups?"warning":"","followup");
 
   const cmp=(a,b)=>{
     if(sortKey==="company")return (a.company||"").localeCompare(b.company||"");
@@ -2339,6 +2364,7 @@ window.kpiGo=function(which){
   else if(which==="offers"){activeTab="interviewing";setF("statusFilter","Offer");}
   else if(which==="followup"){activeTab="open";activeLane="followup";}
   else if(which==="tierA"){activeTab="open";setF("tierFilter","A");}
+  else if(which==="today"){activeTab="today";}
   tierTouched.A=tierTouched.B=tierTouched.C=false;
   render();
 };
@@ -2412,7 +2438,7 @@ function renderToday(){
     : "";
   return `<div class="today-wrap">
     ${scoutRunStripHTML()}
-    <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
+    <div class="today-head">What needs you today — discover → verify → apply → follow up</div>
     ${queue}
     ${pipeline}
     <div class="today-foot">${all.length} jobs tracked · Strong: ${all.filter(x=>x.tier==='A').length} · apply next: ${applyNext.length}. Pick a card to jump straight into that work.</div>
@@ -3499,10 +3525,15 @@ function fillEeo(e){
   });
 }
 function readEeo(){const e={};EEO_FIELDS.forEach(([id,key])=>{e[key]=SET(id).value;});return e;}
+let editKw=false, editWork=false, editEdu=false;   // profile sections default to read-only display
 function renderKeywords(){
   const box=SET("profKeywords");
-  if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No keywords yet — upload a resume or add one below.</span>';return;}
-  box.innerHTML=PROFILE_KEYWORDS.slice(0,80).map((k,i)=>
+  if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No skills yet — upload a résumé or add one below.</span>';return;}
+  if(!editKw){
+    box.innerHTML=PROFILE_KEYWORDS.slice(0,120).map(k=>`<span class="kw">${esc(k.kw)}${(+k.weight>=3)?' <span class="kw-emph" title="emphasized — a fit bonus">★</span>':''}</span>`).join("");
+    return;
+  }
+  box.innerHTML=PROFILE_KEYWORDS.slice(0,120).map((k,i)=>
     `<span class="kw kwedit">${esc(k.kw)} <input type="number" min="0" max="20" step="1" value="${k.weight}" data-kwi="${i}" title="weight"><button class="kwrm" type="button" data-kwx="${i}" title="remove">✕</button></span>`
   ).join("");
   box.querySelectorAll("input[data-kwi]").forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.kwi;if(PROFILE_KEYWORDS[i])PROFILE_KEYWORDS[i].weight=Math.max(0,Math.min(20,parseInt(inp.value,10)||0));});
@@ -3677,18 +3708,42 @@ function fillProfile(p){
 }
 const qa=(s)=>String(s==null?"":s).replace(/"/g,"&quot;");
 function renderWorkHistory(){
-  SET("profWorkHistory").innerHTML=PROFILE_WORK.map((w,i)=>
+  const box=SET("profWorkHistory");
+  if(!editWork){
+    box.innerHTML=PROFILE_WORK.length?PROFILE_WORK.map(w=>{
+      const dates=(w.start||w.end)?`${esc(w.start||'')}${w.end?' – '+esc(w.end):(w.start?' – Present':'')}`:'';
+      const meta=[dates,esc(w.location||'')].filter(Boolean).join('  ·  ');
+      const desc=(w.description||'').trim();
+      return `<div class="histcard"><div class="hc-role">${esc(w.role||'Untitled role')}</div>`+
+        (w.company?`<div class="hc-co">${esc(w.company)}</div>`:'')+
+        (meta?`<div class="hc-meta">${meta}</div>`:'')+
+        (desc?`<div class="hc-desc">${esc(desc)}</div>`:'')+`</div>`;
+    }).join(""):'<div class="setmuted">No work history yet — upload a résumé or add a role.</div>';
+    return;
+  }
+  box.innerHTML=PROFILE_WORK.map((w,i)=>
     `<div class="histedit" data-i="${i}"><button class="narr-rm" type="button" onclick="removeWork(${i})">remove</button>`+
     `<div class="grid2"><input class="wh-role" type="text" placeholder="Role / title" value="${qa(w.role)}">`+
     `<input class="wh-company" type="text" placeholder="Company" value="${qa(w.company)}">`+
     `<input class="wh-location" type="text" placeholder="Location" value="${qa(w.location)}">`+
     `<input class="wh-start" type="text" placeholder="Start (e.g. Aug 2022)" value="${qa(w.start)}">`+
     `<input class="wh-end" type="text" placeholder="End (e.g. Present)" value="${qa(w.end)}"></div>`+
-    `<textarea class="wh-desc" rows="3" placeholder="Description (one bullet per line)">${esc(w.description||"")}</textarea></div>`
+    `<textarea class="wh-desc" rows="4" placeholder="Description (one bullet per line)">${esc(w.description||"")}</textarea></div>`
   ).join("")||'<div class="setmuted">No work history yet — upload a résumé or add a role.</div>';
 }
 function renderEducation(){
-  SET("profEducation").innerHTML=PROFILE_EDU.map((e,i)=>
+  const box=SET("profEducation");
+  if(!editEdu){
+    box.innerHTML=PROFILE_EDU.length?PROFILE_EDU.map(e=>{
+      const deg=[esc(e.level||e.degree||''),esc(e.field||'')].filter(Boolean).join(', ');
+      const dates=(e.start||e.end)?`${esc(e.start||'')}${e.end?' – '+esc(e.end):''}`:'';
+      return `<div class="histcard"><div class="hc-role">${esc(e.school||'School')}</div>`+
+        (deg?`<div class="hc-co">${deg}</div>`:'')+
+        (dates?`<div class="hc-meta">${dates}</div>`:'')+`</div>`;
+    }).join(""):'<div class="setmuted">No education yet — upload a résumé or add an entry.</div>';
+    return;
+  }
+  box.innerHTML=PROFILE_EDU.map((e,i)=>
     `<div class="histedit" data-i="${i}"><button class="narr-rm" type="button" onclick="removeEdu(${i})">remove</button>`+
     `<div class="grid2"><input class="ed-school" type="text" placeholder="School" value="${qa(e.school)}">`+
     `<input class="ed-level" type="text" placeholder="Degree / level (e.g. MBA)" value="${qa(e.level||e.degree)}">`+
@@ -3801,7 +3856,7 @@ function syncAnswersFromDOM(){
 window.removeAnswer=function(i){syncAnswersFromDOM();PROFILE_ANSWERS.splice(i,1);renderAnswers();};
 SET("addAnswerBtn").onclick=()=>{syncAnswersFromDOM();PROFILE_ANSWERS.push({q:"",a:"",tags:""});renderAnswers();};
 async function saveProfile(){
-  syncNarrativesFromDOM(); syncAnswersFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
+  syncNarrativesFromDOM(); syncAnswersFromDOM(); if(editWork)syncWorkFromDOM(); if(editEdu)syncEduFromDOM();
   const body={
     applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim(),github:SET("profGithub").value.trim()},
     github:SET("profGithub").value.trim(),
@@ -3833,6 +3888,15 @@ SET("draftSummaryBtn").onclick=async()=>{
 };
 SET("addWorkBtn").onclick=()=>{syncWorkFromDOM();PROFILE_WORK.push({role:"",company:"",location:"",start:"",end:"",description:""});renderWorkHistory();};
 SET("addEduBtn").onclick=()=>{syncEduFromDOM();PROFILE_EDU.push({school:"",level:"",field:"",start:"",end:""});renderEducation();};
+// Per-section display ↔ edit toggle (read-only cards by default; reveal the editable forms on demand).
+function setSectionEdit(which,on){
+  if(which==='kw'){ editKw=on; SET('kwAddRow').style.display=on?'':'none'; SET('kwHint').style.display=on?'':'none'; SET('kwEditToggle').textContent=on?'Done':'Edit'; renderKeywords(); }
+  else if(which==='work'){ if(!on)syncWorkFromDOM(); editWork=on; SET('workAddRow').style.display=on?'':'none'; SET('workEditToggle').textContent=on?'Done':'Edit'; renderWorkHistory(); }
+  else if(which==='edu'){ if(!on)syncEduFromDOM(); editEdu=on; SET('eduAddRow').style.display=on?'':'none'; SET('eduEditToggle').textContent=on?'Done':'Edit'; renderEducation(); }
+}
+SET("kwEditToggle").onclick=()=>setSectionEdit('kw',!editKw);
+SET("workEditToggle").onclick=()=>setSectionEdit('work',!editWork);
+SET("eduEditToggle").onclick=()=>setSectionEdit('edu',!editEdu);
 SET("kwAddBtn").onclick=()=>{
   const name=SET("kwAddName").value.trim(); if(!name)return;
   const w=Math.max(0,Math.min(20,parseInt(SET("kwAddWeight").value,10)||5));

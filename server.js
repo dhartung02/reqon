@@ -1732,7 +1732,7 @@ async function aiExtractProfile(text) {
       workHistory: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
         role: { type: 'string' }, company: { type: 'string' }, location: { type: 'string' },
         start: { type: 'string' }, end: { type: 'string' },
-        description: { type: 'string', description: '1-2 factual sentences; do not invent' } },
+        description: { type: 'string', description: "the role's FULL responsibilities and achievements, copied faithfully from the résumé — every bullet/line the résumé lists for this role, one per line (\\n-separated). Do not invent, embellish, or summarize away detail; keep what the résumé actually says." } },
         required: ['role', 'company', 'location', 'start', 'end', 'description'] } },
       education: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
         school: { type: 'string' }, level: { type: 'string' }, field: { type: 'string' },
@@ -1740,9 +1740,9 @@ async function aiExtractProfile(text) {
         required: ['school', 'level', 'field', 'start', 'end'] } },
     }, required: ['name', 'email', 'phone', 'linkedin', 'github', 'location', 'summary', 'seniority',
       'roleTerms', 'industries', 'sectors', 'keywords', 'workHistory', 'education'] } };
-  const system = 'You extract a structured candidate profile from résumé text. Use ONLY information present in the text — never invent or guess contact details, employers, dates, degrees, or accomplishments. Leave a field as "" or [] when the résumé does not contain it. Keep each work description to 1-2 factual sentences. roleTerms must be bare role functions with NO seniority words (seniority is captured separately).';
+  const system = 'You extract a structured candidate profile from résumé text. Use ONLY information present in the text — never invent or guess contact details, employers, dates, degrees, or accomplishments. Leave a field as "" or [] when the résumé does not contain it. For each work entry, capture the FULL description — every responsibility and achievement bullet the résumé lists for that role, one per line (\\n-separated) — copied faithfully without inventing or summarizing away detail. (The separate `summary` field stays a condensed 2-4 sentences.) roleTerms must be bare role functions with NO seniority words (seniority is captured separately).';
   const user = 'Résumé text:\n\n' + String(text || '').slice(0, 16000);
-  return callTool({ system, user, tool, maxTokens: 2600 });
+  return callTool({ system, user, tool, maxTokens: 4096 });
 }
 
 app.post('/api/assist', requireFeature('ai_draft'), async (req, res) => {

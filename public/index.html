@@ -749,6 +749,10 @@
   /* auto-grow textareas so the whole list is visible (no inner scroll) */
   .field textarea.ag{resize:none;overflow:hidden;min-height:62px}
   .dh-hidden{display:none!important}   /* deployment-mode (Cloud/Server) visibility — see applyDeploymentVisibility() */
+  .aiusage{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .aiusage-num{font-size:2rem;font-weight:700;color:var(--accent);line-height:1}
+  .aiusage-den{font-size:1rem;color:var(--text-2)}
+  .aiusage-lbl{font-size:.8rem;color:var(--text-2);margin-left:4px}
   /* desired-salary dual-range slider */
   .salslider{position:relative;height:30px;display:flex;align-items:center;margin-top:8px}
   .salslider .sal-fill{position:absolute;height:4px;border-radius:2px;background:var(--accent);top:50%;transform:translateY(-50%);pointer-events:none}
@@ -1473,6 +1477,16 @@
               <div class="field"><label>Monthly budget (USD, optional)</label><input id="setMonthlyBudget" type="number" min="0" step="1" placeholder="blank = no budget bar"></div>
             </div>
             <p class="hint" id="costHint" style="margin:8px 0 0">OpenAI can't report your balance via API, so cost is <b>estimated</b> from logged tokens × the rate you set here (was <code>.env</code>-only). Authoritative billing: <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">platform.openai.com/usage ↗</a></p>
+          </div>
+        </section>
+
+        <!-- Cloud end-user view: the plain-language AI allowance, not the platform knobs above. -->
+        <section class="sset" data-sect="works" hidden data-show="cloud-user">
+          <div class="ssh">AI assistant</div>
+          <p class="ssd">AI drafting composes a cover note or screening answer from your profile + narratives. Output is always editable and never auto-submitted.</p>
+          <div class="sgrp">
+            <div class="sgrp-h">Your AI usage</div>
+            <div id="aiUsageCard"><div class="setmuted" style="padding:8px">loading…</div></div>
           </div>
         </section>
 
@@ -3152,6 +3166,19 @@ function fillSettings(j){
   SET("setMonthlyBudget").value=as.monthlyBudget!=null?as.monthlyBudget:"";
   if(SET("costHint")){const c=as.estCost30d!=null?`~$${as.estCost30d} est. last 30d (${(as.tokens30d||0).toLocaleString()} tokens)`:"set a rate to estimate cost";const bp=as.budgetUsedPct!=null?` · ${as.budgetUsedPct}% of budget`:"";SET("costHint").innerHTML=`${c}${bp}. OpenAI can't report your balance via API. <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">platform.openai.com/usage ↗</a>`;}
   SET("assistUsageHint").textContent=`Used today: ${as.callsToday||0} call(s), ${as.tokensToday||0} tokens. Per-req "✍ AI draft" grounds in your profile + narratives; output is editable and never auto-submitted.`;
+  // Cloud end-user allowance view — read-only; the technical knobs above stay admin/server-only.
+  if(SET("aiUsageCard")){
+    const cap=as.dailyCalls!=null?as.dailyCalls:25, used=as.callsToday||0;
+    const hasAi=!DEPLOY.cloud || !!(DEPLOY.plan&&DEPLOY.plan.ai);   // server/admin always; Cloud needs the AI plan
+    if(hasAi){
+      const left=Math.max(0,cap-used);
+      SET("aiUsageCard").innerHTML=
+        `<div class="aiusage"><span class="aiusage-num">${used}</span><span class="aiusage-den">/ ${cap}</span><span class="aiusage-lbl">AI drafts used today</span></div>`+
+        `<p class="hint" style="margin:10px 0 0">Your plan includes up to <b>${cap}</b> AI draft${cap===1?'':'s'} per day — <b>${left}</b> left today. Resets daily.</p>`;
+    }else{
+      SET("aiUsageCard").innerHTML=`<p class="hint" style="margin:0">AI drafting — auto-composed cover notes and screening answers from your profile — is part of the <b>AI+</b> plan.</p>`;
+    }
+  }
   const dg=j.digest||{};
   SET("setDigestEnabled").checked=!!dg.enabled;
   SET("setDigestTime").value=dg.time||"07:00";
@@ -3248,18 +3275,20 @@ function applyTabMap(tm){
 async function fetchSettings(){return (await fetch("/api/settings",{cache:"no-store"})).json();}
 // ---- deployment-mode visibility (Reqon Cloud vs Reqon Server) -------------------------------
 // One declarative convention so the Cloud/Server divergence lives in markup, not scattered ifs.
-// Tag any settings element with data-show="server" | "admin" | "server-or-admin" | "cloud":
+// Tag any settings element with data-show="server" | "admin" | "server-or-admin" | "cloud" | "cloud-user":
 //   server         → only on self-hosted Reqon Server (infra: passphrase, ingest token, APNs,
 //                     remote URL, env inventory). Hidden on hosted Reqon Cloud (provider-managed).
 //   admin          → only for an admin (Reqon Server owner is always admin; on Cloud, platform
 //                     admins). The Team & admin console.
-//   server-or-admin→ Reqon Server owner OR a Cloud admin (AI-assistant config). Cloud users keep
-//                     AI *features* gated by their plan, not these knobs.
+//   server-or-admin→ Reqon Server owner OR a Cloud admin (the technical AI-assistant config knobs:
+//                     model, caps, token/char limits, cost). Cloud end-users never see these.
 //   cloud          → only on hosted Reqon Cloud.
+//   cloud-user     → a Cloud end-user (non-admin): the plain-language AI allowance view, not the
+//                     platform knobs. Hidden on Reqon Server and from Cloud admins (they get the full config).
 // No attribute = shown everywhere. /api/me already exposes multiUser/role/plan — no server change.
 let DEPLOY={ server:true, cloud:false, admin:true, plan:{} };  // optimistic default = Reqon Server owner
 function applyDeploymentVisibility(){
-  const ok={ server:DEPLOY.server, cloud:DEPLOY.cloud, admin:DEPLOY.admin, 'server-or-admin':(DEPLOY.server||DEPLOY.admin) };
+  const ok={ server:DEPLOY.server, cloud:DEPLOY.cloud, admin:DEPLOY.admin, 'server-or-admin':(DEPLOY.server||DEPLOY.admin), 'cloud-user':(DEPLOY.cloud && !DEPLOY.admin) };
   document.querySelectorAll('[data-show]').forEach(el=>{
     const k=el.dataset.show; const vis=(k in ok)?ok[k]:true;
     el.classList.toggle('dh-hidden', !vis);

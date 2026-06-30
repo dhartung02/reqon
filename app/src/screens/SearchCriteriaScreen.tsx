@@ -44,7 +44,7 @@ export function SearchCriteriaScreen({ onBack }: { onBack: () => void }) {
         </Pressable>
       </View>
       <Text style={styles.title}>Search criteria</Text>
-      <Text style={styles.intro}>What the scout looks for. When a server is connected these sync with its watchlist; otherwise they tune the on-device scout.</Text>
+      <Text style={styles.intro}>What Reqon looks for. When a server is connected these sync with its watchlist; otherwise they tune on-device matching.</Text>
       {status ? <Text style={[styles.status, { color: status.ok ? c.emerald : c.danger }]}>{status.text}</Text> : null}
 
       <Section title="MINIMUM FIT">

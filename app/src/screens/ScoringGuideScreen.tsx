@@ -27,31 +27,31 @@ const BLOCKS: Block[] = [
     ],
   },
   {
-    heading: 'Expected value (EV) — the “Score”',
+    heading: 'Expected value (EV) — the card number',
     body: [
-      'EV = fit × prob ÷ 10. It blends “how good a match” with “how likely a conversation” into one ranking number — the “Score” shown on each card and used to sort.',
+      'EV = fit × prob ÷ 10. It blends “how good a match” with “how likely a conversation” into one ranking number — the number shown on each card and used to sort.',
       'Example: fit 8 × prob 7 ÷ 10 = 5.6.',
     ],
   },
   {
-    heading: 'Tiers A / B / C',
+    heading: 'Strong / Possible / Long shot',
     body: [
-      'Tier A needs all three: EV ≥ 5.2, fit ≥ 8, and prob ≥ 6.5 — a strong match they’re likely to screen.',
-      'Tier B is EV ≥ 4.0. Anything below falls to Tier C.',
-      'These thresholds are yours to tune in Settings → Tiers & rules.',
+      'Strong needs all three: EV ≥ 5.2, fit ≥ 8, and prob ≥ 6.5 — a strong match they’re likely to screen.',
+      'Possible is EV ≥ 4.0. Anything below is a Long shot.',
+      'These thresholds are yours to tune in Settings → How Reqon works for you.',
     ],
   },
   {
-    heading: '“Minimum fit” vs the tier bars',
+    heading: '“Minimum fit” vs the match bars',
     body: [
-      'These look similar but do different jobs. Search criteria → “Minimum fit” (default 6.0) is the floor for a role to be surfaced at all. Tier A’s “min fit 8.0” is the higher bar to be labelled top-tier.',
-      'Also note the units differ: minimum fit is a fit score (0–10), while Tier A’s “min expected value 5.2” is an EV (fit × prob ÷ 10) — so 6.0 and 5.2 aren’t directly comparable.',
+      'These look similar but do different jobs. Search criteria → “Minimum fit” (default 6.0) is the floor for a role to be surfaced at all. Strong’s “min fit 8.0” is the higher bar to be labelled a top match.',
+      'Also note the units differ: minimum fit is a fit score (0–10), while Strong’s “min expected value 5.2” is an EV (fit × prob ÷ 10) — so 6.0 and 5.2 aren’t directly comparable.',
     ],
   },
   {
-    heading: 'Scout merge tier',
+    heading: 'Auto-add threshold',
     body: [
-      'Controls how selective the scout is when it auto-adds finds: “A only” keeps just top-tier, “A & B” adds strong + solid, “All tiers” keeps everything it scores.',
+      'Controls how selective Reqon is when it auto-adds finds: “Strong only” keeps just top matches, “Strong & Possible” adds strong + solid, “Everything” keeps all it scores.',
     ],
   },
   {
@@ -74,7 +74,7 @@ export function ScoringGuideScreen({ onBack }: { onBack: () => void }) {
         </Pressable>
       </View>
       <Text style={styles.title}>How scoring works</Text>
-      <Text style={styles.intro}>Every role gets a Fit and an Interview-probability score; together they set Expected value and the A/B/C tier. Here’s what each means.</Text>
+      <Text style={styles.intro}>Every role gets a Fit and an Interview-probability score; together they set Expected value and its match strength (Strong / Possible / Long shot). Here’s what each means.</Text>
 
       {BLOCKS.map((b) => (
         <View key={b.heading} style={styles.block}>

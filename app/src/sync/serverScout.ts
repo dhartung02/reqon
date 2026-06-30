@@ -8,9 +8,9 @@ const normalize = (u: string) => u.trim().replace(/\/+$/, '');
 // Run modes mirror the web board's "Run Scout" menu (server /api/scout/run accepts these).
 export type ScoutRunMode = 'find' | 'validate' | 'both';
 export const SCOUT_RUN_MODES: { mode: ScoutRunMode; label: string }[] = [
-  { mode: 'find', label: 'Find new matches' },
-  { mode: 'validate', label: 'Validate + refresh existing' },
-  { mode: 'both', label: 'Run all (validate, then find)' },
+  { mode: 'find', label: 'Find new jobs' },
+  { mode: 'validate', label: 'Check existing jobs' },
+  { mode: 'both', label: 'Do everything (check, then find)' },
 ];
 
 // Offline queue: the phone can't run the browser-driven scout itself, so when the server is

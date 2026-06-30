@@ -36,7 +36,7 @@ export function pipelineHealth(roles: Role[]): PipelineHealth {
 
   let score = 100;
   const risks: { w: number; t: string }[] = [];
-  if (applyReady.length < 3) { const w = applyReady.length === 0 ? 30 : 18; score -= w; risks.push({ w, t: applyReady.length === 0 ? 'No apply-ready Tier A/B roles in the queue.' : `Only ${applyReady.length} apply-ready Tier A/B role${applyReady.length === 1 ? '' : 's'} queued.` }); }
+  if (applyReady.length < 3) { const w = applyReady.length === 0 ? 30 : 18; score -= w; risks.push({ w, t: applyReady.length === 0 ? 'No apply-ready Strong / Possible roles in the queue.' : `Only ${applyReady.length} apply-ready Strong / Possible role${applyReady.length === 1 ? '' : 's'} queued.` }); }
   if (appliedLast7.length === 0) { score -= 22; risks.push({ w: 22, t: 'No applications submitted in the last 7 days.' }); }
   if (followupsOverdue.length > 0) { const w = Math.min(20, 6 + followupsOverdue.length * 3); score -= w; risks.push({ w, t: `${followupsOverdue.length} follow-up${followupsOverdue.length === 1 ? '' : 's'} overdue.` }); }
   if (agingApps.length > 0) { const w = Math.min(18, 4 + agingApps.length * 2); score -= w; risks.push({ w, t: `${agingApps.length} application${agingApps.length === 1 ? '' : 's'} aging 14+ days with no response.` }); }
@@ -47,7 +47,7 @@ export function pipelineHealth(roles: Role[]): PipelineHealth {
   const mainRisk = risks.length ? risks[0].t : 'Pipeline is balanced — keep applying to high-EV roles.';
 
   const recommendations: string[] = [];
-  if (applyReady.length < 3) recommendations.push('Run the scout to find fresh Tier A/B roles.');
+  if (applyReady.length < 3) recommendations.push('Find new jobs to surface fresh Strong / Possible roles.');
   if (applyReady.length > 0) recommendations.push(`Apply to your top ${Math.min(3, applyReady.length)} high-EV role${applyReady.length === 1 ? '' : 's'} (avg EV ${avgEvReady}).`);
   if (followupsOverdue.length > 0) recommendations.push(`Send ${followupsOverdue.length} overdue follow-up${followupsOverdue.length === 1 ? '' : 's'}.`);
   if (interviewing.length > 0) recommendations.push('Prep your interview/offer stage roles.');

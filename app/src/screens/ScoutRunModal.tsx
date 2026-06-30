@@ -24,7 +24,7 @@ export function ScoutRunModal({
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}}>
           <View style={styles.headRow}>
-            <Text style={styles.title}>Run Scout</Text>
+            <Text style={styles.title}>Find new jobs</Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <Text style={styles.cancel}>Done</Text>
             </Pressable>

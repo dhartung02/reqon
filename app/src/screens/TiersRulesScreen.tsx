@@ -51,13 +51,13 @@ export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
           <Text style={styles.save}>{busy ? '…' : 'Save'}</Text>
         </Pressable>
       </View>
-      <Text style={styles.title}>Tiers & rules</Text>
-      <Text style={styles.intro}>How A/B/C tiers are defined and the scout's merge rules. Expected value (EV) = fit × prob ÷ 10. Synced with the server when connected.</Text>
+      <Text style={styles.title}>Ranking & rules</Text>
+      <Text style={styles.intro}>How Strong / Possible / Long shot are defined and how selective Reqon is when it adds jobs. Expected value (EV) = fit × prob ÷ 10. Synced with the server when connected.</Text>
       {status ? <Text style={[styles.status, { color: status.ok ? c.emerald : c.danger }]}>{status.text}</Text> : null}
 
       <View style={styles.section}>
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>TIER A — needs all three</Text>
+          <Text style={styles.sectionTitle}>STRONG — needs all three</Text>
           <Pressable onPress={reset} hitSlop={8}><Text style={styles.reset}>Reset defaults</Text></Pressable>
         </View>
         <Stepper label="Min expected value" value={t.aEv} step={0.1} onChange={(v) => setThr('aEv', v)} />
@@ -66,19 +66,19 @@ export function TiersRulesScreen({ onBack }: { onBack: () => void }) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>TIER B — by expected value</Text>
+        <Text style={styles.sectionTitle}>POSSIBLE — by expected value</Text>
         <Stepper label="Min expected value" value={t.bEv} step={0.1} onChange={(v) => setThr('bEv', v)} />
-        <Text style={styles.help}>Anything below Tier B falls to Tier C.</Text>
+        <Text style={styles.help}>Anything below Possible is a Long shot.</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>SCOUT MERGE</Text>
-        <Text style={styles.help}>Lowest tier the scout will add to your pipeline.</Text>
+        <Text style={styles.sectionTitle}>AUTO-ADD</Text>
+        <Text style={styles.help}>Lowest match strength Reqon will add to your pipeline.</Text>
         <View style={styles.seg}>
           {([
-            ['A', 'A only'],
-            ['B', 'A & B'],
-            ['C', 'All tiers'],
+            ['A', 'Strong only'],
+            ['B', 'Strong & Possible'],
+            ['C', 'Everything'],
           ] as [Tier, string][]).map(([m, label]) => (
             <Pressable key={m} style={[styles.segBtn, r.minTierToMerge === m && styles.segBtnOn]} onPress={() => setR((s) => ({ ...s, minTierToMerge: m }))}>
               <Text style={[styles.segText, r.minTierToMerge === m && styles.segTextOn]}>{label}</Text>

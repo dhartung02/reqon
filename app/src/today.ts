@@ -78,8 +78,8 @@ export function todayLanes(roles: Role[]): TodayLane[] {
   return [
     { key: 'new', count: n(newSince), title: 'New since last run', desc: 'Added recently, not yet applied', tone: 'accent', jump: 'open' },
     { key: 'verify', count: n(needsVerify), title: 'Needs verification', desc: 'Unverified links — confirm the live posting first', tone: 'warning', jump: 'open' },
-    { key: 'applynext', count: n(isApplyNext), title: 'Apply next', desc: 'Tier A/B · verified · still open · not applied', tone: 'accent', jump: 'open' },
-    { key: 'tierA', count: n(tierANotApplied), title: 'Tier A · not applied', desc: "Top-tier roles you haven't applied to yet", tone: 'accent', jump: 'open' },
+    { key: 'applynext', count: n(isApplyNext), title: 'Apply next', desc: 'Strong / Possible · verified · still open · not applied', tone: 'accent', jump: 'open' },
+    { key: 'tierA', count: n(tierANotApplied), title: 'Strong · not applied', desc: "Top matches you haven't applied to yet", tone: 'accent', jump: 'open' },
     { key: 'followup', count: n(followUpDue), title: 'Follow-up due', desc: 'Active applications gone quiet past your threshold', tone: 'danger', jump: 'applied' },
     { key: 'closed', count: n(closedReq), title: 'Recently closed', desc: 'Postings detected closed — review and archive', tone: 'muted', jump: 'closed' },
     { key: 'interviews', count: n(inInterview), title: 'In interviews', desc: 'Active interview-stage conversations', tone: 'active', jump: 'interviewing' },

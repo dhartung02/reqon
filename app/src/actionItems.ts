@@ -68,7 +68,7 @@ export function computeActions(roles: Role[]): AppAction[] {
     }
     if (isApplyNext(r)) {
       const ev = +r.score || 0;
-      push({ id: 'apply-' + r.id, type: 'apply_next', severity: ev >= 7 ? 'high' : 'medium', priority: 60 + Math.round(ev), reason: 'Tier ' + r.tier + ' · EV ' + ev + ' — apply next.', ...base });
+      push({ id: 'apply-' + r.id, type: 'apply_next', severity: ev >= 7 ? 'high' : 'medium', priority: 60 + Math.round(ev), reason: (r.tier === 'A' ? 'Strong' : r.tier === 'B' ? 'Possible' : 'Long shot') + ' · EV ' + ev + ' — apply next.', ...base });
     }
     if (r.status === 'Not Applied' && !scored(r)) {
       push({ id: 'score-' + r.id, type: 'needs_scoring', severity: 'low', priority: 45, reason: 'Unscored lead — score fit/prob to rank it.', ...base });

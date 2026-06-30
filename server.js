@@ -3663,6 +3663,7 @@ function settingsPayload() {
     salaryFloor: st.minSalary != null && !isNaN(+st.minSalary) ? +st.minSalary : 0,
     salaryTarget: st.salaryTarget != null && !isNaN(+st.salaryTarget) ? +st.salaryTarget : 0,
     remoteOnly: boards.remoteOnly !== false,
+    theme: (boards.theme === 'light' || boards.theme === 'dark') ? boards.theme : 'dark',
     minDelaySeconds: boards.minDelaySeconds != null ? boards.minDelaySeconds : 0.4,
     analyticsWindowDays: boards.analyticsWindowDays != null ? boards.analyticsWindowDays : 0,
     minTierToMerge: ['A', 'B', 'C'].includes(String(boards.minTierToMerge || '').toUpperCase()) ? String(boards.minTierToMerge).toUpperCase() : 'B',
@@ -3818,6 +3819,7 @@ app.put('/api/settings', (req, res) => {
       touchedBoards = true;
     }
     if (typeof b.remoteOnly === 'boolean') { boards.remoteOnly = b.remoteOnly; touchedBoards = true; }
+    if (b.theme === 'light' || b.theme === 'dark') { boards.theme = b.theme; touchedBoards = true; }
     if (typeof b.minTierToMerge === 'string' && ['A', 'B', 'C'].includes(b.minTierToMerge.toUpperCase())) { boards.minTierToMerge = b.minTierToMerge.toUpperCase(); touchedBoards = true; }
     if (b.tierThresholds && typeof b.tierThresholds === 'object') {
       const cur = tierThresholds(boards);

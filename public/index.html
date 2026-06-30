@@ -27,6 +27,49 @@
     --t9:#00E5A3; --t7:#5BD6A0; --t5:#FFB800; --t3:#64748B;
     --shadow:0 12px 32px -16px rgba(0,0,0,.6);
   }
+  /* Light theme — opt-in via <html data-theme="light"> (dark stays the default, see BRAND.md).
+     Most rules read the var() tokens below, so remapping them themes the whole app. The
+     blocks after the vars only patch spots that hardcode a dark ink on a bright brand color
+     or use a dark translucent badge wash — those don't follow the tokens automatically. */
+  [data-theme="light"]{
+    --bg:#F4F6F9; --panel:#FFFFFF; --panel-2:#EEF2F7; --line:#E3E8EF; --line-2:#D3DBE5;
+    --text:#0B1220; --text-2:#475569; --dim:#7C8A9C;
+    --accent:#00936B; --positive:#00936B; --active:#0D9488; --info:#3B6FB0; --warning:#B45309; --danger:#DC2626; --ai:#7C5CC4; --muted:#7C8A9C;
+    --t9:#00936B; --t7:#5BBF94; --t5:#B45309; --t3:#7C8A9C;
+    --card:#FFFFFF;
+    --shadow:0 18px 40px -24px rgba(15,23,42,.22);
+  }
+  /* dark ink hardcoded on a bright brand background → white once the brand color darkens */
+  [data-theme="light"] .btn,
+  [data-theme="light"] .btn.apply,
+  [data-theme="light"] .fcount,
+  [data-theme="light"] .bellcount,
+  [data-theme="light"] .cc-chip.active,
+  [data-theme="light"] .stpill.offer,
+  [data-theme="light"] .doneflag.offer,
+  [data-theme="light"] .tierTag.A,
+  [data-theme="light"] .tierTag.B,
+  [data-theme="light"] .pill.remote,
+  [data-theme="light"] .pill.onsite,
+  [data-theme="light"] .pill.flex,
+  [data-theme="light"] .bandtag.b-exc{color:#FFFFFF}
+  /* dark translucent / blob badge washes → light tints of the same role color */
+  [data-theme="light"] .pill.source{background:rgba(124,92,196,.10);border-color:rgba(124,92,196,.35)}
+  [data-theme="light"] .tierTag.C{background:var(--panel-2);color:var(--text-2)}
+  [data-theme="light"] .selbar{background:var(--panel-2)}
+  [data-theme="light"] .crow.sel{background:rgba(0,147,107,.08)}
+  [data-theme="light"] .doneflag.applied{background:rgba(0,147,107,.10);border-color:rgba(0,147,107,.30)}
+  [data-theme="light"] .doneflag.active,
+  [data-theme="light"] .pill.verified{background:rgba(13,148,136,.10);border-color:rgba(13,148,136,.30)}
+  [data-theme="light"] .doneflag.rejected,
+  [data-theme="light"] .pill.unverified{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.30)}
+  [data-theme="light"] .pill.boardonly{background:rgba(180,83,9,.10);border-color:rgba(180,83,9,.30)}
+  [data-theme="light"] .pill.sal{background:var(--panel-2);border-color:var(--line-2)}
+  [data-theme="light"] .crow-open,
+  [data-theme="light"] .mini.link{border-color:var(--line-2)}
+  [data-theme="light"] .ent-toast{background:#FFFFFF}
+  /* lighter, softer modal scrim for light mode */
+  [data-theme="light"] .overlay{background:rgba(15,23,42,.38)}
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{background:var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.5;min-height:100vh;padding:clamp(14px,2.4vw,30px);-webkit-font-smoothing:antialiased}
@@ -684,6 +727,14 @@
   .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:9px}
   .scoregrid .field{margin-bottom:0}
   .modalacts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  /* "Add tracking details" disclosure in the add/edit modal */
+  .modal details.trackdetails{margin-top:8px;border-top:1px dashed var(--line-2);padding-top:12px}
+  .modal details.trackdetails>summary{cursor:pointer;font-size:.82rem;color:var(--text-2);list-style:none;display:flex;align-items:center;gap:7px;padding:4px 0;user-select:none}
+  .modal details.trackdetails>summary::-webkit-details-marker{display:none}
+  .modal details.trackdetails>summary::before{content:"▸";color:var(--dim);transition:transform .15s}
+  .modal details.trackdetails[open]>summary::before{transform:rotate(90deg)}
+  .modal details.trackdetails>summary:hover{color:var(--text)}
+  .modal details.trackdetails>.grid2,.modal details.trackdetails>.grid3,.modal details.trackdetails>.field{margin-top:12px}
   /* narrative builder modal */
   .nb-list{display:flex;flex-direction:column;gap:12px;max-height:54vh;overflow:auto;margin:6px 0}
   .nb-card{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
@@ -697,10 +748,14 @@
   .settings-head{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid var(--line);flex:none}
   .settings-head h2{margin:0}
   .settings-body{display:flex;min-height:0;flex:1}
-  .settings-nav{flex:none;width:202px;border-right:1px solid var(--line);padding:12px 10px;overflow:auto;display:flex;flex-direction:column;gap:2px;background:var(--bg)}
-  .settings-nav button{text-align:left;background:transparent;border:0;color:var(--text-2);padding:9px 12px;border-radius:8px;font-family:inherit;font-size:.86rem;cursor:pointer}
+  .settings-nav{flex:none;width:248px;border-right:1px solid var(--line);padding:12px 10px;overflow:auto;display:flex;flex-direction:column;gap:3px;background:var(--bg)}
+  .settings-nav button{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:transparent;border:0;color:var(--text-2);padding:10px 12px;border-radius:9px;font-family:inherit;font-size:.86rem;cursor:pointer}
   .settings-nav button:hover{background:var(--panel-2);color:var(--text)}
   .settings-nav button.active{background:var(--panel-2);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+  .settings-nav .snav-i{font-size:1rem;line-height:1.35;flex:none}
+  .settings-nav .snav-t{display:flex;flex-direction:column;gap:1px;font-weight:600;min-width:0}
+  .settings-nav .snav-t small{font-weight:400;font-size:.72rem;color:var(--dim);line-height:1.3;white-space:normal}
+  .settings-nav button.active .snav-t small{color:var(--text-2)}
   .pairbox{margin-top:10px}
   .pairqr{width:180px;height:180px;background:#fff;border-radius:10px;padding:8px;box-sizing:border-box}
   .pairqr svg{width:100%;height:100%;display:block}
@@ -769,13 +824,13 @@
       </svg>
       <div class="brandwrap">
         <span class="brandmark">Reqon</span>
-        <h1>Requisition pipeline</h1>
+        <h1>Your job board</h1>
       </div>
       <button class="infobtn" id="aboutBtn" title="About this board" aria-label="About this board">i</button>
       <div class="about-pop" id="aboutPop">
-        <p><b>Reqon — self-hosted job-search command center.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
-        <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Tier</b> is set by expected value.</p>
-        <p>Every edit saves server-side and persists. Use <b>Run Scout</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs action.</p>
+        <p><b>Reqon — your self-hosted job-search home base.</b> Live jobs grouped by match strength, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
+        <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Match strength</b> (Strong / Possible / Long shot) is set by expected value.</p>
+        <p>Every edit saves server-side and persists. Use <b>Find new jobs</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs you.</p>
         <p style="margin-top:10px"><a href="/guide" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">Open the full user guide ↗</a></p>
       </div>
     </div>
@@ -790,6 +845,7 @@
       </div>
       <span class="userchip" id="userChip" style="display:none"></span>
       <span class="planbadge" id="planBadge" style="display:none" title="Your Reqon plan"></span>
+      <button class="btn ghost" id="themeToggle" type="button" title="Switch light / dark" aria-label="Switch light or dark theme">☾</button>
       <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
     </div>
   </header>
@@ -802,7 +858,7 @@
   <div class="toolbar">
     <input type="text" id="search" placeholder="Search company, role, recruiter, notes…" />
     <select id="sort">
-      <option value="expected" selected>Sort: Expected value (fit×prob)</option>
+      <option value="expected" selected>Sort: Best bets first</option>
       <option value="fit">Sort: Fit</option>
       <option value="prob">Sort: Interview probability</option>
       <option value="company">Sort: Company A–Z</option>
@@ -810,8 +866,8 @@
       <option value="applied_asc">Sort: Applied date (oldest)</option>
       <option value="followup">Sort: Follow-up date</option>
     </select>
-    <select id="groupBy" title="Group the Open / Applied list">
-      <option value="tier" selected>Group: Tier</option>
+    <select id="groupBy" title="Group the saved / applied list">
+      <option value="tier" selected>Group: Match strength</option>
       <option value="company">Group: Company</option>
       <option value="none">Group: None (flat)</option>
     </select>
@@ -823,10 +879,10 @@
           <option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option>
           <option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option>
         </select>
-        <select id="tierFilter"><option value="">All tiers</option><option value="A">Tier A</option><option value="B">Tier B</option><option value="C">Tier C</option></select>
+        <select id="tierFilter"><option value="">All matches</option><option value="A">Strong</option><option value="B">Possible</option><option value="C">Long shot</option></select>
         <select id="sourceFilter"><option value="">All sources</option></select>
-        <select id="applyModeFilter"><option value="">All apply modes</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
-        <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply-next only</label>
+        <select id="applyModeFilter"><option value="">Any way to apply</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
+        <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply next only</label>
         <label class="toggle"><input type="checkbox" id="remoteOnly"> Remote only</label>
         <label class="toggle"><input type="checkbox" id="activeOnly"> Active only</label>
         <label class="toggle"><input type="checkbox" id="notAppliedOnly"> Not applied only</label>
@@ -835,25 +891,25 @@
     <div class="spacer"></div>
     <span class="scoutstatus" id="scoutStatus"></span>
     <div class="scoutctl">
-      <button class="btn ghost" id="scoutBtn" data-feature="scout">⟳ Run Scout ▾</button>
+      <button class="btn ghost" id="scoutBtn" data-feature="scout">↻ Find new jobs ▾</button>
       <div class="scoutmenu" id="scoutMenu">
-        <div class="scoutmenu-lbl">Run mode</div>
-        <button data-mode="find">Find new matches</button>
-        <button data-mode="validate">Validate + refresh existing</button>
-        <button data-mode="both">Run all (validate, find + scan email)</button>
+        <div class="scoutmenu-lbl">What to do</div>
+        <button data-mode="find">Find new jobs</button>
+        <button data-mode="validate">Check existing jobs</button>
+        <button data-mode="both">Do everything (check, find + scan email)</button>
         <div class="scoutmenu-sep"></div>
-        <div class="scoutmenu-lbl">Email recommendations</div>
-        <button data-mode="email">📥 Scan email for new leads</button>
-        <div class="scoutmenu-hint" id="emailScoutMenuHint" style="padding:2px 10px 4px">Included in “Find” &amp; “Run all” when enabled in Sources.</div>
-        <div class="scoutmenu-lbl">Scope to sources <span id="scoutScopeHint" class="scoutmenu-hint">(all)</span></div>
+        <div class="scoutmenu-lbl">Job emails</div>
+        <button data-mode="email">📥 Scan email for new jobs</button>
+        <div class="scoutmenu-hint" id="emailScoutMenuHint" style="padding:2px 10px 4px">Included in “Find new jobs” &amp; “Do everything” when enabled in Sources.</div>
+        <div class="scoutmenu-lbl">Limit to sites <span id="scoutScopeHint" class="scoutmenu-hint">(all)</span></div>
         <div class="scoutsources" id="scoutSources"></div>
         <div class="scoutmenu-sep"></div>
-        <button data-mode="source-backfill">↻ Backfill source from links</button>
+        <button data-mode="source-backfill">↻ Detect the site from each link</button>
         <button id="openSettingsFromMenu">⚙ Settings…</button>
         <div class="scoutmenu-foot" id="scoutAi">enrichment: …</div>
       </div>
     </div>
-    <button class="btn" id="addBtn">+ Add</button>
+    <button class="btn" id="addBtn">+ Add a job</button>
     <div class="popwrap">
       <button class="btn ghost overflowbtn" id="overflowBtn" type="button" title="More actions" aria-label="More actions">⋯</button>
       <div class="pop menu right" id="overflowPop">
@@ -889,7 +945,7 @@
 
   <section id="cmdCenter" class="cmdcenter" hidden>
     <div class="cc-head" id="ccHead">
-      <span class="cc-title">⚡ What needs action</span>
+      <span class="cc-title">⚡ What needs you today</span>
       <span class="cc-counts" id="ccCounts"></span>
       <button class="cc-toggle" id="ccToggle" title="Collapse / expand">▾</button>
     </div>
@@ -900,19 +956,20 @@
   <div id="board"><div class="loading">▚ loading from server…</div></div>
 
   <footer>
-    <span>Scores, statuses, lanes, apply modes, and integrations are explained in the <a href="/guide" target="_blank" rel="noopener" class="guidelink">user guide ↗</a>.</span>
+    <span>Scores, statuses, what needs you today, ways to apply, and integrations are explained in the <a href="/guide" target="_blank" rel="noopener" class="guidelink">user guide ↗</a>.</span>
   </footer>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
-    <h2 id="modalTitle">Add requisition</h2>
-    <p class="hint">A requisition = one specific role at a company. Group is by company name.</p>
+    <h2 id="modalTitle">Add a job</h2>
+    <p class="hint">Add a job you found. Paste the link and fill in what you know — you can edit anything later.</p>
+    <div class="field"><label>🔗 Job link — paste it, then fill in the rest</label><input id="f_link" type="text" placeholder="https://… careers page or job posting"></div>
     <div class="grid2">
       <div class="field"><label>Company</label><input id="f_company" type="text"></div>
       <div class="field"><label>Sector</label><input id="f_sector" type="text" placeholder="CDP / Data Infra / Martech / AI / Enterprise SaaS"></div>
     </div>
-    <div class="field"><label>Role / requisition title</label><input id="f_role" type="text"></div>
+    <div class="field"><label>Job title</label><input id="f_role" type="text"></div>
     <div class="grid3">
       <div class="field"><label>Salary</label><input id="f_salary" type="text" placeholder="$200K–280K"></div>
       <div class="field"><label>Location</label><input id="f_location" type="text"></div>
@@ -921,33 +978,32 @@
     <div class="grid3">
       <div class="field"><label>Fit (0–10)</label><input id="f_fit" type="number" min="0" max="10" step="0.1"></div>
       <div class="field"><label>Interview prob (0–10)</label><input id="f_prob" type="number" min="0" max="10" step="0.1"></div>
-      <div class="field"><label>Tier</label><select id="f_tier"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
+      <div class="field"><label>Match strength</label><select id="f_tier"><option value="A">Strong</option><option value="B">Possible</option><option value="C">Long shot</option></select></div>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Link</label><input id="f_link" type="text" placeholder="https://…"></div>
-      <div class="field"><label>Link confidence</label><select id="f_conf"><option value="verified">Verified</option><option value="boardonly">Board-only</option><option value="unverified">Unverified</option></select></div>
-    </div>
-    <div class="field"><label>Why it fits / commentary</label><textarea id="f_notes" rows="2"></textarea></div>
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <div class="grid3">
-      <div class="field"><label>Status</label><select id="f_status"><option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option><option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option></select></div>
-      <div class="field"><label>Applied date</label><input id="f_applied" type="date"></div>
-      <div class="field"><label>Interview date</label><input id="f_interview" type="date"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Recruiter name</label><input id="f_recruiter" type="text" placeholder="Jane Smith"></div>
-      <div class="field"><label>Recruiter email</label><input id="f_recruiterEmail" type="email" placeholder="jane@company.com"></div>
-    </div>
-    <div class="grid3">
-      <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
-      <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
-      <div class="field"><label>Cover letter?</label><select id="f_cover"><option>No</option><option>Yes</option></select></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Follow-up date</label><input id="f_followup" type="date"></div>
-      <div class="field"><label>Last contact</label><input id="f_lastcontact" type="date"></div>
-    </div>
-    <div class="field"><label>Next action</label><input id="f_next" type="text" placeholder="e.g. Ask Karolina for a referral"></div>
+    <div class="field"><label>How sure is the link?</label><select id="f_conf"><option value="verified">Verified</option><option value="boardonly">Board-only</option><option value="unverified">Unverified</option></select></div>
+    <div class="field"><label>Why it caught your eye</label><textarea id="f_notes" rows="2"></textarea></div>
+    <details class="trackdetails">
+      <summary>Add tracking details — status, dates, recruiter <span class="setmuted">(Reqon sets these as you go)</span></summary>
+      <div class="grid3">
+        <div class="field"><label>Status</label><select id="f_status"><option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option><option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option></select></div>
+        <div class="field"><label>Applied date</label><input id="f_applied" type="date"></div>
+        <div class="field"><label>Interview date</label><input id="f_interview" type="date"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Recruiter name</label><input id="f_recruiter" type="text" placeholder="Jane Smith"></div>
+        <div class="field"><label>Recruiter email</label><input id="f_recruiterEmail" type="email" placeholder="jane@company.com"></div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
+        <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
+        <div class="field"><label>Cover letter?</label><select id="f_cover"><option>No</option><option>Yes</option></select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Follow-up date</label><input id="f_followup" type="date"></div>
+        <div class="field"><label>Last contact</label><input id="f_lastcontact" type="date"></div>
+      </div>
+      <div class="field"><label>Next action</label><input id="f_next" type="text" placeholder="e.g. Ask Karolina for a referral"></div>
+    </details>
     <div class="modalacts">
       <button class="btn ghost" id="cancelBtn">Cancel</button>
       <button class="btn" id="saveBtn">Save</button>
@@ -972,7 +1028,7 @@
   <div class="modal" style="max-width:560px">
     <h2>Welcome to Reqon 👋</h2>
     <p class="hint">A couple of quick questions so your first board is relevant. You can change all of this later in Settings.</p>
-    <div class="field"><label>What role(s) are you seeking? <span class="setmuted">one per line — titles the scout searches for</span></label>
+    <div class="field"><label>What role(s) are you seeking? <span class="setmuted">one per line — titles Reqon searches for</span></label>
       <textarea id="obRoles" rows="4" placeholder="Principal Product Manager, AI Platform&#10;Director, Product Management&#10;Staff PM, Data Platform"></textarea>
     </div>
     <div class="grid2">
@@ -986,7 +1042,7 @@
     <div id="obMsg" class="setmsg"></div>
     <div class="modalacts">
       <button class="btn ghost" id="obSkip" type="button">Skip for now</button>
-      <button class="btn" id="obSave" type="button">Save &amp; run my first scout</button>
+      <button class="btn" id="obSave" type="button">Save &amp; find my first jobs</button>
     </div>
   </div>
 </div>
@@ -1004,7 +1060,7 @@
       <div style="display:flex;gap:18px;flex-wrap:wrap;font-family:'Spline Sans Mono',monospace;font-size:.82rem">
         <span>Fit <b id="scNowFit">–</b> → <b id="scNewFit" style="color:var(--accent,#706CFF)">–</b></span>
         <span>Prob <b id="scNowProb">–</b> → <b id="scNewProb" style="color:var(--accent,#706CFF)">–</b></span>
-        <span>Tier <b id="scNowTier">–</b> → <b id="scNewTier" style="color:var(--accent,#706CFF)">–</b></span>
+        <span>Match <b id="scNowTier">–</b> → <b id="scNewTier" style="color:var(--accent,#706CFF)">–</b></span>
       </div>
       <p id="scRationale" style="margin:8px 0 0;font-size:.86rem;line-height:1.45"></p>
       <div class="ahintrow" style="margin-top:8px"><button class="btn" id="assistApplyScore" type="button">Apply suggested scores</button> <span class="setmuted" id="assistApplyNote">Saves the rationale to notes too. Nothing is submitted to any employer.</span></div>
@@ -1056,7 +1112,7 @@
 <div class="overlay" id="jobsOverlay">
   <div class="modal">
     <h2>Background jobs</h2>
-    <p class="hint">Scout, enrichment, Gmail ingest, guides, digest and backups — running and recent.</p>
+    <p class="hint">Finding jobs, enrichment, Gmail ingest, guides, digest and backups — running and recent.</p>
     <div id="jobsBody" class="jobs-body"><div class="setmuted">Loading…</div></div>
     <div class="modalacts">
       <button class="btn ghost" id="jobsRefresh">Refresh</button>
@@ -1141,21 +1197,17 @@
     </div>
     <div class="settings-body">
       <nav class="settings-nav" id="settingsNav">
-        <button data-sect="sources" class="active">Sources</button>
-        <button data-sect="matching">Matching &amp; scoring</button>
-        <button data-sect="profile">Candidate profile</button>
-        <button data-sect="workflow">Workflow</button>
-        <button data-sect="ai">AI assistant</button>
-        <button data-sect="digest">Digest &amp; notifications</button>
-        <button data-sect="data">Data safety</button>
-        <button data-sect="users" id="usersNavBtn" style="display:none">Admin</button>
-        <button data-sect="advanced">Advanced</button>
+        <button data-sect="profile" class="active"><span class="snav-i">👤</span><span class="snav-t">Your profile<small>Résumé, contact, your story</small></span></button>
+        <button data-sect="looking"><span class="snav-i">🎯</span><span class="snav-t">What you’re looking for<small>Roles, pay, where jobs come from</small></span></button>
+        <button data-sect="works"><span class="snav-i">⚙️</span><span class="snav-t">How Reqon works for you<small>Ranking, applying, AI help</small></span></button>
+        <button data-sect="updates"><span class="snav-i">🔔</span><span class="snav-t">Updates &amp; alerts<small>Daily summary &amp; where it goes</small></span></button>
+        <button data-sect="account"><span class="snav-i">🗄️</span><span class="snav-t">Account &amp; data<small>Backups, connections, team</small></span></button>
       </nav>
       <div class="settings-content" id="settingsContent">
 
-        <section class="sset" data-sect="sources">
+        <section class="sset" data-sect="looking" hidden>
           <div class="ssh">Sources</div>
-          <p class="ssd">Enable or disable the board APIs the scout polls, add companies by careers URL, and check each source's last run. Saves to boards.json / watchlist.json — takes effect on the next run, no restart.</p>
+          <p class="ssd">Enable or disable the board APIs Reqon polls, add companies by careers URL, and check each source's last run. Saves to boards.json / watchlist.json — takes effect on the next run, no restart.</p>
           <div class="sgrp">
             <div class="sgrp-h">Board sources</div>
             <div class="field"><label>Enabled sources</label>
@@ -1168,19 +1220,19 @@
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Email recommendations <span class="setmuted" style="font-weight:400">new opportunities from your inbox</span></div>
-            <p class="sgrp-d">When the scout runs, also read job-recommendation emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and add the new roles to the board — scored and deduped like board finds, and resolved to the employer's real req when possible.</p>
+            <p class="sgrp-d">When Reqon checks for jobs, also read job-recommendation emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and add the new roles to the board — scored and deduped like board finds, and resolved to the employer's real posting when possible.</p>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutEnable" type="checkbox" style="width:auto"> Check email for new opportunities</label></div>
             <p class="hint" style="margin:6px 0 0">Requires Gmail ingest — set up the connection and tune which sites / fit threshold under <a href="#" id="emailScoutGotoGmail" style="color:var(--gold);text-decoration:none">Digest &amp; notifications</a>. <span id="emailScoutSrcHint" class="setmuted"></span></p>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Source health <button class="mini" id="refreshHealthBtn" type="button" style="margin-left:auto">↻ refresh</button></div>
-            <div id="sourceHealth" class="bklist" style="max-height:220px"><div class="setmuted" style="padding:8px">Run the scout to populate.</div></div>
+            <div id="sourceHealth" class="bklist" style="max-height:220px"><div class="setmuted" style="padding:8px">Find jobs to populate.</div></div>
           </div>
         </section>
 
-        <section class="sset" data-sect="matching" hidden>
+        <section class="sset" data-sect="looking" hidden>
           <div class="ssh">Matching &amp; scoring</div>
-          <p class="ssd">Thresholds and keyword lists that decide which roles the scout adds and how it ranks them.</p>
+          <p class="ssd">Thresholds and keyword lists that decide which roles Reqon adds and how it ranks them.</p>
           <div class="sgrp">
             <div class="sgrp-h">Thresholds</div>
             <div class="grid2">
@@ -1209,7 +1261,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="profile" hidden>
+        <section class="sset" data-sect="profile">
           <div class="ssh">Candidate profile</div>
           <p class="ssd" id="profMeta">Drives scoring &amp; pre-fill. Re-parse your resume to refresh keywords.</p>
           <div class="sgrp">
@@ -1240,7 +1292,7 @@
           <div class="sgrp">
             <div class="sgrp-h">Targeting</div>
             <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text">
-              <p class="hint" style="margin:4px 0 0">Reference levels the scout treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
+              <p class="hint" style="margin:4px 0 0">Reference levels Reqon treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
             </div>
             <div class="field"><label>Role / title terms (comma-separated)</label><input id="profRoleTerms" type="text">
               <p class="hint" style="margin:4px 0 0">Bare role functions you target (e.g. <code>Product Manager, Product</code>) — no seniority words; that's tracked above.</p>
@@ -1251,14 +1303,14 @@
             </div>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what the scout favors</span></div>
+            <div class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what Reqon favors</span></div>
             <div id="profKeywords" class="profkw"></div>
             <div class="ahintrow" style="margin-top:8px">
               <input id="kwAddName" type="text" placeholder="add a keyword (e.g. agentic)" style="flex:1;min-width:120px">
               <input id="kwAddWeight" type="number" min="1" max="20" step="1" value="5" title="weight" style="width:64px">
               <button class="mini" id="kwAddBtn" type="button">+ Add</button>
             </div>
-            <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a scout fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server scout. <span class="setmuted">The on-device app scout uses Search criteria keywords; it only runs when no server is connected.</span></p>
+            <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server's job finder. <span class="setmuted">The on-device app finder uses Search criteria keywords; it only runs when no server is connected.</span></p>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
@@ -1298,9 +1350,9 @@
           <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
         </section>
 
-        <section class="sset" data-sect="workflow" hidden>
+        <section class="sset" data-sect="works" hidden>
           <div class="ssh">Workflow</div>
-          <p class="ssd">How statuses route to board tabs, when hygiene lanes flag work, the analytics window, and per-source apply modes.</p>
+          <p class="ssd">How statuses route to board tabs, when “what needs you today” flags work, the analytics window, and the default way to apply per source.</p>
           <div class="sgrp">
             <div class="sgrp-h">Lifecycle tabs</div>
             <div class="grid2">
@@ -1323,8 +1375,8 @@
             <p class="hint" style="margin:2px 0 0">Lanes are non-destructive: closed reqs are surfaced for review and archived only on confirm (snapshot taken first) — never auto-deleted.</p>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Apply mode</div>
-            <div class="field"><label>Source → default apply mode</label>
+            <div class="sgrp-h">How you apply</div>
+            <div class="field"><label>Source → default way to apply</label>
               <div id="applyModeMapBox" class="ammap"><div class="setmuted">loading…</div></div>
             </div>
             <div class="ahintrow"><button class="mini" id="backfillApplyModeBtn" type="button">↻ Backfill apply-mode now</button> <span class="setmuted">Stamps inferred apply-mode onto rows missing it (snapshots first).</span></div>
@@ -1332,11 +1384,11 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="ai" hidden>
+        <section class="sset" data-sect="works" hidden>
           <div class="ssh">AI assistant</div>
-          <p class="ssd">The OpenAI model and budget for scout rescoring, plus the per-req draft assistant. API keys live under Advanced.</p>
+          <p class="ssd">The OpenAI model and budget for re-scoring jobs, plus the per-job draft assistant. API keys live under Account &amp; data.</p>
           <div class="sgrp">
-            <div class="sgrp-h">Scout rescoring</div>
+            <div class="sgrp-h">Re-scoring jobs</div>
             <div class="field"><label>OpenAI model</label><select id="setModel"></select></div>
             <div class="grid2">
               <div class="field"><label>AI calls per run (cap)</label><input id="setAiMax" type="number" min="0" max="500" step="1"></div>
@@ -1347,7 +1399,7 @@
               <div class="field"><label>JD chars sent to AI</label><input id="setJdChars" type="number" min="500" max="20000" step="100"></div>
               <div class="field"><label>Max tokens per scoring call</label><input id="setMaxTokens" type="number" min="64" max="4000" step="10"></div>
             </div>
-            <div class="field"><label>Scout delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
+            <div class="field"><label>Delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Application draft assistant</div>
@@ -1369,7 +1421,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="digest" hidden>
+        <section class="sset" data-sect="updates" hidden>
           <div class="ssh">Digest &amp; notifications</div>
           <p class="ssd">The always-on server composes a digest from your data and delivers it to the channels you pick. A file fallback is always written to <code>agent/digest-latest.html</code>.</p>
           <div class="sgrp">
@@ -1378,7 +1430,7 @@
               <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestEnabled" type="checkbox" style="width:auto"> Enable scheduled digest</label></div>
               <div class="field"><label>Time (HH:MM, server local)</label><input id="setDigestTime" type="text" placeholder="07:00"></div>
               <div class="field"><label>Look-back window (days)</label><input id="setDigestDays" type="number" min="1" max="60" step="1"></div>
-              <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestAfterScout" type="checkbox" style="width:auto"> Also send after the first scout run of the day</label></div>
+              <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestAfterScout" type="checkbox" style="width:auto"> Also send after the first job check of the day</label></div>
             </div>
             <div class="field"><label>Delivery channels</label>
               <div id="setDigestChannels" class="chanchips"></div>
@@ -1443,7 +1495,7 @@
             </div>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="mailAi" type="checkbox" style="width:auto"> Use AI for ambiguous emails (server OpenAI key)</label></div>
             <div class="ahintrow"><button class="mini" id="mailSaveBtn" type="button">Save</button> <button class="mini" id="mailConnTestBtn" type="button">🔌 Test connection</button> <button class="mini" id="mailTestBtn" type="button">Test (dry run)</button> <button class="mini" id="mailRunBtn" type="button">▶ Run now</button> <button class="mini danger" id="mailClearBtn" type="button">Clear credentials</button> <span id="mailStatus" class="setmuted"></span></div>
-            <p class="hint" style="margin:6px 0 0"><b>Test connection</b> just checks your Gmail login works (shared by both this and the email job-scout) — use it to verify setup. <b>Test (dry run)</b> previews recruiter-response matching without changing anything.</p>
+            <p class="hint" style="margin:6px 0 0"><b>Test connection</b> just checks your Gmail login works (shared by both this and the email job finder) — use it to verify setup. <b>Test (dry run)</b> previews recruiter-response matching without changing anything.</p>
             <pre id="mailReport" class="mailreport" style="display:none"></pre>
             <div class="field" style="margin-top:12px"><label>Notify me when ingest detects…</label>
               <div class="statuschips" id="mailNotifyKinds" style="margin-bottom:8px">
@@ -1458,8 +1510,8 @@
           </div>
 
           <div class="sgrp">
-            <div class="sgrp-h">Email job-scout (recommendation emails → leads)</div>
-            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site req</b> when possible. Uses the Gmail connection above. Turn it on under <a href="#" id="emailScoutGotoSources" style="color:var(--gold);text-decoration:none">Sources → Email recommendations</a>; tune the options here.</p>
+            <div class="sgrp-h">Email job finder (recommendation emails → leads)</div>
+            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site posting</b> when possible. Uses the Gmail connection above. Turn it on under <a href="#" id="emailScoutGotoSources" style="color:var(--gold);text-decoration:none">Sources → Email recommendations</a>; tune the options here.</p>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutResolve" type="checkbox" style="width:auto"> Resolve leads to the real employer req (Greenhouse/Ashby/Lever)</label></div>
             <div class="grid2">
               <div class="field"><label>Limit to sources (optional)</label><input id="emailScoutSources" type="text" placeholder="e.g. linkedin,indeed (blank = all)" autocomplete="off"></div>
@@ -1470,7 +1522,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="data" hidden>
+        <section class="sset" data-sect="account" hidden>
           <div class="ssh">Data safety</div>
           <p class="ssd">Every board save snapshots the previous data first; corruption-shaped saves are refused. Snapshots are never auto-deleted beyond the retention cap (manual &amp; phase snapshots are always kept).</p>
           <div class="sgrp">
@@ -1498,9 +1550,9 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="users" hidden>
+        <section class="sset" data-sect="account" id="usersNavBtn" hidden style="display:none">
           <div class="ssh">Admin console</div>
-          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and scout. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
+          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and job finder. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
           <div class="sgrp">
             <div class="sgrp-h">Server</div>
             <div id="adminServer" class="adminstats"><div class="setmuted" style="padding:8px">loading…</div></div>
@@ -1524,7 +1576,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="advanced" hidden>
+        <section class="sset" data-sect="account" hidden>
           <div class="ssh">Advanced — integrations &amp; security</div>
           <p class="ssd">API keys and tokens for AI rescoring and job aggregators.</p>
           <div class="safetynote">🔒 Keys are stored server-side in <code>.env</code> and are <b>never sent back to the browser</b>. Fields show only whether a key is set; leave blank to keep the current value.</div>
@@ -1568,7 +1620,7 @@
             <div class="sgrp-h">API keys</div>
             <div class="field"><label>OpenAI API key <span id="setKeyState" class="setmuted"></span></label>
               <input id="setKey" type="password" placeholder="leave blank to keep current" autocomplete="off">
-              <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Powers scout rescoring + the draft assistant.</span></div>
+              <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Powers job re-scoring + the draft assistant.</span></div>
             </div>
             <div class="field"><label>Aggregator keys (optional)</label>
               <div class="grid2">
@@ -1652,7 +1704,7 @@ function thankyouDue(x){if(!["Recruiter Screen","Hiring Manager","Panel"].includ
 const LANE_DEFS=[
   {key:"verify",label:"⚠ Needs verify",pred:needsVerify,desc:"Not-applied leads with an unverified link — confirm the live posting before applying.",reason:x=>x.reqCheck==="lead"?"lead":x.conf},
   {key:"followup",label:"⏰ Follow-up due",pred:followUpDue,desc:"Active applications with no contact past your follow-up threshold — nudge or log an update.",reason:x=>{const d=daysSince(x.lastcontact||x.applied);return d!=null?d+"d quiet":"stale";}},
-  {key:"closed",label:"✖ Closed reqs",pred:closedReq,desc:"Postings detected closed. Archive them (snapshots first) — never auto-deleted.",reason:x=>"req closed"},
+  {key:"closed",label:"✖ Closed jobs",pred:closedReq,desc:"Postings detected closed. Archive them (snapshots first) — never auto-deleted.",reason:x=>"job closed"},
   {key:"thankyou",label:"🙏 Thank-you due",pred:thankyouDue,desc:"Interview was in the last 2 days — send a thank-you note while it's fresh.",reason:x=>{const d=daysSince(x.interview);return d===0?"today":d+"d ago";}},
 ];
 function laneDef(k){return LANE_DEFS.find(d=>d.key===k);}
@@ -1667,7 +1719,10 @@ function statusesForTab(k){return new Set((TAB_MAP[k]&&TAB_MAP[k].length?TAB_MAP
 function tabKeyForStatus(status){for(const d of TAB_DEFS){if(statusesForTab(d.key).has(status))return d.key;}return "open";} // unmapped -> Open so nothing disappears
 // apply-next queue: tier A/B · verified · req still open · not yet applied
 function isApplyNext(x){return ["A","B"].includes(x.tier)&&x.conf==="verified"&&!["closed","lead","unknown"].includes(x.reqCheck||"")&&x.status==="Not Applied";}
-const tierOpen={A:true,B:false,C:false};   // accordion state — Tier A open by default
+const tierOpen={A:true,B:false,C:false};   // accordion state — Strong open by default
+// Plain-language words for the stored tier value (data stays A/B/C; only the label changes).
+const TIER_WORD={A:'Strong',B:'Possible',C:'Long shot'};
+const tierWord=t=>TIER_WORD[t]||('Tier '+(t||'?'));
 const tierTouched={A:false,B:false,C:false};  // user manually toggled this tier (overrides filter auto-expand)
 const expanded=new Set();                  // compact rows expanded into full cards (by row index)
 const selected=new Set();                  // checkbox selection (by row index)
@@ -1897,9 +1952,17 @@ window.openThankYou=function(i){
     setTimeout(()=>{ if(F("assistKind").value==="thankyou") F("assistGenBtn").click(); }, 350);
   });
 };
+// Settings reorganized 9 old sections into 5 plain-named groups. This maps any old
+// section key (or a new group key) to its group so existing deep-links keep working.
+const SECT_GROUP={
+  sources:'looking', matching:'looking', profile:'profile', workflow:'works', ai:'works',
+  digest:'updates', data:'account', users:'account', advanced:'account',
+  looking:'looking', works:'works', updates:'updates', account:'account'
+};
+const settingsGroup=sect=>SECT_GROUP[sect]||sect;
 function openSettingsTo(sect){
   const sb=document.getElementById('settingsBtn'); if(sb)sb.click();
-  setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+sect+'"]'); if(nav)nav.click(); },120);
+  setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+settingsGroup(sect)+'"]'); if(nav)nav.click(); },120);
 }
 (function ccWire(){
   const head=document.getElementById('ccHead'); if(!head) return;
@@ -1944,7 +2007,7 @@ function reqCardHTML(x,i){
   <div class="req tier${x.tier} ${scls}" id="req-${i}" style="margin-left:8px">
     <div class="reqtop">
       <div>
-        <div class="rtitle">${logoHTML(x.company,'lg')}<span class="tierTag ${x.tier}">TIER ${x.tier}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
+        <div class="rtitle">${logoHTML(x.company,'lg')}<span class="tierTag ${x.tier}">${tierWord(x.tier)}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
         <div class="meta">
           <span class="pill ${rc}">${rt}</span>
           ${x.location?`<span class="pill">${esc(x.location)}</span>`:""}
@@ -2090,7 +2153,7 @@ function render(){
   const laneActive=!analytics&&!today&&activeLane!=="all";
   const recentActive=!analytics&&!today&&!laneActive&&recentOnly;
   F("laneBar").style.display=(analytics||today)?"none":"";
-  F("laneBar").innerHTML=`<span class="llbl">Lanes</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
+  F("laneBar").innerHTML=`<span class="llbl">Quick filters</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
     LANE_DEFS.map(d=>`<div class="lane ${activeLane===d.key?'active':''}" onclick="setLane('${d.key}')"><span>${d.label}</span><span class="lcnt">${base.filter(d.pred).length}</span></div>`).join("");
   F("applyNextWrap").style.display=(activeTab==="open"&&!laneActive&&!analytics)?"":"none";
   F("groupBy").style.display=((activeTab==="open"||activeTab==="applied")&&!laneActive&&!recentOnly)?"":"none";   // grouping only applies to the accordion tabs
@@ -2138,8 +2201,8 @@ function render(){
     kpi("Interviews",inInterview,"active","","interviewing",isInterview)+
     kpi("Offers",offers,offers?"active":"","","offers",isOffers)+
     `<div class="kpi-div"></div>`+
-    kpi("Total roles",total,"sec")+
-    kpi("Tier A",tierA,"sec","","tierA",isTierA)+
+    kpi("Jobs tracked",total,"sec")+
+    kpi("Strong matches",tierA,"sec","","tierA",isTierA)+
     kpi("Response rate",am.responseRate+"%","sec")+
     kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");
 
@@ -2194,7 +2257,7 @@ function render(){
   } else if(recentActive){
     // "New since last run" — flat list of not-applied roles added on/after the cutoff
     const items=[...list].sort(cmp);
-    const lbl=recentCutoff?`the last scout run (${recentCutoff})`:`the last 3 days`;
+    const lbl=recentCutoff?`the last check (${recentCutoff})`:`the last 3 days`;
     html+=`<div class="recent-head"><span class="rh-title">New since last run</span><span class="rh-desc">Not-applied roles added since ${lbl}.</span><button class="btn ghost" onclick="setTab('open')">Clear</button></div><div class="flatlist">`;
     if(!items.length)html+=`<div class="flat-empty">Nothing new since the last run.</div>`;
     else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
@@ -2241,13 +2304,13 @@ function render(){
           <div class="tier-head" onclick="toggleTier('${t}')">
             <span class="caret">▼</span>
             <span class="tdot ${t}"></span>
-            <span class="tname">Tier ${t}</span>
+            <span class="tname">${tierWord(t)}</span>
             <span class="tcount">(${items.length}${ofN})</span>
             <span class="tsum">${tsum}</span>
-            ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible Tier ${t} row(s)">Select all</button>`:""}
+            ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible ${tierWord(t)} row(s)">Select all</button>`:""}
           </div>
           <div class="tier-body">`;
-        if(!items.length) html+=`<div class="tier-empty">${applied?`No Tier ${t} applications yet.`:`No matching Tier ${t} requisitions.`}</div>`;
+        if(!items.length) html+=`<div class="tier-empty">${applied?`No ${tierWord(t)} applications yet.`:`No matching ${tierWord(t)} jobs.`}</div>`;
         else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
         html+=`</div></div>`;
       });
@@ -2305,12 +2368,12 @@ async function loadScoutSummary(){
 function scoutRunStripHTML(){
   const s=scoutLast;
   if(s&&s.running)return `<div class="scoutrun"><span class="sr-lbl">Scout</span><span class="sr-when">running…</span></div>`;
-  if(!s||!s.when)return `<div class="scoutrun"><span class="sr-lbl">Last scout run</span><span class="sr-when">never</span><span class="sr-stat">Run Scout to pull fresh roles.</span><button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
+  if(!s||!s.when)return `<div class="scoutrun"><span class="sr-lbl">Last check</span><span class="sr-when">never</span><span class="sr-stat">Find new jobs to pull fresh roles.</span><button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">↻ Find new jobs</button></div>`;
   return `<div class="scoutrun"><span class="sr-lbl">Last scout run</span><span class="sr-when">${fmtWhen(s.when)}</span>`+
     `<span class="sr-stat">${s.postings!=null?`<b>${s.postings}</b> scanned · `:""}<b>${s.newMatches||0}</b> matches · <b>+${s.added||0}</b> added · <b>~${s.updated||0}</b> updated</span>`+
     `<span class="sr-stat ${s.errors?'sr-err':''}"><b>${s.errors||0}</b> error${s.errors===1?'':'s'}</span>`+
     `${s.dry?`<span class="sr-stat">· dry-run</span>`:""}`+
-    `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
+    `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">↻ Find new jobs</button></div>`;
 }
 function renderToday(){
   const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)})).filter(x=>x.deleted!==true);
@@ -2331,12 +2394,12 @@ function renderToday(){
   };
   const actionTotal=newSince.length+verify.length+applyNext.length+tierAOpen.length+followup.length+closed.length+thankyou.length;
   const queue=actionTotal===0
-    ? `<div class="today-clear">✓ You're all caught up — nothing needs action right now. Run Scout to pull fresh matches.</div>`
+    ? `<div class="today-clear">✓ You're all caught up — nothing needs you right now. Find new jobs to pull fresh matches.</div>`
     : `<div class="today-grid">
-        ${card(newSince.length,"New since last run",anchored?"Added since the last scout run, not yet applied":"Added in the last 3 days, not yet applied","accent","todoGo('review')")}
+        ${card(newSince.length,"New since last run",anchored?"Added since the last check, not yet applied":"Added in the last 3 days, not yet applied","accent","todoGo('review')")}
         ${card(verify.length,"Needs verification","Unverified links — confirm the live posting first","warning","todoGo('verify')")}
-        ${card(applyNext.length,"Apply next","Tier A/B · verified · still open · not applied","accent","todoGo('applynext')")}
-        ${card(tierAOpen.length,"Tier A · not applied","Top-tier roles you haven't applied to yet","accent","todoGo('tierA')")}
+        ${card(applyNext.length,"Apply next","Strong / Possible · verified · still open · not applied","accent","todoGo('applynext')")}
+        ${card(tierAOpen.length,"Strong · not applied","Top matches you haven't applied to yet","accent","todoGo('tierA')")}
         ${card(followup.length,"Follow-up due","Active applications gone quiet past your threshold","danger","todoGo('followup')")}
         ${card(closed.length,"Recently closed","Postings detected closed — review and archive","muted","todoGo('closed')")}
       </div>`;
@@ -2352,7 +2415,7 @@ function renderToday(){
     <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
     ${queue}
     ${pipeline}
-    <div class="today-foot">${all.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
+    <div class="today-foot">${all.length} jobs tracked · Strong: ${all.filter(x=>x.tier==='A').length} · apply next: ${applyNext.length}. Pick a card to jump straight into that work.</div>
   </div>`;
 }
 window.todoGo=function(view){
@@ -2465,7 +2528,7 @@ function donut(rs,keyFn,label,opt){
   return card(label,`<div class="donut-wrap">${svg}${leg}</div>`,opt.sub);
 }
 function card(label,body,sub){return `<div class="an-card"><h3>${label}${sub?`<span class="sub">${sub}</span>`:""}</h3>${body}</div>`;}
-const TIER_COLOR=k=>({"A":"#00E5A3","Tier A":"#00E5A3","B":"#FFB800","Tier B":"#FFB800","C":"#5A6470","Tier C":"#5A6470"}[k]||"#94A3B8");
+const TIER_COLOR=k=>({"A":"#00E5A3","Strong":"#00E5A3","B":"#FFB800","Possible":"#FFB800","C":"#5A6470","Long shot":"#5A6470","Unknown":"#94A3B8"}[k]||"#94A3B8");
 const LEVEL_COLOR=k=>({Principal:"#00E5A3",Director:"#2DD4BF",VP:"#A78BDB",Head:"#79A6E0",Group:"#706CFF",Staff:"#C8FF49",Lead:"#FFB800",Senior:"#94A3B8",Manager:"#5A6470",Other:"#3a4550"}[k]||"#5A6470");
 // Weekly application volume over the window (by applied date).
 function velocityChart(rs){
@@ -2537,7 +2600,7 @@ function sourceQuality(rs){
   if(!out.length)return "";
   return `<div class="an-card"><h3>Source quality</h3><table class="an-table"><tr><th>Source</th><th>Roles</th><th>A/B&nbsp;%</th><th>App&nbsp;%</th><th>Resp&nbsp;%</th><th>Int&nbsp;%</th><th>Closed&nbsp;%</th><th>Dup</th></tr>`+
     out.map(r=>`<tr><td>${esc(r.s)}</td><td>${r.n}</td><td>${r.abP}%</td><td>${r.appP}%</td><td>${r.respP}%</td><td>${r.intP}%</td><td class="${r.closedP?'rejcell':''}">${r.closedP}%</td><td class="${r.dup?'rejcell':''}">${r.dup||''}</td></tr>`).join("")+
-    `</table><p class="an-note" style="margin-top:8px">A/B% = share that scored Tier A/B · Resp/Int% are of applied (current status, a floor) · Closed% = archived or dead postings · Dup = rows sharing a company+role with another. Use this to enable/disable/prioritize sources.</p></div>`;
+    `</table><p class="an-note" style="margin-top:8px">S/P% = share that scored Strong/Possible · Resp/Int% are of applied (current status, a floor) · Closed% = archived or dead postings · Dup = rows sharing a company+role with another. Use this to enable/disable/prioritize sources.</p></div>`;
 }
 // Auto-generated decision-support insights for the Analytics tab (#12).
 function buildInsights(rs,m){
@@ -2564,13 +2627,13 @@ function buildInsights(rs,m){
     const mApplied=manual.filter(x=>x.applied||INTERVIEW_NOW.has(x.status)||x.status==="Rejected").length;
     const mResp=manual.filter(x=>INTERVIEW_NOW.has(x.status)).length;
     const mAB=manual.filter(x=>x.tier==="A"||x.tier==="B").length;
-    out.push({tone:mResp?"good":"",html:`Manual captures (you clipped/added): <b>${manual.length}</b> roles, ${mAB} Tier A/B, ${mApplied} applied, ${mResp} reached a recruiter — ${mApplied?Math.round(mResp/mApplied*100):0}% conversion.`});
+    out.push({tone:mResp?"good":"",html:`Manual captures (you clipped/added): <b>${manual.length}</b> roles, ${mAB} Strong/Possible, ${mApplied} applied, ${mResp} reached a recruiter — ${mApplied?Math.round(mResp/mApplied*100):0}% conversion.`});
   }
   // Tier A engagement
   const tierA=rs.filter(x=>x.tier==="A");
   const tierAApplied=tierA.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
   const tierAResp=tierA.filter(x=>STAGE_RANK[x.status]>=2).length;
-  if(tierA.length)out.push({tone:tierAResp?"good":"",html:`Tier A: ${tierAApplied} of ${tierA.length} applied, ${tierAResp} response${tierAResp===1?"":"s"} so far.`});
+  if(tierA.length)out.push({tone:tierAResp?"good":"",html:`Strong: ${tierAApplied} of ${tierA.length} applied, ${tierAResp} response${tierAResp===1?"":"s"} so far.`});
   // stale active applications
   const stale=rs.filter(x=>["Applied","Recruiter Screen","Hiring Manager","Panel"].includes(x.status)&&(()=>{const d=daysSince(x.lastcontact||x.applied);return d!=null&&d>=14;})()).length;
   if(stale>0)out.push({tone:"warn",html:`<b>${stale}</b> active application${stale===1?" is":"s are"} aging 14+ days without contact — consider a follow-up.`});
@@ -2625,7 +2688,7 @@ function renderAnalytics(f){
     `<p class="an-note" style="margin-top:10px">Current status of your ${ocTotal} application${ocTotal===1?'':'s'} (mutually exclusive). Reject rate: <b style="color:var(--coral)">${m.rejectRate}%</b> of applied · response rate ${m.responseRate}%. Window: ${win}.</p></div>`;
   const breakdowns=`${sourceQuality(rs)}<div class="an-grid2">`+
     anBreakdown(rs,x=>rowSource(x),"Source / ATS")+anBreakdown(rs,x=>x.sector,"Sector")+
-    anBreakdown(rs,x=>"Tier "+(x.tier||"?"),"Tier")+anBreakdown(rs,x=>applyModeOf(x),"Apply mode")+`</div>`;
+    anBreakdown(rs,x=>x.tier?tierWord(x.tier):"Unknown","Match strength")+anBreakdown(rs,x=>applyModeOf(x),"How you apply")+`</div>`;
 
   // ---- distributions, viewed through the selected lens ----
   const cohort=rs.filter(lensPred(analyticsLens));
@@ -2645,7 +2708,7 @@ function renderAnalytics(f){
   const salaryRow=histogram(cohort,salaryBand,SALARY_BANDS,"Salary bands","$200–300K in $10K bands (lower bound)");
   const donutsRow=`<div class="an-grid3">`+
     donut(cohort,x=>x.sector||"—","Industry / sector",{unit})+
-    donut(cohort,x=>"Tier "+(x.tier||"?"),"Tier",{order:["Tier A","Tier B","Tier C","Tier ?"],colorFn:TIER_COLOR,unit})+
+    donut(cohort,x=>x.tier?tierWord(x.tier):"Unknown","Match strength",{order:["Strong","Possible","Long shot","Unknown"],colorFn:TIER_COLOR,unit})+
     donut(cohort,x=>({remote:"Remote",flex:"Flex/Hybrid",onsite:"On-site"}[x.remote]||"—"),"Remote posture",{unit})+`</div>`;
   const distGrid=`${barsRow}${salaryRow}${donutsRow}`;
   const trends=`<div class="an-grid2">${velocityChart(rs.filter(lensPred("applied")))}${fitByOutcome(rs)}</div>`;
@@ -2844,9 +2907,9 @@ const SEL=["remote","tier","conf","status","referral","resume","cover"];
 function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("f_prob").value="";F("f_remote").value="remote";F("f_tier").value="A";F("f_conf").value="unverified";F("f_status").value="Not Applied";F("f_referral").value="No";F("f_resume").value="—";F("f_cover").value="No";}
 function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
 function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);o.updatedAt=new Date().toISOString();o.updatedBy="you";if(!o.source)o.source="manual";return o;}
-window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit requisition");};
+window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit a job");};
 window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?\n\nKept as a recoverable deleted row (remove permanently in Settings → Data safety) so the delete syncs to other devices.")){rows[i].deleted=true;stampRow(i);persistNow();render();}};
-F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition");};
+F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add a job");};
 F("cancelBtn").onclick=closeModal;
 F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
 F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0){rows[editingIndex]={...rows[editingIndex],...o};stampRow(editingIndex);}else rows.unshift(o);persistNow();render();closeModal();};
@@ -2888,7 +2951,7 @@ function startScoutPoll(){
     const last=j.last||{};
     if(j.running){
       scoutBusy(true);
-      let p="scout running…";
+      let p="finding jobs…";
       if(last.phase==="validating"&&last.total)p=`validating ${last.processed||0}/${last.total}…`;
       else if(last.phase==="source-backfill"&&last.total)p=`stamping sources ${last.processed||0}/${last.total}…`;
       else if(last.phase==="finding")p="finding new roles…";
@@ -2916,9 +2979,9 @@ async function triggerScout(mode){
     const r=await fetch("/api/scout/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,sources})});
     const j=await r.json().catch(()=>({}));
     if(r.status===409){setScoutStatus("a run is already in progress…",true);startScoutPoll();return;}
-    if(!r.ok||!j.ok){scoutBusy(false);setScoutStatus("⚠ "+(j.error||"could not start scout"),false);return;}
+    if(!r.ok||!j.ok){scoutBusy(false);setScoutStatus("⚠ "+(j.error||"could not start the job finder"),false);return;}
     startScoutPoll();
-  }catch(e){scoutBusy(false);setScoutStatus("⚠ network error starting scout",false);}
+  }catch(e){scoutBusy(false);setScoutStatus("⚠ network error starting the job finder",false);}
 }
 // Run JUST the email scout (recommendation emails → leads) on demand, regardless of the Sources
 // toggle. Synchronous on the server (bounded by the resolution budget); show the funnel inline.
@@ -3112,10 +3175,12 @@ function buildConnStatus(j){
 }
 // Jump to a settings sub-tab and highlight/focus a specific field (used by Connection Status rows).
 function gotoSetting(sect,focusId){
-  const navBtn=SET("settingsNav").querySelector(`button[data-sect="${sect}"]`);
+  const navBtn=SET("settingsNav").querySelector(`button[data-sect="${settingsGroup(sect)}"]`);
   if(navBtn)navBtn.click();
   if(!focusId)return;
   setTimeout(()=>{const el=SET(focusId);if(!el)return;
+    // open any collapsed <details> that contains the target field so it can be focused
+    for(let p=el.parentElement;p;p=p.parentElement){ if(p.tagName==='DETAILS')p.open=true; }
     el.scrollIntoView({behavior:"smooth",block:"center"});
     try{el.focus({preventScroll:true});}catch(e){}
     el.classList.add("flashfield");setTimeout(()=>el.classList.remove("flashfield"),1600);
@@ -3177,7 +3242,7 @@ async function loadSourceHealth(){
   try{
     const j=await (await fetch("/api/source-health",{cache:"no-store"})).json();
     const src=(j.health&&j.health.sources)||{}; const keys=Object.keys(src);
-    if(!keys.length){box.innerHTML='<div class="setmuted" style="padding:8px">No runs yet — run the scout to populate.</div>';return;}
+    if(!keys.length){box.innerHTML='<div class="setmuted" style="padding:8px">No runs yet — find jobs to populate.</div>';return;}
     const nf=n=>Number(n||0).toLocaleString();
     box.innerHTML='<div class="srchealth-hdr"><span>Source</span><span>Last run</span><span>Matches added</span></div>'+
       keys.sort().map(k=>{const h=src[k]||{};
@@ -3226,13 +3291,13 @@ SET("discoverBtn").onclick=async()=>{
       `<datalist id="industryList">`+
         ["AI / ML","Data / Analytics","Developer Tools","Fintech","Healthtech","E-commerce / Retail","Martech / Adtech","Cybersecurity","Enterprise SaaS","Cloud / Infrastructure","Identity / Security","Gaming","Media / Streaming","EdTech","Logistics / Supply Chain","Climate / Energy","Crypto / Web3","Government / Defense"].map(v=>`<option value="${v}">`).join("")+
       `</datalist> `+
-      `<button class="mini" id="addCompanyBtn" type="button">Add to scout</button>`+
+      `<button class="mini" id="addCompanyBtn" type="button">Add to watchlist</button>`+
       `<p class="hint" style="margin:6px 0 0">Tagging the vertical helps Reqon recommend boards to others in your industry later.</p>`;
     SET("addCompanyBtn").onclick=async()=>{
       try{const r=await (await fetch("/api/sources/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ats:j.ats,slug:j.slug,name:SET("discoverName").value.trim(),industry:SET("discoverIndustry").value.trim()})})).json();
         if(!r.ok)throw new Error(r.error||"failed");
         const tag=r.industry?(" · "+esc(r.industry)):"";
-        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)+tag+(r.tagged?" (industry saved)":"")):("Added "+esc(r.name)+tag+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs next scout.")}</span>`;
+        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)+tag+(r.tagged?" (industry saved)":"")):("Added "+esc(r.name)+tag+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs on the next check.")}</span>`;
       }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Add failed: ${esc(e.message)}</span>`;}
     };
   }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Failed: ${esc(e.message)}</span>`;}
@@ -3369,7 +3434,7 @@ SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()
   SET("settingsNav").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
   document.querySelectorAll(".sset").forEach(s=>s.hidden=(s.dataset.sect!==k));
   SET("settingsContent").scrollTop=0;
-  if(k==='users')loadUsers();
+  if(k==='account'){ const ub=SET('usersNavBtn'); if(ub&&ub.style.display!=='none')loadUsers(); }
 });
 // Settings stays open until you explicitly Save / Close / × — no click-outside dismissal (a stray
 // backdrop click used to drop the whole panel and lose your place). Esc still closes for keyboard users.
@@ -3391,7 +3456,23 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&SET("settingsOverla
   };
 })();
 // populate the Run-Scout source checklist + AI footer on load
-fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
+fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0; applyTheme(j.theme);}).catch(()=>{});
+// ---- Light/dark theme (persisted server-side as a setting; no localStorage per project rule) ----
+function applyTheme(t){
+  const v=(t==='light'||t==='dark')?t:'dark';
+  document.documentElement.dataset.theme=v;
+  const b=document.getElementById('themeToggle');
+  if(b){ b.textContent=v==='light'?'☀':'☾'; b.title=v==='light'?'Switch to dark':'Switch to light'; }
+}
+(function themeWire(){
+  const b=document.getElementById('themeToggle'); if(!b) return;
+  applyTheme(document.documentElement.dataset.theme||'dark');
+  b.onclick=()=>{
+    const next=document.documentElement.dataset.theme==='light'?'dark':'light';
+    applyTheme(next);
+    fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:next})}).catch(()=>{});
+  };
+})();
 
 // ---------- candidate profile + narrative library (Phase 5) ----------
 let PROFILE_NARRATIVES=[]; let PROFILE_ANSWERS=[];
@@ -3496,7 +3577,7 @@ SET("mailRunBtn").onclick=()=>mailRun(true);
 SET("emailScoutEnable").onchange=async(e)=>{
   const on=e.target.checked;
   try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailScout:on})})).json();
-    const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent=on?(m.configured?"On — runs with the daily scout. Gmail connected ✓":"On, but Gmail isn't configured yet — connect it under Digest & notifications."):"Off.";
+    const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent=on?(m.configured?"On — runs with the daily check. Gmail connected ✓":"On, but Gmail isn't configured yet — connect it under Updates & alerts."):"Off.";
   }catch(err){const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent="Couldn't save: "+err.message;}
 };
 // Cross-links between the Sources toggle and the Gmail/options panel.
@@ -3824,7 +3905,7 @@ document.getElementById("assistActions").addEventListener("click",async e=>{
 });
 F("assistApplyScore").onclick=()=>{
   if(!lastScore||assistIdx<0)return;
-  if(!confirm(`Apply AI scores to ${assistRow.company} — ${assistRow.role}?\n\nFit ${assistRow.fit} → ${lastScore.fit}\nProb ${assistRow.prob} → ${lastScore.prob}\nTier ${assistRow.tier||"–"} → ${lastScore.tier}`))return;
+  if(!confirm(`Apply AI scores to ${assistRow.company} — ${assistRow.role}?\n\nFit ${assistRow.fit} → ${lastScore.fit}\nProb ${assistRow.prob} → ${lastScore.prob}\nMatch ${assistRow.tier?tierWord(assistRow.tier):"–"} → ${tierWord(lastScore.tier)}`))return;
   const r=rows[assistIdx];
   r.fit=lastScore.fit; r.prob=lastScore.prob; r.tier=lastScore.tier;
   const stamp=`[AI score ${new Date().toISOString().slice(0,10)}] fit ${lastScore.fit} · prob ${lastScore.prob} · ${lastScore.tier}: ${lastScore.rationale||""}`.trim();
@@ -3964,7 +4045,7 @@ async function loadJobs(){
   try{
     const j=await (await fetch("/api/jobs",{cache:"no-store"})).json();
     if(!j.ok)throw new Error(j.error||"failed");
-    if(!j.jobs.length){box.innerHTML='<div class="setmuted" style="padding:10px 2px">No jobs yet. Run a scout, enrich a lead, or generate a guide.</div>';return;}
+    if(!j.jobs.length){box.innerHTML='<div class="setmuted" style="padding:10px 2px">No jobs yet. Find jobs, enrich a lead, or generate a guide.</div>';return;}
     box.innerHTML=j.jobs.map(x=>{
       const when=(x.finishedAt||x.startedAt||x.createdAt||"").slice(0,16).replace("T"," ");
       const sub=x.status==="running"?(esc(x.phase||"running")+(x.progress?" · "+x.progress+"%":"")):(x.error?esc(x.error.slice(0,80)):(x.result?Object.entries(x.result).slice(0,3).map(([k,v])=>k+": "+(typeof v==="object"?JSON.stringify(v):v)).join(" · "):when));
@@ -4056,7 +4137,7 @@ window.detectApplyMode=async function(i){
     // inconclusive → ask before spending a token (per your preference)
     setScoutStatus("",false);
     const why=j.reason?` (${j.reason})`:"";
-    if(!confirm(`Couldn't determine the apply mode deterministically${why}.\n\nTry AI? It reads the page text and classifies it (uses one OpenAI call). The result is saved for this domain.`)){
+    if(!confirm(`Couldn't determine how to apply deterministically${why}.\n\nTry AI? It reads the page text and classifies it (uses one OpenAI call). The result is saved for this domain.`)){
       setScoutStatus("Apply-mode detection skipped.",false);return;
     }
     setScoutStatus("Asking AI…",true);
@@ -4217,9 +4298,9 @@ async function loadUsers(){   // admin console: server stats + per-user usage + 
       const cost=u.ai30dCost!=null?'$'+u.ai30dCost:'—';
       return `<div class="urow" data-uid="${esc(u.id)}">`
       +`<span class="uname">${esc(u.displayName||u.id)} <span class="uid">@${esc(u.id)}</span>${u.email?` <span class="uid">${esc(u.email)}</span>`:''} ${u.role==='admin'?'<span class="urole">admin</span>':''}${u.disabled?' <span class="udis">disabled</span>':''}${u.onboarded?'':' <span class="udis" style="color:var(--warning);border-color:var(--warning)">onboarding</span>'}`
-      +`<span class="ustat">${u.rows} roles · ${u.applied} applied · AI ${_kfmt(u.ai30dTokens)} tok/30d (${cost}) · ${u.diskKB}KB · scout ${u.lastScout?relWhen(u.lastScout):'never'}</span></span>`
+      +`<span class="ustat">${u.rows} roles · ${u.applied} applied · AI ${_kfmt(u.ai30dTokens)} tok/30d (${cost}) · ${u.diskKB}KB · last find ${u.lastScout?relWhen(u.lastScout):'never'}</span></span>`
       +`<span class="uacts">${key}<label title="Use the server's shared AI key (you fund it)"><input type="checkbox" class="u-shared" ${u.useSharedKey?'checked':''}> shared</label>`
-      +`<button class="mini" data-act="scout" title="Run a scout for this user now">Scout</button><button class="mini" data-act="digest" title="Send this user's digest now">Digest</button><button class="mini" data-act="cap" title="Set this user's AI usage caps">Caps</button><button class="mini" data-act="restore" title="Restore one of this user's snapshots">Restore</button><button class="mini" data-act="imp" title="Sign in as this user for support">Impersonate</button><button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`;}).join('')
+      +`<button class="mini" data-act="scout" title="Find jobs for this user now">Find jobs</button><button class="mini" data-act="digest" title="Send this user's digest now">Digest</button><button class="mini" data-act="cap" title="Set this user's AI usage caps">Caps</button><button class="mini" data-act="restore" title="Restore one of this user's snapshots">Restore</button><button class="mini" data-act="imp" title="Sign in as this user for support">Impersonate</button><button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`;}).join('')
       ||'<div class="setmuted" style="padding:8px">No users yet.</div>';
     box.querySelectorAll('.urow').forEach(row=>{const uid=row.dataset.uid;
       row.querySelector('.u-shared').onchange=e=>{patchUser(uid,{useSharedKey:e.target.checked}).then(loadUsers);};
@@ -4233,7 +4314,7 @@ async function userAct(uid,act,row){
   if(act==='reset'){ const pw=prompt('New temporary password for "'+uid+'" (≥8 chars):'); if(!pw)return; await patchUser(uid,{password:pw}); SET('usersMsg').className='setmsg ok'; SET('usersMsg').textContent='Password reset for '+uid+'.'; return; }
   const run=async(payload,verb)=>{ SET('usersMsg').className='setmsg'; SET('usersMsg').textContent=verb+' '+uid+'…'; try{const r=await (await fetch('/api/admin/users/'+encodeURIComponent(uid)+'/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json(); SET('usersMsg').className=r.ok?'setmsg ok':'setmsg err'; SET('usersMsg').textContent=r.ok?(verb+' done for '+uid+'.'):('Failed: '+(r.error||'?')); loadUsers(); return r;}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} };
   if(act==='digest'){ await run({action:'digest'},'Sending digest for'); return; }
-  if(act==='scout'){ if(!confirm('Run a scout now for "'+uid+'"? It searches the boards and appends new matches to their pipeline.'))return; await run({action:'scout'},'Scouting for'); return; }
+  if(act==='scout'){ if(!confirm('Find jobs now for "'+uid+'"? It searches the boards and appends new matches to their pipeline.'))return; await run({action:'scout'},'Finding jobs for'); return; }
   if(act==='cap'){ const mt=prompt('Monthly AI token cap for "'+uid+'" (0 = unlimited):','0'); if(mt===null)return; const dc=prompt('Daily AI call cap for "'+uid+'" (0 = use server default):','0'); if(dc===null)return; await run({action:'setCap',monthlyTokens:mt,dailyCalls:dc},'Setting caps for'); return; }
   if(act==='imp'){ if(!confirm('Sign in as "'+uid+'" for support? Your admin session is preserved and you can return via the banner. This is audited.'))return; try{const r=await (await fetch('/api/admin/impersonate/'+encodeURIComponent(uid),{method:'POST'})).json(); if(r.ok)location.reload(); else{SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+(r.error||'?');}}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} return; }
   if(act==='restore'){

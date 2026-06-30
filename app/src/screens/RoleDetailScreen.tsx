@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking, Alert } from 'react-native';
 import { alpha, fonts, tierColor, useThemedStyles, type Palette } from '../theme';
-import { statusColor, SECTORS, REMOTE_MODES, type Role, type Status } from '../model';
-import { explainScore, type RationaleTone } from '../scout/explain';
+import { statusColor, tierWord, SECTORS, REMOTE_MODES, type Role, type Status } from '../model';
+import { explainScore, remoteBadge, type RationaleTone } from '../scout/explain';
+import { ScoreCircle } from '../components/ScoreCircle';
 import { useEntitlements } from '../entitlements';
 import { DraftModal } from './DraftModal';
 import { GuideModal } from './GuideModal';
@@ -129,6 +130,32 @@ function ThankYouToggle({ value, onSave }: { value?: string; onSave: (patch: Edi
   );
 }
 
+// Saved → Applied → Interviewing → Offer stepper. Current node is emerald + glow, completed
+// nodes/segments emerald, upcoming dimmed. Rejected/Archived have no active node (idx -1).
+const TRACK_STEPS = ['Saved', 'Applied', 'Interviewing', 'Offer'];
+function ProgressTrack({ status }: { status: Status }) {
+  const { styles } = useThemedStyles(makeStyles);
+  const idx =
+    status === 'Not Applied' ? 0 : status === 'Applied' ? 1 : INTERVIEW_STATUSES.includes(status) && status !== 'Offer' ? 2 : status === 'Offer' ? 3 : -1;
+  return (
+    <View style={styles.track}>
+      {TRACK_STEPS.map((label, i) => {
+        const done = idx >= 0 && i <= idx;
+        return (
+          <View key={label} style={styles.trackCol}>
+            <View style={styles.nodeRow}>
+              {i > 0 ? <View style={[styles.seg, done && styles.segOn]} /> : <View style={styles.segSpacer} />}
+              <View style={[styles.node, done && styles.nodeOn, i === idx && styles.nodeCurrent]} />
+              {i < TRACK_STEPS.length - 1 ? <View style={[styles.seg, idx >= 0 && i < idx && styles.segOn]} /> : <View style={styles.segSpacer} />}
+            </View>
+            <Text style={[styles.trackLabel, done && styles.trackLabelOn]} numberOfLines={1}>{label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function RoleDetailScreen({
   role,
   onBack,
@@ -150,6 +177,8 @@ export function RoleDetailScreen({
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const accent = tierColor(role.tier, c);
+  const remote = remoteBadge(role.location)?.label;
+  const salary = role.salary?.trim();
   const ent = useEntitlements();
   const [showDraft, setShowDraft] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -172,30 +201,42 @@ export function RoleDetailScreen({
         </Pressable>
       )}
 
-      <View style={styles.head}>
-        <View style={styles.badgeRow}>
-          <Text style={[styles.tierBadge, { color: accent, backgroundColor: alpha(accent, 0.1) }]}>TIER {role.tier}</Text>
-          <Text style={styles.score}>EV {role.score.toFixed(1)} · fit {role.fit} / prob {role.prob}</Text>
-        </View>
+      <View style={styles.hero}>
+        <ScoreCircle score={role.score} tier={role.tier} size={88} />
+        <Text style={[styles.heroWord, { color: accent }]}>{tierWord(role.tier)} match</Text>
         <Text style={styles.role}>{role.role}</Text>
-        <Text style={styles.company}>{role.company}</Text>
-        <View style={styles.statusWrap}>
-          <View style={[styles.dot, { backgroundColor: statusColor(role.status, c) }]} />
-          <Text style={[styles.statusText, { color: statusColor(role.status, c) }]}>{role.status}</Text>
+        <Text style={styles.company}>{role.company}{remote ? ` · ${remote}` : ''}</Text>
+        <View style={styles.heroChips}>
+          {salary ? <Text style={styles.heroChip}>{salary}</Text> : null}
+          <View style={styles.statusChip}>
+            <View style={[styles.dot, { backgroundColor: statusColor(role.status, c) }]} />
+            <Text style={[styles.statusText, { color: statusColor(role.status, c) }]}>{role.status}</Text>
+          </View>
         </View>
       </View>
 
+      <ProgressTrack status={role.status} />
+
+      {role.next ? (
+        <View style={styles.nextCard}>
+          <Text style={styles.nextLabel}>NEXT</Text>
+          <Text style={styles.nextText}>{role.next}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <View style={styles.scoreHead}>
-          <Text style={styles.sectionLabel}>WHY THIS SCORE</Text>
+          <Text style={styles.h3}>Why it fits</Text>
           <Pressable onPress={gateAI('ai_score', () => setShowScore(true))} hitSlop={8}><Text style={[styles.rescore, !canScore && styles.lockedText]}>Re-score · AI{lockTag(canScore)}</Text></Pressable>
         </View>
-        {explainScore(role).map((line) => (
-          <View key={line.text} style={styles.whyRow}>
-            <View style={[styles.whyDot, { backgroundColor: toneColor[line.tone] }]} />
-            <Text style={styles.whyText}>{line.text}</Text>
-          </View>
-        ))}
+        <View style={styles.whyCard}>
+          {explainScore(role).map((line) => (
+            <View key={line.text} style={styles.whyRow}>
+              <View style={[styles.whyDot, { backgroundColor: toneColor[line.tone] }]} />
+              <Text style={styles.whyText}>{line.text}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -305,24 +346,33 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { padding: 24, gap: 18 },
   back: { paddingVertical: 4 },
   backText: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '500', color: c.emerald },
-  head: { gap: 6 },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tierBadge: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  score: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
-  role: { fontFamily: fonts.serif, fontSize: 24, fontWeight: '600', color: c.textHigh, marginTop: 2 },
-  company: { fontFamily: fonts.sans, fontSize: 15, color: c.textBase },
-  statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  hero: { alignItems: 'center', gap: 8, paddingVertical: 6 },
+  heroWord: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  role: { fontFamily: fonts.serif, fontSize: 22, fontWeight: '600', color: c.textHigh, textAlign: 'center' },
+  company: { fontFamily: fonts.sans, fontSize: 15, color: c.textBase, textAlign: 'center' },
+  heroChips: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  heroChip: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase, backgroundColor: c.element, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
+  statusChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.element, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '500' },
+  // progress track: Saved → Applied → Interviewing → Offer
+  track: { flexDirection: 'row' },
+  trackCol: { flex: 1, alignItems: 'center', gap: 6 },
+  nodeRow: { flexDirection: 'row', alignItems: 'center', width: '100%' },
+  seg: { flex: 1, height: 2, backgroundColor: alpha(c.textBase, 0.25) },
+  segSpacer: { flex: 1, height: 2 },
+  segOn: { backgroundColor: c.emerald },
+  node: { width: 12, height: 12, borderRadius: 6, backgroundColor: alpha(c.textBase, 0.25) },
+  nodeOn: { backgroundColor: c.emerald },
+  nodeCurrent: { shadowColor: c.emerald, shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: 4 },
+  trackLabel: { fontFamily: fonts.sans, fontSize: 11, color: c.muted },
+  trackLabelOn: { color: c.textHigh, fontWeight: '600' },
+  // next card + section headings + why card
+  nextCard: { backgroundColor: c.element, borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: c.emerald, gap: 3 },
+  nextLabel: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 1, color: c.emerald },
+  nextText: { fontFamily: fonts.sans, fontSize: 15, color: c.textHigh, lineHeight: 21 },
+  h3: { fontFamily: fonts.serif, fontSize: 17, fontWeight: '600', color: c.textHigh },
+  whyCard: { backgroundColor: c.element, borderRadius: 14, padding: 14, gap: 10 },
   section: { gap: 8 },
   sectionLabel: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 2, color: c.muted },
   scoreHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

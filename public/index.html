@@ -785,6 +785,13 @@
   .sgrp:last-child{margin-bottom:0}
   .sgrp-h{font-size:.84rem;font-weight:700;letter-spacing:.01em;color:var(--text);margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .sgrp-h::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--accent);flex:0 0 auto;opacity:.85}
+  /* collapsible group — "Advanced ▾" / private fields tucked away until opened */
+  details.sgrp>summary{cursor:pointer;list-style:none;user-select:none}
+  details.sgrp>summary::-webkit-details-marker{display:none}
+  details.sgrp>summary::after{content:"▾";margin-left:auto;color:var(--dim);font-size:.8rem;transition:transform .15s}
+  details.sgrp[open]>summary::after{transform:rotate(180deg)}
+  details.sgrp:not([open])>summary{margin-bottom:0}
+  details.sgrp:not([open]):hover{border-color:var(--line-2)}
   .sgrp-d{color:var(--dim);font-size:.78rem;line-height:1.5;margin:-6px 0 12px}
   .sgrp .field:last-child{margin-bottom:0}
   .sgrp>.hint:last-child,.sgrp .field .hint:last-child{margin-bottom:0!important}
@@ -1302,8 +1309,8 @@
               <span id="summaryMsg" class="setmuted"></span>
             </div>
           </div>
-          <div class="sgrp">
-            <div class="sgrp-h">Targeting</div>
+          <details class="sgrp adv">
+            <summary class="sgrp-h">Targeting <span class="setmuted" style="font-weight:400">reference levels Reqon ranks loosely</span></summary>
             <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text">
               <p class="hint" style="margin:4px 0 0">Reference levels Reqon treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
             </div>
@@ -1314,9 +1321,9 @@
               <div class="field"><label>Industries (comma-separated)</label><input id="profIndustries" type="text"></div>
               <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
             </div>
-          </div>
-          <div class="sgrp">
-            <div class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what Reqon favors</span></div>
+          </details>
+          <details class="sgrp adv">
+            <summary class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what Reqon favors</span></summary>
             <div id="profKeywords" class="profkw"></div>
             <div class="ahintrow" style="margin-top:8px">
               <input id="kwAddName" type="text" placeholder="add a keyword (e.g. agentic)" style="flex:1;min-width:120px">
@@ -1324,7 +1331,7 @@
               <button class="mini" id="kwAddBtn" type="button">+ Add</button>
             </div>
             <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server's job finder. <span class="setmuted">The on-device app finder uses Search criteria keywords; it only runs when no server is connected.</span></p>
-          </div>
+          </details>
           <div class="sgrp">
             <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
             <div id="profWorkHistory"></div>
@@ -1347,8 +1354,8 @@
             <div id="answerBox"></div>
             <div class="ahintrow"><button class="mini" id="addAnswerBtn" type="button">+ Add saved answer</button></div>
           </div>
-          <div class="sgrp">
-            <div class="sgrp-h">Demographics (EEO)</div>
+          <details class="sgrp adv">
+            <summary class="sgrp-h">Equal-opportunity info <span class="setmuted" style="font-weight:400">private · never auto-filled</span></summary>
             <p class="sgrp-d">Voluntary self-identification, synced to the app. Stored privately for your reference — the apply-assist never auto-fills or submits these.</p>
             <div class="grid2">
               <div class="field"><label>Pronouns</label><select id="eeoPronouns"></select></div>
@@ -1359,7 +1366,7 @@
               <div class="field"><label>Disability status</label><select id="eeoDisability"></select></div>
               <div class="field"><label>Sexual orientation</label><select id="eeoOrientation"></select></div>
             </div>
-          </div>
+          </details>
           <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
         </section>
 

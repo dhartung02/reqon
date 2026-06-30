@@ -1,65 +1,64 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Reqon Clip</title>
+<link rel="stylesheet" href="theme.css">
 <style>
-  :root { color-scheme: dark; }
-  body { width: 320px; margin: 0; background: #0d1117; color: #e8eef5;
-         font: 14px/1.45 -apple-system, system-ui, sans-serif; }
-  .wrap { padding: 14px 14px 12px; }
-  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .head h1 { font-size: 1rem; margin: 0; font-weight: 700; }
-  .gear { background: none; border: 0; color: #aab6c2; cursor: pointer; font-size: 1rem; padding: 2px 4px; }
-  .card { background: #151b23; border: 1px solid #28323d; border-radius: 11px; padding: 12px; }
-  .muted { color: #8b97a4; }
-  .role { font-weight: 700; font-size: .95rem; }
-  .company { color: #aab6c2; font-size: .85rem; margin-top: 1px; }
-  .metrics { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }
-  .chip { font: 600 .72rem/1 "SF Mono", ui-monospace, monospace; background: #0d1117; border: 1px solid #28323d;
-          border-radius: 20px; padding: 4px 8px; color: #cdd7e1; }
-  .chip b { color: #c8ff49; }
-  .status { font-size: .8rem; font-weight: 600; margin-top: 2px; }
-  .s-open { color: #69c57e; } .s-applied { color: #706cff; } .s-rejected { color: #e8755f; } .s-none { color: #8b97a4; }
-  .btn { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; border: 0; border-radius: 9px;
-         padding: 11px; font: 700 .9rem inherit; cursor: pointer; }
-  .btn-primary { background: #00df8f; color: #08130d; }
-  .btn-ghost { background: transparent; color: #e8eef5; border: 1px solid #3a4550; }
-  .btn:disabled { opacity: .5; cursor: default; }
-  a.link { color: #706cff; font-size: .8rem; text-decoration: none; display: inline-block; margin-top: 9px; }
+  body { width: 340px; margin: 0; background: var(--canvas); color: var(--text);
+         font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+  .wrap { padding: 16px 16px 18px; }
+  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .head svg { width: 22px; height: 22px; flex: none; }
+  .head .titles { flex: 1; min-width: 0; }
+  .eyebrow-logo { font: 600 .54rem/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--emerald); }
+  .head h1 { font: 600 1.12rem/1.1 var(--serif); margin: 1px 0 0; }
+  .gear { background: none; border: 0; color: var(--text2); cursor: pointer; font-size: 1rem; padding: 3px; }
+
+  .clip-top { display: flex; gap: 12px; align-items: flex-start; }
+  .reassure { font-size: .74rem; color: var(--muted); text-align: center; margin: 11px 0 0; }
   #msg { font-size: .82rem; min-height: 1.1em; margin-top: 9px; }
-  .ok { color: #69c57e; } .err { color: #e8755f; }
-  .settings { margin-top: 12px; border-top: 1px solid #28323d; padding-top: 11px; display: none; }
-  .settings.open { display: block; }
-  label { display: block; font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; color: #8b97a4; margin: 9px 0 4px; }
-  input[type=text], input[type=password] { width: 100%; box-sizing: border-box; background: #0d1117; border: 1px solid #333c47;
-         color: #e8eef5; border-radius: 8px; padding: 8px 10px; font: inherit; }
-  input:focus { outline: none; border-color: #00df8f; }
-  .togrow { display: flex; align-items: center; gap: 8px; margin-top: 11px; }
-  .togrow label { margin: 0; text-transform: none; letter-spacing: 0; font-size: .8rem; color: #cdd7e1; }
-  .setrow { display: flex; gap: 8px; margin-top: 11px; }
+
+  /* settings view */
+  .settings { margin-top: 4px; display: none; flex-direction: column; gap: 11px; }
+  .settings.open { display: flex; }
+  .settings-head { display: flex; align-items: center; gap: 8px; }
+  .settings-head h2 { font: 600 1rem var(--serif); margin: 0; flex: 1; }
+  .back { background: none; border: 0; color: var(--muted); cursor: pointer; font: .8rem var(--sans); }
+  .fld { display: flex; flex-direction: column; gap: 5px; }
+  .togrow { display: flex; align-items: center; gap: 9px; font-size: .82rem; color: var(--text); }
+  .togrow input { width: auto; }
+  .setrow { display: flex; gap: 8px; margin-top: 2px; }
   .setrow .btn { margin-top: 0; }
-  .hint { font-size: .72rem; color: #8b97a4; margin: 5px 0 0; }
-  .queue { margin-top: 12px; border-top: 1px solid #28323d; padding-top: 11px; display: none; }
+  .hint { font-size: .72rem; color: var(--muted); margin: 0; }
+
+  /* pending-sync queue */
+  .queue { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; display: none; }
   .queue.open { display: block; }
-  .queue h2 { font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: #e8755f; margin: 0 0 8px; }
-  .qitem { display: flex; align-items: center; gap: 6px; font-size: .76rem; color: #cdd7e1; padding: 6px 0; border-bottom: 1px solid #1c252e; }
+  .queue h2 { font: 600 .62rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--coral); margin: 0 0 9px; }
+  .qitem { display: flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--text2); padding: 6px 0; border-bottom: 1px solid var(--line); }
   .qitem .qlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qitem .qx { background: none; border: 0; color: #8b97a4; cursor: pointer; font-size: .9rem; padding: 0 3px; }
-  .qitem .qx:hover { color: #e8755f; }
-  .qerr { font-size: .72rem; color: #e8755f; margin: 7px 0 0; }
-  .qmeta { font-size: .7rem; color: #8b97a4; margin-top: 4px; }
+  .qitem .qx { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: .9rem; padding: 0 3px; }
+  .qitem .qx:hover { color: var(--coral); }
+  .qerr { font-size: .72rem; color: var(--coral); margin: 7px 0 0; }
+  .qmeta { font-size: .7rem; color: var(--muted); margin-top: 4px; }
   .qrow { display: flex; gap: 8px; margin-top: 10px; }
-  .qrow .btn { margin-top: 0; padding: 8px; font-size: .8rem; }
+  .qrow .btn { margin-top: 0; padding: 9px; font-size: .8rem; }
 </style>
 <div class="wrap">
   <div class="head">
-    <h1>Reqon Clip</h1>
+    <svg viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="35" stroke="var(--emerald)" stroke-width="10" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="var(--emerald)" stroke-width="10" stroke-linecap="round"></line></svg>
+    <div class="titles">
+      <div class="eyebrow-logo">Reqon</div>
+      <h1>Clip this job</h1>
+    </div>
+    <button id="themeBtn" class="themebtn" type="button" title="Appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"></circle><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"></path></svg></button>
     <button id="gear" class="gear" title="Settings">⚙</button>
   </div>
 
   <div id="card" class="card">
     <div class="muted">Loading…</div>
   </div>
-  <button id="panel" class="btn btn-ghost" style="margin-top:10px">📊 Open analytics sidebar</button>
+  <button id="panel" class="btn btn-ghost">📊 Open analytics panel</button>
+  <p class="reassure">Reqon never submits anything for you.</p>
   <div id="msg"></div>
 
   <div id="queue" class="queue">
@@ -74,25 +73,38 @@
   </div>
 
   <div id="settings" class="settings">
-    <label>Server</label>
-    <select id="serverPreset" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #333c47;color:#e8eef5;border-radius:8px;padding:8px 10px;font:inherit">
-      <option value="cloud">Reqon Cloud</option>
-      <option value="personal">Personal server…</option>
-    </select>
-    <div id="customOriginWrap" style="display:none">
-      <label>Server URL</label>
+    <div class="settings-head">
+      <h2>Connect your board</h2>
+      <button id="settingsBack" class="back" type="button">← back</button>
+    </div>
+    <label class="fld"><span class="eyebrow">Where's your board</span>
+      <select id="serverPreset">
+        <option value="cloud">Reqon Cloud</option>
+        <option value="personal">My own server…</option>
+      </select>
+    </label>
+    <div id="customOriginWrap" class="fld" style="display:none">
+      <span class="eyebrow">Server URL</span>
       <input id="origin" type="url" placeholder="https://your-server.com">
     </div>
-    <label>Username</label>
-    <input id="username" type="text" placeholder="your username" autocomplete="username">
-    <label>Password</label>
-    <input id="password" type="password" placeholder="your password" autocomplete="current-password">
-    <div class="togrow"><input id="overlay" type="checkbox"><label for="overlay">Show the on-page overlay on job postings</label></div>
-    <div class="togrow"><input id="notify" type="checkbox"><label for="notify">Show a notification on clip / mark-applied</label></div>
+    <label class="fld"><span class="eyebrow">Username</span>
+      <input id="username" type="text" placeholder="you@example.com" autocomplete="username"></label>
+    <label class="fld"><span class="eyebrow">Password</span>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></label>
+    <div class="togrow"><input id="overlay" type="checkbox"><label for="overlay">Show the helper on job postings</label></div>
+    <div class="togrow"><input id="notify" type="checkbox"><label for="notify">Notify me when I clip or mark applied</label></div>
+    <label class="fld"><span class="eyebrow">Appearance</span>
+      <div class="seg" id="themeSeg">
+        <button type="button" data-pref="system">System</button>
+        <button type="button" data-pref="light">Light</button>
+        <button type="button" data-pref="dark">Dark</button>
+      </div>
+    </label>
     <div class="setrow">
       <button id="save" class="btn btn-primary" style="flex:1">Connect</button>
       <button id="test" class="btn btn-ghost" style="flex:1">Test</button>
     </div>
   </div>
 </div>
+<script src="theme.js"></script>
 <script src="popup.js"></script>

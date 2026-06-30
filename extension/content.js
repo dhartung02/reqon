@@ -27,10 +27,46 @@
     if (best.length < 200) best = (document.body && document.body.innerText || '').trim();
     return best.slice(0, 20000);
   }
+  // Function words + job-posting boilerplate that carry no résumé-match signal. Frequency ranking
+  // alone surfaces these (they're the most common words), which pollutes the keyword coverage and
+  // makes the % meaningless — so we drop them before ranking.
+  const STOPWORDS = new Set((
+    'a an the and or but if then else of to in on at by for with from into onto upon about above below ' +
+    'under over across through during before after between among per via within without as is are was were ' +
+    'be been being am do does did have has had having will would shall should can could may might must ' +
+    'not no nor so than too very just only also more most much many some any all each every both few several ' +
+    'other others such own same this that these those here there where when why how what which who whom whose ' +
+    'you your yours we our ours us they them their theirs it its he she his her hers i me my mine everyone ' +
+    'anyone someone everything anything something etc ie eg ' +
+    // posting boilerplate — present in nearly every JD, so non-differentiating
+    'role roles job jobs position positions candidate candidates applicant applicants apply application ' +
+    'hiring hire company companies looking join opportunity opportunities please ability able including ' +
+    'include includes new using use used help make want need years year week weeks day days plus'
+  ).split(/\s+/));
+
+  // Tokens belonging to the employer name (og:site_name + the company portion of the page title).
+  // The company name is in every JD but says nothing about résumé fit, so we exclude it.
+  function companyTokens() {
+    const tk = (typeof _tokenize === 'function' ? _tokenize : (s) => (String(s || '').toLowerCase().match(/[a-z0-9+#]+/g) || []));
+    const siteName = (document.querySelector('meta[property="og:site_name"]') || {}).content || '';
+    const title = document.title || '';
+    // company commonly trails a separator: "Role | Company", "Role - Company", "Role at Company"
+    const parts = title.split(/\s[|–—\-@·]\s|\s+at\s+|\s+hiring\s+/i);
+    const tail = parts.length > 1 ? parts[parts.length - 1] : '';
+    return new Set([...tk(siteName), ...tk(tail)]);
+  }
+
   function jdKeywords() {
-    const toks = (typeof _tokenize === 'function' ? _tokenize : (s) => (String(s || '').toLowerCase().match(/[a-z0-9+#]+/g) || []))(jdText());
+    const tk = (typeof _tokenize === 'function' ? _tokenize : (s) => (String(s || '').toLowerCase().match(/[a-z0-9+#]+/g) || []));
+    const co = companyTokens();
     const freq = new Map();
-    for (const t of toks) { if (/^\d+$/.test(t)) continue; freq.set(t, (freq.get(t) || 0) + 1); }
+    for (const t of tk(jdText())) {
+      if (t.length < 3) continue;          // drop 1–2 char noise
+      if (/^\d+$/.test(t)) continue;       // drop pure numbers
+      if (STOPWORDS.has(t)) continue;      // drop function words + boilerplate
+      if (co.has(t)) continue;             // drop the employer name
+      freq.set(t, (freq.get(t) || 0) + 1);
+    }
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).map((e) => e[0]).slice(0, 24);
   }
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -122,7 +158,7 @@
       msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '') + ' — review, never auto-submitted.',
     };
   }
-  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '✎ Fill'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '✎ Fill'; renderFillSummary(res); }; return b; };
+  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '⚡ Fill form'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '⚡ Fill form'; renderFillSummary(res); }; return b; };
 
   // Autofill summary (P1.13): after a fill, show exactly what changed + what was intentionally left,
   // a review reminder, and a Clear-highlights action. Replaces the old one-line toast.
@@ -236,21 +272,49 @@
   }
 
   let box;
+  // Mirror the extension's appearance switch (chrome.storage.sync "theme"): the overlay can't read
+  // storage synchronously at CSS-load, so the content script sets the mode class on the box. dark is
+  // the base; jpcrm-light forces light; jpcrm-system follows the OS via overlay.css's media query.
+  function applyOverlayTheme(pref) {
+    if (!box) return;
+    box.classList.remove('jpcrm-system', 'jpcrm-light', 'jpcrm-dark');
+    box.classList.add('jpcrm-' + (pref === 'light' || pref === 'dark' ? pref : 'system'));
+  }
   function mount() {
-    box = el('div', 'jpcrm-box');
+    box = el('div', 'jpcrm-box jpcrm-system');
     box.innerHTML = '<div class="jpcrm-row"><span class="jpcrm-logo">Reqon</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide on this page">×</button></div><div class="jpcrm-body"></div>';
     document.documentElement.appendChild(box);
     box.querySelector('.jpcrm-x').onclick = () => { box.remove(); box = null; };
+    chrome.storage.sync.get({ theme: 'system' }, (c) => applyOverlayTheme(c && c.theme));
+  }
+
+  // Tier → word (the signature change: Strong / Possible / Long shot replaces TIER A/B/C).
+  const TIER_WORD = { A: 'Strong', B: 'Possible', C: 'Long shot' };
+  function setTier(t) {
+    if (!box) return;
+    box.classList.remove('jpcrm-tA', 'jpcrm-tB', 'jpcrm-tC');
+    box.classList.add('jpcrm-t' + (t || 'C').toUpperCase());
+  }
+  // The circular fit dial + "Strong match" + fit/prob/EV metrics row.
+  function scoreBlock(row) {
+    const t = (row.tier || 'C').toUpperCase();
+    const blk = el('div', 'jpcrm-score');
+    blk.innerHTML =
+      '<div class="jpcrm-circle"><span>' + (+row.fit || 0) + '</span></div>' +
+      '<div class="jpcrm-score-main">' +
+        '<div class="jpcrm-match">' + (TIER_WORD[t] || '') + ' match</div>' +
+        '<div class="jpcrm-metrics"><span>fit <b>' + (+row.fit || 0) + '</b></span>' +
+        '<span>prob <b>' + (+row.prob || 0) + '</b></span>' +
+        '<span class="jpcrm-ev">EV <b>' + ev(row) + '</b></span></div>' +
+      '</div>';
+    return blk;
   }
 
   function renderTracked(row) {
-    box.querySelector('.jpcrm-status').textContent = row.company + ' — ' + (row.role || '');
+    box.querySelector('.jpcrm-status').textContent = row.role || row.company || '';
     const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
-    const tier = (row.tier || 'C');
-    body.appendChild(el('span', 'jpcrm-tier jpcrm-t' + tier, 'Tier ' + tier));
-    body.appendChild(el('span', 'jpcrm-metric', 'Fit ' + (+row.fit || 0)));
-    body.appendChild(el('span', 'jpcrm-metric', 'Prob ' + (+row.prob || 0)));
-    body.appendChild(el('span', 'jpcrm-metric jpcrm-ev', 'EV ' + ev(row)));
+    setTier(row.tier);
+    body.appendChild(scoreBlock(row));
     body.appendChild(el('span', 'jpcrm-pill', row.status || 'Not Applied'));
     if (row.status === 'Not Applied' || !row.status) {
       const b = el('button', 'jpcrm-btn', '✓ Mark applied (today)');
@@ -275,18 +339,19 @@
     }
     const { fill } = captureMeta();
     body.appendChild(fillabilityRow(fill));
-    if (fill.level !== 'External redirect') body.appendChild(fillBtn());
+    if (fill.level !== 'External redirect') { body.appendChild(fillBtn()); body.appendChild(el('div', 'jpcrm-foot', 'Skips passwords & EEO · never submits')); }
   }
 
   function renderUntracked() {
     box.querySelector('.jpcrm-status').textContent = 'Not tracked yet';
     const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
+    setTier('');
     const { fill } = captureMeta();
     body.appendChild(fillabilityRow(fill));
-    const b = el('button', 'jpcrm-btn jpcrm-primary', '+ Clip to CRM');
+    const b = el('button', 'jpcrm-btn jpcrm-primary', '＋ Clip to my board');
     b.onclick = () => openClipPanel();
     body.appendChild(b);
-    if (fill.level !== 'External redirect') body.appendChild(fillBtn());
+    if (fill.level !== 'External redirect') { body.appendChild(fillBtn()); body.appendChild(el('div', 'jpcrm-foot', 'Skips passwords & EEO · never submits')); }
   }
 
   // Fillability hint line (P1.11): "Likely fillable · 5 fields" + a tooltip of the reasons.
@@ -318,14 +383,14 @@
     ['Priority: normal', 'Priority: high', 'Priority: low'].forEach((t, i) => { const o = el('option', null, t); o.value = ['', 'high', 'low'][i]; prio.appendChild(o); });
     panel.appendChild(note); panel.appendChild(tag); panel.appendChild(prio);
     const row = el('div', 'jpcrm-clip-acts');
-    const confirm = el('button', 'jpcrm-btn jpcrm-primary', '✓ Clip to CRM');
+    const confirm = el('button', 'jpcrm-btn jpcrm-primary', '✓ Clip to my board');
     const cancel = el('button', 'jpcrm-btn', 'Cancel');
     confirm.onclick = async () => {
       confirm.disabled = cancel.disabled = true; confirm.textContent = 'Clipping…';
       const r = await send({ type: 'clip', url: location.href, title: document.title, meta, note: note.value.trim(), tag: tag.value.trim(), priority: prio.value });
       toast(r.msg, r.ok);
       if (r.ok) setTimeout(() => refresh(true), 2500);
-      else { confirm.disabled = cancel.disabled = false; confirm.textContent = '✓ Clip to CRM'; }
+      else { confirm.disabled = cancel.disabled = false; confirm.textContent = '✓ Clip to my board'; }
     };
     cancel.onclick = () => renderUntracked();
     row.appendChild(confirm); row.appendChild(cancel);
@@ -351,7 +416,9 @@
   function start() { if (box) return; mount(); refresh(false); }
   chrome.storage.sync.get({ overlayEnabled: true }, (cfg) => { if (cfg.overlayEnabled !== false) start(); });
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area !== 'sync' || !ch.overlayEnabled) return;
+    if (area !== 'sync') return;
+    if (ch.theme && box) applyOverlayTheme(ch.theme.newValue);
+    if (!ch.overlayEnabled) return;
     if (ch.overlayEnabled.newValue === false) { if (box) { box.remove(); box = null; } }
     else start();
   });

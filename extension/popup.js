@@ -14,11 +14,20 @@ const ev = (r) => Math.round(((+r.fit || 0) * (+r.prob || 0) / 10) * 10) / 10;
 const isApplied = (s) => /^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(s || '');
 const isClosed = (s) => /^(Rejected|Archived)$/.test(s || '');
 
-function statusClass(s) {
-  if (isApplied(s)) return 's-applied';
-  if (isClosed(s)) return 's-rejected';
-  if (s) return 's-open';
-  return 's-none';
+// Tier → word (the signature change: Strong / Possible / Long shot replaces TIER A/B/C).
+const TIER_WORD = { A: 'Strong', B: 'Possible', C: 'Long shot' };
+const tierKey = (t) => (t || 'C').toString().toUpperCase();
+// Status → shared status role for the data-st color token (theme.css).
+function statusKey(s) {
+  if (/^(Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(s || '')) return 'interviewing';
+  if (/^Applied$/.test(s || '')) return 'applied';
+  if (isClosed(s)) return 'rejected';
+  return s ? 'ready' : 'saved';
+}
+// The circular fit dial: score in the tier color + Strong/Possible/Long shot beneath.
+function scoreCircle(row) {
+  return '<div class="scorewrap"><div class="scorecirc"><span>' + esc(row.fit ?? '—') + '</span></div>' +
+    '<span class="scorelbl">' + (TIER_WORD[tierKey(row.tier)] || '') + '</span></div>';
 }
 
 function setMsg(text, kind) {
@@ -31,27 +40,34 @@ async function getConfig() {
 }
 
 function renderUntracked() {
+  $('card').setAttribute('data-tier', '');
+  $('card').setAttribute('data-st', 'ready');
   $('card').innerHTML =
-    '<div class="role">Not on your board</div>' +
-    '<div class="company muted">Clip this page to add it as a requisition.</div>' +
-    '<button id="clip" class="btn btn-primary">+ Clip to board</button>';
+    '<div class="role">Not tracked yet</div>' +
+    '<div class="company">Clip this page to add it to your board.</div>' +
+    '<div class="status" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;color:var(--emerald)">' +
+      '<span style="width:6px;height:6px;border-radius:50%;background:var(--emerald)"></span>Clip it to your board</div>' +
+    '<button id="clip" class="btn btn-primary">＋ Clip to my board</button>';
   $('clip').onclick = doClip;
 }
 
 function renderTracked(row) {
-  const tier = row.tier ? 'Tier ' + esc(row.tier) : '';
-  const chips =
-    (tier ? `<span class="chip">${tier}</span>` : '') +
-    `<span class="chip">fit <b>${esc(row.fit ?? '—')}</b></span>` +
+  const salaryChip = row.salary ? `<span class="chip">${esc(row.salary)}</span>` : '';
+  const chips = salaryChip +
     `<span class="chip">prob <b>${esc(row.prob ?? '—')}</b></span>` +
-    `<span class="chip">EV <b>${ev(row)}</b></span>`;
+    `<span class="chip ev">EV <b>${ev(row)}</b></span>`;
   const applied = isApplied(row.status);
   const closed = isClosed(row.status);
+  $('card').setAttribute('data-tier', tierKey(row.tier).toLowerCase());
+  $('card').setAttribute('data-st', statusKey(row.status));
   $('card').innerHTML =
-    `<div class="role">${esc(row.role || '—')}</div>` +
-    `<div class="company">${esc(row.company || '')}</div>` +
-    `<div class="metrics">${chips}</div>` +
-    `<div class="status ${statusClass(row.status)}">${esc(row.status || 'Not Applied')}</div>` +
+    `<div class="clip-top">${scoreCircle(row)}` +
+      `<div style="flex:1;min-width:0">` +
+        `<div class="role">${esc(row.role || '—')}</div>` +
+        `<div class="company">${esc(row.company || '')}${row.location ? ' · ' + esc(row.location) : ''}</div>` +
+        `<div class="metrics">${chips}</div>` +
+      `</div></div>` +
+    `<div class="status">${esc(row.status || 'Not Applied')}</div>` +
     (applied || closed ? '' : '<button id="applied" class="btn btn-primary">✓ Mark applied (today)</button>') +
     '<a id="board" class="link" href="#">View on board ↗</a>';
   const ab = $('applied');
@@ -101,7 +117,7 @@ async function refresh() {
   if (!r || r.ok === false) {
     $('card').innerHTML = '<div class="role">Can’t reach the server</div><div class="company muted">Check the settings below, then Test.</div>';
     setMsg((r && r.msg) || 'Lookup failed.', 'err');
-    $('settings').classList.add('open');
+    setSettingsView(true);
     return;
   }
   currentRow = r.row || null;
@@ -141,7 +157,17 @@ async function loadSettings() {
 $('serverPreset').onchange = () => {
   $('customOriginWrap').style.display = $('serverPreset').value === 'personal' ? '' : 'none';
 };
-$('gear').onclick = () => $('settings').classList.toggle('open');
+// The gear swaps the clip card for the settings view (and back), matching the redesign.
+function setSettingsView(show) {
+  $('settings').classList.toggle('open', show);
+  const clipEls = [$('card'), $('panel'), $('queue'), document.querySelector('.reassure')];
+  clipEls.forEach((e) => { if (e) e.style.display = show ? 'none' : ''; });
+}
+$('gear').onclick = () => setSettingsView(!$('settings').classList.contains('open'));
+$('settingsBack').onclick = () => setSettingsView(false);
+// Appearance switch (System / Light / Dark) — quick button by the gear + segmented control in settings.
+if (window.reqonThemeWireButton) window.reqonThemeWireButton($('themeBtn'));
+if (window.reqonThemeWireSeg) window.reqonThemeWireSeg($('themeSeg'));
 $('panel').onclick = async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

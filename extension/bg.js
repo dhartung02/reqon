@@ -270,12 +270,14 @@ async function refreshBadge(tabId, url) {
   try {
     const rows = await getRows();
     const row = matchRow(rows, url);
-    let text = '', color = '#00df8f';
+    // Badge colors use the shared "Emerald Command" status roles (dark-scheme values — the badge
+    // always sits on the browser chrome): emerald = ready, teal = applied/in-process, muted = closed.
+    let text = '', color = '#00E5A3';
     if (row) {
       const s = row.status || '';
-      if (/^(Rejected|Archived)$/.test(s)) { text = '×'; color = '#5a6470'; }
-      else if (/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(s)) { text = '●'; color = '#706cff'; }
-      else { text = '✓'; color = '#00df8f'; }
+      if (/^(Rejected|Archived)$/.test(s)) { text = '×'; color = '#64748B'; }
+      else if (/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(s)) { text = '●'; color = '#2DD4BF'; }
+      else { text = '✓'; color = '#00E5A3'; }
     }
     chrome.action.setBadgeText({ tabId, text });
     if (text) chrome.action.setBadgeBackgroundColor({ tabId, color });

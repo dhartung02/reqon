@@ -1028,7 +1028,7 @@
   <div class="modal" style="max-width:560px">
     <h2>Welcome to Reqon 👋</h2>
     <p class="hint">A couple of quick questions so your first board is relevant. You can change all of this later in Settings.</p>
-    <div class="field"><label>What role(s) are you seeking? <span class="setmuted">one per line — titles the scout searches for</span></label>
+    <div class="field"><label>What role(s) are you seeking? <span class="setmuted">one per line — titles Reqon searches for</span></label>
       <textarea id="obRoles" rows="4" placeholder="Principal Product Manager, AI Platform&#10;Director, Product Management&#10;Staff PM, Data Platform"></textarea>
     </div>
     <div class="grid2">
@@ -1042,7 +1042,7 @@
     <div id="obMsg" class="setmsg"></div>
     <div class="modalacts">
       <button class="btn ghost" id="obSkip" type="button">Skip for now</button>
-      <button class="btn" id="obSave" type="button">Save &amp; run my first scout</button>
+      <button class="btn" id="obSave" type="button">Save &amp; find my first jobs</button>
     </div>
   </div>
 </div>
@@ -1060,7 +1060,7 @@
       <div style="display:flex;gap:18px;flex-wrap:wrap;font-family:'Spline Sans Mono',monospace;font-size:.82rem">
         <span>Fit <b id="scNowFit">–</b> → <b id="scNewFit" style="color:var(--accent,#706CFF)">–</b></span>
         <span>Prob <b id="scNowProb">–</b> → <b id="scNewProb" style="color:var(--accent,#706CFF)">–</b></span>
-        <span>Tier <b id="scNowTier">–</b> → <b id="scNewTier" style="color:var(--accent,#706CFF)">–</b></span>
+        <span>Match <b id="scNowTier">–</b> → <b id="scNewTier" style="color:var(--accent,#706CFF)">–</b></span>
       </div>
       <p id="scRationale" style="margin:8px 0 0;font-size:.86rem;line-height:1.45"></p>
       <div class="ahintrow" style="margin-top:8px"><button class="btn" id="assistApplyScore" type="button">Apply suggested scores</button> <span class="setmuted" id="assistApplyNote">Saves the rationale to notes too. Nothing is submitted to any employer.</span></div>
@@ -1112,7 +1112,7 @@
 <div class="overlay" id="jobsOverlay">
   <div class="modal">
     <h2>Background jobs</h2>
-    <p class="hint">Scout, enrichment, Gmail ingest, guides, digest and backups — running and recent.</p>
+    <p class="hint">Finding jobs, enrichment, Gmail ingest, guides, digest and backups — running and recent.</p>
     <div id="jobsBody" class="jobs-body"><div class="setmuted">Loading…</div></div>
     <div class="modalacts">
       <button class="btn ghost" id="jobsRefresh">Refresh</button>
@@ -1207,7 +1207,7 @@
 
         <section class="sset" data-sect="looking" hidden>
           <div class="ssh">Sources</div>
-          <p class="ssd">Enable or disable the board APIs the scout polls, add companies by careers URL, and check each source's last run. Saves to boards.json / watchlist.json — takes effect on the next run, no restart.</p>
+          <p class="ssd">Enable or disable the board APIs Reqon polls, add companies by careers URL, and check each source's last run. Saves to boards.json / watchlist.json — takes effect on the next run, no restart.</p>
           <div class="sgrp">
             <div class="sgrp-h">Board sources</div>
             <div class="field"><label>Enabled sources</label>
@@ -1220,19 +1220,19 @@
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Email recommendations <span class="setmuted" style="font-weight:400">new opportunities from your inbox</span></div>
-            <p class="sgrp-d">When the scout runs, also read job-recommendation emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and add the new roles to the board — scored and deduped like board finds, and resolved to the employer's real req when possible.</p>
+            <p class="sgrp-d">When Reqon checks for jobs, also read job-recommendation emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and add the new roles to the board — scored and deduped like board finds, and resolved to the employer's real posting when possible.</p>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutEnable" type="checkbox" style="width:auto"> Check email for new opportunities</label></div>
             <p class="hint" style="margin:6px 0 0">Requires Gmail ingest — set up the connection and tune which sites / fit threshold under <a href="#" id="emailScoutGotoGmail" style="color:var(--gold);text-decoration:none">Digest &amp; notifications</a>. <span id="emailScoutSrcHint" class="setmuted"></span></p>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Source health <button class="mini" id="refreshHealthBtn" type="button" style="margin-left:auto">↻ refresh</button></div>
-            <div id="sourceHealth" class="bklist" style="max-height:220px"><div class="setmuted" style="padding:8px">Run the scout to populate.</div></div>
+            <div id="sourceHealth" class="bklist" style="max-height:220px"><div class="setmuted" style="padding:8px">Find jobs to populate.</div></div>
           </div>
         </section>
 
         <section class="sset" data-sect="looking" hidden>
           <div class="ssh">Matching &amp; scoring</div>
-          <p class="ssd">Thresholds and keyword lists that decide which roles the scout adds and how it ranks them.</p>
+          <p class="ssd">Thresholds and keyword lists that decide which roles Reqon adds and how it ranks them.</p>
           <div class="sgrp">
             <div class="sgrp-h">Thresholds</div>
             <div class="grid2">
@@ -1292,7 +1292,7 @@
           <div class="sgrp">
             <div class="sgrp-h">Targeting</div>
             <div class="field"><label>Seniority / title bands (comma-separated)</label><input id="profSeniority" type="text">
-              <p class="hint" style="margin:4px 0 0">Reference levels the scout treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
+              <p class="hint" style="margin:4px 0 0">Reference levels Reqon treats loosely when ranking. <b>Not from your résumé</b> — edit freely. (The hard scoring thresholds live in <b>Matching &amp; scoring → Title bands</b>.)</p>
             </div>
             <div class="field"><label>Role / title terms (comma-separated)</label><input id="profRoleTerms" type="text">
               <p class="hint" style="margin:4px 0 0">Bare role functions you target (e.g. <code>Product Manager, Product</code>) — no seniority words; that's tracked above.</p>
@@ -1303,14 +1303,14 @@
             </div>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what the scout favors</span></div>
+            <div class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what Reqon favors</span></div>
             <div id="profKeywords" class="profkw"></div>
             <div class="ahintrow" style="margin-top:8px">
               <input id="kwAddName" type="text" placeholder="add a keyword (e.g. agentic)" style="flex:1;min-width:120px">
               <input id="kwAddWeight" type="number" min="1" max="20" step="1" value="5" title="weight" style="width:64px">
               <button class="mini" id="kwAddBtn" type="button">+ Add</button>
             </div>
-            <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a scout fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server scout. <span class="setmuted">The on-device app scout uses Search criteria keywords; it only runs when no server is connected.</span></p>
+            <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server's job finder. <span class="setmuted">The on-device app finder uses Search criteria keywords; it only runs when no server is connected.</span></p>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
@@ -1352,7 +1352,7 @@
 
         <section class="sset" data-sect="works" hidden>
           <div class="ssh">Workflow</div>
-          <p class="ssd">How statuses route to board tabs, when hygiene lanes flag work, the analytics window, and per-source apply modes.</p>
+          <p class="ssd">How statuses route to board tabs, when “what needs you today” flags work, the analytics window, and the default way to apply per source.</p>
           <div class="sgrp">
             <div class="sgrp-h">Lifecycle tabs</div>
             <div class="grid2">
@@ -1375,8 +1375,8 @@
             <p class="hint" style="margin:2px 0 0">Lanes are non-destructive: closed reqs are surfaced for review and archived only on confirm (snapshot taken first) — never auto-deleted.</p>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Apply mode</div>
-            <div class="field"><label>Source → default apply mode</label>
+            <div class="sgrp-h">How you apply</div>
+            <div class="field"><label>Source → default way to apply</label>
               <div id="applyModeMapBox" class="ammap"><div class="setmuted">loading…</div></div>
             </div>
             <div class="ahintrow"><button class="mini" id="backfillApplyModeBtn" type="button">↻ Backfill apply-mode now</button> <span class="setmuted">Stamps inferred apply-mode onto rows missing it (snapshots first).</span></div>
@@ -1386,9 +1386,9 @@
 
         <section class="sset" data-sect="works" hidden>
           <div class="ssh">AI assistant</div>
-          <p class="ssd">The OpenAI model and budget for scout rescoring, plus the per-req draft assistant. API keys live under Advanced.</p>
+          <p class="ssd">The OpenAI model and budget for re-scoring jobs, plus the per-job draft assistant. API keys live under Account &amp; data.</p>
           <div class="sgrp">
-            <div class="sgrp-h">Scout rescoring</div>
+            <div class="sgrp-h">Re-scoring jobs</div>
             <div class="field"><label>OpenAI model</label><select id="setModel"></select></div>
             <div class="grid2">
               <div class="field"><label>AI calls per run (cap)</label><input id="setAiMax" type="number" min="0" max="500" step="1"></div>
@@ -1399,7 +1399,7 @@
               <div class="field"><label>JD chars sent to AI</label><input id="setJdChars" type="number" min="500" max="20000" step="100"></div>
               <div class="field"><label>Max tokens per scoring call</label><input id="setMaxTokens" type="number" min="64" max="4000" step="10"></div>
             </div>
-            <div class="field"><label>Scout delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
+            <div class="field"><label>Delay between companies (seconds)</label><input id="setMinDelay" type="number" min="0" max="10" step="0.1"></div>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Application draft assistant</div>
@@ -1430,7 +1430,7 @@
               <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestEnabled" type="checkbox" style="width:auto"> Enable scheduled digest</label></div>
               <div class="field"><label>Time (HH:MM, server local)</label><input id="setDigestTime" type="text" placeholder="07:00"></div>
               <div class="field"><label>Look-back window (days)</label><input id="setDigestDays" type="number" min="1" max="60" step="1"></div>
-              <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestAfterScout" type="checkbox" style="width:auto"> Also send after the first scout run of the day</label></div>
+              <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setDigestAfterScout" type="checkbox" style="width:auto"> Also send after the first job check of the day</label></div>
             </div>
             <div class="field"><label>Delivery channels</label>
               <div id="setDigestChannels" class="chanchips"></div>
@@ -1495,7 +1495,7 @@
             </div>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="mailAi" type="checkbox" style="width:auto"> Use AI for ambiguous emails (server OpenAI key)</label></div>
             <div class="ahintrow"><button class="mini" id="mailSaveBtn" type="button">Save</button> <button class="mini" id="mailConnTestBtn" type="button">🔌 Test connection</button> <button class="mini" id="mailTestBtn" type="button">Test (dry run)</button> <button class="mini" id="mailRunBtn" type="button">▶ Run now</button> <button class="mini danger" id="mailClearBtn" type="button">Clear credentials</button> <span id="mailStatus" class="setmuted"></span></div>
-            <p class="hint" style="margin:6px 0 0"><b>Test connection</b> just checks your Gmail login works (shared by both this and the email job-scout) — use it to verify setup. <b>Test (dry run)</b> previews recruiter-response matching without changing anything.</p>
+            <p class="hint" style="margin:6px 0 0"><b>Test connection</b> just checks your Gmail login works (shared by both this and the email job finder) — use it to verify setup. <b>Test (dry run)</b> previews recruiter-response matching without changing anything.</p>
             <pre id="mailReport" class="mailreport" style="display:none"></pre>
             <div class="field" style="margin-top:12px"><label>Notify me when ingest detects…</label>
               <div class="statuschips" id="mailNotifyKinds" style="margin-bottom:8px">
@@ -1510,8 +1510,8 @@
           </div>
 
           <div class="sgrp">
-            <div class="sgrp-h">Email job-scout (recommendation emails → leads)</div>
-            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site req</b> when possible. Uses the Gmail connection above. Turn it on under <a href="#" id="emailScoutGotoSources" style="color:var(--gold);text-decoration:none">Sources → Email recommendations</a>; tune the options here.</p>
+            <div class="sgrp-h">Email job finder (recommendation emails → leads)</div>
+            <p class="sgrp-d">The other direction: reads job-<b>recommendation</b> emails (LinkedIn, Indeed, Glassdoor, ZipRecruiter, …) and adds the new roles to the board as leads — scored, deduped, and <b>resolved to the employer's real career-site posting</b> when possible. Uses the Gmail connection above. Turn it on under <a href="#" id="emailScoutGotoSources" style="color:var(--gold);text-decoration:none">Sources → Email recommendations</a>; tune the options here.</p>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="emailScoutResolve" type="checkbox" style="width:auto"> Resolve leads to the real employer req (Greenhouse/Ashby/Lever)</label></div>
             <div class="grid2">
               <div class="field"><label>Limit to sources (optional)</label><input id="emailScoutSources" type="text" placeholder="e.g. linkedin,indeed (blank = all)" autocomplete="off"></div>
@@ -1552,7 +1552,7 @@
 
         <section class="sset" data-sect="account" id="usersNavBtn" hidden style="display:none">
           <div class="ssh">Admin console</div>
-          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and scout. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
+          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and job finder. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
           <div class="sgrp">
             <div class="sgrp-h">Server</div>
             <div id="adminServer" class="adminstats"><div class="setmuted" style="padding:8px">loading…</div></div>
@@ -1620,7 +1620,7 @@
             <div class="sgrp-h">API keys</div>
             <div class="field"><label>OpenAI API key <span id="setKeyState" class="setmuted"></span></label>
               <input id="setKey" type="password" placeholder="leave blank to keep current" autocomplete="off">
-              <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Powers scout rescoring + the draft assistant.</span></div>
+              <div class="ahintrow"><button class="mini danger" id="clearKeyBtn" type="button">Clear key</button> <span class="setmuted">Powers job re-scoring + the draft assistant.</span></div>
             </div>
             <div class="field"><label>Aggregator keys (optional)</label>
               <div class="grid2">
@@ -2257,7 +2257,7 @@ function render(){
   } else if(recentActive){
     // "New since last run" — flat list of not-applied roles added on/after the cutoff
     const items=[...list].sort(cmp);
-    const lbl=recentCutoff?`the last scout run (${recentCutoff})`:`the last 3 days`;
+    const lbl=recentCutoff?`the last check (${recentCutoff})`:`the last 3 days`;
     html+=`<div class="recent-head"><span class="rh-title">New since last run</span><span class="rh-desc">Not-applied roles added since ${lbl}.</span><button class="btn ghost" onclick="setTab('open')">Clear</button></div><div class="flatlist">`;
     if(!items.length)html+=`<div class="flat-empty">Nothing new since the last run.</div>`;
     else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
@@ -2396,7 +2396,7 @@ function renderToday(){
   const queue=actionTotal===0
     ? `<div class="today-clear">✓ You're all caught up — nothing needs you right now. Find new jobs to pull fresh matches.</div>`
     : `<div class="today-grid">
-        ${card(newSince.length,"New since last run",anchored?"Added since the last scout run, not yet applied":"Added in the last 3 days, not yet applied","accent","todoGo('review')")}
+        ${card(newSince.length,"New since last run",anchored?"Added since the last check, not yet applied":"Added in the last 3 days, not yet applied","accent","todoGo('review')")}
         ${card(verify.length,"Needs verification","Unverified links — confirm the live posting first","warning","todoGo('verify')")}
         ${card(applyNext.length,"Apply next","Strong / Possible · verified · still open · not applied","accent","todoGo('applynext')")}
         ${card(tierAOpen.length,"Strong · not applied","Top matches you haven't applied to yet","accent","todoGo('tierA')")}
@@ -2951,7 +2951,7 @@ function startScoutPoll(){
     const last=j.last||{};
     if(j.running){
       scoutBusy(true);
-      let p="scout running…";
+      let p="finding jobs…";
       if(last.phase==="validating"&&last.total)p=`validating ${last.processed||0}/${last.total}…`;
       else if(last.phase==="source-backfill"&&last.total)p=`stamping sources ${last.processed||0}/${last.total}…`;
       else if(last.phase==="finding")p="finding new roles…";
@@ -2979,9 +2979,9 @@ async function triggerScout(mode){
     const r=await fetch("/api/scout/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,sources})});
     const j=await r.json().catch(()=>({}));
     if(r.status===409){setScoutStatus("a run is already in progress…",true);startScoutPoll();return;}
-    if(!r.ok||!j.ok){scoutBusy(false);setScoutStatus("⚠ "+(j.error||"could not start scout"),false);return;}
+    if(!r.ok||!j.ok){scoutBusy(false);setScoutStatus("⚠ "+(j.error||"could not start the job finder"),false);return;}
     startScoutPoll();
-  }catch(e){scoutBusy(false);setScoutStatus("⚠ network error starting scout",false);}
+  }catch(e){scoutBusy(false);setScoutStatus("⚠ network error starting the job finder",false);}
 }
 // Run JUST the email scout (recommendation emails → leads) on demand, regardless of the Sources
 // toggle. Synchronous on the server (bounded by the resolution budget); show the funnel inline.
@@ -3242,7 +3242,7 @@ async function loadSourceHealth(){
   try{
     const j=await (await fetch("/api/source-health",{cache:"no-store"})).json();
     const src=(j.health&&j.health.sources)||{}; const keys=Object.keys(src);
-    if(!keys.length){box.innerHTML='<div class="setmuted" style="padding:8px">No runs yet — run the scout to populate.</div>';return;}
+    if(!keys.length){box.innerHTML='<div class="setmuted" style="padding:8px">No runs yet — find jobs to populate.</div>';return;}
     const nf=n=>Number(n||0).toLocaleString();
     box.innerHTML='<div class="srchealth-hdr"><span>Source</span><span>Last run</span><span>Matches added</span></div>'+
       keys.sort().map(k=>{const h=src[k]||{};
@@ -3291,13 +3291,13 @@ SET("discoverBtn").onclick=async()=>{
       `<datalist id="industryList">`+
         ["AI / ML","Data / Analytics","Developer Tools","Fintech","Healthtech","E-commerce / Retail","Martech / Adtech","Cybersecurity","Enterprise SaaS","Cloud / Infrastructure","Identity / Security","Gaming","Media / Streaming","EdTech","Logistics / Supply Chain","Climate / Energy","Crypto / Web3","Government / Defense"].map(v=>`<option value="${v}">`).join("")+
       `</datalist> `+
-      `<button class="mini" id="addCompanyBtn" type="button">Add to scout</button>`+
+      `<button class="mini" id="addCompanyBtn" type="button">Add to watchlist</button>`+
       `<p class="hint" style="margin:6px 0 0">Tagging the vertical helps Reqon recommend boards to others in your industry later.</p>`;
     SET("addCompanyBtn").onclick=async()=>{
       try{const r=await (await fetch("/api/sources/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ats:j.ats,slug:j.slug,name:SET("discoverName").value.trim(),industry:SET("discoverIndustry").value.trim()})})).json();
         if(!r.ok)throw new Error(r.error||"failed");
         const tag=r.industry?(" · "+esc(r.industry)):"";
-        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)+tag+(r.tagged?" (industry saved)":"")):("Added "+esc(r.name)+tag+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs next scout.")}</span>`;
+        SET("discoverResult").innerHTML=`<span class="setmsg ok">${r.duplicate?("Already tracked: "+esc(r.name)+tag+(r.tagged?" (industry saved)":"")):("Added "+esc(r.name)+tag+" ("+esc(j.ats)+"/"+esc(j.slug)+") — "+r.total+" companies. Runs on the next check.")}</span>`;
       }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Add failed: ${esc(e.message)}</span>`;}
     };
   }catch(e){SET("discoverResult").innerHTML=`<span class="setmsg err">Failed: ${esc(e.message)}</span>`;}
@@ -3577,7 +3577,7 @@ SET("mailRunBtn").onclick=()=>mailRun(true);
 SET("emailScoutEnable").onchange=async(e)=>{
   const on=e.target.checked;
   try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailScout:on})})).json();
-    const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent=on?(m.configured?"On — runs with the daily scout. Gmail connected ✓":"On, but Gmail isn't configured yet — connect it under Digest & notifications."):"Off.";
+    const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent=on?(m.configured?"On — runs with the daily check. Gmail connected ✓":"On, but Gmail isn't configured yet — connect it under Updates & alerts."):"Off.";
   }catch(err){const sh=SET("emailScoutSrcHint"); if(sh) sh.textContent="Couldn't save: "+err.message;}
 };
 // Cross-links between the Sources toggle and the Gmail/options panel.
@@ -4045,7 +4045,7 @@ async function loadJobs(){
   try{
     const j=await (await fetch("/api/jobs",{cache:"no-store"})).json();
     if(!j.ok)throw new Error(j.error||"failed");
-    if(!j.jobs.length){box.innerHTML='<div class="setmuted" style="padding:10px 2px">No jobs yet. Run a scout, enrich a lead, or generate a guide.</div>';return;}
+    if(!j.jobs.length){box.innerHTML='<div class="setmuted" style="padding:10px 2px">No jobs yet. Find jobs, enrich a lead, or generate a guide.</div>';return;}
     box.innerHTML=j.jobs.map(x=>{
       const when=(x.finishedAt||x.startedAt||x.createdAt||"").slice(0,16).replace("T"," ");
       const sub=x.status==="running"?(esc(x.phase||"running")+(x.progress?" · "+x.progress+"%":"")):(x.error?esc(x.error.slice(0,80)):(x.result?Object.entries(x.result).slice(0,3).map(([k,v])=>k+": "+(typeof v==="object"?JSON.stringify(v):v)).join(" · "):when));
@@ -4137,7 +4137,7 @@ window.detectApplyMode=async function(i){
     // inconclusive → ask before spending a token (per your preference)
     setScoutStatus("",false);
     const why=j.reason?` (${j.reason})`:"";
-    if(!confirm(`Couldn't determine the apply mode deterministically${why}.\n\nTry AI? It reads the page text and classifies it (uses one OpenAI call). The result is saved for this domain.`)){
+    if(!confirm(`Couldn't determine how to apply deterministically${why}.\n\nTry AI? It reads the page text and classifies it (uses one OpenAI call). The result is saved for this domain.`)){
       setScoutStatus("Apply-mode detection skipped.",false);return;
     }
     setScoutStatus("Asking AI…",true);
@@ -4298,9 +4298,9 @@ async function loadUsers(){   // admin console: server stats + per-user usage + 
       const cost=u.ai30dCost!=null?'$'+u.ai30dCost:'—';
       return `<div class="urow" data-uid="${esc(u.id)}">`
       +`<span class="uname">${esc(u.displayName||u.id)} <span class="uid">@${esc(u.id)}</span>${u.email?` <span class="uid">${esc(u.email)}</span>`:''} ${u.role==='admin'?'<span class="urole">admin</span>':''}${u.disabled?' <span class="udis">disabled</span>':''}${u.onboarded?'':' <span class="udis" style="color:var(--warning);border-color:var(--warning)">onboarding</span>'}`
-      +`<span class="ustat">${u.rows} roles · ${u.applied} applied · AI ${_kfmt(u.ai30dTokens)} tok/30d (${cost}) · ${u.diskKB}KB · scout ${u.lastScout?relWhen(u.lastScout):'never'}</span></span>`
+      +`<span class="ustat">${u.rows} roles · ${u.applied} applied · AI ${_kfmt(u.ai30dTokens)} tok/30d (${cost}) · ${u.diskKB}KB · last find ${u.lastScout?relWhen(u.lastScout):'never'}</span></span>`
       +`<span class="uacts">${key}<label title="Use the server's shared AI key (you fund it)"><input type="checkbox" class="u-shared" ${u.useSharedKey?'checked':''}> shared</label>`
-      +`<button class="mini" data-act="scout" title="Run a scout for this user now">Scout</button><button class="mini" data-act="digest" title="Send this user's digest now">Digest</button><button class="mini" data-act="cap" title="Set this user's AI usage caps">Caps</button><button class="mini" data-act="restore" title="Restore one of this user's snapshots">Restore</button><button class="mini" data-act="imp" title="Sign in as this user for support">Impersonate</button><button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`;}).join('')
+      +`<button class="mini" data-act="scout" title="Find jobs for this user now">Find jobs</button><button class="mini" data-act="digest" title="Send this user's digest now">Digest</button><button class="mini" data-act="cap" title="Set this user's AI usage caps">Caps</button><button class="mini" data-act="restore" title="Restore one of this user's snapshots">Restore</button><button class="mini" data-act="imp" title="Sign in as this user for support">Impersonate</button><button class="mini" data-act="reset">Reset pw</button><button class="mini" data-act="toggle">${u.disabled?'Enable':'Disable'}</button><button class="mini danger" data-act="del">Delete</button></span></div>`;}).join('')
       ||'<div class="setmuted" style="padding:8px">No users yet.</div>';
     box.querySelectorAll('.urow').forEach(row=>{const uid=row.dataset.uid;
       row.querySelector('.u-shared').onchange=e=>{patchUser(uid,{useSharedKey:e.target.checked}).then(loadUsers);};
@@ -4314,7 +4314,7 @@ async function userAct(uid,act,row){
   if(act==='reset'){ const pw=prompt('New temporary password for "'+uid+'" (≥8 chars):'); if(!pw)return; await patchUser(uid,{password:pw}); SET('usersMsg').className='setmsg ok'; SET('usersMsg').textContent='Password reset for '+uid+'.'; return; }
   const run=async(payload,verb)=>{ SET('usersMsg').className='setmsg'; SET('usersMsg').textContent=verb+' '+uid+'…'; try{const r=await (await fetch('/api/admin/users/'+encodeURIComponent(uid)+'/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json(); SET('usersMsg').className=r.ok?'setmsg ok':'setmsg err'; SET('usersMsg').textContent=r.ok?(verb+' done for '+uid+'.'):('Failed: '+(r.error||'?')); loadUsers(); return r;}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} };
   if(act==='digest'){ await run({action:'digest'},'Sending digest for'); return; }
-  if(act==='scout'){ if(!confirm('Run a scout now for "'+uid+'"? It searches the boards and appends new matches to their pipeline.'))return; await run({action:'scout'},'Scouting for'); return; }
+  if(act==='scout'){ if(!confirm('Find jobs now for "'+uid+'"? It searches the boards and appends new matches to their pipeline.'))return; await run({action:'scout'},'Finding jobs for'); return; }
   if(act==='cap'){ const mt=prompt('Monthly AI token cap for "'+uid+'" (0 = unlimited):','0'); if(mt===null)return; const dc=prompt('Daily AI call cap for "'+uid+'" (0 = use server default):','0'); if(dc===null)return; await run({action:'setCap',monthlyTokens:mt,dailyCalls:dc},'Setting caps for'); return; }
   if(act==='imp'){ if(!confirm('Sign in as "'+uid+'" for support? Your admin session is preserved and you can return via the banner. This is audited.'))return; try{const r=await (await fetch('/api/admin/impersonate/'+encodeURIComponent(uid),{method:'POST'})).json(); if(r.ok)location.reload(); else{SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+(r.error||'?');}}catch(e){SET('usersMsg').className='setmsg err';SET('usersMsg').textContent='Failed: '+e.message;} return; }
   if(act==='restore'){

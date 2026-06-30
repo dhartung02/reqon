@@ -467,6 +467,8 @@
   /* read-only display cards (work history / education) + per-section edit toggle */
   .sgrp-h .grp-edit{margin-left:auto;background:none;border:0;color:var(--accent);font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;padding:0}
   .sgrp-h .grp-edit:hover{text-decoration:underline}
+  .summaryview{color:var(--text);font-size:.9rem;line-height:1.62;white-space:pre-wrap}
+  .summaryview.empty{color:var(--dim)}
   .histcard{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:13px 16px;margin-bottom:8px}
   .histcard:last-child{margin-bottom:0}
   .histcard .hc-role{font-weight:700;color:var(--text);font-size:.95rem}
@@ -1335,9 +1337,11 @@
             </div>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Professional summary <button class="mini" id="draftSummaryBtn" data-feature="profile_summary" type="button" style="margin-left:auto">✨ AI draft from résumé</button></div>
-            <div class="field"><textarea id="profSummary" rows="4" placeholder="A 2–4 sentence positioning statement. Used in cover notes and as application 'about me' text. Leave blank and click AI draft to generate one from your résumé."></textarea>
-              <span id="summaryMsg" class="setmuted"></span>
+            <div class="sgrp-h">Professional summary <button class="grp-edit" id="summaryEditToggle" type="button">Edit</button></div>
+            <div id="profSummaryView" class="summaryview"></div>
+            <div class="field summaryedit-only" id="summaryEditWrap" style="display:none">
+              <textarea id="profSummary" rows="6" placeholder="A 2–4 sentence positioning statement. Used in cover notes and as application 'about me' text. Leave blank and click AI draft to generate one from your résumé."></textarea>
+              <div class="ahintrow" style="margin-top:6px"><button class="mini" id="draftSummaryBtn" data-feature="profile_summary" type="button">✨ AI draft from résumé</button> <span id="summaryMsg" class="setmuted"></span></div>
             </div>
           </div>
           <details class="sgrp adv">
@@ -3600,7 +3604,13 @@ function fillEeo(e){
   });
 }
 function readEeo(){const e={};EEO_FIELDS.forEach(([id,key])=>{e[key]=SET(id).value;});return e;}
-let editKw=false, editWork=false, editEdu=false;   // profile sections default to read-only display
+let editKw=false, editWork=false, editEdu=false, editSummary=false;   // profile sections default to read-only display
+function renderSummaryView(){
+  const view=SET("profSummaryView"), ta=SET("profSummary"); if(!view||!ta)return;
+  const txt=(ta.value||"").trim();
+  view.classList.toggle("empty",!txt);
+  view.textContent=txt||"No summary yet — add one, or use AI draft from your résumé.";
+}
 function renderKeywords(){
   const box=SET("profKeywords");
   if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No skills yet — upload a résumé or add one below.</span>';return;}
@@ -3764,7 +3774,7 @@ function fillProfile(p){
   SET("profName").value=a.name||""; SET("profEmail").value=a.email||""; SET("profPhone").value=a.phone||"";
   SET("profLinkedin").value=a.linkedin||""; SET("profLocation").value=a.location||"";
   SET("profGithub").value=a.github||p.github||"";
-  SET("profSummary").value=p.summary||"";
+  SET("profSummary").value=p.summary||""; renderSummaryView();
   SET("profSeniority").value=(p.seniority||[]).join(", ");
   SET("profRoleTerms").value=(p.roleTerms||[]).join(", ");
   SET("profIndustries").value=(p.industries||[]).join(", ");
@@ -3955,7 +3965,7 @@ SET("draftSummaryBtn").onclick=async()=>{
   try{
     const j=await (await fetch("/api/profile/draft-summary",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})})).json();
     if(!j.ok)throw new Error(j.error||"failed");
-    SET("profSummary").value=j.summary||""; msg.textContent="Draft inserted — edit, then Save profile. ("+(j.tokens||0)+" tokens)";
+    SET("profSummary").value=j.summary||""; renderSummaryView(); msg.textContent="Draft inserted — edit, then Save profile. ("+(j.tokens||0)+" tokens)";
   }catch(e){msg.className="setmsg err";msg.textContent="Draft failed: "+e.message+" (needs an OpenAI key under Advanced).";}
   finally{btn.disabled=false;}
 };
@@ -3963,10 +3973,12 @@ SET("addWorkBtn").onclick=()=>{syncWorkFromDOM();PROFILE_WORK.push({role:"",comp
 SET("addEduBtn").onclick=()=>{syncEduFromDOM();PROFILE_EDU.push({school:"",level:"",field:"",start:"",end:""});renderEducation();};
 // Per-section display ↔ edit toggle (read-only cards by default; reveal the editable forms on demand).
 function setSectionEdit(which,on){
-  if(which==='kw'){ editKw=on; SET('kwAddRow').style.display=on?'':'none'; SET('kwHint').style.display=on?'':'none'; SET('kwEditToggle').textContent=on?'Done':'Edit'; renderKeywords(); }
+  if(which==='summary'){ editSummary=on; SET('summaryEditWrap').style.display=on?'':'none'; SET('profSummaryView').style.display=on?'none':''; SET('summaryEditToggle').textContent=on?'Done':'Edit'; renderSummaryView(); }
+  else if(which==='kw'){ editKw=on; SET('kwAddRow').style.display=on?'':'none'; SET('kwHint').style.display=on?'':'none'; SET('kwEditToggle').textContent=on?'Done':'Edit'; renderKeywords(); }
   else if(which==='work'){ if(!on)syncWorkFromDOM(); editWork=on; SET('workAddRow').style.display=on?'':'none'; SET('workEditToggle').textContent=on?'Done':'Edit'; renderWorkHistory(); }
   else if(which==='edu'){ if(!on)syncEduFromDOM(); editEdu=on; SET('eduAddRow').style.display=on?'':'none'; SET('eduEditToggle').textContent=on?'Done':'Edit'; renderEducation(); }
 }
+SET("summaryEditToggle").onclick=()=>setSectionEdit('summary',!editSummary);
 SET("kwEditToggle").onclick=()=>setSectionEdit('kw',!editKw);
 SET("workEditToggle").onclick=()=>setSectionEdit('work',!editWork);
 SET("eduEditToggle").onclick=()=>setSectionEdit('edu',!editEdu);

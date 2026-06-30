@@ -457,12 +457,22 @@
   .narr input:focus,.narr textarea:focus{border-color:var(--gold)}
   .narr textarea{resize:vertical;line-height:1.5}
   .narr .narr-rm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.74rem;float:right}
-  .profkw{display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:120px;overflow:auto}
-  .profkw .kw{font-family:"Spline Sans Mono",monospace;font-size:.7rem;color:var(--text-2);background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:2px 8px}
+  .profkw{display:flex;flex-wrap:wrap;gap:7px;padding:0;background:transparent;border:0}
+  .profkw .kw{font-family:"Spline Sans",sans-serif;font-size:.78rem;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;display:inline-flex;align-items:center;gap:6px}
+  .profkw .kw .kw-emph{color:var(--accent);font-size:.72rem}
   .profkw .kw b{color:var(--gold)}
-  .profkw .kw.kwedit{display:inline-flex;align-items:center;gap:5px;padding:2px 5px 2px 9px}
-  .profkw .kw.kwedit input{width:38px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--gold);font-family:"Spline Sans Mono",monospace;font-size:.7rem;padding:1px 3px;text-align:center}
+  .profkw .kw.kwedit{padding:3px 6px 3px 12px}
+  .profkw .kw.kwedit input{width:38px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--accent);font-family:"Spline Sans Mono",monospace;font-size:.7rem;padding:1px 3px;text-align:center}
   .profkw .kw .kwrm{background:none;border:0;color:var(--coral);cursor:pointer;font-size:.82rem;line-height:1;padding:0 2px}
+  /* read-only display cards (work history / education) + per-section edit toggle */
+  .sgrp-h .grp-edit{margin-left:auto;background:none;border:0;color:var(--accent);font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;padding:0}
+  .sgrp-h .grp-edit:hover{text-decoration:underline}
+  .histcard{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:13px 16px;margin-bottom:8px}
+  .histcard:last-child{margin-bottom:0}
+  .histcard .hc-role{font-weight:700;color:var(--text);font-size:.95rem}
+  .histcard .hc-co{color:var(--text-2);font-size:.85rem;margin-top:1px}
+  .histcard .hc-meta{color:var(--dim);font-family:"Spline Sans Mono",monospace;font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;margin-top:6px}
+  .histcard .hc-desc{color:var(--text-2);font-size:.83rem;line-height:1.55;margin-top:9px;white-space:pre-wrap}
   .profhist{display:flex;flex-direction:column;gap:8px;padding:8px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;max-height:260px;overflow:auto}
   .histitem{border-bottom:1px solid var(--line);padding-bottom:7px}
   .histitem:last-child{border-bottom:0;padding-bottom:0}
@@ -1322,25 +1332,25 @@
               <div class="field"><label>Sectors (comma-separated)</label><input id="profSectors" type="text"></div>
             </div>
           </details>
-          <details class="sgrp adv">
-            <summary class="sgrp-h">Résumé keywords <span class="setmuted" style="font-weight:400">weighted — tune what Reqon favors</span></summary>
+          <div class="sgrp">
+            <div class="sgrp-h">Skills <span class="setmuted" style="font-weight:400">weighted résumé keywords — tune what Reqon favors</span><button class="grp-edit" id="kwEditToggle" type="button">Edit</button></div>
             <div id="profKeywords" class="profkw"></div>
-            <div class="ahintrow" style="margin-top:8px">
-              <input id="kwAddName" type="text" placeholder="add a keyword (e.g. agentic)" style="flex:1;min-width:120px">
+            <div class="ahintrow kwedit-only" id="kwAddRow" style="margin-top:8px;display:none">
+              <input id="kwAddName" type="text" placeholder="add a skill (e.g. agentic)" style="flex:1;min-width:120px">
               <input id="kwAddWeight" type="number" min="1" max="20" step="1" value="5" title="weight" style="width:64px">
               <button class="mini" id="kwAddBtn" type="button">+ Add</button>
             </div>
-            <p class="hint" style="margin:8px 0 0">Higher weight = stronger pull. Weight ≥ 3 marks a term "emphasized" (a fit bonus). Set a weight to 0 (or remove) to suppress. These overrides are kept when you re-parse your résumé, and feed the server's job finder. <span class="setmuted">The on-device app finder uses Search criteria keywords; it only runs when no server is connected.</span></p>
-          </details>
-          <div class="sgrp">
-            <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
-            <div id="profWorkHistory"></div>
-            <div class="ahintrow"><button class="mini" id="addWorkBtn" type="button">+ Add role</button></div>
+            <p class="hint kwedit-only" id="kwHint" style="margin:8px 0 0;display:none">Higher weight = stronger pull. Weight ≥ 3 marks a skill <b>emphasized</b> (★, a fit bonus). Set a weight to 0 (or remove) to suppress. Kept when you re-parse your résumé.</p>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Education <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span></div>
+            <div class="sgrp-h">Work history <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span><button class="grp-edit" id="workEditToggle" type="button">Edit</button></div>
+            <div id="profWorkHistory"></div>
+            <div class="ahintrow workedit-only" id="workAddRow" style="display:none"><button class="mini" id="addWorkBtn" type="button">+ Add role</button></div>
+          </div>
+          <div class="sgrp">
+            <div class="sgrp-h">Education <span class="setmuted" style="font-weight:400">parsed from your résumé · synced to the app</span><button class="grp-edit" id="eduEditToggle" type="button">Edit</button></div>
             <div id="profEducation"></div>
-            <div class="ahintrow"><button class="mini" id="addEduBtn" type="button">+ Add education</button></div>
+            <div class="ahintrow eduedit-only" id="eduAddRow" style="display:none"><button class="mini" id="addEduBtn" type="button">+ Add education</button></div>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Narrative library</div>
@@ -3515,10 +3525,15 @@ function fillEeo(e){
   });
 }
 function readEeo(){const e={};EEO_FIELDS.forEach(([id,key])=>{e[key]=SET(id).value;});return e;}
+let editKw=false, editWork=false, editEdu=false;   // profile sections default to read-only display
 function renderKeywords(){
   const box=SET("profKeywords");
-  if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No keywords yet — upload a resume or add one below.</span>';return;}
-  box.innerHTML=PROFILE_KEYWORDS.slice(0,80).map((k,i)=>
+  if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No skills yet — upload a résumé or add one below.</span>';return;}
+  if(!editKw){
+    box.innerHTML=PROFILE_KEYWORDS.slice(0,120).map(k=>`<span class="kw">${esc(k.kw)}${(+k.weight>=3)?' <span class="kw-emph" title="emphasized — a fit bonus">★</span>':''}</span>`).join("");
+    return;
+  }
+  box.innerHTML=PROFILE_KEYWORDS.slice(0,120).map((k,i)=>
     `<span class="kw kwedit">${esc(k.kw)} <input type="number" min="0" max="20" step="1" value="${k.weight}" data-kwi="${i}" title="weight"><button class="kwrm" type="button" data-kwx="${i}" title="remove">✕</button></span>`
   ).join("");
   box.querySelectorAll("input[data-kwi]").forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.kwi;if(PROFILE_KEYWORDS[i])PROFILE_KEYWORDS[i].weight=Math.max(0,Math.min(20,parseInt(inp.value,10)||0));});
@@ -3693,18 +3708,42 @@ function fillProfile(p){
 }
 const qa=(s)=>String(s==null?"":s).replace(/"/g,"&quot;");
 function renderWorkHistory(){
-  SET("profWorkHistory").innerHTML=PROFILE_WORK.map((w,i)=>
+  const box=SET("profWorkHistory");
+  if(!editWork){
+    box.innerHTML=PROFILE_WORK.length?PROFILE_WORK.map(w=>{
+      const dates=(w.start||w.end)?`${esc(w.start||'')}${w.end?' – '+esc(w.end):(w.start?' – Present':'')}`:'';
+      const meta=[dates,esc(w.location||'')].filter(Boolean).join('  ·  ');
+      const desc=(w.description||'').trim();
+      return `<div class="histcard"><div class="hc-role">${esc(w.role||'Untitled role')}</div>`+
+        (w.company?`<div class="hc-co">${esc(w.company)}</div>`:'')+
+        (meta?`<div class="hc-meta">${meta}</div>`:'')+
+        (desc?`<div class="hc-desc">${esc(desc)}</div>`:'')+`</div>`;
+    }).join(""):'<div class="setmuted">No work history yet — upload a résumé or add a role.</div>';
+    return;
+  }
+  box.innerHTML=PROFILE_WORK.map((w,i)=>
     `<div class="histedit" data-i="${i}"><button class="narr-rm" type="button" onclick="removeWork(${i})">remove</button>`+
     `<div class="grid2"><input class="wh-role" type="text" placeholder="Role / title" value="${qa(w.role)}">`+
     `<input class="wh-company" type="text" placeholder="Company" value="${qa(w.company)}">`+
     `<input class="wh-location" type="text" placeholder="Location" value="${qa(w.location)}">`+
     `<input class="wh-start" type="text" placeholder="Start (e.g. Aug 2022)" value="${qa(w.start)}">`+
     `<input class="wh-end" type="text" placeholder="End (e.g. Present)" value="${qa(w.end)}"></div>`+
-    `<textarea class="wh-desc" rows="3" placeholder="Description (one bullet per line)">${esc(w.description||"")}</textarea></div>`
+    `<textarea class="wh-desc" rows="4" placeholder="Description (one bullet per line)">${esc(w.description||"")}</textarea></div>`
   ).join("")||'<div class="setmuted">No work history yet — upload a résumé or add a role.</div>';
 }
 function renderEducation(){
-  SET("profEducation").innerHTML=PROFILE_EDU.map((e,i)=>
+  const box=SET("profEducation");
+  if(!editEdu){
+    box.innerHTML=PROFILE_EDU.length?PROFILE_EDU.map(e=>{
+      const deg=[esc(e.level||e.degree||''),esc(e.field||'')].filter(Boolean).join(', ');
+      const dates=(e.start||e.end)?`${esc(e.start||'')}${e.end?' – '+esc(e.end):''}`:'';
+      return `<div class="histcard"><div class="hc-role">${esc(e.school||'School')}</div>`+
+        (deg?`<div class="hc-co">${deg}</div>`:'')+
+        (dates?`<div class="hc-meta">${dates}</div>`:'')+`</div>`;
+    }).join(""):'<div class="setmuted">No education yet — upload a résumé or add an entry.</div>';
+    return;
+  }
+  box.innerHTML=PROFILE_EDU.map((e,i)=>
     `<div class="histedit" data-i="${i}"><button class="narr-rm" type="button" onclick="removeEdu(${i})">remove</button>`+
     `<div class="grid2"><input class="ed-school" type="text" placeholder="School" value="${qa(e.school)}">`+
     `<input class="ed-level" type="text" placeholder="Degree / level (e.g. MBA)" value="${qa(e.level||e.degree)}">`+
@@ -3817,7 +3856,7 @@ function syncAnswersFromDOM(){
 window.removeAnswer=function(i){syncAnswersFromDOM();PROFILE_ANSWERS.splice(i,1);renderAnswers();};
 SET("addAnswerBtn").onclick=()=>{syncAnswersFromDOM();PROFILE_ANSWERS.push({q:"",a:"",tags:""});renderAnswers();};
 async function saveProfile(){
-  syncNarrativesFromDOM(); syncAnswersFromDOM(); syncWorkFromDOM(); syncEduFromDOM();
+  syncNarrativesFromDOM(); syncAnswersFromDOM(); if(editWork)syncWorkFromDOM(); if(editEdu)syncEduFromDOM();
   const body={
     applicant:{name:SET("profName").value.trim(),email:SET("profEmail").value.trim(),phone:SET("profPhone").value.trim(),linkedin:SET("profLinkedin").value.trim(),location:SET("profLocation").value.trim(),github:SET("profGithub").value.trim()},
     github:SET("profGithub").value.trim(),
@@ -3849,6 +3888,15 @@ SET("draftSummaryBtn").onclick=async()=>{
 };
 SET("addWorkBtn").onclick=()=>{syncWorkFromDOM();PROFILE_WORK.push({role:"",company:"",location:"",start:"",end:"",description:""});renderWorkHistory();};
 SET("addEduBtn").onclick=()=>{syncEduFromDOM();PROFILE_EDU.push({school:"",level:"",field:"",start:"",end:""});renderEducation();};
+// Per-section display ↔ edit toggle (read-only cards by default; reveal the editable forms on demand).
+function setSectionEdit(which,on){
+  if(which==='kw'){ editKw=on; SET('kwAddRow').style.display=on?'':'none'; SET('kwHint').style.display=on?'':'none'; SET('kwEditToggle').textContent=on?'Done':'Edit'; renderKeywords(); }
+  else if(which==='work'){ if(!on)syncWorkFromDOM(); editWork=on; SET('workAddRow').style.display=on?'':'none'; SET('workEditToggle').textContent=on?'Done':'Edit'; renderWorkHistory(); }
+  else if(which==='edu'){ if(!on)syncEduFromDOM(); editEdu=on; SET('eduAddRow').style.display=on?'':'none'; SET('eduEditToggle').textContent=on?'Done':'Edit'; renderEducation(); }
+}
+SET("kwEditToggle").onclick=()=>setSectionEdit('kw',!editKw);
+SET("workEditToggle").onclick=()=>setSectionEdit('work',!editWork);
+SET("eduEditToggle").onclick=()=>setSectionEdit('edu',!editEdu);
 SET("kwAddBtn").onclick=()=>{
   const name=SET("kwAddName").value.trim(); if(!name)return;
   const w=Math.max(0,Math.min(20,parseInt(SET("kwAddWeight").value,10)||5));

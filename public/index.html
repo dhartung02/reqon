@@ -740,10 +740,14 @@
   .settings-head{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid var(--line);flex:none}
   .settings-head h2{margin:0}
   .settings-body{display:flex;min-height:0;flex:1}
-  .settings-nav{flex:none;width:202px;border-right:1px solid var(--line);padding:12px 10px;overflow:auto;display:flex;flex-direction:column;gap:2px;background:var(--bg)}
-  .settings-nav button{text-align:left;background:transparent;border:0;color:var(--text-2);padding:9px 12px;border-radius:8px;font-family:inherit;font-size:.86rem;cursor:pointer}
+  .settings-nav{flex:none;width:248px;border-right:1px solid var(--line);padding:12px 10px;overflow:auto;display:flex;flex-direction:column;gap:3px;background:var(--bg)}
+  .settings-nav button{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:transparent;border:0;color:var(--text-2);padding:10px 12px;border-radius:9px;font-family:inherit;font-size:.86rem;cursor:pointer}
   .settings-nav button:hover{background:var(--panel-2);color:var(--text)}
   .settings-nav button.active{background:var(--panel-2);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+  .settings-nav .snav-i{font-size:1rem;line-height:1.35;flex:none}
+  .settings-nav .snav-t{display:flex;flex-direction:column;gap:1px;font-weight:600;min-width:0}
+  .settings-nav .snav-t small{font-weight:400;font-size:.72rem;color:var(--dim);line-height:1.3;white-space:normal}
+  .settings-nav button.active .snav-t small{color:var(--text-2)}
   .pairbox{margin-top:10px}
   .pairqr{width:180px;height:180px;background:#fff;border-radius:10px;padding:8px;box-sizing:border-box}
   .pairqr svg{width:100%;height:100%;display:block}
@@ -1185,19 +1189,15 @@
     </div>
     <div class="settings-body">
       <nav class="settings-nav" id="settingsNav">
-        <button data-sect="sources" class="active">Sources</button>
-        <button data-sect="matching">Matching &amp; scoring</button>
-        <button data-sect="profile">Candidate profile</button>
-        <button data-sect="workflow">Workflow</button>
-        <button data-sect="ai">AI assistant</button>
-        <button data-sect="digest">Digest &amp; notifications</button>
-        <button data-sect="data">Data safety</button>
-        <button data-sect="users" id="usersNavBtn" style="display:none">Admin</button>
-        <button data-sect="advanced">Advanced</button>
+        <button data-sect="profile" class="active"><span class="snav-i">👤</span><span class="snav-t">Your profile<small>Résumé, contact, your story</small></span></button>
+        <button data-sect="looking"><span class="snav-i">🎯</span><span class="snav-t">What you’re looking for<small>Roles, pay, where jobs come from</small></span></button>
+        <button data-sect="works"><span class="snav-i">⚙️</span><span class="snav-t">How Reqon works for you<small>Ranking, applying, AI help</small></span></button>
+        <button data-sect="updates"><span class="snav-i">🔔</span><span class="snav-t">Updates &amp; alerts<small>Daily summary &amp; where it goes</small></span></button>
+        <button data-sect="account"><span class="snav-i">🗄️</span><span class="snav-t">Account &amp; data<small>Backups, connections, team</small></span></button>
       </nav>
       <div class="settings-content" id="settingsContent">
 
-        <section class="sset" data-sect="sources">
+        <section class="sset" data-sect="looking" hidden>
           <div class="ssh">Sources</div>
           <p class="ssd">Enable or disable the board APIs the scout polls, add companies by careers URL, and check each source's last run. Saves to boards.json / watchlist.json — takes effect on the next run, no restart.</p>
           <div class="sgrp">
@@ -1222,7 +1222,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="matching" hidden>
+        <section class="sset" data-sect="looking" hidden>
           <div class="ssh">Matching &amp; scoring</div>
           <p class="ssd">Thresholds and keyword lists that decide which roles the scout adds and how it ranks them.</p>
           <div class="sgrp">
@@ -1253,7 +1253,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="profile" hidden>
+        <section class="sset" data-sect="profile">
           <div class="ssh">Candidate profile</div>
           <p class="ssd" id="profMeta">Drives scoring &amp; pre-fill. Re-parse your resume to refresh keywords.</p>
           <div class="sgrp">
@@ -1342,7 +1342,7 @@
           <div class="ahintrow"><button class="btn" id="saveProfileBtn" type="button">Save profile</button> <span id="profMsg" class="setmsg"></span></div>
         </section>
 
-        <section class="sset" data-sect="workflow" hidden>
+        <section class="sset" data-sect="works" hidden>
           <div class="ssh">Workflow</div>
           <p class="ssd">How statuses route to board tabs, when hygiene lanes flag work, the analytics window, and per-source apply modes.</p>
           <div class="sgrp">
@@ -1376,7 +1376,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="ai" hidden>
+        <section class="sset" data-sect="works" hidden>
           <div class="ssh">AI assistant</div>
           <p class="ssd">The OpenAI model and budget for scout rescoring, plus the per-req draft assistant. API keys live under Advanced.</p>
           <div class="sgrp">
@@ -1413,7 +1413,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="digest" hidden>
+        <section class="sset" data-sect="updates" hidden>
           <div class="ssh">Digest &amp; notifications</div>
           <p class="ssd">The always-on server composes a digest from your data and delivers it to the channels you pick. A file fallback is always written to <code>agent/digest-latest.html</code>.</p>
           <div class="sgrp">
@@ -1514,7 +1514,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="data" hidden>
+        <section class="sset" data-sect="account" hidden>
           <div class="ssh">Data safety</div>
           <p class="ssd">Every board save snapshots the previous data first; corruption-shaped saves are refused. Snapshots are never auto-deleted beyond the retention cap (manual &amp; phase snapshots are always kept).</p>
           <div class="sgrp">
@@ -1542,7 +1542,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="users" hidden>
+        <section class="sset" data-sect="account" id="usersNavBtn" hidden style="display:none">
           <div class="ssh">Admin console</div>
           <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and scout. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
           <div class="sgrp">
@@ -1568,7 +1568,7 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="advanced" hidden>
+        <section class="sset" data-sect="account" hidden>
           <div class="ssh">Advanced — integrations &amp; security</div>
           <p class="ssd">API keys and tokens for AI rescoring and job aggregators.</p>
           <div class="safetynote">🔒 Keys are stored server-side in <code>.env</code> and are <b>never sent back to the browser</b>. Fields show only whether a key is set; leave blank to keep the current value.</div>
@@ -1944,9 +1944,17 @@ window.openThankYou=function(i){
     setTimeout(()=>{ if(F("assistKind").value==="thankyou") F("assistGenBtn").click(); }, 350);
   });
 };
+// Settings reorganized 9 old sections into 5 plain-named groups. This maps any old
+// section key (or a new group key) to its group so existing deep-links keep working.
+const SECT_GROUP={
+  sources:'looking', matching:'looking', profile:'profile', workflow:'works', ai:'works',
+  digest:'updates', data:'account', users:'account', advanced:'account',
+  looking:'looking', works:'works', updates:'updates', account:'account'
+};
+const settingsGroup=sect=>SECT_GROUP[sect]||sect;
 function openSettingsTo(sect){
   const sb=document.getElementById('settingsBtn'); if(sb)sb.click();
-  setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+sect+'"]'); if(nav)nav.click(); },120);
+  setTimeout(()=>{ const nav=document.querySelector('#settingsNav [data-sect="'+settingsGroup(sect)+'"]'); if(nav)nav.click(); },120);
 }
 (function ccWire(){
   const head=document.getElementById('ccHead'); if(!head) return;
@@ -3159,10 +3167,12 @@ function buildConnStatus(j){
 }
 // Jump to a settings sub-tab and highlight/focus a specific field (used by Connection Status rows).
 function gotoSetting(sect,focusId){
-  const navBtn=SET("settingsNav").querySelector(`button[data-sect="${sect}"]`);
+  const navBtn=SET("settingsNav").querySelector(`button[data-sect="${settingsGroup(sect)}"]`);
   if(navBtn)navBtn.click();
   if(!focusId)return;
   setTimeout(()=>{const el=SET(focusId);if(!el)return;
+    // open any collapsed <details> that contains the target field so it can be focused
+    for(let p=el.parentElement;p;p=p.parentElement){ if(p.tagName==='DETAILS')p.open=true; }
     el.scrollIntoView({behavior:"smooth",block:"center"});
     try{el.focus({preventScroll:true});}catch(e){}
     el.classList.add("flashfield");setTimeout(()=>el.classList.remove("flashfield"),1600);
@@ -3416,7 +3426,7 @@ SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()
   SET("settingsNav").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
   document.querySelectorAll(".sset").forEach(s=>s.hidden=(s.dataset.sect!==k));
   SET("settingsContent").scrollTop=0;
-  if(k==='users')loadUsers();
+  if(k==='account'){ const ub=SET('usersNavBtn'); if(ub&&ub.style.display!=='none')loadUsers(); }
 });
 // Settings stays open until you explicitly Save / Close / × — no click-outside dismissal (a stray
 // backdrop click used to drop the whole panel and lose your place). Esc still closes for keyboard users.

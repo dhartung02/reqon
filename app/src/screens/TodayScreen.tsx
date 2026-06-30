@@ -4,6 +4,7 @@ import type { Role, Lane } from '../model';
 import { isApplyNext, inInterview, followUpDue } from '../today';
 import { computeActions, groupActions, type Severity } from '../actionItems';
 import { ReqonGlyph } from '../components/ReqonGlyph';
+import { ScoreCircle } from '../components/ScoreCircle';
 import { useLayout } from '../useLayout';
 
 const sevColor = (c: Palette): Record<Severity, string> => ({ high: c.danger, medium: c.amber, low: c.active });
@@ -42,6 +43,7 @@ export function TodayScreen({
   const { wide } = useLayout();
   const sev = sevColor(c);
   const actionGroups = groupActions(computeActions(roles));
+  const roleById = new Map(roles.map((r) => [r.id, r])); // action → its role, for the score circle
   const rel = (t: number) => {
     const s = (Date.now() - t) / 1000;
     return s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
@@ -117,15 +119,25 @@ export function TodayScreen({
           {actionGroups.map((g) => (
             <View key={g.title} style={styles.actSec}>
               <Text style={styles.actSecTitle}>{g.title.toUpperCase()} · {g.items.length}</Text>
-              {g.items.slice(0, 8).map((a) => (
-                <Pressable key={a.id} style={styles.actItem} disabled={!onOpenRole} onPress={() => onOpenRole && onOpenRole(a.roleId)}>
-                  <View style={[styles.actDot, { backgroundColor: sev[a.severity] }]} />
-                  <View style={styles.actMain}>
-                    <Text style={styles.actRole} numberOfLines={1}>{a.company}{a.role ? ` — ${a.role}` : ''}</Text>
-                    <Text style={styles.actReason} numberOfLines={1}>{a.reason}</Text>
-                  </View>
-                </Pressable>
-              ))}
+              {g.items.slice(0, 8).map((a) => {
+                const r = roleById.get(a.roleId);
+                return (
+                  <Pressable key={a.id} style={styles.actItem} disabled={!onOpenRole} onPress={() => onOpenRole && onOpenRole(a.roleId)}>
+                    {r ? (
+                      <ScoreCircle score={r.score} tier={r.tier} size={38} />
+                    ) : (
+                      <View style={[styles.actDot, { backgroundColor: sev[a.severity] }]} />
+                    )}
+                    <View style={styles.actMain}>
+                      <Text style={styles.actRole} numberOfLines={1}>{a.company}{a.role ? ` — ${a.role}` : ''}</Text>
+                      <View style={styles.actReasonRow}>
+                        <View style={[styles.sevDot, { backgroundColor: sev[a.severity] }]} />
+                        <Text style={styles.actReason} numberOfLines={1}>{a.reason}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           ))}
         </View>
@@ -174,11 +186,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   actions: { backgroundColor: c.element, borderRadius: 14, padding: 12, gap: 4 },
   actSec: { marginTop: 6 },
   actSecTitle: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: c.muted, marginBottom: 4 },
-  actItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  actItem: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 8 },
   actDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
   actMain: { flex: 1, minWidth: 0 },
   actRole: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.textHigh },
-  actReason: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 1 },
+  actReasonRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  sevDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  actReason: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, flex: 1 },
   allClear: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, backgroundColor: c.element, borderRadius: 14, padding: 16 },
   foot: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 4, lineHeight: 17 },
 });

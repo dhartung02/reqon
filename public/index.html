@@ -27,6 +27,49 @@
     --t9:#00E5A3; --t7:#5BD6A0; --t5:#FFB800; --t3:#64748B;
     --shadow:0 12px 32px -16px rgba(0,0,0,.6);
   }
+  /* Light theme — opt-in via <html data-theme="light"> (dark stays the default, see BRAND.md).
+     Most rules read the var() tokens below, so remapping them themes the whole app. The
+     blocks after the vars only patch spots that hardcode a dark ink on a bright brand color
+     or use a dark translucent badge wash — those don't follow the tokens automatically. */
+  [data-theme="light"]{
+    --bg:#F4F6F9; --panel:#FFFFFF; --panel-2:#EEF2F7; --line:#E3E8EF; --line-2:#D3DBE5;
+    --text:#0B1220; --text-2:#475569; --dim:#7C8A9C;
+    --accent:#00936B; --positive:#00936B; --active:#0D9488; --info:#3B6FB0; --warning:#B45309; --danger:#DC2626; --ai:#7C5CC4; --muted:#7C8A9C;
+    --t9:#00936B; --t7:#5BBF94; --t5:#B45309; --t3:#7C8A9C;
+    --card:#FFFFFF;
+    --shadow:0 18px 40px -24px rgba(15,23,42,.22);
+  }
+  /* dark ink hardcoded on a bright brand background → white once the brand color darkens */
+  [data-theme="light"] .btn,
+  [data-theme="light"] .btn.apply,
+  [data-theme="light"] .fcount,
+  [data-theme="light"] .bellcount,
+  [data-theme="light"] .cc-chip.active,
+  [data-theme="light"] .stpill.offer,
+  [data-theme="light"] .doneflag.offer,
+  [data-theme="light"] .tierTag.A,
+  [data-theme="light"] .tierTag.B,
+  [data-theme="light"] .pill.remote,
+  [data-theme="light"] .pill.onsite,
+  [data-theme="light"] .pill.flex,
+  [data-theme="light"] .bandtag.b-exc{color:#FFFFFF}
+  /* dark translucent / blob badge washes → light tints of the same role color */
+  [data-theme="light"] .pill.source{background:rgba(124,92,196,.10);border-color:rgba(124,92,196,.35)}
+  [data-theme="light"] .tierTag.C{background:var(--panel-2);color:var(--text-2)}
+  [data-theme="light"] .selbar{background:var(--panel-2)}
+  [data-theme="light"] .crow.sel{background:rgba(0,147,107,.08)}
+  [data-theme="light"] .doneflag.applied{background:rgba(0,147,107,.10);border-color:rgba(0,147,107,.30)}
+  [data-theme="light"] .doneflag.active,
+  [data-theme="light"] .pill.verified{background:rgba(13,148,136,.10);border-color:rgba(13,148,136,.30)}
+  [data-theme="light"] .doneflag.rejected,
+  [data-theme="light"] .pill.unverified{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.30)}
+  [data-theme="light"] .pill.boardonly{background:rgba(180,83,9,.10);border-color:rgba(180,83,9,.30)}
+  [data-theme="light"] .pill.sal{background:var(--panel-2);border-color:var(--line-2)}
+  [data-theme="light"] .crow-open,
+  [data-theme="light"] .mini.link{border-color:var(--line-2)}
+  [data-theme="light"] .ent-toast{background:#FFFFFF}
+  /* lighter, softer modal scrim for light mode */
+  [data-theme="light"] .overlay{background:rgba(15,23,42,.38)}
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{background:var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.5;min-height:100vh;padding:clamp(14px,2.4vw,30px);-webkit-font-smoothing:antialiased}
@@ -790,6 +833,7 @@
       </div>
       <span class="userchip" id="userChip" style="display:none"></span>
       <span class="planbadge" id="planBadge" style="display:none" title="Your Reqon plan"></span>
+      <button class="btn ghost" id="themeToggle" type="button" title="Switch light / dark" aria-label="Switch light or dark theme">☾</button>
       <button class="btn ghost" id="settingsBtn">⚙ Settings</button>
     </div>
   </header>
@@ -3391,7 +3435,23 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&SET("settingsOverla
   };
 })();
 // populate the Run-Scout source checklist + AI footer on load
-fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0;}).catch(()=>{});
+fetchSettings().then(j=>{buildScoutSources(j); applyTabMap(j.tabStatusMap); applyHygiene(j.hygiene); applyApplyModeMap(j.applyModeMap); ANALYTICS_WINDOW=+j.analyticsWindowDays||0; applyTheme(j.theme);}).catch(()=>{});
+// ---- Light/dark theme (persisted server-side as a setting; no localStorage per project rule) ----
+function applyTheme(t){
+  const v=(t==='light'||t==='dark')?t:'dark';
+  document.documentElement.dataset.theme=v;
+  const b=document.getElementById('themeToggle');
+  if(b){ b.textContent=v==='light'?'☀':'☾'; b.title=v==='light'?'Switch to dark':'Switch to light'; }
+}
+(function themeWire(){
+  const b=document.getElementById('themeToggle'); if(!b) return;
+  applyTheme(document.documentElement.dataset.theme||'dark');
+  b.onclick=()=>{
+    const next=document.documentElement.dataset.theme==='light'?'dark':'light';
+    applyTheme(next);
+    fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:next})}).catch(()=>{});
+  };
+})();
 
 // ---------- candidate profile + narrative library (Phase 5) ----------
 let PROFILE_NARRATIVES=[]; let PROFILE_ANSWERS=[];

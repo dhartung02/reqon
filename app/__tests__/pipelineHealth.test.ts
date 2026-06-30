@@ -18,10 +18,10 @@ describe('pipelineHealth (app analytics, P1.6)', () => {
     expect(h.recommendations.some((r) => /Apply to your top/.test(r))).toBe(true);
   });
 
-  it('empty pipeline → At risk, recommends scout', () => {
+  it('empty pipeline → At risk, recommends finding new jobs', () => {
     const h = pipelineHealth([]);
     expect(h.band).toBe('At risk');
-    expect(h.recommendations.some((r) => /scout/i.test(r))).toBe(true);
+    expect(h.recommendations.some((r) => /find new jobs/i.test(r))).toBe(true);
   });
 
   it('computes response rate from applied total', () => {

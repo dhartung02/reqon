@@ -56,7 +56,7 @@ export function AnalyticsScreen({
 
   const kpis: { label: string; value: string; accent?: string }[] = [
     { label: 'Total roles', value: String(view.total) },
-    { label: 'Tier A', value: String(view.tierA), accent: c.emerald },
+    { label: 'Strong', value: String(view.tierA), accent: c.emerald },
     { label: 'Open', value: String(view.open) },
     { label: 'Applied', value: String(view.applied) },
     { label: 'Interviewing', value: String(view.interviewing), accent: c.active },
@@ -119,11 +119,11 @@ export function AnalyticsScreen({
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>TIER DISTRIBUTION</Text>
+      <Text style={styles.sectionTitle}>MATCH STRENGTH</Text>
       <View
         style={styles.bar}
         accessibilityRole="image"
-        accessibilityLabel={`Tier distribution: ${view.tiers.A} tier A, ${view.tiers.B} tier B, ${view.tiers.C} tier C`}
+        accessibilityLabel={`Match strength: ${view.tiers.A} strong, ${view.tiers.B} possible, ${view.tiers.C} long shot`}
       >
         {(['A', 'B', 'C'] as Tier[]).map((t) =>
           view.tiers[t] ? (
@@ -139,7 +139,7 @@ export function AnalyticsScreen({
           <View key={t} style={styles.legendItem}>
             <View style={[styles.dot, { backgroundColor: tierColor(t, c) }]} />
             <Text style={styles.legendText}>
-              Tier {t} · {view.tiers[t]}
+              {t === 'A' ? 'Strong' : t === 'B' ? 'Possible' : 'Long shot'} · {view.tiers[t]}
             </Text>
           </View>
         ))}

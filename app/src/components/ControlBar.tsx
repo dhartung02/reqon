@@ -5,7 +5,7 @@ import { SORTS, type SortKey, type RoleFilter } from '../model';
 const FILTERS: { key: keyof RoleFilter; label: string }[] = [
   { key: 'noOnsite', label: 'No on-site' },
   { key: 'verifiedOnly', label: 'Verified' },
-  { key: 'hideTierC', label: 'Hide Tier C' },
+  { key: 'hideTierC', label: 'Hide long shots' },
 ];
 
 // Search box + sort pills + filter toggles for the lane lists.

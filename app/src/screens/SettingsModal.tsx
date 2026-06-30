@@ -65,12 +65,14 @@ export function SettingsModal({
   const [scanOpen, setScanOpen] = useState(false);
   const [mailReload, setMailReload] = useState(0);   // bumped on "Sync now" to re-pull server settings
   const [srv, setSrv] = useState<ServerStatus | null>(null);   // read-only server status (P1.9)
+  const [phoneView, setPhoneView] = useState<'list' | 'sync'>('list');   // phone: grouped list vs the sync sub-view
 
   useEffect(() => {
     if (visible) {
       getConfig().then((cfg) => { setUrl(cfg.url); setToken(cfg.token); setStatus(null); if (cfg.url) fetchServerStatus().then(setSrv); else setSrv(null); });
       getScoutMode().then(setScout);
       setSection('sync');
+      setPhoneView('list');
     }
   }, [visible, mailReload]);
 
@@ -181,17 +183,19 @@ export function SettingsModal({
         </View>
         <Text style={styles.help}>{scoutHelp}</Text>
       </View>
-      <View style={styles.labeled}>
-        <Text style={styles.label}>Appearance</Text>
-        <View style={styles.seg}>
-          {(['light', 'dark', 'system'] as SchemePref[]).map((m) => (
-            <Pressable key={m} style={[styles.segBtn, pref === m && styles.segBtnOn]} onPress={() => setScheme(m)}>
-              <Text style={[styles.segText, pref === m && styles.segTextOn]}>{m === 'light' ? 'Light' : m === 'dark' ? 'Dark' : 'System'}</Text>
-            </Pressable>
-          ))}
+      {wide ? (
+        <View style={styles.labeled}>
+          <Text style={styles.label}>Appearance</Text>
+          <View style={styles.seg}>
+            {(['light', 'dark', 'system'] as SchemePref[]).map((m) => (
+              <Pressable key={m} style={[styles.segBtn, pref === m && styles.segBtnOn]} onPress={() => setScheme(m)}>
+                <Text style={[styles.segText, pref === m && styles.segTextOn]}>{m === 'light' ? 'Light' : m === 'dark' ? 'Dark' : 'System'}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
         </View>
-        <Text style={styles.help}>{pref === 'system' ? 'Follows your device light/dark setting.' : `Always ${pref}.`}</Text>
-      </View>
+      ) : null}
       {url ? <MailIngestPanel reloadSignal={mailReload} /> : null}
     </>
   );
@@ -223,23 +227,45 @@ export function SettingsModal({
       </View>
     </>
   );
-  const navRow = (label: string, help: string, onPress: () => void) => (
-    <Pressable style={styles.profileRow} onPress={onPress}>
+  // Grouped iOS-style list (phone landing), mirroring the web's plain groups. Each row reuses an
+  // existing sub-screen editor via the onEdit* callbacks; "Phone & sync" opens the sync sub-view.
+  const gRow = (icon: string, label: string, value: string, onPress: () => void, last?: boolean) => (
+    <Pressable key={label} style={[styles.gRow, !last && styles.gRowDivider]} onPress={onPress}>
+      <View style={styles.gIcon}><Text style={styles.gIconText}>{icon}</Text></View>
       <View style={styles.flex1}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.help}>{help}</Text>
+        <Text style={styles.gLabel}>{label}</Text>
+        <Text style={styles.gValue}>{value}</Text>
       </View>
       <Text style={styles.profileChev}>›</Text>
     </Pressable>
   );
-  const navRows = (
+  const groupedList = (
     <>
-      {navRow('Profile · apply-assist', 'Name, links, education, work history, EEO + résumé upload', onEditProfile)}
-      {navRow('Search criteria', 'Role titles, keywords, min-fit, salary floor + remote', onEditSearch)}
-      {navRow('Tiers & rules', 'A/B/C thresholds, scout merge tier, follow-up days, AI drafts', onEditRules)}
-      {navRow('Saved answers', 'Reusable Q&A + saved AI drafts — searchable, tagged', onEditAnswers)}
-      {navRow('Build CV', 'Generate a .docx / PDF CV from your profile + narratives', onBuildCv)}
-      {navRow('How scoring works', 'What Fit, Interview probability, EV, and tiers mean', onOpenGuide)}
+      <Text style={styles.groupHeader}>YOU</Text>
+      <View style={styles.groupCard}>
+        {gRow('👤', 'Your profile', 'Résumé, story, contact', onEditProfile)}
+        {gRow('🎯', "What you're looking for", 'Roles, pay, where jobs come from', onEditSearch)}
+        {gRow('💬', 'Saved answers', 'Reusable Q&A + saved drafts', onEditAnswers, true)}
+      </View>
+      <Text style={styles.groupHeader}>HOW REQON WORKS</Text>
+      <View style={styles.groupCard}>
+        {gRow('⚙️', 'How Reqon works for you', 'Ranking, applying, AI help', onEditRules)}
+        {gRow('📊', 'How scoring works', 'What fit, interview odds & match strength mean', onOpenGuide)}
+        {gRow('📄', 'Build a CV', 'Generate a tailored CV from your profile', onBuildCv, true)}
+      </View>
+      <Text style={styles.groupHeader}>ACCOUNT & DATA</Text>
+      <View style={styles.groupCard}>
+        {gRow('📱', 'Phone & sync', url ? 'Connected' : 'Not connected', () => setPhoneView('sync'), true)}
+      </View>
+      <Text style={styles.groupHeader}>APPEARANCE</Text>
+      <View style={styles.seg}>
+        {(['light', 'dark', 'system'] as SchemePref[]).map((m) => (
+          <Pressable key={m} style={[styles.segBtn, pref === m && styles.segBtnOn]} onPress={() => setScheme(m)}>
+            <Text style={[styles.segText, pref === m && styles.segTextOn]}>{m === 'light' ? 'Light' : m === 'dark' ? 'Dark' : 'System'}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.appFoot}>Reqon for iOS · in sync with the web app</Text>
     </>
   );
 
@@ -296,7 +322,13 @@ export function SettingsModal({
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.sheet}>
           <View style={styles.headRow}>
-            <Text style={styles.title}>Sync</Text>
+            {phoneView === 'sync' ? (
+              <Pressable onPress={() => setPhoneView('list')} hitSlop={8}>
+                <Text style={styles.cancel}>‹ Settings</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.title}>Settings</Text>
+            )}
             <Pressable onPress={onClose} hitSlop={8}>
               <Text style={styles.cancel}>Done</Text>
             </Pressable>
@@ -306,9 +338,14 @@ export function SettingsModal({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
           >
-            {syncTop}
-            {navRows}
-            {syncBottom}
+            {phoneView === 'sync' ? (
+              <>
+                {syncTop}
+                {syncBottom}
+              </>
+            ) : (
+              groupedList
+            )}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -349,6 +386,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   flex1: { flex: 1 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.element, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   profileChev: { fontSize: 22, color: c.muted, lineHeight: 22 },
+  groupHeader: { fontFamily: fonts.sans, fontSize: 12, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: c.muted, marginTop: 6, marginBottom: 2, marginLeft: 4 },
+  groupCard: { backgroundColor: c.element, borderRadius: 12, overflow: 'hidden' },
+  gRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 11 },
+  gRowDivider: { borderBottomWidth: 1, borderBottomColor: alpha(c.canvas, 0.6) },
+  gIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: alpha(c.emerald, 0.14), alignItems: 'center', justifyContent: 'center' },
+  gIconText: { fontSize: 15 },
+  gLabel: { fontFamily: fonts.sans, fontSize: 15, fontWeight: '600', color: c.textHigh },
+  gValue: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 1 },
+  appFoot: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, textAlign: 'center', marginTop: 10 },
   serverOnly: { fontFamily: fonts.sans, fontSize: 11, color: c.muted, lineHeight: 16, fontStyle: 'italic' },
   srvBlock: { backgroundColor: c.element, borderRadius: 11, padding: 12, gap: 4 },
   srvRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },

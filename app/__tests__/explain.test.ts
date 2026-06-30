@@ -27,7 +27,7 @@ describe('explainScore', () => {
 
   it('always explains the tier via expected value', () => {
     const lines = explainScore(role({ tier: 'B', fit: 7, prob: 7, score: 4.9 }));
-    expect(lines[lines.length - 1].text).toMatch(/Tier B — expected value 4\.9/);
+    expect(lines[lines.length - 1].text).toMatch(/Possible match — expected value 4\.9/);
   });
 });
 

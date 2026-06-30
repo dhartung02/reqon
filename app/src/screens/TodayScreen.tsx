@@ -1,22 +1,16 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import type { Role, Lane } from '../model';
-import { todayLanes, isApplyNext, type Tone } from '../today';
+import { isApplyNext, inInterview, followUpDue } from '../today';
 import { computeActions, groupActions, type Severity } from '../actionItems';
+import { ReqonGlyph } from '../components/ReqonGlyph';
 import { useLayout } from '../useLayout';
 
 const sevColor = (c: Palette): Record<Severity, string> => ({ high: c.danger, medium: c.amber, low: c.active });
 
-const toneColor = (c: Palette): Record<Tone, string> => ({
-  accent: c.emerald,
-  warning: c.amber,
-  muted: c.muted,
-  active: c.active,
-  danger: c.danger,
-});
-
-// Today = the daily-loop command center (mirrors the web): scout strip + action cards + footer.
-// The scored role lists live in the lane tabs.
+// Today = the daily-loop home base (mirrors the web): a "Find new jobs" strip, four headline
+// stats, the "What needs you today" action list, and a reassuring footer. The full scored lists
+// live in the Board lanes. All scout / sync wiring is unchanged — only labels and layout differ.
 export function TodayScreen({
   roles,
   onJump,
@@ -46,71 +40,79 @@ export function TodayScreen({
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   const { wide } = useLayout();
-  const tone = toneColor(c);
   const sev = sevColor(c);
   const actionGroups = groupActions(computeActions(roles));
   const rel = (t: number) => {
     const s = (Date.now() - t) / 1000;
     return s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
   };
-  const lanes = todayLanes(roles);
-  const tierA = roles.filter((r) => r.tier === 'A').length;
-  const applyNext = roles.filter(isApplyNext).length;
+
+  // Four headline stats from the existing predicates (today.ts) — tappable to the matching lane.
+  const stats: { key: string; n: number; label: string; desc: string; color: string; jump?: Lane }[] = [
+    { key: 'strong', n: roles.filter((r) => r.tier === 'A').length, label: 'Strong matches', desc: 'Top fits to prioritize', color: c.emerald, jump: 'open' },
+    { key: 'ready', n: roles.filter(isApplyNext).length, label: 'Ready to apply', desc: 'Verified · open · not applied', color: c.emerald, jump: 'open' },
+    { key: 'replies', n: roles.filter(inInterview).length, label: 'Replies', desc: 'In conversation', color: c.active, jump: 'interviewing' },
+    { key: 'followups', n: roles.filter(followUpDue).length, label: 'Follow-ups', desc: 'Gone quiet — nudge', color: c.danger, jump: 'applied' },
+  ];
+
+  const findBtn = (onPress: () => void) => (
+    <Pressable style={styles.findBtn} onPress={onPress} disabled={scouting} accessibilityRole="button" accessibilityLabel="Find new jobs">
+      {scouting ? <ActivityIndicator size="small" color={c.canvas} /> : <Text style={styles.findBtnText}>Find new jobs</Text>}
+    </Pressable>
+  );
 
   return (
     <ScrollView
       contentContainerStyle={[styles.scroll, wide && styles.scrollWide]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.emerald} />}
     >
+      <View style={styles.header}>
+        <View style={styles.brandRow}>
+          <ReqonGlyph size={18} color={c.emerald} />
+          <Text style={styles.eyebrow}>REQON</Text>
+        </View>
+        <Text style={styles.h1}>Today</Text>
+      </View>
+
       <View style={styles.scoutStrip}>
         <View style={styles.scoutLeft}>
           <View style={styles.pulse} />
-          <Text style={styles.scoutText}>Reqon Scout • {roles.length} tracked</Text>
+          <Text style={styles.scoutText}>
+            <Text style={styles.scoutStrong}>{roles.length} jobs</Text> tracked
+          </Text>
         </View>
         {scoutEnabled ? (
-          <Pressable style={styles.scoutBtn} onPress={onScout} disabled={scouting}>
-            {scouting ? (
-              <ActivityIndicator size="small" color={c.emerald} />
-            ) : (
-              <Text style={styles.scoutBtnText}>Run Scout</Text>
-            )}
-          </Pressable>
+          findBtn(onScout)
         ) : serverConfigured ? (
           <View style={styles.serverCol}>
-            <Pressable style={styles.scoutBtn} onPress={onServerScout} disabled={scouting}>
-              {scouting ? <ActivityIndicator size="small" color={c.emerald} /> : <Text style={styles.scoutBtnText}>Run server scout</Text>}
-            </Pressable>
+            {findBtn(onServerScout)}
             <Text style={[styles.serverScout, syncState.error && styles.syncErr]}>
               {syncState.error ? 'Sync failed' : syncState.at ? `Synced ${rel(syncState.at)}` : 'Server connected'}
             </Text>
           </View>
         ) : (
-          <Text style={styles.serverScout}>Scout off</Text>
+          <Text style={styles.serverScout}>Off</Text>
         )}
       </View>
       {scoutMsg ? <Text style={styles.scoutMsg}>{scoutMsg}</Text> : null}
 
       <View style={styles.grid}>
-        {lanes.map((l) => {
-          const empty = l.count === 0;
-          return (
-            <Pressable
-              key={l.key}
-              style={[styles.card, wide && styles.cardWide, empty && styles.cardEmpty]}
-              disabled={empty || !l.jump}
-              onPress={() => l.jump && onJump(l.jump)}
-            >
-              <Text style={[styles.cardNum, { color: empty ? c.muted : tone[l.tone] }]}>{l.count}</Text>
-              <Text style={styles.cardTitle}>{l.title}</Text>
-              <Text style={styles.cardDesc}>{l.desc}</Text>
-            </Pressable>
-          );
-        })}
+        {stats.map((s) => (
+          <Pressable
+            key={s.key}
+            style={[styles.card, wide && styles.cardWide]}
+            disabled={!s.jump}
+            onPress={() => s.jump && onJump(s.jump)}
+          >
+            <Text style={[styles.cardNum, { color: s.n === 0 ? c.muted : s.color }]}>{s.n}</Text>
+            <Text style={styles.cardTitle}>{s.label}</Text>
+            <Text style={styles.cardDesc}>{s.desc}</Text>
+          </Pressable>
+        ))}
       </View>
 
-      <Text style={styles.sectionTitle}>ACTION NEEDED — DISCOVER → VERIFY → APPLY → FOLLOW UP</Text>
-
-      {actionGroups.length > 0 && (
+      <Text style={styles.h2}>What needs you today</Text>
+      {actionGroups.length > 0 ? (
         <View style={styles.actions}>
           {actionGroups.map((g) => (
             <View key={g.title} style={styles.actSec}>
@@ -127,40 +129,49 @@ export function TodayScreen({
             </View>
           ))}
         </View>
+      ) : (
+        <Text style={styles.allClear}>You're all caught up — nothing needs you right now.</Text>
       )}
 
-      <Text style={styles.foot}>
-        {roles.length} roles tracked · Tier A: {tierA} · apply-next queue: {applyNext}
-      </Text>
+      <Text style={styles.foot}>Nothing slips — Reqon nudges you before a good lead goes cold.</Text>
     </ScrollView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  scroll: { paddingTop: 16, paddingBottom: 32, gap: 16 },
+  scroll: { paddingTop: 12, paddingBottom: 32, gap: 16 },
   scrollWide: { maxWidth: 1040, width: '100%', alignSelf: 'center' },
+  header: { gap: 4 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  eyebrow: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '700', letterSpacing: 2, color: c.emerald },
+  h1: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, letterSpacing: -0.3 },
   scoutStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   scoutLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pulse: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.emerald },
-  scoutText: { fontFamily: fonts.sans, fontSize: 13, color: c.muted },
-  scoutBtn: {
-    paddingHorizontal: 12,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: alpha(c.emerald, 0.1),
-    borderWidth: 1,
-    borderColor: alpha(c.emerald, 0.4),
+  scoutText: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase },
+  scoutStrong: { color: c.textHigh, fontWeight: '700' },
+  findBtn: {
+    paddingHorizontal: 16,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: c.emerald,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 84,
+    minWidth: 120,
   },
-  scoutBtnText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: c.emerald },
+  findBtnText: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '700', color: c.canvas },
   serverCol: { alignItems: 'flex-end', gap: 4 },
   serverScout: { fontFamily: fonts.sans, fontSize: 12, color: c.muted },
   syncErr: { color: c.danger },
   scoutMsg: { fontFamily: fonts.sans, fontSize: 12, color: c.textBase },
-  sectionTitle: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '500', letterSpacing: 1.4, color: c.muted },
-  actions: { backgroundColor: c.element, borderRadius: 12, padding: 12, gap: 4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  card: { flexBasis: '47.5%', flexGrow: 1, backgroundColor: c.element, borderRadius: 14, padding: 14, gap: 2 },
+  cardWide: { flexBasis: '23%', minWidth: 150 },
+  cardNum: { fontFamily: fonts.serif, fontSize: 32, fontWeight: '700', lineHeight: 36 },
+  cardTitle: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.textHigh, marginTop: 2 },
+  cardDesc: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, lineHeight: 16 },
+  h2: { fontFamily: fonts.serif, fontSize: 18, fontWeight: '600', color: c.textHigh },
+  actions: { backgroundColor: c.element, borderRadius: 14, padding: 12, gap: 4 },
   actSec: { marginTop: 6 },
   actSecTitle: { fontFamily: fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: c.muted, marginBottom: 4 },
   actItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
@@ -168,19 +179,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   actMain: { flex: 1, minWidth: 0 },
   actRole: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.textHigh },
   actReason: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 1 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: {
-    flexBasis: '47.5%',
-    flexGrow: 1,
-    backgroundColor: c.element,
-    borderRadius: 12,
-    padding: 14,
-    gap: 2,
-  },
-  cardWide: { flexBasis: '23%', minWidth: 150 },
-  cardEmpty: { opacity: 0.45 },
-  cardNum: { fontFamily: fonts.serif, fontSize: 30, fontWeight: '700', lineHeight: 34 },
-  cardTitle: { fontFamily: fonts.sans, fontSize: 14, fontWeight: '600', color: c.textHigh, marginTop: 2 },
-  cardDesc: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, lineHeight: 16 },
-  foot: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 4 },
+  allClear: { fontFamily: fonts.sans, fontSize: 14, color: c.textBase, backgroundColor: c.element, borderRadius: 14, padding: 16 },
+  foot: { fontFamily: fonts.sans, fontSize: 12, color: c.muted, marginTop: 4, lineHeight: 17 },
 });

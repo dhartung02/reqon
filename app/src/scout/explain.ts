@@ -52,7 +52,7 @@ export function explainScore(role: Pick<Role, 'role' | 'fit' | 'prob' | 'tier' |
   else lines.push({ text: 'On-site — penalized (you’re remote-only)', tone: 'bad' });
 
   // Tier / expected value
-  lines.push({ text: `Tier ${role.tier} — expected value ${role.score.toFixed(1)} (fit ${role.fit} × prob ${role.prob} ÷ 10)`, tone: 'neutral' });
+  lines.push({ text: `${role.tier === 'A' ? 'Strong' : role.tier === 'B' ? 'Possible' : 'Long shot'} match — expected value ${role.score.toFixed(1)} (fit ${role.fit} × prob ${role.prob} ÷ 10)`, tone: 'neutral' });
 
   return lines;
 }

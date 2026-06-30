@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { alpha, fonts, useThemedStyles, type Palette } from '../theme';
 import { computeTier, expectedValue } from '@reqon/core';
-import { SECTORS, REMOTE_MODES } from '../model';
+import { SECTORS, REMOTE_MODES, tierWord } from '../model';
 import type { NewRole } from '../db/store';
 
 // Minimal create form. Company + role required; fit/prob (0–10) drive the live tier/score preview.
@@ -79,7 +79,7 @@ export function AddRoleModal({
               </Labeled>
             </View>
             <Text style={styles.preview}>
-              Tier {tier} · EV {ev.toFixed(1)}
+              {tierWord(tier)} · EV {ev.toFixed(1)}
             </Text>
             <Labeled label="Salary (optional)" styles={styles}>
               <TextInput value={salary} onChangeText={setSalary} placeholder="$240–280K" placeholderTextColor={c.muted} style={styles.input} />

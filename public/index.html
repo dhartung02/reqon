@@ -727,6 +727,14 @@
   .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:9px}
   .scoregrid .field{margin-bottom:0}
   .modalacts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  /* "Add tracking details" disclosure in the add/edit modal */
+  .modal details.trackdetails{margin-top:8px;border-top:1px dashed var(--line-2);padding-top:12px}
+  .modal details.trackdetails>summary{cursor:pointer;font-size:.82rem;color:var(--text-2);list-style:none;display:flex;align-items:center;gap:7px;padding:4px 0;user-select:none}
+  .modal details.trackdetails>summary::-webkit-details-marker{display:none}
+  .modal details.trackdetails>summary::before{content:"▸";color:var(--dim);transition:transform .15s}
+  .modal details.trackdetails[open]>summary::before{transform:rotate(90deg)}
+  .modal details.trackdetails>summary:hover{color:var(--text)}
+  .modal details.trackdetails>.grid2,.modal details.trackdetails>.grid3,.modal details.trackdetails>.field{margin-top:12px}
   /* narrative builder modal */
   .nb-list{display:flex;flex-direction:column;gap:12px;max-height:54vh;overflow:auto;margin:6px 0}
   .nb-card{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
@@ -954,13 +962,14 @@
 
 <div class="overlay" id="overlay">
   <div class="modal">
-    <h2 id="modalTitle">Add requisition</h2>
-    <p class="hint">A requisition = one specific role at a company. Group is by company name.</p>
+    <h2 id="modalTitle">Add a job</h2>
+    <p class="hint">Add a job you found. Paste the link and fill in what you know — you can edit anything later.</p>
+    <div class="field"><label>🔗 Job link — paste it, then fill in the rest</label><input id="f_link" type="text" placeholder="https://… careers page or job posting"></div>
     <div class="grid2">
       <div class="field"><label>Company</label><input id="f_company" type="text"></div>
       <div class="field"><label>Sector</label><input id="f_sector" type="text" placeholder="CDP / Data Infra / Martech / AI / Enterprise SaaS"></div>
     </div>
-    <div class="field"><label>Role / requisition title</label><input id="f_role" type="text"></div>
+    <div class="field"><label>Job title</label><input id="f_role" type="text"></div>
     <div class="grid3">
       <div class="field"><label>Salary</label><input id="f_salary" type="text" placeholder="$200K–280K"></div>
       <div class="field"><label>Location</label><input id="f_location" type="text"></div>
@@ -969,33 +978,32 @@
     <div class="grid3">
       <div class="field"><label>Fit (0–10)</label><input id="f_fit" type="number" min="0" max="10" step="0.1"></div>
       <div class="field"><label>Interview prob (0–10)</label><input id="f_prob" type="number" min="0" max="10" step="0.1"></div>
-      <div class="field"><label>Tier</label><select id="f_tier"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
+      <div class="field"><label>Match strength</label><select id="f_tier"><option value="A">Strong</option><option value="B">Possible</option><option value="C">Long shot</option></select></div>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Link</label><input id="f_link" type="text" placeholder="https://…"></div>
-      <div class="field"><label>Link confidence</label><select id="f_conf"><option value="verified">Verified</option><option value="boardonly">Board-only</option><option value="unverified">Unverified</option></select></div>
-    </div>
-    <div class="field"><label>Why it fits / commentary</label><textarea id="f_notes" rows="2"></textarea></div>
-    <hr style="border:none;border-top:1px dashed var(--line-2);margin:14px 0">
-    <div class="grid3">
-      <div class="field"><label>Status</label><select id="f_status"><option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option><option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option></select></div>
-      <div class="field"><label>Applied date</label><input id="f_applied" type="date"></div>
-      <div class="field"><label>Interview date</label><input id="f_interview" type="date"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Recruiter name</label><input id="f_recruiter" type="text" placeholder="Jane Smith"></div>
-      <div class="field"><label>Recruiter email</label><input id="f_recruiterEmail" type="email" placeholder="jane@company.com"></div>
-    </div>
-    <div class="grid3">
-      <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
-      <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
-      <div class="field"><label>Cover letter?</label><select id="f_cover"><option>No</option><option>Yes</option></select></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Follow-up date</label><input id="f_followup" type="date"></div>
-      <div class="field"><label>Last contact</label><input id="f_lastcontact" type="date"></div>
-    </div>
-    <div class="field"><label>Next action</label><input id="f_next" type="text" placeholder="e.g. Ask Karolina for a referral"></div>
+    <div class="field"><label>How sure is the link?</label><select id="f_conf"><option value="verified">Verified</option><option value="boardonly">Board-only</option><option value="unverified">Unverified</option></select></div>
+    <div class="field"><label>Why it caught your eye</label><textarea id="f_notes" rows="2"></textarea></div>
+    <details class="trackdetails">
+      <summary>Add tracking details — status, dates, recruiter <span class="setmuted">(Reqon sets these as you go)</span></summary>
+      <div class="grid3">
+        <div class="field"><label>Status</label><select id="f_status"><option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option><option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option></select></div>
+        <div class="field"><label>Applied date</label><input id="f_applied" type="date"></div>
+        <div class="field"><label>Interview date</label><input id="f_interview" type="date"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Recruiter name</label><input id="f_recruiter" type="text" placeholder="Jane Smith"></div>
+        <div class="field"><label>Recruiter email</label><input id="f_recruiterEmail" type="email" placeholder="jane@company.com"></div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Referral?</label><select id="f_referral"><option>No</option><option>Yes</option></select></div>
+        <div class="field"><label>Resume version</label><select id="f_resume"><option>—</option><option>PM</option><option>Director</option><option>Principal</option><option>Platform</option><option>AI</option></select></div>
+        <div class="field"><label>Cover letter?</label><select id="f_cover"><option>No</option><option>Yes</option></select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Follow-up date</label><input id="f_followup" type="date"></div>
+        <div class="field"><label>Last contact</label><input id="f_lastcontact" type="date"></div>
+      </div>
+      <div class="field"><label>Next action</label><input id="f_next" type="text" placeholder="e.g. Ask Karolina for a referral"></div>
+    </details>
     <div class="modalacts">
       <button class="btn ghost" id="cancelBtn">Cancel</button>
       <button class="btn" id="saveBtn">Save</button>
@@ -2899,9 +2907,9 @@ const SEL=["remote","tier","conf","status","referral","resume","cover"];
 function clearForm(){TEXT.forEach(k=>F("f_"+k).value="");F("f_fit").value="";F("f_prob").value="";F("f_remote").value="remote";F("f_tier").value="A";F("f_conf").value="unverified";F("f_status").value="Not Applied";F("f_referral").value="No";F("f_resume").value="—";F("f_cover").value="No";}
 function fillForm(x){TEXT.forEach(k=>F("f_"+k).value=x[k]||"");F("f_fit").value=x.fit;F("f_prob").value=x.prob;["remote","tier","conf","status","referral","resume","cover"].forEach(k=>F("f_"+k).value=x[k]||"");}
 function readForm(){const o={};TEXT.forEach(k=>o[k]=F("f_"+k).value.trim());o.fit=Math.max(0,Math.min(10,parseFloat(F("f_fit").value)||0));o.prob=Math.max(0,Math.min(10,parseFloat(F("f_prob").value)||0));SEL.forEach(k=>o[k]=F("f_"+k).value);if(!o.company)o.company="Untitled";o.added=new Date().toISOString().slice(0,10);o.updatedAt=new Date().toISOString();o.updatedBy="you";if(!o.source)o.source="manual";return o;}
-window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit requisition");};
+window.editRow=function(i){editingIndex=i;fillForm(rows[i]);openModal("Edit a job");};
 window.delRow=function(i){if(confirm("Delete "+rows[i].company+" — "+rows[i].role+"?\n\nKept as a recoverable deleted row (remove permanently in Settings → Data safety) so the delete syncs to other devices.")){rows[i].deleted=true;stampRow(i);persistNow();render();}};
-F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add requisition");};
+F("addBtn").onclick=()=>{editingIndex=-1;clearForm();openModal("Add a job");};
 F("cancelBtn").onclick=closeModal;
 F("overlay").onclick=e=>{if(e.target.id==="overlay")closeModal();};
 F("saveBtn").onclick=()=>{const o=readForm();if(editingIndex>=0){rows[editingIndex]={...rows[editingIndex],...o};stampRow(editingIndex);}else rows.unshift(o);persistNow();render();closeModal();};
@@ -3897,7 +3905,7 @@ document.getElementById("assistActions").addEventListener("click",async e=>{
 });
 F("assistApplyScore").onclick=()=>{
   if(!lastScore||assistIdx<0)return;
-  if(!confirm(`Apply AI scores to ${assistRow.company} — ${assistRow.role}?\n\nFit ${assistRow.fit} → ${lastScore.fit}\nProb ${assistRow.prob} → ${lastScore.prob}\nTier ${assistRow.tier||"–"} → ${lastScore.tier}`))return;
+  if(!confirm(`Apply AI scores to ${assistRow.company} — ${assistRow.role}?\n\nFit ${assistRow.fit} → ${lastScore.fit}\nProb ${assistRow.prob} → ${lastScore.prob}\nMatch ${assistRow.tier?tierWord(assistRow.tier):"–"} → ${tierWord(lastScore.tier)}`))return;
   const r=rows[assistIdx];
   r.fit=lastScore.fit; r.prob=lastScore.prob; r.tier=lastScore.tier;
   const stamp=`[AI score ${new Date().toISOString().slice(0,10)}] fit ${lastScore.fit} · prob ${lastScore.prob} · ${lastScore.tier}: ${lastScore.rationale||""}`.trim();

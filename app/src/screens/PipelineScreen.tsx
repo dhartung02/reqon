@@ -21,7 +21,7 @@ import {
 // (A→B→C), sorted within each group. Tap a card to open detail, or enter Select mode to
 // bulk-change status on many at once.
 const TIER_ORDER: Tier[] = ['A', 'B', 'C'];
-const TIER_LABEL: Record<Tier, string> = { A: 'Tier A', B: 'Tier B', C: 'Tier C' };
+const TIER_LABEL: Record<Tier, string> = { A: 'Strong', B: 'Possible', C: 'Long shot' };
 
 export function PipelineScreen({
   lane,

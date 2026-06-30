@@ -79,12 +79,16 @@ export const LANE_STATUS: Record<StatusLane, Status[]> = {
 
 export const LANES: { key: Lane; label: string }[] = [
   { key: 'today', label: 'Today' },
-  { key: 'open', label: 'Open' },
+  { key: 'open', label: 'Saved' },
   { key: 'applied', label: 'Applied' },
   { key: 'interviewing', label: 'Interviewing' },
   { key: 'closed', label: 'Closed' },
   { key: 'analytics', label: 'Analytics' },
 ];
+
+// Plain-language match-strength word for a stored tier (data stays A/B/C; only the label changes).
+// Mirrors the web redesign's Strong / Possible / Long shot.
+export const tierWord = (t: Tier): string => (t === 'A' ? 'Strong' : t === 'B' ? 'Possible' : 'Long shot');
 
 export const laneOf = (s: Status): StatusLane => {
   for (const lane of ['open', 'applied', 'interviewing', 'closed'] as const) {

@@ -812,13 +812,13 @@
       </svg>
       <div class="brandwrap">
         <span class="brandmark">Reqon</span>
-        <h1>Requisition pipeline</h1>
+        <h1>Your job board</h1>
       </div>
       <button class="infobtn" id="aboutBtn" title="About this board" aria-label="About this board">i</button>
       <div class="about-pop" id="aboutPop">
-        <p><b>Reqon — self-hosted job-search command center.</b> Live requisitions grouped by fit tier, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
-        <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Tier</b> is set by expected value.</p>
-        <p>Every edit saves server-side and persists. Use <b>Run Scout</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs action.</p>
+        <p><b>Reqon — your self-hosted job-search home base.</b> Live jobs grouped by match strength, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
+        <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Match strength</b> (Strong / Possible / Long shot) is set by expected value.</p>
+        <p>Every edit saves server-side and persists. Use <b>Find new jobs</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs you.</p>
         <p style="margin-top:10px"><a href="/guide" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">Open the full user guide ↗</a></p>
       </div>
     </div>
@@ -846,7 +846,7 @@
   <div class="toolbar">
     <input type="text" id="search" placeholder="Search company, role, recruiter, notes…" />
     <select id="sort">
-      <option value="expected" selected>Sort: Expected value (fit×prob)</option>
+      <option value="expected" selected>Sort: Best bets first</option>
       <option value="fit">Sort: Fit</option>
       <option value="prob">Sort: Interview probability</option>
       <option value="company">Sort: Company A–Z</option>
@@ -854,8 +854,8 @@
       <option value="applied_asc">Sort: Applied date (oldest)</option>
       <option value="followup">Sort: Follow-up date</option>
     </select>
-    <select id="groupBy" title="Group the Open / Applied list">
-      <option value="tier" selected>Group: Tier</option>
+    <select id="groupBy" title="Group the saved / applied list">
+      <option value="tier" selected>Group: Match strength</option>
       <option value="company">Group: Company</option>
       <option value="none">Group: None (flat)</option>
     </select>
@@ -867,10 +867,10 @@
           <option>Not Applied</option><option>Applied</option><option>Recruiter Screen</option>
           <option>Hiring Manager</option><option>Panel</option><option>Offer</option><option>Rejected</option><option>Archived</option>
         </select>
-        <select id="tierFilter"><option value="">All tiers</option><option value="A">Tier A</option><option value="B">Tier B</option><option value="C">Tier C</option></select>
+        <select id="tierFilter"><option value="">All matches</option><option value="A">Strong</option><option value="B">Possible</option><option value="C">Long shot</option></select>
         <select id="sourceFilter"><option value="">All sources</option></select>
-        <select id="applyModeFilter"><option value="">All apply modes</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
-        <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply-next only</label>
+        <select id="applyModeFilter"><option value="">Any way to apply</option><option value="fillable">Fillable</option><option value="gated">Gated</option><option value="simplify">Simplify</option><option value="manual">Manual</option></select>
+        <label class="toggle" id="applyNextWrap"><input type="checkbox" id="applyNextOnly" checked> Apply next only</label>
         <label class="toggle"><input type="checkbox" id="remoteOnly"> Remote only</label>
         <label class="toggle"><input type="checkbox" id="activeOnly"> Active only</label>
         <label class="toggle"><input type="checkbox" id="notAppliedOnly"> Not applied only</label>
@@ -879,25 +879,25 @@
     <div class="spacer"></div>
     <span class="scoutstatus" id="scoutStatus"></span>
     <div class="scoutctl">
-      <button class="btn ghost" id="scoutBtn" data-feature="scout">⟳ Run Scout ▾</button>
+      <button class="btn ghost" id="scoutBtn" data-feature="scout">↻ Find new jobs ▾</button>
       <div class="scoutmenu" id="scoutMenu">
-        <div class="scoutmenu-lbl">Run mode</div>
-        <button data-mode="find">Find new matches</button>
-        <button data-mode="validate">Validate + refresh existing</button>
-        <button data-mode="both">Run all (validate, find + scan email)</button>
+        <div class="scoutmenu-lbl">What to do</div>
+        <button data-mode="find">Find new jobs</button>
+        <button data-mode="validate">Check existing jobs</button>
+        <button data-mode="both">Do everything (check, find + scan email)</button>
         <div class="scoutmenu-sep"></div>
-        <div class="scoutmenu-lbl">Email recommendations</div>
-        <button data-mode="email">📥 Scan email for new leads</button>
-        <div class="scoutmenu-hint" id="emailScoutMenuHint" style="padding:2px 10px 4px">Included in “Find” &amp; “Run all” when enabled in Sources.</div>
-        <div class="scoutmenu-lbl">Scope to sources <span id="scoutScopeHint" class="scoutmenu-hint">(all)</span></div>
+        <div class="scoutmenu-lbl">Job emails</div>
+        <button data-mode="email">📥 Scan email for new jobs</button>
+        <div class="scoutmenu-hint" id="emailScoutMenuHint" style="padding:2px 10px 4px">Included in “Find new jobs” &amp; “Do everything” when enabled in Sources.</div>
+        <div class="scoutmenu-lbl">Limit to sites <span id="scoutScopeHint" class="scoutmenu-hint">(all)</span></div>
         <div class="scoutsources" id="scoutSources"></div>
         <div class="scoutmenu-sep"></div>
-        <button data-mode="source-backfill">↻ Backfill source from links</button>
+        <button data-mode="source-backfill">↻ Detect the site from each link</button>
         <button id="openSettingsFromMenu">⚙ Settings…</button>
         <div class="scoutmenu-foot" id="scoutAi">enrichment: …</div>
       </div>
     </div>
-    <button class="btn" id="addBtn">+ Add</button>
+    <button class="btn" id="addBtn">+ Add a job</button>
     <div class="popwrap">
       <button class="btn ghost overflowbtn" id="overflowBtn" type="button" title="More actions" aria-label="More actions">⋯</button>
       <div class="pop menu right" id="overflowPop">
@@ -933,7 +933,7 @@
 
   <section id="cmdCenter" class="cmdcenter" hidden>
     <div class="cc-head" id="ccHead">
-      <span class="cc-title">⚡ What needs action</span>
+      <span class="cc-title">⚡ What needs you today</span>
       <span class="cc-counts" id="ccCounts"></span>
       <button class="cc-toggle" id="ccToggle" title="Collapse / expand">▾</button>
     </div>
@@ -944,7 +944,7 @@
   <div id="board"><div class="loading">▚ loading from server…</div></div>
 
   <footer>
-    <span>Scores, statuses, lanes, apply modes, and integrations are explained in the <a href="/guide" target="_blank" rel="noopener" class="guidelink">user guide ↗</a>.</span>
+    <span>Scores, statuses, what needs you today, ways to apply, and integrations are explained in the <a href="/guide" target="_blank" rel="noopener" class="guidelink">user guide ↗</a>.</span>
   </footer>
 </div>
 
@@ -1696,7 +1696,7 @@ function thankyouDue(x){if(!["Recruiter Screen","Hiring Manager","Panel"].includ
 const LANE_DEFS=[
   {key:"verify",label:"⚠ Needs verify",pred:needsVerify,desc:"Not-applied leads with an unverified link — confirm the live posting before applying.",reason:x=>x.reqCheck==="lead"?"lead":x.conf},
   {key:"followup",label:"⏰ Follow-up due",pred:followUpDue,desc:"Active applications with no contact past your follow-up threshold — nudge or log an update.",reason:x=>{const d=daysSince(x.lastcontact||x.applied);return d!=null?d+"d quiet":"stale";}},
-  {key:"closed",label:"✖ Closed reqs",pred:closedReq,desc:"Postings detected closed. Archive them (snapshots first) — never auto-deleted.",reason:x=>"req closed"},
+  {key:"closed",label:"✖ Closed jobs",pred:closedReq,desc:"Postings detected closed. Archive them (snapshots first) — never auto-deleted.",reason:x=>"job closed"},
   {key:"thankyou",label:"🙏 Thank-you due",pred:thankyouDue,desc:"Interview was in the last 2 days — send a thank-you note while it's fresh.",reason:x=>{const d=daysSince(x.interview);return d===0?"today":d+"d ago";}},
 ];
 function laneDef(k){return LANE_DEFS.find(d=>d.key===k);}
@@ -1711,7 +1711,10 @@ function statusesForTab(k){return new Set((TAB_MAP[k]&&TAB_MAP[k].length?TAB_MAP
 function tabKeyForStatus(status){for(const d of TAB_DEFS){if(statusesForTab(d.key).has(status))return d.key;}return "open";} // unmapped -> Open so nothing disappears
 // apply-next queue: tier A/B · verified · req still open · not yet applied
 function isApplyNext(x){return ["A","B"].includes(x.tier)&&x.conf==="verified"&&!["closed","lead","unknown"].includes(x.reqCheck||"")&&x.status==="Not Applied";}
-const tierOpen={A:true,B:false,C:false};   // accordion state — Tier A open by default
+const tierOpen={A:true,B:false,C:false};   // accordion state — Strong open by default
+// Plain-language words for the stored tier value (data stays A/B/C; only the label changes).
+const TIER_WORD={A:'Strong',B:'Possible',C:'Long shot'};
+const tierWord=t=>TIER_WORD[t]||('Tier '+(t||'?'));
 const tierTouched={A:false,B:false,C:false};  // user manually toggled this tier (overrides filter auto-expand)
 const expanded=new Set();                  // compact rows expanded into full cards (by row index)
 const selected=new Set();                  // checkbox selection (by row index)
@@ -1988,7 +1991,7 @@ function reqCardHTML(x,i){
   <div class="req tier${x.tier} ${scls}" id="req-${i}" style="margin-left:8px">
     <div class="reqtop">
       <div>
-        <div class="rtitle">${logoHTML(x.company,'lg')}<span class="tierTag ${x.tier}">TIER ${x.tier}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
+        <div class="rtitle">${logoHTML(x.company,'lg')}<span class="tierTag ${x.tier}">${tierWord(x.tier)}</span> <span class="bandtag ${bandClass(x.fit)}" title="Fit band">${bandLabel(x.fit)}</span> ${esc(x.role)} ${flag}</div>
         <div class="meta">
           <span class="pill ${rc}">${rt}</span>
           ${x.location?`<span class="pill">${esc(x.location)}</span>`:""}
@@ -2134,7 +2137,7 @@ function render(){
   const laneActive=!analytics&&!today&&activeLane!=="all";
   const recentActive=!analytics&&!today&&!laneActive&&recentOnly;
   F("laneBar").style.display=(analytics||today)?"none":"";
-  F("laneBar").innerHTML=`<span class="llbl">Lanes</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
+  F("laneBar").innerHTML=`<span class="llbl">Quick filters</span><div class="lane ${activeLane==='all'?'active':''}" onclick="setLane('all')">All</div>`+
     LANE_DEFS.map(d=>`<div class="lane ${activeLane===d.key?'active':''}" onclick="setLane('${d.key}')"><span>${d.label}</span><span class="lcnt">${base.filter(d.pred).length}</span></div>`).join("");
   F("applyNextWrap").style.display=(activeTab==="open"&&!laneActive&&!analytics)?"":"none";
   F("groupBy").style.display=((activeTab==="open"||activeTab==="applied")&&!laneActive&&!recentOnly)?"":"none";   // grouping only applies to the accordion tabs
@@ -2182,8 +2185,8 @@ function render(){
     kpi("Interviews",inInterview,"active","","interviewing",isInterview)+
     kpi("Offers",offers,offers?"active":"","","offers",isOffers)+
     `<div class="kpi-div"></div>`+
-    kpi("Total roles",total,"sec")+
-    kpi("Tier A",tierA,"sec","","tierA",isTierA)+
+    kpi("Jobs tracked",total,"sec")+
+    kpi("Strong matches",tierA,"sec","","tierA",isTierA)+
     kpi("Response rate",am.responseRate+"%","sec")+
     kpi("Avg days→contact",am.ttr!=null?am.ttr:"—","sec");
 
@@ -2285,13 +2288,13 @@ function render(){
           <div class="tier-head" onclick="toggleTier('${t}')">
             <span class="caret">▼</span>
             <span class="tdot ${t}"></span>
-            <span class="tname">Tier ${t}</span>
+            <span class="tname">${tierWord(t)}</span>
             <span class="tcount">(${items.length}${ofN})</span>
             <span class="tsum">${tsum}</span>
-            ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible Tier ${t} row(s)">Select all</button>`:""}
+            ${items.length?`<button class="tsel" onclick="event.stopPropagation();selectTier('${t}')" title="Select all ${items.length} visible ${tierWord(t)} row(s)">Select all</button>`:""}
           </div>
           <div class="tier-body">`;
-        if(!items.length) html+=`<div class="tier-empty">${applied?`No Tier ${t} applications yet.`:`No matching Tier ${t} requisitions.`}</div>`;
+        if(!items.length) html+=`<div class="tier-empty">${applied?`No ${tierWord(t)} applications yet.`:`No matching ${tierWord(t)} jobs.`}</div>`;
         else items.forEach(x=>{ html+=compactRowHTML(x); if(expanded.has(x._i)) html+=reqCardHTML(x,x._i); });
         html+=`</div></div>`;
       });
@@ -2349,12 +2352,12 @@ async function loadScoutSummary(){
 function scoutRunStripHTML(){
   const s=scoutLast;
   if(s&&s.running)return `<div class="scoutrun"><span class="sr-lbl">Scout</span><span class="sr-when">running…</span></div>`;
-  if(!s||!s.when)return `<div class="scoutrun"><span class="sr-lbl">Last scout run</span><span class="sr-when">never</span><span class="sr-stat">Run Scout to pull fresh roles.</span><button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
+  if(!s||!s.when)return `<div class="scoutrun"><span class="sr-lbl">Last check</span><span class="sr-when">never</span><span class="sr-stat">Find new jobs to pull fresh roles.</span><button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">↻ Find new jobs</button></div>`;
   return `<div class="scoutrun"><span class="sr-lbl">Last scout run</span><span class="sr-when">${fmtWhen(s.when)}</span>`+
     `<span class="sr-stat">${s.postings!=null?`<b>${s.postings}</b> scanned · `:""}<b>${s.newMatches||0}</b> matches · <b>+${s.added||0}</b> added · <b>~${s.updated||0}</b> updated</span>`+
     `<span class="sr-stat ${s.errors?'sr-err':''}"><b>${s.errors||0}</b> error${s.errors===1?'':'s'}</span>`+
     `${s.dry?`<span class="sr-stat">· dry-run</span>`:""}`+
-    `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">⟳ Run Scout</button></div>`;
+    `<button class="btn ghost sr-run" onclick="document.getElementById('scoutBtn').click()">↻ Find new jobs</button></div>`;
 }
 function renderToday(){
   const all=rows.map((x,i)=>({...x,_i:i,_ev:expected(x)})).filter(x=>x.deleted!==true);
@@ -2375,12 +2378,12 @@ function renderToday(){
   };
   const actionTotal=newSince.length+verify.length+applyNext.length+tierAOpen.length+followup.length+closed.length+thankyou.length;
   const queue=actionTotal===0
-    ? `<div class="today-clear">✓ You're all caught up — nothing needs action right now. Run Scout to pull fresh matches.</div>`
+    ? `<div class="today-clear">✓ You're all caught up — nothing needs you right now. Find new jobs to pull fresh matches.</div>`
     : `<div class="today-grid">
         ${card(newSince.length,"New since last run",anchored?"Added since the last scout run, not yet applied":"Added in the last 3 days, not yet applied","accent","todoGo('review')")}
         ${card(verify.length,"Needs verification","Unverified links — confirm the live posting first","warning","todoGo('verify')")}
-        ${card(applyNext.length,"Apply next","Tier A/B · verified · still open · not applied","accent","todoGo('applynext')")}
-        ${card(tierAOpen.length,"Tier A · not applied","Top-tier roles you haven't applied to yet","accent","todoGo('tierA')")}
+        ${card(applyNext.length,"Apply next","Strong / Possible · verified · still open · not applied","accent","todoGo('applynext')")}
+        ${card(tierAOpen.length,"Strong · not applied","Top matches you haven't applied to yet","accent","todoGo('tierA')")}
         ${card(followup.length,"Follow-up due","Active applications gone quiet past your threshold","danger","todoGo('followup')")}
         ${card(closed.length,"Recently closed","Postings detected closed — review and archive","muted","todoGo('closed')")}
       </div>`;
@@ -2396,7 +2399,7 @@ function renderToday(){
     <div class="today-head">Action needed — your daily loop: discover → verify → apply → follow up</div>
     ${queue}
     ${pipeline}
-    <div class="today-foot">${all.length} roles tracked · Tier A: ${all.filter(x=>x.tier==='A').length} · apply-next queue: ${applyNext.length}. Pick a card to jump straight into that work.</div>
+    <div class="today-foot">${all.length} jobs tracked · Strong: ${all.filter(x=>x.tier==='A').length} · apply next: ${applyNext.length}. Pick a card to jump straight into that work.</div>
   </div>`;
 }
 window.todoGo=function(view){
@@ -2509,7 +2512,7 @@ function donut(rs,keyFn,label,opt){
   return card(label,`<div class="donut-wrap">${svg}${leg}</div>`,opt.sub);
 }
 function card(label,body,sub){return `<div class="an-card"><h3>${label}${sub?`<span class="sub">${sub}</span>`:""}</h3>${body}</div>`;}
-const TIER_COLOR=k=>({"A":"#00E5A3","Tier A":"#00E5A3","B":"#FFB800","Tier B":"#FFB800","C":"#5A6470","Tier C":"#5A6470"}[k]||"#94A3B8");
+const TIER_COLOR=k=>({"A":"#00E5A3","Strong":"#00E5A3","B":"#FFB800","Possible":"#FFB800","C":"#5A6470","Long shot":"#5A6470","Unknown":"#94A3B8"}[k]||"#94A3B8");
 const LEVEL_COLOR=k=>({Principal:"#00E5A3",Director:"#2DD4BF",VP:"#A78BDB",Head:"#79A6E0",Group:"#706CFF",Staff:"#C8FF49",Lead:"#FFB800",Senior:"#94A3B8",Manager:"#5A6470",Other:"#3a4550"}[k]||"#5A6470");
 // Weekly application volume over the window (by applied date).
 function velocityChart(rs){
@@ -2581,7 +2584,7 @@ function sourceQuality(rs){
   if(!out.length)return "";
   return `<div class="an-card"><h3>Source quality</h3><table class="an-table"><tr><th>Source</th><th>Roles</th><th>A/B&nbsp;%</th><th>App&nbsp;%</th><th>Resp&nbsp;%</th><th>Int&nbsp;%</th><th>Closed&nbsp;%</th><th>Dup</th></tr>`+
     out.map(r=>`<tr><td>${esc(r.s)}</td><td>${r.n}</td><td>${r.abP}%</td><td>${r.appP}%</td><td>${r.respP}%</td><td>${r.intP}%</td><td class="${r.closedP?'rejcell':''}">${r.closedP}%</td><td class="${r.dup?'rejcell':''}">${r.dup||''}</td></tr>`).join("")+
-    `</table><p class="an-note" style="margin-top:8px">A/B% = share that scored Tier A/B · Resp/Int% are of applied (current status, a floor) · Closed% = archived or dead postings · Dup = rows sharing a company+role with another. Use this to enable/disable/prioritize sources.</p></div>`;
+    `</table><p class="an-note" style="margin-top:8px">S/P% = share that scored Strong/Possible · Resp/Int% are of applied (current status, a floor) · Closed% = archived or dead postings · Dup = rows sharing a company+role with another. Use this to enable/disable/prioritize sources.</p></div>`;
 }
 // Auto-generated decision-support insights for the Analytics tab (#12).
 function buildInsights(rs,m){
@@ -2608,13 +2611,13 @@ function buildInsights(rs,m){
     const mApplied=manual.filter(x=>x.applied||INTERVIEW_NOW.has(x.status)||x.status==="Rejected").length;
     const mResp=manual.filter(x=>INTERVIEW_NOW.has(x.status)).length;
     const mAB=manual.filter(x=>x.tier==="A"||x.tier==="B").length;
-    out.push({tone:mResp?"good":"",html:`Manual captures (you clipped/added): <b>${manual.length}</b> roles, ${mAB} Tier A/B, ${mApplied} applied, ${mResp} reached a recruiter — ${mApplied?Math.round(mResp/mApplied*100):0}% conversion.`});
+    out.push({tone:mResp?"good":"",html:`Manual captures (you clipped/added): <b>${manual.length}</b> roles, ${mAB} Strong/Possible, ${mApplied} applied, ${mResp} reached a recruiter — ${mApplied?Math.round(mResp/mApplied*100):0}% conversion.`});
   }
   // Tier A engagement
   const tierA=rs.filter(x=>x.tier==="A");
   const tierAApplied=tierA.filter(x=>x.status!=="Not Applied"&&x.status!=="Archived").length;
   const tierAResp=tierA.filter(x=>STAGE_RANK[x.status]>=2).length;
-  if(tierA.length)out.push({tone:tierAResp?"good":"",html:`Tier A: ${tierAApplied} of ${tierA.length} applied, ${tierAResp} response${tierAResp===1?"":"s"} so far.`});
+  if(tierA.length)out.push({tone:tierAResp?"good":"",html:`Strong: ${tierAApplied} of ${tierA.length} applied, ${tierAResp} response${tierAResp===1?"":"s"} so far.`});
   // stale active applications
   const stale=rs.filter(x=>["Applied","Recruiter Screen","Hiring Manager","Panel"].includes(x.status)&&(()=>{const d=daysSince(x.lastcontact||x.applied);return d!=null&&d>=14;})()).length;
   if(stale>0)out.push({tone:"warn",html:`<b>${stale}</b> active application${stale===1?" is":"s are"} aging 14+ days without contact — consider a follow-up.`});
@@ -2669,7 +2672,7 @@ function renderAnalytics(f){
     `<p class="an-note" style="margin-top:10px">Current status of your ${ocTotal} application${ocTotal===1?'':'s'} (mutually exclusive). Reject rate: <b style="color:var(--coral)">${m.rejectRate}%</b> of applied · response rate ${m.responseRate}%. Window: ${win}.</p></div>`;
   const breakdowns=`${sourceQuality(rs)}<div class="an-grid2">`+
     anBreakdown(rs,x=>rowSource(x),"Source / ATS")+anBreakdown(rs,x=>x.sector,"Sector")+
-    anBreakdown(rs,x=>"Tier "+(x.tier||"?"),"Tier")+anBreakdown(rs,x=>applyModeOf(x),"Apply mode")+`</div>`;
+    anBreakdown(rs,x=>x.tier?tierWord(x.tier):"Unknown","Match strength")+anBreakdown(rs,x=>applyModeOf(x),"How you apply")+`</div>`;
 
   // ---- distributions, viewed through the selected lens ----
   const cohort=rs.filter(lensPred(analyticsLens));
@@ -2689,7 +2692,7 @@ function renderAnalytics(f){
   const salaryRow=histogram(cohort,salaryBand,SALARY_BANDS,"Salary bands","$200–300K in $10K bands (lower bound)");
   const donutsRow=`<div class="an-grid3">`+
     donut(cohort,x=>x.sector||"—","Industry / sector",{unit})+
-    donut(cohort,x=>"Tier "+(x.tier||"?"),"Tier",{order:["Tier A","Tier B","Tier C","Tier ?"],colorFn:TIER_COLOR,unit})+
+    donut(cohort,x=>x.tier?tierWord(x.tier):"Unknown","Match strength",{order:["Strong","Possible","Long shot","Unknown"],colorFn:TIER_COLOR,unit})+
     donut(cohort,x=>({remote:"Remote",flex:"Flex/Hybrid",onsite:"On-site"}[x.remote]||"—"),"Remote posture",{unit})+`</div>`;
   const distGrid=`${barsRow}${salaryRow}${donutsRow}`;
   const trends=`<div class="an-grid2">${velocityChart(rs.filter(lensPred("applied")))}${fitByOutcome(rs)}</div>`;

@@ -16,6 +16,12 @@
     --gold:var(--accent); --teal:var(--active); --green:var(--positive); --coral:var(--danger); --blue:var(--info); --violet:var(--ai);
     --shadow:0 18px 50px rgba(0,0,0,.55);
   }
+  [data-theme="light"]{
+    --bg:#F4F6F9; --panel:#FFFFFF; --panel-2:#EEF2F7; --line:#E3E8EF; --line-2:#D3DBE5;
+    --text:#0B1220; --text-2:#475569; --dim:#7C8A9C;
+    --accent:#00936B; --positive:#00936B; --active:#0D9488; --info:#3B6FB0; --warning:#B45309; --danger:#DC2626; --ai:#7C5CC4; --muted:#7C8A9C;
+    --shadow:0 18px 40px -24px rgba(15,23,42,.22);
+  }
   *{box-sizing:border-box}
   body{background:var(--bg);color:var(--text);font-family:"Spline Sans",sans-serif;line-height:1.6;margin:0;padding:clamp(18px,3vw,46px);-webkit-font-smoothing:antialiased}
   .wrap{max-width:920px;margin:0 auto}
@@ -50,28 +56,28 @@
     <a class="back" href="/">← Back to board</a>
   </div>
 
-  <p class="lead">Reqon is a self-hosted command center for your job search. It tracks every requisition by fit tier, scouts new roles from board APIs, and helps you draft and apply. This guide explains the scores, statuses, lanes, and the moving parts behind Settings.</p>
+  <p class="lead">Reqon is your self-hosted home base for the job search. It tracks every job by match strength, finds new roles from board APIs, and helps you draft and apply. This guide explains the scores, statuses, what needs you today, and the moving parts behind Settings.</p>
 
   <div class="toc">
-    <a href="#scores">Scores &amp; tiers</a>
+    <a href="#scores">Scores &amp; match strength</a>
     <a href="#confidence">Link confidence</a>
-    <a href="#status">Status &amp; tiers</a>
-    <a href="#lanes">Action lanes</a>
-    <a href="#applymode">Apply modes</a>
+    <a href="#status">Status &amp; match strength</a>
+    <a href="#lanes">What needs you today</a>
+    <a href="#applymode">Ways to apply</a>
     <a href="#sources">Sources &amp; health</a>
     <a href="#safety">Data safety</a>
     <a href="#integrations">Integrations</a>
   </div>
 
-  <h2 id="scores">Scores &amp; tiers</h2>
+  <h2 id="scores">Scores &amp; match strength</h2>
   <p><b>Fit</b> = domain / résumé match (a condensed version of the 7-axis model). <b>Interview probability</b> = the estimated odds of landing a screen given seniority, remote competition, and how directly your background maps — kept deliberately <em>separate</em> from fit, because some perfect-fit roles are genuinely hard to land. <b>Expected value</b> = fit × probability ÷ 10 — your best single number for allocating apply effort.</p>
-  <p><b>Tier</b> is set by expected value, not raw fit. <b>Bands</b> (shown on an expanded card):</p>
+  <p><b>Match strength</b> (Strong / Possible / Long shot) is set by expected value, not raw fit. <b>Bands</b> (shown on an expanded card):</p>
   <table>
     <tr><th>Band</th><th>Score</th><th>Meaning</th></tr>
-    <tr><td><span class="key">Excellent</span></td><td>8.0+</td><td>Tier A territory — apply with a tailored résumé</td></tr>
-    <tr><td><span class="key">Strong</span></td><td>6.5–7.9</td><td>Tier A/B — strong apply</td></tr>
-    <tr><td>Possible</td><td>5.0–6.4</td><td>Tier B — apply if capacity allows</td></tr>
-    <tr><td>Low priority</td><td>&lt;5.0</td><td>Tier C — skip unless something else pulls you in</td></tr>
+    <tr><td><span class="key">Excellent</span></td><td>8.0+</td><td>Strong territory — apply with a tailored résumé</td></tr>
+    <tr><td><span class="key">Strong</span></td><td>6.5–7.9</td><td>Strong / Possible — strong apply</td></tr>
+    <tr><td>Possible</td><td>5.0–6.4</td><td>Possible — apply if capacity allows</td></tr>
+    <tr><td>Low priority</td><td>&lt;5.0</td><td>Long shot — skip unless something else pulls you in</td></tr>
   </table>
   <p>All scores are estimates and salary ranges are indicative — verify on each board.</p>
 
@@ -84,21 +90,21 @@
   </table>
   <p><b>What "Needs verification" asks of you:</b> open the link and confirm the posting is still live, then change confidence to Verified (or archive it if it's dead). It's a manual confidence check — there's no automated step — so you don't spend effort applying to a posting that's already closed.</p>
 
-  <h2 id="status">Status &amp; tier edge</h2>
-  <p>Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks the tier: <span style="color:var(--accent)">A emerald</span> · <span style="color:var(--warning)">B amber</span> · <span style="color:var(--muted)">C muted</span>.</p>
+  <h2 id="status">Status &amp; match-strength edge</h2>
+  <p>Each row carries a status pill — <span style="color:var(--green)">applied</span> green, <span style="color:var(--teal)">in-interview</span> teal (solid at offer), <span style="color:var(--coral)">rejected</span> red (row dimmed), archived faded. The thin left edge marks match strength: <span style="color:var(--accent)">Strong emerald</span> · <span style="color:var(--warning)">Possible amber</span> · <span style="color:var(--muted)">Long shot muted</span>.</p>
 
-  <h2 id="lanes">Action lanes</h2>
-  <p>The Today view surfaces work in lanes so you always know the next move:</p>
+  <h2 id="lanes">What needs you today</h2>
+  <p>The Today view surfaces work in quick filters so you always know the next move:</p>
   <table>
-    <tr><th>Lane</th><th>What lands here</th></tr>
+    <tr><th>Filter</th><th>What lands here</th></tr>
     <tr><td>Needs verify</td><td>Not-applied leads with an unverified link — confirm the live posting first.</td></tr>
     <tr><td>Follow-up due</td><td>Active applications with no contact past your follow-up threshold.</td></tr>
-    <tr><td>Closed reqs</td><td>Postings detected as closed — review and archive (snapshots first; never auto-deleted).</td></tr>
-    <tr><td>Apply next</td><td>Tier A/B · verified · still open · not yet applied.</td></tr>
+    <tr><td>Closed jobs</td><td>Postings detected as closed — review and archive (snapshots first; never auto-deleted).</td></tr>
+    <tr><td>Apply next</td><td>Strong / Possible · verified · still open · not yet applied.</td></tr>
   </table>
 
-  <h2 id="applymode">Apply modes</h2>
-  <p>Apply mode tells you how a posting can be filled. It's inferred from the source (the ATS the posting lives on) and can be overridden per row.</p>
+  <h2 id="applymode">Ways to apply</h2>
+  <p>This tells you how a posting can be filled. It's inferred from the source (the ATS the posting lives on) and can be overridden per row.</p>
   <table>
     <tr><th>Mode</th><th>Meaning</th></tr>
     <tr><td><span class="key">fillable</span></td><td>A public ATS (Greenhouse, Ashby, Lever, Workable, SmartRecruiters, Recruitee, Personio, Teamtailor) — the apply-assist can pre-fill the form.</td></tr>
@@ -108,22 +114,22 @@
   </table>
 
   <h2 id="sources">Sources &amp; source health</h2>
-  <p>The scout polls public board APIs for the companies on your watchlist. In <b>Settings → Sources</b> you can enable/disable each source and add a company by pasting a careers URL (the detector recognizes the ATS automatically).</p>
-  <p><b>Source health</b> reports, per source, the result of the most recent scout run:</p>
+  <p>Reqon polls public board APIs for the companies on your watchlist. In <b>Settings → What you’re looking for</b> you can enable/disable each source and add a company by pasting a careers URL (the detector recognizes the ATS automatically).</p>
+  <p><b>Source health</b> reports, per source, the result of the most recent check:</p>
   <table>
     <tr><th>Number</th><th>What it tells you</th></tr>
-    <tr><td>Matches</td><td><b>The number that matters</b> — roles that cleared your fit/tier bar and were added.</td></tr>
+    <tr><td>Matches</td><td><b>The number that matters</b> — roles that cleared your fit / match-strength bar and were added.</td></tr>
     <tr><td>Errors</td><td>Parse/API failures last run. Anything &gt; 0 means that source needs attention.</td></tr>
     <tr><td>Companies / Postings</td><td>How many companies were polled and how many raw postings were scanned — process telemetry, useful when debugging a quiet source.</td></tr>
   </table>
 
   <h2 id="safety">Data safety &amp; deleted rows</h2>
   <p>Every board save snapshots the previous data first, and corruption-shaped saves (an empty save over a full store, or one that drops a large share of rows) are refused.</p>
-  <p><b>Deleted rows are recoverable.</b> When you delete a row it isn't erased — it's hidden and marked deleted, so the deletion still syncs to your other devices instead of the row reappearing. "Purge" permanently removes those hidden rows (after a snapshot). <span class="dim">(Internally these hidden rows are called "tombstones" — the database term for a soft-delete marker.)</span></p>
+  <p><b>Deleted rows are recoverable.</b> When you delete a row it isn't erased — it's hidden and marked deleted, so the deletion still syncs to your other devices instead of the row reappearing. "Purge" permanently removes those hidden rows (after a snapshot). <span class="dim">(Internally they're kept as a soft-delete marker so the deletion syncs across devices instead of the row reappearing.)</span></p>
 
   <h2 id="integrations">Integrations</h2>
   <h3>Job aggregators — TheirStack &amp; Apify (Fantastic.jobs)</h3>
-  <p>These are optional paid third-party APIs that reach the gated ATSes (Workday, iCIMS, etc.) the scout can't poll directly. Each needs an API key (free trial tiers exist; real volume is paid). Add keys under <b>Settings → Advanced</b>. Both stay inert until a key is present — they never block a scout or digest run.</p>
+  <p>These are optional paid third-party APIs that reach the gated ATSes (Workday, iCIMS, etc.) Reqon can't poll directly. Each needs an API key (free trial plans exist; real volume is paid). Add keys under <b>Settings → Account &amp; data</b>. Both stay inert until a key is present — they never block a check or digest run.</p>
   <h3>iOS push (APNs)</h3>
   <p>Push to the iOS app uses token-based Apple Push Notification service, which requires an Apple Developer account. You provide:</p>
   <table>
@@ -135,9 +141,15 @@
     <tr><td>Environment</td><td><code>sandbox</code> for dev / Expo Go / TestFlight builds; <code>production</code> for App Store builds.</td></tr>
   </table>
   <h3>Remote access (HTTPS)</h3>
-  <p>iOS blocks plaintext HTTP, so connecting from outside your LAN needs HTTPS via Tailscale Funnel or Caddy. Set your public hostname under <b>Settings → Advanced → Remote access URL</b> and the pairing QR will use it.</p>
+  <p>iOS blocks plaintext HTTP, so connecting from outside your LAN needs HTTPS via Tailscale Funnel or Caddy. Set your public hostname under <b>Settings → Account &amp; data → Remote access URL</b> and the pairing QR will use it.</p>
 
   <div class="card" style="margin-top:30px"><a class="back" href="/">← Back to board</a></div>
 </div>
+<script>
+  // Match the board's persisted light/dark choice (dark default).
+  fetch('/api/settings',{cache:'no-store'}).then(r=>r.json())
+    .then(j=>{document.documentElement.dataset.theme=(j&&(j.theme==='light'||j.theme==='dark'))?j.theme:'dark';})
+    .catch(()=>{});
+</script>
 </body>
 </html>

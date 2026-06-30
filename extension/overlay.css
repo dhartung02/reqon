@@ -1,61 +1,100 @@
-/* Reqon on-page overlay — "Emerald Command" palette (matches the board UI + popup, see BRAND.md §3). */
-.jpcrm-box{position:fixed;right:16px;bottom:16px;z-index:2147483647;width:300px;
-  background:#151b23;color:#e8eef5;border:1px solid #28323d;border-radius:12px;
-  box-shadow:0 12px 32px -16px rgba(0,0,0,.55);font:13px/1.4 -apple-system,system-ui,sans-serif;padding:11px 13px}
-.jpcrm-box *{box-sizing:border-box}
-.jpcrm-row{display:flex;align-items:center;gap:8px}
-.jpcrm-logo{font-weight:700;font-size:.62rem;letter-spacing:.26em;text-transform:uppercase;color:#00df8f}
-.jpcrm-status{flex:1;color:#aab6c2;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.jpcrm-x{background:none;border:0;color:#8a96a3;font-size:1.1rem;cursor:pointer;line-height:1;padding:0 2px}
-.jpcrm-x:hover{color:#e8eef5}
-.jpcrm-body{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:9px}
-.jpcrm-tier{font-weight:700;font-size:.62rem;padding:2px 7px;border-radius:6px}
-.jpcrm-tA{background:#00df8f;color:#08130d}.jpcrm-tB{background:#79a6e0;color:#0e1217}.jpcrm-tC{background:#2a3540;color:#aab6c2}
-.jpcrm-metric{font-family:ui-monospace,monospace;font-size:.72rem;color:#aab6c2}
-.jpcrm-ev{color:#c8ff49;font-weight:700}
-.jpcrm-pill{font-size:.7rem;padding:3px 9px;border-radius:7px;border:1px solid #333c47;color:#aab6c2}
-.jpcrm-btn{margin-top:4px;flex-basis:100%;background:transparent;border:1px solid #3a4550;color:#e8eef5;
-  border-radius:8px;padding:7px 10px;font-size:.8rem;cursor:pointer;font-family:inherit}
-.jpcrm-btn:hover{border-color:#00df8f}
-.jpcrm-btn:disabled{opacity:.6;cursor:default}
-.jpcrm-primary{background:#00df8f;color:#08130d;border-color:#00df8f;font-weight:700}
-.jpcrm-primary:hover{border-color:#00df8f}
-.jpcrm-toast{margin-top:8px;background:#16240f;border:1px solid #345a32;color:#69c57e;border-radius:8px;padding:7px 10px;font-size:.78rem}
-.jpcrm-toast.jpcrm-warn{background:#2f1a16;border-color:#54322b;color:#e8755f}
-/* fillability hint (P1.11) */
-.jpcrm-fill{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:.74rem;color:#aab6c2;cursor:default}
-.jpcrm-fill-dot{width:8px;height:8px;border-radius:50%;background:#5a6470;flex:0 0 auto}
-.jpcrm-fl-ok .jpcrm-fill-dot{background:#00df8f}.jpcrm-fl-ok{color:#69c57e}
-.jpcrm-fl-mid .jpcrm-fill-dot{background:#c8ff49}.jpcrm-fl-mid{color:#bcd86b}
-.jpcrm-fl-warn .jpcrm-fill-dot{background:#e8755f}.jpcrm-fl-warn{color:#e8a08f}
-.jpcrm-fl-dim .jpcrm-fill-dot{background:#5a6470}
-/* clip confirmation panel (P1.10/P1.12) */
-.jpcrm-clip{flex-basis:100%;display:flex;flex-direction:column;gap:7px}
-.jpcrm-clip-h{font-weight:600;font-size:.82rem;color:#e8eef5}
-.jpcrm-clip-conf{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.jpcrm-c-hi{color:#00df8f}.jpcrm-c-mid{color:#c8ff49}.jpcrm-c-lo{color:#e8755f}
-.jpcrm-clip-meta{font-size:.74rem;color:#aab6c2}
-.jpcrm-clip-warn{color:#e8a08f}
-.jpcrm-in{width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #333c47;color:#e8eef5;border-radius:7px;padding:6px 8px;font:inherit;font-size:.78rem}
-.jpcrm-in:focus{outline:none;border-color:#00df8f}
-.jpcrm-clip-acts{display:flex;gap:7px}
-.jpcrm-clip-acts .jpcrm-btn{margin-top:2px;flex:1}
-/* autofill summary (P1.13) */
-.jpcrm-summary{margin-top:9px;border-top:1px solid #28323d;padding-top:9px;flex-basis:100%}
-.jpcrm-sum-line{font-size:.76rem;color:#aab6c2;padding:2px 0}
-.jpcrm-sum-line.jpcrm-ok{color:#69c57e}
-.jpcrm-sum-line.jpcrm-warn-line{color:#e8755f}
-.jpcrm-sum-line.jpcrm-dim{color:#7c8794;font-style:italic}
+/* Reqon on-page overlay — "Emerald Command" palette (matches the board UI, popup + side panel).
+   The content script sets one of jpcrm-system / jpcrm-light / jpcrm-dark on the box from the saved
+   appearance preference (chrome.storage.sync "theme"), so the overlay follows the same switch as the
+   rest of the extension. Dark is the base; light tokens apply for jpcrm-light, and for jpcrm-system
+   the prefers-color-scheme media query decides. Fonts are bundled + @font-face'd locally (MV3 content
+   scripts can't rely on remote fonts). */
+@font-face{font-family:"Reqon Fraunces";src:url(fonts/Fraunces.ttf) format("truetype");font-weight:400 900;font-display:swap}
+@font-face{font-family:"Reqon Spline";src:url(fonts/SplineSans.ttf) format("truetype");font-weight:300 700;font-display:swap}
+@font-face{font-family:"Reqon Spline Mono";src:url(fonts/SplineSansMono.ttf) format("truetype");font-weight:400 700;font-display:swap}
+
+/* dark tokens — the base (also covers forced jpcrm-dark) */
+.jpcrm-box{
+  --bg:#16181C;--fg:#E2E8F0;--fg2:#94A3B8;--mut:#64748B;--ln:#2E3741;--ln2:#232A31;--el2:#1B1F25;
+  --em:#00E5A3;--am:#FFB800;--co:#F87171;--info:#79A6E0;--ink:#06211a;--ring:rgba(255,255,255,.04);
+  --tier:var(--em);
+  position:fixed;right:14px;bottom:14px;z-index:2147483647;width:262px;
+  background:var(--bg);color:var(--fg);border:1px solid var(--ln);border-radius:13px;
+  box-shadow:0 18px 40px -18px rgba(0,0,0,.6);
+  font:13px/1.4 "Reqon Spline",-apple-system,system-ui,sans-serif;padding:13px}
+/* light tokens — forced light */
+.jpcrm-box.jpcrm-light{
+  --bg:#FFFFFF;--fg:#0B1220;--fg2:#475569;--mut:#7C8A9C;--ln:#D3DBE5;--ln2:#E3E8EF;--el2:#EEF2F7;
+  --em:#00936B;--am:#B45309;--co:#DC2626;--info:#3B6FB0;--ink:#FFFFFF;--ring:rgba(2,12,27,.04)}
+/* system mode — follow the OS */
 @media (prefers-color-scheme: light){
-  .jpcrm-box{background:#fff;color:#1a1f29;border-color:#d0d1d8}
-  .jpcrm-status,.jpcrm-metric,.jpcrm-pill{color:#5a5d77}
-  .jpcrm-logo{color:#00936b}
-  .jpcrm-ev{color:#3f7a00}
-  /* The ghost (outline) buttons need a dark label on the white card — was near-white = invisible. */
-  .jpcrm-btn{color:#1a1f29;border-color:#d0d1d8}
-  .jpcrm-primary{background:#00df8f;color:#08130d;border-color:#00df8f}
-  .jpcrm-clip-h{color:#1a1f29}
-  .jpcrm-clip-meta,.jpcrm-fill,.jpcrm-sum-line{color:#5a5d77}
-  .jpcrm-in{background:#f4f6f9;border-color:#d0d1d8;color:#1a1f29}
-  .jpcrm-summary{border-top-color:#d0d1d8}
+  .jpcrm-box.jpcrm-system{
+    --bg:#FFFFFF;--fg:#0B1220;--fg2:#475569;--mut:#7C8A9C;--ln:#D3DBE5;--ln2:#E3E8EF;--el2:#EEF2F7;
+    --em:#00936B;--am:#B45309;--co:#DC2626;--info:#3B6FB0;--ink:#FFFFFF;--ring:rgba(2,12,27,.04)}
 }
+
+/* Defend against host-page CSS bleed. This overlay is injected into arbitrary job sites, some of
+   which ship aggressive resets (e.g. `div{line-height:0}`) that collapse our text rows so they
+   overlap. Re-assert the properties hostile resets commonly clobber; `.jpcrm-box *` (specificity
+   0,1,0) beats bare `div`/`*` host rules, and our component rules below (equal specificity, later)
+   still override where they set these intentionally. */
+.jpcrm-box, .jpcrm-box *{
+  box-sizing:border-box; line-height:1.4; letter-spacing:normal; text-transform:none;
+  text-align:left; text-indent:0; white-space:normal; word-spacing:normal; font-style:normal;
+  vertical-align:baseline; float:none; max-width:none; min-width:0; min-height:0;
+  text-shadow:none; transform:none}
+.jpcrm-box.jpcrm-tA{--tier:var(--em)}.jpcrm-box.jpcrm-tB{--tier:var(--info)}.jpcrm-box.jpcrm-tC{--tier:var(--mut)}
+.jpcrm-row{display:flex;align-items:center;gap:8px}
+.jpcrm-logo{font-family:"Reqon Spline Mono",ui-monospace,monospace;font-weight:600;font-size:.54rem;letter-spacing:.22em;text-transform:uppercase;color:var(--em)}
+.jpcrm-status{flex:1;color:var(--fg2);font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jpcrm-x{background:none;border:0;color:var(--mut);font-size:1rem;cursor:pointer;line-height:1;padding:0 2px}
+.jpcrm-x:hover{color:var(--fg)}
+.jpcrm-body{margin-top:11px}
+.jpcrm-body>*{margin-top:11px}.jpcrm-body>*:first-child{margin-top:0}
+
+/* the signature score circle (replaces the old .jpcrm-tier badge) */
+.jpcrm-score{display:flex;align-items:center;gap:11px}
+.jpcrm-circle{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+  background:var(--ring);border:2px solid var(--tier)}
+.jpcrm-circle span{font-family:"Reqon Fraunces",Georgia,serif;font-weight:600;font-size:1rem;color:var(--tier)}
+.jpcrm-score-main{flex:1;min-width:0}
+.jpcrm-match{font-family:"Reqon Spline Mono",ui-monospace,monospace;font-weight:600;font-size:.5rem;letter-spacing:.06em;text-transform:uppercase;color:var(--tier)}
+.jpcrm-metrics{display:flex;gap:9px;margin-top:4px;font-family:"Reqon Spline Mono",ui-monospace,monospace;font-size:.7rem;color:var(--fg2)}
+.jpcrm-metrics b{color:var(--fg);font-weight:700}
+.jpcrm-metrics .jpcrm-ev,.jpcrm-metrics .jpcrm-ev b{color:var(--em)}
+
+/* legacy tier badge / metric / pill — kept for any older code paths, retoken'd */
+.jpcrm-tier{font-weight:700;font-size:.62rem;padding:2px 7px;border-radius:6px}
+.jpcrm-tA-badge{background:var(--em);color:var(--ink)}.jpcrm-tB-badge{background:var(--info);color:var(--bg)}.jpcrm-tC-badge{background:var(--el2);color:var(--fg2)}
+.jpcrm-metric{font-family:"Reqon Spline Mono",ui-monospace,monospace;font-size:.72rem;color:var(--fg2)}
+.jpcrm-ev{color:var(--em);font-weight:700}
+.jpcrm-pill{font-size:.7rem;padding:3px 9px;border-radius:7px;border:1px solid var(--ln);color:var(--fg2)}
+
+.jpcrm-btn{display:block;width:100%;background:transparent;border:1px solid var(--ln);color:var(--fg);
+  border-radius:9px;padding:8px 10px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit}
+.jpcrm-btn:hover{border-color:var(--em)}
+.jpcrm-btn:disabled{opacity:.6;cursor:default}
+.jpcrm-primary{background:var(--em);color:var(--ink);border-color:var(--em);font-weight:700}
+.jpcrm-primary:hover{border-color:var(--em)}
+.jpcrm-foot{font-size:.68rem;color:var(--mut);text-align:center}
+.jpcrm-toast{background:var(--ring);border:1px solid var(--em);color:var(--em);border-radius:8px;padding:7px 10px;font-size:.78rem}
+.jpcrm-toast.jpcrm-warn{border-color:var(--co);color:var(--co)}
+/* fillability hint (P1.11) */
+.jpcrm-fill{display:flex;align-items:center;gap:7px;font-size:.74rem;color:var(--fg2);cursor:default}
+.jpcrm-fill-dot{width:7px;height:7px;border-radius:50%;background:var(--mut);flex:0 0 auto}
+.jpcrm-fl-ok .jpcrm-fill-dot{background:var(--em)}.jpcrm-fl-ok{color:var(--em)}
+.jpcrm-fl-mid .jpcrm-fill-dot{background:var(--am)}.jpcrm-fl-mid{color:var(--am)}
+.jpcrm-fl-warn .jpcrm-fill-dot{background:var(--co)}.jpcrm-fl-warn{color:var(--co)}
+.jpcrm-fl-dim .jpcrm-fill-dot{background:var(--mut)}
+/* clip confirmation panel (P1.10/P1.12) */
+.jpcrm-clip{display:flex;flex-direction:column;gap:7px}
+.jpcrm-clip-h{font-weight:600;font-size:.82rem;color:var(--fg)}
+.jpcrm-clip-conf{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.jpcrm-c-hi{color:var(--em)}.jpcrm-c-mid{color:var(--am)}.jpcrm-c-lo{color:var(--co)}
+.jpcrm-clip-meta{font-size:.74rem;color:var(--fg2)}
+.jpcrm-clip-warn{color:var(--co)}
+.jpcrm-in{width:100%;box-sizing:border-box;background:var(--el2);border:1px solid var(--ln);color:var(--fg);border-radius:7px;padding:6px 8px;font:inherit;font-size:.78rem}
+.jpcrm-in:focus{outline:none;border-color:var(--em)}
+.jpcrm-clip-acts{display:flex;gap:7px}
+.jpcrm-clip-acts .jpcrm-btn{flex:1}
+/* autofill summary (P1.13) */
+.jpcrm-summary{border-top:1px solid var(--ln2);padding-top:9px}
+.jpcrm-sum-line{font-size:.76rem;color:var(--fg2);padding:2px 0}
+.jpcrm-sum-line.jpcrm-ok{color:var(--em)}
+.jpcrm-sum-line.jpcrm-warn-line{color:var(--co)}
+.jpcrm-sum-line.jpcrm-dim{color:var(--mut);font-style:italic}

@@ -446,7 +446,7 @@
   .am.simplify{color:var(--violet);border-color:#3b3160}
   .am.gated{color:var(--gold);border-color:#5a4a1e}
   .am.manual{color:var(--text-2)}
-  .ammap{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;max-height:220px;overflow:auto}
+  .ammap{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px}
   .ammap .amrow{display:flex;align-items:center;gap:8px;font-size:.8rem}
   .ammap .amrow span{flex:1;color:var(--text-2)}
   .ammap .amrow select{flex:none;width:auto;padding:5px 8px;font-size:.78rem}
@@ -467,6 +467,8 @@
   /* read-only display cards (work history / education) + per-section edit toggle */
   .sgrp-h .grp-edit{margin-left:auto;background:none;border:0;color:var(--accent);font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;padding:0}
   .sgrp-h .grp-edit:hover{text-decoration:underline}
+  .summaryview{color:var(--text);font-size:.9rem;line-height:1.62;white-space:pre-wrap}
+  .summaryview.empty{color:var(--dim)}
   .histcard{background:var(--bg);border:1px solid var(--line-2);border-radius:12px;padding:13px 16px;margin-bottom:8px}
   .histcard:last-child{margin-bottom:0}
   .histcard .hc-role{font-weight:700;color:var(--text);font-size:.95rem}
@@ -744,6 +746,21 @@
   .field{margin-bottom:12px}
   .field label{display:block;font-size:.7rem;letter-spacing:.03em;text-transform:uppercase;color:var(--text-2);margin-bottom:5px}
   .field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:.86rem;outline:none}
+  /* auto-grow textareas so the whole list is visible (no inner scroll) */
+  .field textarea.ag{resize:none;overflow:hidden;min-height:62px}
+  .dh-hidden{display:none!important}   /* deployment-mode (Cloud/Server) visibility — see applyDeploymentVisibility() */
+  /* desired-salary dual-range slider */
+  .salslider{position:relative;height:30px;display:flex;align-items:center;margin-top:8px}
+  .salslider .sal-fill{position:absolute;height:4px;border-radius:2px;background:var(--accent);top:50%;transform:translateY(-50%);pointer-events:none}
+  .salslider input[type=range]{position:absolute;left:0;width:100%;height:30px;margin:0;padding:0;border:0;background:transparent;-webkit-appearance:none;appearance:none;pointer-events:none}
+  .salslider input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line-2)}
+  .salslider input[type=range]:last-of-type::-webkit-slider-runnable-track{background:transparent}
+  .salslider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.3);margin-top:-7px;cursor:pointer}
+  .salslider input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line-2)}
+  .salslider input[type=range]::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);cursor:pointer}
+  .salslider.saloff{opacity:.4;pointer-events:none}
+  .salignore{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.8rem;color:var(--text-2);text-transform:none;letter-spacing:0;cursor:pointer}
+  .salignore input{width:auto}
   .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gold)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
@@ -858,7 +875,7 @@
       </div>
       <button class="infobtn" id="aboutBtn" title="About this board" aria-label="About this board">i</button>
       <div class="about-pop" id="aboutPop">
-        <p><b>Reqon — your self-hosted job-search home base.</b> Live jobs grouped by match strength, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
+        <p><b>Reqon — your job-search home base.</b> Live jobs grouped by match strength, each carrying a fit score, interview-probability estimate, salary, link-confidence, and a full tracking layer (status, dates, recruiter, referral, resume version, follow-ups, next action).</p>
         <p><b>Fit</b> = domain / résumé match. <b>Interview probability</b> = odds of landing a screen, kept separate from fit. <b>Expected value</b> = fit × probability — your apply-effort allocator. <b>Match strength</b> (Strong / Possible / Long shot) is set by expected value.</p>
         <p>Every edit saves server-side and persists. Use <b>Find new jobs</b> to pull fresh roles from board APIs, and the <b>Today</b> tab for what needs you.</p>
         <p style="margin-top:10px"><a href="/guide" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">Open the full user guide ↗</a></p>
@@ -1231,7 +1248,8 @@
         <button data-sect="looking"><span class="snav-i">🎯</span><span class="snav-t">What you’re looking for<small>Roles, pay, where jobs come from</small></span></button>
         <button data-sect="works"><span class="snav-i">⚙️</span><span class="snav-t">How Reqon works for you<small>Ranking, applying, AI help</small></span></button>
         <button data-sect="updates"><span class="snav-i">🔔</span><span class="snav-t">Updates &amp; alerts<small>Daily summary &amp; where it goes</small></span></button>
-        <button data-sect="account"><span class="snav-i">🗄️</span><span class="snav-t">Account &amp; data<small>Backups, connections, team</small></span></button>
+        <button data-sect="account"><span class="snav-i">🗄️</span><span class="snav-t">Account &amp; data<small>Backups &amp; connections</small></span></button>
+        <button data-sect="admin" data-show="admin"><span class="snav-i">🛡️</span><span class="snav-t">Team &amp; admin<small>Users, server, environment</small></span></button>
       </nav>
       <div class="settings-content" id="settingsContent">
 
@@ -1267,27 +1285,32 @@
             <div class="sgrp-h">Thresholds</div>
             <div class="grid2">
               <div class="field"><label>Min fit to add (0–10)</label><input id="setMinFit" type="number" min="0" max="10" step="0.1"></div>
-              <div class="field"><label>Min tier to add</label><select id="setMinTier"><option value="A">A only</option><option value="B">A &amp; B</option><option value="C">A, B &amp; C (all)</option></select></div>
+              <div class="field"><label>Min tier to add</label><select id="setMinTier"><option value="A">Strong only</option><option value="B">Strong &amp; Possible</option><option value="C">Everything</option></select></div>
             </div>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="setRemoteOnly" type="checkbox" style="width:auto"> Remote-only (drop on-site)</label></div>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Desired salary</div>
-            <div class="grid2">
-              <div class="field"><label>Minimum acceptable (USD)</label><input id="setSalaryFloor" type="number" min="0" max="2000000" step="5000" placeholder="e.g. 200000"></div>
-              <div class="field"><label>Target / ideal (USD)</label><input id="setSalaryTarget" type="number" min="0" max="2000000" step="5000" placeholder="e.g. 260000"></div>
+            <div class="field">
+              <label>Range you’ll consider <span class="setmuted" id="salReadout"></span></label>
+              <div class="salslider">
+                <div class="sal-fill" id="salFill"></div>
+                <input id="setSalaryFloor" type="range" min="20000" max="1000000" step="10000" value="20000" aria-label="Minimum acceptable salary">
+                <input id="setSalaryTarget" type="range" min="20000" max="1000000" step="10000" value="20000" aria-label="Target salary">
+              </div>
+              <label class="salignore"><input id="setSalaryIgnore" type="checkbox"> Don’t filter by salary</label>
             </div>
-            <p class="hint" style="margin:8px 0 0">Scores salary fit against the <b>top</b> of each posting's range. At/above target = small fit bonus; at/above the minimum = neutral; below = a fit penalty that scales (well-below roles can drop out). Roles with no posted comp are never penalized. Leave both at 0 to ignore salary. <a href="/guide#scores" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">How fit works ↗</a></p>
+            <p class="hint" style="margin:8px 0 0">Scores salary fit against the <b>top</b> of each posting's range. At/above target = small fit bonus; at/above the minimum = neutral; below = a fit penalty that scales (well-below roles can drop out). Roles with no posted comp are never penalized. Tick <b>Don’t filter by salary</b> to ignore pay entirely. <a href="/guide#scores" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">How fit works ↗</a></p>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Titles &amp; keywords</div>
-            <div class="field"><label>Title bands (one per line)</label><textarea id="setTitles" rows="4"></textarea></div>
-            <div class="field"><label>Domain keywords (one per line)</label><textarea id="setKeywords" rows="5"></textarea></div>
+            <div class="field"><label>Title bands (one per line)</label><textarea id="setTitles" class="ag" rows="3"></textarea></div>
+            <div class="field"><label>Domain keywords (one per line)</label><textarea id="setKeywords" class="ag" rows="3"></textarea></div>
             <div class="grid2">
-              <div class="field"><label>Skip employment types (one per line)</label><textarea id="setSkipTypes" rows="4" placeholder="contract&#10;intern&#10;associate"></textarea></div>
-              <div class="field"><label>Blockers / negative keywords (one per line)</label><textarea id="setNegKw" rows="4" placeholder="crypto&#10;on-call&#10;clearance required"></textarea></div>
+              <div class="field"><label>Skip employment types (one per line)</label><textarea id="setSkipTypes" class="ag" rows="3" placeholder="contract&#10;intern&#10;associate"></textarea></div>
+              <div class="field"><label>Blockers / negative keywords (one per line)</label><textarea id="setNegKw" class="ag" rows="3" placeholder="crypto&#10;on-call&#10;clearance required"></textarea></div>
             </div>
-            <p class="hint" style="margin:8px 0 0">Employment types match the role title and are dropped. Blockers demote a match (−2 fit each) so heavy hits fall below your min-fit / min-tier; light hits just rank lower.</p>
+            <p class="hint" style="margin:8px 0 0">Employment types match the role title and are dropped. Blockers demote a match (−2 fit each) so heavy hits fall below your min-fit / match-strength bar; light hits just rank lower.</p>
           </div>
         </section>
 
@@ -1314,9 +1337,11 @@
             </div>
           </div>
           <div class="sgrp">
-            <div class="sgrp-h">Professional summary <button class="mini" id="draftSummaryBtn" data-feature="profile_summary" type="button" style="margin-left:auto">✨ AI draft from résumé</button></div>
-            <div class="field"><textarea id="profSummary" rows="4" placeholder="A 2–4 sentence positioning statement. Used in cover notes and as application 'about me' text. Leave blank and click AI draft to generate one from your résumé."></textarea>
-              <span id="summaryMsg" class="setmuted"></span>
+            <div class="sgrp-h">Professional summary <button class="grp-edit" id="summaryEditToggle" type="button">Edit</button></div>
+            <div id="profSummaryView" class="summaryview"></div>
+            <div class="field summaryedit-only" id="summaryEditWrap" style="display:none">
+              <textarea id="profSummary" rows="6" placeholder="A 2–4 sentence positioning statement. Used in cover notes and as application 'about me' text. Leave blank and click AI draft to generate one from your résumé."></textarea>
+              <div class="ahintrow" style="margin-top:6px"><button class="mini" id="draftSummaryBtn" data-feature="profile_summary" type="button">✨ AI draft from résumé</button> <span id="summaryMsg" class="setmuted"></span></div>
             </div>
           </div>
           <details class="sgrp adv">
@@ -1414,9 +1439,9 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="works" hidden>
+        <section class="sset" data-sect="works" hidden data-show="server-or-admin">
           <div class="ssh">AI assistant</div>
-          <p class="ssd">The OpenAI model and budget for re-scoring jobs, plus the per-job draft assistant. API keys live under Account &amp; data.</p>
+          <p class="ssd">The OpenAI model and budget for re-scoring jobs, plus the per-job draft assistant. API keys live under Account &amp; data. On Reqon Cloud these are platform settings managed by an admin — your AI features are governed by your plan.</p>
           <div class="sgrp">
             <div class="sgrp-h">Re-scoring jobs</div>
             <div class="field"><label>OpenAI model</label><select id="setModel"></select></div>
@@ -1524,8 +1549,8 @@
               <div class="field"><label>Look-back (days)</label><input id="mailSince" type="number" min="1" max="90" step="1" placeholder="14"></div>
             </div>
             <div class="field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0"><input id="mailAi" type="checkbox" style="width:auto"> Use AI for ambiguous emails (server OpenAI key)</label></div>
-            <div class="ahintrow"><button class="mini" id="mailSaveBtn" type="button">Save</button> <button class="mini" id="mailConnTestBtn" type="button">🔌 Test connection</button> <button class="mini" id="mailTestBtn" type="button">Test (dry run)</button> <button class="mini" id="mailRunBtn" type="button">▶ Run now</button> <button class="mini danger" id="mailClearBtn" type="button">Clear credentials</button> <span id="mailStatus" class="setmuted"></span></div>
-            <p class="hint" style="margin:6px 0 0"><b>Test connection</b> just checks your Gmail login works (shared by both this and the email job finder) — use it to verify setup. <b>Test (dry run)</b> previews recruiter-response matching without changing anything.</p>
+            <div class="ahintrow"><button class="mini" id="mailSaveBtn" type="button">Save</button> <button class="mini" id="mailConnTestBtn" type="button">🔌 Test connection</button> <button class="mini" id="mailRunBtn" type="button">▶ Run now</button> <button class="mini danger" id="mailClearBtn" type="button">Clear credentials</button> <span id="mailStatus" class="setmuted"></span></div>
+            <p class="hint" style="margin:6px 0 0"><b>Test connection</b> just checks your Gmail login works (shared by both this and the email job finder) — use it to verify setup. <b>Run now</b> scans for recruiter replies and updates the board.</p>
             <pre id="mailReport" class="mailreport" style="display:none"></pre>
             <div class="field" style="margin-top:12px"><label>Notify me when ingest detects…</label>
               <div class="statuschips" id="mailNotifyKinds" style="margin-bottom:8px">
@@ -1547,7 +1572,7 @@
               <div class="field"><label>Limit to sources (optional)</label><input id="emailScoutSources" type="text" placeholder="e.g. linkedin,indeed (blank = all)" autocomplete="off"></div>
               <div class="field"><label>Min fit to add (optional)</label><input id="emailScoutMinFit" type="number" min="0" max="10" step="0.5" placeholder="from watchlist (e.g. 6)"></div>
             </div>
-            <div class="ahintrow"><button class="mini" id="emailScoutSaveBtn" type="button">Save</button> <button class="mini" id="emailScoutTestBtn" type="button">Test (dry run)</button> <button class="mini" id="emailScoutRunBtn" type="button">▶ Run now</button> <span id="emailScoutStatus" class="setmuted"></span></div>
+            <div class="ahintrow"><button class="mini" id="emailScoutSaveBtn" type="button">Save</button> <button class="mini" id="emailScoutRunBtn" type="button">▶ Run now</button> <span id="emailScoutStatus" class="setmuted"></span></div>
             <pre id="emailScoutReport" class="mailreport" style="display:none"></pre>
           </div>
         </section>
@@ -1580,9 +1605,9 @@
           </div>
         </section>
 
-        <section class="sset" data-sect="account" id="usersNavBtn" hidden style="display:none">
-          <div class="ssh">Admin console</div>
-          <p class="ssd">Who's on this server, what they're using, and how the box is doing. Each user has a fully separate board, profile, settings, and job finder. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the server's OpenAI account (you pay); otherwise they add their own.</p>
+        <section class="sset" data-sect="admin" id="usersNavBtn" hidden data-show="admin">
+          <div class="ssh">Team &amp; admin</div>
+          <p class="ssd">Who's on this deployment, what they're using, and how the server is doing. Each user has a fully separate board, profile, settings, and job finder. <b>API keys are per-user</b> — grant <em>shared key</em> to let a user run AI on the deployment's OpenAI account (you pay); otherwise they add their own.</p>
           <div class="sgrp">
             <div class="sgrp-h">Server</div>
             <div id="adminServer" class="adminstats"><div class="setmuted" style="padding:8px">loading…</div></div>
@@ -1604,6 +1629,11 @@
             <div class="ahintrow"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.82rem"><input id="nuWelcome" type="checkbox" checked style="width:auto"> Send a welcome email (needs SMTP configured + an email above)</label></div>
             <div class="ahintrow"><button class="btn" id="nuAddBtn" type="button">Create user</button> <span id="usersMsg" class="setmsg"></span></div>
           </div>
+          <div class="sgrp" data-show="server">
+            <div class="sgrp-h">Environment variables <button class="mini" id="refreshEnvBtn" type="button" style="margin-left:auto">↻ refresh</button></div>
+            <p class="sgrp-d">Everything Reqon Server reads from <code>.env</code>, in one place. Non-secret values are shown; secrets show only set/last-4 (edit secrets in their own fields under Account &amp; data). The common knobs are editable under AI assistant / Digest / Workflow.</p>
+            <div id="envInventory" class="envinv"><div class="setmuted" style="padding:8px">loading…</div></div>
+          </div>
         </section>
 
         <section class="sset" data-sect="account" hidden>
@@ -1619,7 +1649,7 @@
               <div id="httpsStatus" class="httpsstat"><div class="setmuted">checking…</div></div>
             </div>
           </div>
-          <div class="sgrp">
+          <div class="sgrp" data-show="server">
             <div class="sgrp-h">Access tokens</div>
             <div class="tokrow"><span class="tokname">App passphrase</span><span id="appTokState" class="tokstate">—</span><span class="tokhint">full access</span></div>
             <div class="field" style="margin:6px 0 10px">
@@ -1634,7 +1664,7 @@
             <div id="ingestTokNew" class="toknew" style="display:none"></div>
             <p class="hint" style="margin:8px 0 0">The <b>ingest token</b> is scoped to <code>POST /api/reqs/merge</code> + <code>/quickadd</code> only — safe to hand an automation (ChatGPT Action). Send either it or the app passphrase as the <code>X-CRM-Token</code> header.</p>
           </div>
-          <div class="sgrp">
+          <div class="sgrp" data-show="server">
             <div class="sgrp-h">Remote access</div>
             <div class="field"><label>Remote access URL (HTTPS) <span id="remoteLanHint" class="setmuted"></span></label>
               <input id="setPublicUrl" type="text" placeholder="https://your-machine.tailnet.ts.net (blank = LAN only)" autocomplete="off">
@@ -1660,7 +1690,7 @@
               <div class="ahintrow"><button class="mini danger" id="clearTheirstackBtn" type="button">Clear TheirStack</button> <button class="mini danger" id="clearApifyBtn" type="button">Clear Apify</button></div>
             </div>
           </div>
-          <div class="sgrp">
+          <div class="sgrp" data-show="server">
             <div class="sgrp-h">APNs push (iOS) <span id="apnsState" class="setmuted" style="font-weight:400"></span></div>
             <p class="sgrp-d">Token-based APNs (.p8 key). From the Apple Developer portal: Keys → an APNs key (.p8) + its Key ID, your Team ID, and the app's Bundle ID (<code>com.reqon.app</code>). Paste the .p8 contents or give a server file path — the key is written 0600 and never sent back to the browser.</p>
             <div class="grid2">
@@ -1672,11 +1702,6 @@
             <div class="field"><label>.p8 key (paste contents, blank = keep) — or path below</label><textarea id="apnsKeyP8" rows="3" placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----" autocomplete="off" style="font-family:'Spline Sans Mono',monospace;font-size:.72rem"></textarea></div>
             <div class="field"><label>…or server path to the .p8</label><input id="apnsKeyPath" type="text" placeholder="agent/AuthKey_ABC123.p8 (relative to project root)"></div>
             <div class="ahintrow"><button class="mini" id="apnsSaveBtn" type="button">Save</button> <button class="mini" id="apnsTestBtn" type="button">Send test push</button> <button class="mini danger" id="apnsClearBtn" type="button">Clear APNs</button> <span id="apnsStatus" class="setmuted"></span></div>
-          </div>
-          <div class="sgrp">
-            <div class="sgrp-h">Environment variables <button class="mini" id="refreshEnvBtn" type="button" style="margin-left:auto">↻ refresh</button></div>
-            <p class="sgrp-d">Everything the server reads from <code>.env</code>, in one place. Non-secret values are shown; secrets show only set/last-4 (edit secrets in their own fields above). The common knobs are editable under AI assistant / Digest / Workflow.</p>
-            <div id="envInventory" class="envinv"><div class="setmuted" style="padding:8px">loading…</div></div>
           </div>
         </section>
 
@@ -1986,8 +2011,9 @@ window.openThankYou=function(i){
 // section key (or a new group key) to its group so existing deep-links keep working.
 const SECT_GROUP={
   sources:'looking', matching:'looking', profile:'profile', workflow:'works', ai:'works',
-  digest:'updates', data:'account', users:'account', advanced:'account',
-  looking:'looking', works:'works', updates:'updates', account:'account'
+  digest:'updates', data:'account', advanced:'account',
+  users:'admin', team:'admin', env:'admin', environment:'admin',
+  looking:'looking', works:'works', updates:'updates', account:'account', admin:'admin'
 };
 const settingsGroup=sect=>SECT_GROUP[sect]||sect;
 function openSettingsTo(sect){
@@ -3100,14 +3126,17 @@ function fillSettings(j){
   if(sa)sa.onchange=()=>{SET("setSources").querySelectorAll("input[data-src]").forEach(c=>{c.checked=sa.checked;});updateSourceCount();};
   updateSourceCount();
   SET("setMinFit").value=j.minFit;
-  SET("setSalaryFloor").value=j.salaryFloor?j.salaryFloor:"";
-  SET("setSalaryTarget").value=j.salaryTarget?j.salaryTarget:"";
+  {const sf=+j.salaryFloor||0, st=+j.salaryTarget||0, ignored=(sf<=0&&st<=0);
+   SET("setSalaryIgnore").checked=ignored;
+   SET("setSalaryFloor").value=ignored?20000:sf;   // range input auto-clamps into [20000, 1000000]
+   SET("setSalaryTarget").value=ignored?20000:st;}
   SET("setMinTier").value=["A","B","C"].includes(j.minTierToMerge)?j.minTierToMerge:"B";
   SET("setRemoteOnly").checked=!!j.remoteOnly;
   SET("setTitles").value=(j.titles||[]).join("\n");
   SET("setKeywords").value=(j.keywords||[]).join("\n");
   SET("setSkipTypes").value=(j.skipEmploymentTypes||[]).join("\n");
   SET("setNegKw").value=(j.negativeKeywords||[]).join("\n");
+  refreshSettingsUi();   // size the salary slider + auto-grow the textareas to their content
   populateModelSelects(j.llm.model||"", (j.assist&&j.assist.model)||"");
   SET("setKeyState").textContent=j.llm.keySet?`(set ••••${j.llm.keyLast4})`:"(not set)";
   SET("setKey").value="";
@@ -3217,9 +3246,58 @@ function applyTabMap(tm){
   if(rows.length)render();
 }
 async function fetchSettings(){return (await fetch("/api/settings",{cache:"no-store"})).json();}
+// ---- deployment-mode visibility (Reqon Cloud vs Reqon Server) -------------------------------
+// One declarative convention so the Cloud/Server divergence lives in markup, not scattered ifs.
+// Tag any settings element with data-show="server" | "admin" | "server-or-admin" | "cloud":
+//   server         → only on self-hosted Reqon Server (infra: passphrase, ingest token, APNs,
+//                     remote URL, env inventory). Hidden on hosted Reqon Cloud (provider-managed).
+//   admin          → only for an admin (Reqon Server owner is always admin; on Cloud, platform
+//                     admins). The Team & admin console.
+//   server-or-admin→ Reqon Server owner OR a Cloud admin (AI-assistant config). Cloud users keep
+//                     AI *features* gated by their plan, not these knobs.
+//   cloud          → only on hosted Reqon Cloud.
+// No attribute = shown everywhere. /api/me already exposes multiUser/role/plan — no server change.
+let DEPLOY={ server:true, cloud:false, admin:true, plan:{} };  // optimistic default = Reqon Server owner
+function applyDeploymentVisibility(){
+  const ok={ server:DEPLOY.server, cloud:DEPLOY.cloud, admin:DEPLOY.admin, 'server-or-admin':(DEPLOY.server||DEPLOY.admin) };
+  document.querySelectorAll('[data-show]').forEach(el=>{
+    const k=el.dataset.show; const vis=(k in ok)?ok[k]:true;
+    el.classList.toggle('dh-hidden', !vis);
+  });
+}
+async function loadDeploy(){
+  try{
+    const me=await (await fetch('/api/me',{cache:'no-store'})).json();
+    DEPLOY={ server:!me.multiUser, cloud:!!me.multiUser, admin:((me.user||{}).role)==='admin', plan:me.plan||{} };
+  }catch(e){ /* offline → keep optimistic Server defaults */ }
+  applyDeploymentVisibility();
+}
+loadDeploy();
+
+// ---- desired-salary dual slider + auto-grow textareas ----
+function salFmt(n){ n=+n||0; if(n<=0)return '$0'; if(n>=1000000)return '$1M'; return '$'+Math.round(n/1000)+'K'; }
+function salUpdate(){
+  const lo=SET('setSalaryFloor'), hi=SET('setSalaryTarget'); if(!lo||!hi)return;
+  const ign=SET('setSalaryIgnore'), ignored=!!(ign&&ign.checked);
+  let a=+lo.value||0, b=+hi.value||0;
+  if(a>b){ b=a; hi.value=String(a); }   // floor can't exceed target
+  const min=+lo.min||0, max=+lo.max||1000000, span=Math.max(1,max-min);
+  const fill=SET('salFill'); if(fill){ fill.style.left=((a-min)/span*100)+'%'; fill.style.width=(Math.max(0,b-a)/span*100)+'%'; }
+  lo.disabled=hi.disabled=ignored;
+  const sl=lo.closest('.salslider'); if(sl) sl.classList.toggle('saloff', ignored);
+  const ro=SET('salReadout'); if(ro) ro.textContent=ignored?'off — salary ignored':(salFmt(a)+' — '+salFmt(b));
+}
+function autogrow(el){ if(!el)return; el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+function refreshSettingsUi(){ salUpdate(); document.querySelectorAll('.field textarea.ag').forEach(autogrow); }
+(function salWire(){
+  const lo=SET('setSalaryFloor'), hi=SET('setSalaryTarget'), ign=SET('setSalaryIgnore');
+  if(lo&&hi)[lo,hi].forEach(r=>r.addEventListener('input',salUpdate));
+  if(ign) ign.addEventListener('change',salUpdate);
+  document.querySelectorAll('.field textarea.ag').forEach(t=>t.addEventListener('input',()=>autogrow(t)));
+})();
 function openSettings(){
   F("scoutMenu").classList.remove("open");
-  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();loadMailConfig();loadPushConfig();loadHttpsStatus();loadEnvInventory();})
+  fetchSettings().then(j=>{fillSettings(j);buildScoutSources(j);applyDeploymentVisibility();SET("settingsOverlay").classList.add("open");loadBackups();loadProfile();loadSourceHealth();loadMailConfig();loadHttpsStatus();if(DEPLOY.server){loadPushConfig();loadEnvInventory();}})
     .catch(()=>{SET("setMsg").className="setmsg err";SET("setMsg").textContent="Could not load settings.";SET("settingsOverlay").classList.add("open");});
 }
 
@@ -3333,8 +3411,8 @@ async function saveSettings(){
     disabledSources:[...SET("setSources").querySelectorAll("input[data-src]")].filter(c=>!c.checked).map(c=>c.dataset.src),
     remoteOnly:SET("setRemoteOnly").checked,
     minFit:parseFloat(SET("setMinFit").value)||0,
-    salaryFloor:parseInt(SET("setSalaryFloor").value,10)||0,
-    salaryTarget:parseInt(SET("setSalaryTarget").value,10)||0,
+    salaryFloor:(SET("setSalaryIgnore").checked?0:parseInt(SET("setSalaryFloor").value,10)||0),
+    salaryTarget:(SET("setSalaryIgnore").checked?0:parseInt(SET("setSalaryTarget").value,10)||0),
     minTierToMerge:SET("setMinTier").value,
     titles:SET("setTitles").value.split("\n").map(s=>s.trim()).filter(Boolean),
     keywords:SET("setKeywords").value.split("\n").map(s=>s.trim()).filter(Boolean),
@@ -3460,7 +3538,8 @@ SET("settingsNav").querySelectorAll("button[data-sect]").forEach(b=>b.onclick=()
   SET("settingsNav").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
   document.querySelectorAll(".sset").forEach(s=>s.hidden=(s.dataset.sect!==k));
   SET("settingsContent").scrollTop=0;
-  if(k==='account'){ const ub=SET('usersNavBtn'); if(ub&&ub.style.display!=='none')loadUsers(); }
+  refreshSettingsUi();   // re-grow now-visible textareas (scrollHeight is 0 while a section is hidden)
+  if(k==='admin' && DEPLOY.admin){ loadUsers(); }
 });
 // Settings stays open until you explicitly Save / Close / × — no click-outside dismissal (a stray
 // backdrop click used to drop the whole panel and lose your place). Esc still closes for keyboard users.
@@ -3525,7 +3604,13 @@ function fillEeo(e){
   });
 }
 function readEeo(){const e={};EEO_FIELDS.forEach(([id,key])=>{e[key]=SET(id).value;});return e;}
-let editKw=false, editWork=false, editEdu=false;   // profile sections default to read-only display
+let editKw=false, editWork=false, editEdu=false, editSummary=false;   // profile sections default to read-only display
+function renderSummaryView(){
+  const view=SET("profSummaryView"), ta=SET("profSummary"); if(!view||!ta)return;
+  const txt=(ta.value||"").trim();
+  view.classList.toggle("empty",!txt);
+  view.textContent=txt||"No summary yet — add one, or use AI draft from your résumé.";
+}
 function renderKeywords(){
   const box=SET("profKeywords");
   if(!PROFILE_KEYWORDS.length){box.innerHTML='<span class="setmuted">No skills yet — upload a résumé or add one below.</span>';return;}
@@ -3601,7 +3686,6 @@ async function mailConnTest(){
 }
 SET("mailSaveBtn").onclick=mailSave;
 SET("mailConnTestBtn").onclick=mailConnTest;
-SET("mailTestBtn").onclick=()=>mailRun(false);
 SET("mailRunBtn").onclick=()=>mailRun(true);
 // Canonical email-scout on/off lives in Sources → persist immediately on toggle (the global
 // "Save settings" only writes /api/settings; mail config saves via /api/mail/config).
@@ -3638,7 +3722,6 @@ async function emailScoutRun(apply){
   }catch(e){SET("emailScoutStatus").textContent="Failed: "+e.message;}
 }
 SET("emailScoutSaveBtn").onclick=mailSave;
-SET("emailScoutTestBtn").onclick=()=>emailScoutRun(false);
 SET("emailScoutRunBtn").onclick=()=>emailScoutRun(true);
 SET("mailClearBtn").onclick=async()=>{
   if(!confirm("Clear the saved Gmail address + app password on the server?"))return;
@@ -3691,7 +3774,7 @@ function fillProfile(p){
   SET("profName").value=a.name||""; SET("profEmail").value=a.email||""; SET("profPhone").value=a.phone||"";
   SET("profLinkedin").value=a.linkedin||""; SET("profLocation").value=a.location||"";
   SET("profGithub").value=a.github||p.github||"";
-  SET("profSummary").value=p.summary||"";
+  SET("profSummary").value=p.summary||""; renderSummaryView();
   SET("profSeniority").value=(p.seniority||[]).join(", ");
   SET("profRoleTerms").value=(p.roleTerms||[]).join(", ");
   SET("profIndustries").value=(p.industries||[]).join(", ");
@@ -3882,7 +3965,7 @@ SET("draftSummaryBtn").onclick=async()=>{
   try{
     const j=await (await fetch("/api/profile/draft-summary",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})})).json();
     if(!j.ok)throw new Error(j.error||"failed");
-    SET("profSummary").value=j.summary||""; msg.textContent="Draft inserted — edit, then Save profile. ("+(j.tokens||0)+" tokens)";
+    SET("profSummary").value=j.summary||""; renderSummaryView(); msg.textContent="Draft inserted — edit, then Save profile. ("+(j.tokens||0)+" tokens)";
   }catch(e){msg.className="setmsg err";msg.textContent="Draft failed: "+e.message+" (needs an OpenAI key under Advanced).";}
   finally{btn.disabled=false;}
 };
@@ -3890,10 +3973,12 @@ SET("addWorkBtn").onclick=()=>{syncWorkFromDOM();PROFILE_WORK.push({role:"",comp
 SET("addEduBtn").onclick=()=>{syncEduFromDOM();PROFILE_EDU.push({school:"",level:"",field:"",start:"",end:""});renderEducation();};
 // Per-section display ↔ edit toggle (read-only cards by default; reveal the editable forms on demand).
 function setSectionEdit(which,on){
-  if(which==='kw'){ editKw=on; SET('kwAddRow').style.display=on?'':'none'; SET('kwHint').style.display=on?'':'none'; SET('kwEditToggle').textContent=on?'Done':'Edit'; renderKeywords(); }
+  if(which==='summary'){ editSummary=on; SET('summaryEditWrap').style.display=on?'':'none'; SET('profSummaryView').style.display=on?'none':''; SET('summaryEditToggle').textContent=on?'Done':'Edit'; renderSummaryView(); }
+  else if(which==='kw'){ editKw=on; SET('kwAddRow').style.display=on?'':'none'; SET('kwHint').style.display=on?'':'none'; SET('kwEditToggle').textContent=on?'Done':'Edit'; renderKeywords(); }
   else if(which==='work'){ if(!on)syncWorkFromDOM(); editWork=on; SET('workAddRow').style.display=on?'':'none'; SET('workEditToggle').textContent=on?'Done':'Edit'; renderWorkHistory(); }
   else if(which==='edu'){ if(!on)syncEduFromDOM(); editEdu=on; SET('eduAddRow').style.display=on?'':'none'; SET('eduEditToggle').textContent=on?'Done':'Edit'; renderEducation(); }
 }
+SET("summaryEditToggle").onclick=()=>setSectionEdit('summary',!editSummary);
 SET("kwEditToggle").onclick=()=>setSectionEdit('kw',!editKw);
 SET("workEditToggle").onclick=()=>setSectionEdit('work',!editWork);
 SET("eduEditToggle").onclick=()=>setSectionEdit('edu',!editEdu);
@@ -4266,7 +4351,7 @@ async function checkMe(){
     if(me.multiUser && me.user){
       const chip=F('userChip'); chip.style.display='';
       chip.innerHTML=`${esc(me.user.displayName||me.user.id)}${me.user.role==='admin'?' <span class="urole">admin</span>':''} · <a href="/logout">Log out</a>`;
-      if(me.user.role==='admin'){const ub=F('usersNavBtn'); if(ub)ub.style.display='';}
+      // Team & admin nav visibility is declarative now (data-show="admin" + applyDeploymentVisibility).
       if(me.impersonatedBy) showImpBanner(me.user.displayName||me.user.id, me.impersonatedBy);
       if(!me.onboarded){
         const ob=await (await fetch('/api/onboarding',{cache:'no-store'})).json();
@@ -4311,7 +4396,7 @@ F('obSkip').onclick=()=>completeOnboarding(false);
 checkMe();
 
 // ---- entitlements (freemium tier gating) ----
-// Mirrors core/entitlements.js / GET /api/entitlements. Owner & self-hosted Local Pro see every
+// Mirrors core/entitlements.js / GET /api/entitlements. Reqon Server owner & Local Pro see every
 // control unlocked; lower tiers get gated controls disabled with an upgrade tooltip + a plan badge.
 // Gating is declarative: tag any control `data-feature="ai_draft"` (etc.) and it auto-locks.
 let ENT={plan:{tier:'owner',owner:true},features:{},labels:{}};

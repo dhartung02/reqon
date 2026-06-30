@@ -25,6 +25,10 @@ function scoreCircle(row) {
 let activeTab = null;
 let currentRow = null;
 let ENT = null; // freemium plan + feature gate map from GET /api/entitlements (null until loaded)
+// Best-bets filter + expand state (persists across re-renders within a panel session).
+let oppFilter = { tier: 'all', remote: false };
+let oppsExpanded = false;
+let lastRows = [];
 
 // Fail-open: until entitlements load (or if the server is old), treat features as available.
 const entHas = (f) => !ENT || !ENT.features || ENT.features[f] !== false;
@@ -214,7 +218,7 @@ const tokenize = (typeof _tokenize === 'function') ? _tokenize : (s) => (String(
 async function renderCoverage() {
   if (!activeTab || !/^https?:/.test(activeTab.url || '')) { return; }
   let jd = null;
-  try { jd = await chrome.tabs.sendMessage(activeTab.id, { type: 'jdKeywords' }); } catch (e) { jd = null; }
+  try { jd = await chrome.tabs.sendMessage(activeTab.id, { type: 'jdKeywords', company: currentRow && currentRow.company }); } catch (e) { jd = null; }
   if (!jd || !jd.ok || !Array.isArray(jd.tokens) || !jd.tokens.length) {
     $('coverage').innerHTML = '<div class="muted">No job description detected on this page.</div>';
     return;
@@ -241,9 +245,16 @@ async function renderCoverage() {
     missing.map((t) => `<span class="kw miss">${esc(t)} ✕</span>`).join('') +
     '</div>' +
     (missing.length ? '<div class="muted" style="margin-top:8px;font-size:.72rem">Red = in the posting, not in your résumé keywords.</div>' : '') +
-    (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:10px">✦ Suggest how to close the gaps</button><div id="tailorOut"></div>' : '');
+    (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:10px">✦ Suggest how to close the gaps</button><div id="tailorOut"></div>' : '') +
+    '<div id="covAi" class="covai"></div>';
+  wireTailor(missing);
+  renderKwAiSlot();
+}
+
+function wireTailor(missing) {
   const tb = $('tailor');
-  if (tb) tb.onclick = async () => {
+  if (!tb) return;
+  tb.onclick = async () => {
     tb.disabled = true; tb.textContent = 'Thinking…';
     let jdText = '';
     try { if (activeTab && activeTab.id != null) { const t = await chrome.tabs.sendMessage(activeTab.id, { type: 'jdText' }); if (t && t.ok) jdText = t.text || ''; } } catch (e) { /* ignore */ }
@@ -258,23 +269,70 @@ async function renderCoverage() {
   };
 }
 
+// AI keyword/skills match — the paid enhancement over the deterministic coverage above. On the AI
+// tier it runs automatically (cached per posting so navigation/refresh never re-spends a request);
+// on other tiers it's a one-request button. The server gates the package and counts the request.
+const aiKwCache = {};   // activeTab.url -> { score, matched, missing, summary }
+function renderKwAiSlot() {
+  const slot = $('covAi'); if (!slot) return;
+  const url = activeTab && activeTab.url;
+  if (url && aiKwCache[url]) { renderKwAi(aiKwCache[url]); return; }
+  const aiTier = !!(ENT && ENT.plan && ENT.plan.ai);
+  if (aiTier) { runKeywordAI(); return; }
+  slot.innerHTML = '<button id="kwAiBtn" class="btn btn-ghost" style="margin-top:10px">✦ Improve match with AI (1 request)</button>';
+  const b = $('kwAiBtn'); if (b) b.onclick = () => runKeywordAI();
+}
+async function runKeywordAI() {
+  const slot = $('covAi'); if (!slot) return;
+  slot.innerHTML = '<div class="muted" style="margin-top:10px">Analyzing skills with AI…</div>';
+  let jdText = '';
+  try { if (activeTab && activeTab.id != null) { const t = await chrome.tabs.sendMessage(activeTab.id, { type: 'jdText' }); if (t && t.ok) jdText = t.text || ''; } } catch (e) { /* ignore */ }
+  const payload = { jd: jdText };
+  if (currentRow) payload.key = reqKeyOf(currentRow);
+  const r = await send({ type: 'keywordMatch', payload });
+  if (!r || !r.ok) {
+    const m = (r && r.error) || 'AI match unavailable';
+    const upgrade = /package|upgrade/i.test(m);
+    slot.innerHTML = `<div class="muted" style="margin-top:10px">${esc(m)}` + (upgrade ? '' : ' <a class="link" id="kwRetry" href="#">Try again</a>') + '</div>';
+    const rt = $('kwRetry'); if (rt) rt.onclick = (e) => { e.preventDefault(); runKeywordAI(); };
+    return;
+  }
+  const res = { score: r.score || 0, matched: r.matched || [], missing: r.missing || [], summary: r.summary || '' };
+  if (activeTab && activeTab.url) aiKwCache[activeTab.url] = res;
+  renderKwAi(res);
+  loadUsage();
+}
+function renderKwAi(res) {
+  const slot = $('covAi'); if (!slot) return;
+  const cls = res.score >= 70 ? 'good' : res.score >= 40 ? 'mid' : 'low';
+  slot.innerHTML =
+    `<div class="cov-head covai-head"><span class="muted">AI skills match</span><span class="cov-pct ${cls}">${res.score}%</span></div>` +
+    '<div>' +
+    res.matched.map((t) => `<span class="kw">${esc(t)}</span>`).join('') +
+    res.missing.map((t) => `<span class="kw miss">${esc(t)} ✕</span>`).join('') +
+    '</div>' +
+    (res.summary ? `<div class="muted" style="margin-top:8px;font-size:.74rem">${esc(res.summary)}</div>` : '');
+}
+
 // ---- analytics ----
 function renderAnalytics(rows) {
   const live = rows.filter((r) => r.deleted !== true);
   const total = live.length;
   const tier = { A: 0, B: 0, C: 0 };
-  let applied = 0, open = 0, closed = 0, appliedWk = 0, evSum = 0;
+  let applied = 0, open = 0, closed = 0, evSum = 0;
   live.forEach((r) => {
     const t = (r.tier || 'C').toUpperCase(); if (tier[t] != null) tier[t]++;
     if (isClosed(r.status)) closed++;
-    else if (isApplied(r.status)) { applied++; if (daysAgo(r.applied) <= 7) appliedWk++; }
+    else if (isApplied(r.status)) applied++;
     else open++;
     evSum += ev(r);
   });
   const avgEv = total ? (evSum / total).toFixed(1) : '0.0';
+  // "Applied" = total applied/in-process across the board (matches the count you see in the app),
+  // not a 7-day window — the old "Applied · 7d" read as a confusing 0 next to a much larger total.
   $('kpis').innerHTML =
     kpi(tier.A, 'Strong', 'accent') +
-    kpi(appliedWk, 'Applied · 7d', 'teal') +
+    kpi(applied, 'Applied', 'teal') +
     kpi(total, 'Tracked') +
     kpi(avgEv, 'Avg EV');
 
@@ -287,22 +345,57 @@ function renderAnalytics(rows) {
     `<span><i style="background:var(--info)"></i>Possible ${tier.B}</span>` +
     `<span><i style="background:var(--muted)"></i>Long shot ${tier.C}</span></div>`;
 
-  const opps = live
-    .filter((r) => !isApplied(r.status) && !isClosed(r.status))
-    .sort((a, b) => ev(b) - ev(a))
-    .slice(0, 6);
-  $('opps').innerHTML = opps.length
-    ? opps.map((r) => `<div class="opp" data-tier="${esc((r.tier || 'C').toLowerCase())}" data-link="${esc(r.link || '')}">` +
-        `<span class="tdot"></span>` +
-        `<div class="opp-main"><div class="opp-role">${esc(r.role || '—')}</div>` +
-        `<div class="opp-co">${esc(r.company || '')}</div></div>` +
-        `<span class="opp-ev">${ev(r)}</span></div>`).join('')
-    : '<div class="muted">Nothing open — clip some roles to build your pipeline.</div>';
+  lastRows = live;
+  renderOpps();
+}
+const kpi = (v, l, cls) => `<div class="kpi"><div class="kpi-v ${cls || ''}">${v}</div><div class="kpi-l">${l}</div></div>`;
+
+// Best bets — the open (not applied/closed) roles ranked by EV. Filter chips (tier + remote-only)
+// narrow the set; the list shows the top few with a "Show N more" expander for the rest, so you can
+// work the whole ranked backlog from here instead of just the first six.
+const OPP_TOP = 6;
+function oppMatches(r) {
+  if (isApplied(r.status) || isClosed(r.status)) return false;
+  if (oppFilter.tier !== 'all' && tierKey(r.tier) !== oppFilter.tier) return false;
+  if (oppFilter.remote && !/remote|flex/i.test(r.remote || '')) return false;
+  return true;
+}
+function renderOpps() {
+  const all = lastRows.filter(oppMatches).sort((a, b) => ev(b) - ev(a));
+  const chip = (f, label, active) => `<button class="oppchip${active ? ' on' : ''}" data-f="${f}">${esc(label)}</button>`;
+  $('oppsFilters').innerHTML =
+    chip('tier:all', 'All', oppFilter.tier === 'all') +
+    chip('tier:A', 'Strong', oppFilter.tier === 'A') +
+    chip('tier:B', 'Possible', oppFilter.tier === 'B') +
+    chip('tier:C', 'Long shot', oppFilter.tier === 'C') +
+    chip('remote', 'Remote only', oppFilter.remote);
+  const shown = oppsExpanded ? all : all.slice(0, OPP_TOP);
+  const rowHtml = (r) => `<div class="opp" data-tier="${esc((r.tier || 'C').toLowerCase())}" data-link="${esc(r.link || '')}">` +
+    `<span class="tdot"></span>` +
+    `<div class="opp-main"><div class="opp-role">${esc(r.role || '—')}</div>` +
+    `<div class="opp-co">${esc(r.company || '')}</div></div>` +
+    `<span class="opp-ev">${ev(r)}</span></div>`;
+  const anyOpen = lastRows.some((r) => !isApplied(r.status) && !isClosed(r.status));
+  $('opps').innerHTML = shown.length
+    ? shown.map(rowHtml).join('') +
+      (all.length > OPP_TOP
+        ? `<button class="oppmore" id="oppMore">${oppsExpanded ? 'Show fewer' : 'Show ' + (all.length - OPP_TOP) + ' more'}</button>`
+        : '')
+    : `<div class="muted">${anyOpen ? 'No open roles match these filters.' : 'Nothing open — clip some roles to build your pipeline.'}</div>`;
   $('opps').querySelectorAll('.opp').forEach((el) => {
     el.onclick = () => { const u = el.getAttribute('data-link'); if (u) chrome.tabs.create({ url: u }); };
   });
+  const more = $('oppMore'); if (more) more.onclick = () => { oppsExpanded = !oppsExpanded; renderOpps(); };
+  $('oppsFilters').querySelectorAll('.oppchip').forEach((el) => {
+    el.onclick = () => {
+      const f = el.getAttribute('data-f');
+      if (f === 'remote') oppFilter.remote = !oppFilter.remote;
+      else if (f.indexOf('tier:') === 0) oppFilter.tier = f.slice(5);
+      oppsExpanded = false;   // collapse when the filter changes so the top of the new set shows
+      renderOpps();
+    };
+  });
 }
-const kpi = (v, l, cls) => `<div class="kpi"><div class="kpi-v ${cls || ''}">${v}</div><div class="kpi-l">${l}</div></div>`;
 
 async function renderPipeline() {
   const r = await send({ type: 'reqs', force: false });
@@ -345,7 +438,7 @@ async function doDraft() {
 function renderDraft(text, tokens, usage) {
   const cap = usage && usage.cap;
   const used = usage && usage.calls;
-  const meta = (used != null ? `${used}${cap ? '/' + cap : ''} calls today` : '') + (tokens ? ` · ~${tokens} tokens` : '');
+  const meta = (used != null ? `${used}${cap ? '/' + cap : ''} AI requests today` : '') + (tokens ? ` · ~${tokens} tokens` : '');
   const out = $('aiOut');
   out.innerHTML = `<div class="draft" id="draftText"></div>` +
     `<div class="draft-foot"><span class="tok">${esc(meta)}</span><span><button id="insertDraft" class="copybtn">Insert into page</button> <button id="copyDraft" class="copybtn">Copy</button></span></div>` +
@@ -378,8 +471,9 @@ async function loadUsage() {
   const pct = cap ? Math.min(100, Math.round((calls / cap) * 100)) : 0;
   const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
   el.innerHTML =
-    `<div class="urow"><span class="muted">Calls today</span><span class="v">${calls}${cap ? ' / ' + cap : ''}</span></div>` +
+    `<div class="urow"><span class="muted">AI requests today</span><span class="v">${calls}${cap ? ' / ' + cap : ''}</span></div>` +
     (cap ? `<div class="budget"><span class="${cls}" style="width:${pct}%"></span></div>` : '') +
+    `<div class="tok" style="margin-top:6px">Each AI draft, score, autofill, or match counts as one request.</div>` +
     `<div class="tok" style="margin-top:8px"><a class="link" id="usageDetails" href="#">Detailed usage →</a></div>`;
   const d = $('usageDetails'); if (d) d.onclick = (e) => { e.preventDefault(); try { chrome.runtime.openOptionsPage(); } catch (_) {} };
 }
@@ -391,6 +485,17 @@ async function refresh() {
   await renderPage();
   await Promise.all([renderCoverage(), renderPipeline(), loadUsage()]);
 }
+
+// Re-detect just the current page when the active tab navigates or changes. The pipeline, usage
+// and entitlements don't change with the tab, so the full refresh() stays for load / manual reload
+// / post-edit. Without this the panel kept rendering the previously-detected page and showed a
+// stale "Not on your board" after you opened a different posting (e.g. a Best-bets link) — the only
+// way to refresh was reopening the panel. Debounced so a navigation's burst of events runs once.
+let pageNavTimer = null;
+function refreshPageSoon() { clearTimeout(pageNavTimer); pageNavTimer = setTimeout(async () => { await renderPage(); renderCoverage(); }, 150); }
+chrome.tabs.onActivated.addListener(refreshPageSoon);
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (tab && tab.active && (info.url || info.status === 'complete')) refreshPageSoon(); });
+try { chrome.windows.onFocusChanged.addListener((wid) => { if (wid !== chrome.windows.WINDOW_ID_NONE) refreshPageSoon(); }); } catch (_) {}
 
 // Gate the open-ended AI draft button on the AI package (it calls /api/assist).
 function applyDraftGate() {

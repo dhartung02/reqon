@@ -41,7 +41,19 @@
     // posting boilerplate — present in nearly every JD, so non-differentiating
     'role roles job jobs position positions candidate candidates applicant applicants apply application ' +
     'hiring hire company companies looking join opportunity opportunities please ability able including ' +
-    'include includes new using use used help make want need years year week weeks day days plus'
+    'include includes new using use used help make want need years year week weeks day days plus ' +
+    // EEO / legal / benefits boilerplate — in most JDs, never a résumé-fit signal (this is the junk
+    // that showed up as "veteran / disability / status": legal language, not skills).
+    'equal opportunity employer regardless race color religion religious creed sex gender genders ' +
+    'sexual orientation identity national origin ancestry age marital pregnancy disability disabilities ' +
+    'disabled veteran veterans status citizenship immigration sponsorship sponsor authorized authorization ' +
+    'eligible eligibility accommodation accommodations reasonable protected affirmative diversity inclusion ' +
+    'belonging compensation salary benefits benefit insurance dental vision medical healthcare retirement ' +
+    'bonus equity stipend perks wellness pto background check drug screening ' +
+    // generic HR / posting-process words that carry no skill signal on their own
+    'qualifications qualification requirements requirement responsibilities responsibility duties preferred ' +
+    'required must based located location remote hybrid onsite office select selected work working team teams ' +
+    'experience skills strong excellent great good ideal successful responsible'
   ).split(/\s+/));
 
   // Tokens belonging to the employer name (og:site_name + the company portion of the page title).
@@ -56,9 +68,10 @@
     return new Set([...tk(siteName), ...tk(tail)]);
   }
 
-  function jdKeywords() {
+  function jdKeywords(company) {
     const tk = (typeof _tokenize === 'function' ? _tokenize : (s) => (String(s || '').toLowerCase().match(/[a-z0-9+#]+/g) || []));
     const co = companyTokens();
+    tk(company).forEach((t) => co.add(t));   // the tracked employer name from the board (drops e.g. "smartsheet")
     const freq = new Map();
     for (const t of tk(jdText())) {
       if (t.length < 3) continue;          // drop 1–2 char noise
@@ -72,7 +85,7 @@
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg) return;
     hookFocus();   // once the panel/overlay is in use, track the last-focused field for Insert
-    if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords() }); } catch (e) { sendResponse({ ok: false }); } return; }
+    if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords(msg.company) }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'smartFill') { smartFill().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }

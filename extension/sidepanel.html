@@ -33,6 +33,14 @@
   .legend { display: flex; gap: 13px; flex-wrap: wrap; font-size: .7rem; color: var(--text2); }
   .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 
+  /* best-bets filters + expander */
+  .oppfilters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .oppchip { font: 600 .7rem var(--sans); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--line2); background: transparent; color: var(--text2); cursor: pointer; }
+  .oppchip:hover { border-color: var(--emerald); }
+  .oppchip.on { background: var(--ringbg); border-color: var(--emerald); color: var(--emerald); }
+  .oppmore { width: 100%; margin-top: 9px; padding: 7px; font: 600 .74rem var(--sans); background: transparent; border: 1px solid var(--line2); border-radius: 8px; color: var(--text2); cursor: pointer; }
+  .oppmore:hover { border-color: var(--emerald); color: var(--emerald); }
+
   /* opportunity list */
   .opp { display: flex; align-items: center; gap: 9px; padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; }
   .opp:first-child { border-top: 0; }
@@ -52,6 +60,8 @@
   .kw { display: inline-block; font-size: .7rem; padding: 3px 9px; border-radius: 20px; margin: 4px 4px 0 0;
         border: 1px solid var(--line2); color: var(--text2); }
   .kw.miss { border-color: var(--coral); color: var(--coral); background: var(--ringbg); }
+  .covai { margin-top: 12px; }
+  .covai-head { border-top: 1px dashed var(--line); padding-top: 11px; }
 
   /* AI assist */
   .draft { margin-top: 10px; background: var(--elem2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; white-space: pre-wrap; font-size: .82rem; color: var(--text); }
@@ -111,6 +121,7 @@
   </div>
 
   <div class="sect-title">Best bets to apply</div>
+  <div id="oppsFilters" class="oppfilters"></div>
   <div id="opps" class="card"><div class="muted">Loading…</div></div>
 
   <div class="sect-title">AI usage</div>

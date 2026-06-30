@@ -219,6 +219,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(await postJson('/api/assist/score', msg.payload));
       } else if (msg.type === 'mapFields') {
         sendResponse(await postJson('/api/assist/map-fields', msg.payload));
+      } else if (msg.type === 'keywordMatch') {
+        sendResponse(await postJson('/api/assist/keywords', msg.payload));
       } else if (msg.type === 'setStatus') {
         sendResponse(await setStatus(msg.row, msg.status));
       } else if (msg.type === 'genGuide') {

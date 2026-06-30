@@ -1,4 +1,4 @@
-// Unit tests for the unified action-item model (lib/action-items.js, ROADMAP-V3 P2.1).
+// Unit tests for the unified action-item model (lib/action-items.js, ROADMAP P2.1).
 // Pure + deterministic — run: node tests/test_action_items.js
 const assert = require('node:assert');
 const { computeActionItems } = require('../lib/action-items');

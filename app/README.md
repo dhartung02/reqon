@@ -2,8 +2,8 @@
 
 The mobile command center for the Reqon job-search pipeline. Local-first; works with no
 backend, syncs with the optional self-hosted server (Reqon Sync) when configured. Part of the
-`reqon` monorepo — see the repo-root [ROADMAP.md](../ROADMAP.md) (Phase 2) and
-[WORKPLAN.md](../WORKPLAN.md) (WP-2) for scope and milestones.
+`reqon` monorepo — see the repo-root [ROADMAP.md](../ROADMAP.md) (Phase 2; build history + WP-2 in
+§17) for scope and milestones.
 
 ## Architecture: one shared core, never re-ported
 

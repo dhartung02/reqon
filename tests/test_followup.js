@@ -1,4 +1,4 @@
-// Unit tests for the follow-up recommendation engine (lib/followup.js, ROADMAP-V3 P2.8). Pure.
+// Unit tests for the follow-up recommendation engine (lib/followup.js, ROADMAP P2.8). Pure.
 // Run: node tests/test_followup.js
 const assert = require('node:assert');
 const { computeFollowup } = require('../lib/followup');

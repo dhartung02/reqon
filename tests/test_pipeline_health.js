@@ -1,4 +1,4 @@
-// Unit tests for the pipeline health score (lib/pipeline-health.js, ROADMAP-V3 P2.6). Pure.
+// Unit tests for the pipeline health score (lib/pipeline-health.js, ROADMAP P2.6). Pure.
 // Run: node tests/test_pipeline_health.js
 const assert = require('node:assert');
 const { computePipelineHealth } = require('../lib/pipeline-health');

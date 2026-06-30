@@ -4195,7 +4195,7 @@ document.addEventListener("click",(e)=>{if(!e.target.closest("#bellBtn")&&!e.tar
 F("bellReadAll").onclick=async()=>{try{await fetch("/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});NOTIFS.forEach(n=>n.read=true);renderBell();}catch(e){}};
 pollNotifications(); setInterval(pollNotifications, 90000);
 
-// ---- multi-user: identity chip + first-run onboarding (ROADMAP-V3 PR0) ----
+// ---- multi-user: identity chip + first-run onboarding (ROADMAP PR0) ----
 async function checkMe(){
   try{
     const me=await (await fetch('/api/me',{cache:'no-store'})).json();

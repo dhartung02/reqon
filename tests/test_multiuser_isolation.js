@@ -1,4 +1,4 @@
-// Multi-user tenancy invariants (ROADMAP-V3 PR0). Run: node tests/test_multiuser_isolation.js
+// Multi-user tenancy invariants (ROADMAP PR0). Run: node tests/test_multiuser_isolation.js
 // Deterministic, no server — exercises lib/store (namespacing) + lib/users (auth/tokens). Uses a
 // throwaway users.json under a temp HOME-less path; cleans up after.
 'use strict';

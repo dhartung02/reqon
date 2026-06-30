@@ -20,7 +20,7 @@ const { spawn } = require('child_process');
 const ExcelJS = require('exceljs');
 const QRCode = require('qrcode');
 const docx = require('docx');
-const store = require('./lib/store');   // tenant-scoped paths (ROADMAP-V3 PR0): owner==legacy paths
+const store = require('./lib/store');   // tenant-scoped paths (ROADMAP PR0): owner==legacy paths
 const users = require('./lib/users');   // user registry + auth (multi-user mode)
 const MULTIUSER = () => store.multiUserEnabled();   // read live (env MULTIUSER=true)
 
@@ -93,7 +93,7 @@ const P = {
   get enrichLog() { return store.paths().enrichLog; },
   get changeLog() { return store.paths().changeLog; },
 };
-// Per-user settings (ROADMAP-V3 PR0): these config keys live in the user's namespace, not shared
+// Per-user settings (ROADMAP PR0): these config keys live in the user's namespace, not shared
 // .env — so each user has their own digest schedule/channels, AI caps/model, Gmail ingest, SMS, etc.
 // Anything NOT in this set stays server-level in .env (SMTP sending identity, PUBLIC_URL, tokens,
 // aggregator keys, APNs). Owner / single-user always read .env (unchanged).
@@ -417,7 +417,7 @@ if (REQON_ROLE === 'cloud') {
 
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false }));
-// ROADMAP-V3 PR0 slice 3: bind every request to its tenant namespace. Multi-user OFF -> owner
+// ROADMAP PR0 slice 3: bind every request to its tenant namespace. Multi-user OFF -> owner
 // (legacy paths; a no-op). resolveUserId/sessionUser below are function declarations (hoisted), so
 // this closure resolves them at request time. AsyncLocalStorage propagates through async handlers.
 app.use((req, res, next) => { const uid = resolveUserId(req); if (MULTIUSER()) store.ensureUserDir(uid); store.runAs(uid, () => next()); });
@@ -706,7 +706,7 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, count: readStore().length, port: PORT, dataFile: P.data });
 });
 
-// ---------- multi-user: identity, accounts, onboarding (ROADMAP-V3 PR0 slices 3-4) ----------
+// ---------- multi-user: identity, accounts, onboarding (ROADMAP PR0 slices 3-4) ----------
 function reqUser(req) { return MULTIUSER() ? sessionUser(req) : null; }
 function requireAdmin(req, res, next) {
   if (!MULTIUSER()) return res.status(400).json({ ok: false, error: 'Multi-user is disabled.' });
@@ -4264,13 +4264,13 @@ module.exports = { postingId, sameReq, reqKey, computeTier, reconcileSync, ensur
 
 if (require.main !== module) return;   // imported for tests — stop before side effects
 
-// ROADMAP-V3 PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
+// ROADMAP PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
 // migrate the existing single-user board into that admin's namespace (Q1: "your current board
 // becomes your user"). Migration is once-only + reversible (legacy root files are left intact).
 // Backend-only boot work (data bootstrap, migrations, schedulers). The cloud role is a thin UI +
 // proxy and owns no data, so it skips all of this — it just serves the UI and listens.
 if (SERVE_API) {
-  // ROADMAP-V3 PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
+  // ROADMAP PR0: in multi-user mode, ensure an initial admin exists (first-run bootstrap), and
   // migrate the existing single-user board into that admin's namespace (Q1: "your current board
   // becomes your user"). Migration is once-only + reversible (legacy root files are left intact).
   if (MULTIUSER()) {

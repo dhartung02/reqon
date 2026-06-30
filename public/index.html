@@ -3637,8 +3637,21 @@ function brandFromProfile(p){ const n=(p&&p.applicant&&p.applicant.name||"").tri
 loadProfile();   // sets the title at startup; re-runs when Settings opens
 
 // ---------- Gmail response ingest (IMAP) — server-side config, mirrors the iOS app ----------
+// Mail endpoints always return JSON. Behind a proxy / expired session the browser can instead get
+// an HTML page (login screen, 502/504 gateway error) — parse that into a clear message rather than
+// the cryptic "Unexpected token '<'" that a bare .json() throws.
+async function apiJson(path, opts){
+  const r = await fetch(path, opts);
+  const txt = await r.text();
+  try { return JSON.parse(txt); }
+  catch(e){
+    if (r.status===401 || r.status===403) throw new Error(`not signed in (HTTP ${r.status}) — reload the page and sign in again.`);
+    if (/^\s*<(?:!doctype|html)/i.test(txt)) throw new Error(`the server returned a web page, not data (HTTP ${r.status}) — you're likely signed out, or a long run timed out at the gateway. Reload and retry.`);
+    throw new Error(`unexpected non-JSON response (HTTP ${r.status})${txt?': '+txt.slice(0,120):''}`);
+  }
+}
 async function loadMailConfig(){
-  try{const m=await (await fetch("/api/mail/config",{cache:"no-store"})).json();
+  try{const m=await apiJson("/api/mail/config",{cache:"no-store"});
     if(!m||!m.ok)return;
     SET("mailUser").value=m.user||""; SET("mailLabel").value=m.label||"INBOX";
     SET("mailSince").value=m.sinceDays||14; SET("mailAi").checked=!!m.ai; SET("mailPass").value="";
@@ -3652,7 +3665,7 @@ function mailBody(){return {user:SET("mailUser").value.trim(),password:SET("mail
   emailScout:SET("emailScoutEnable").checked,emailScoutResolve:SET("emailScoutResolve").checked,emailScoutSources:SET("emailScoutSources").value.trim(),emailScoutMinFit:SET("emailScoutMinFit").value};}
 async function mailSave(){
   SET("mailStatus").textContent="Saving…";
-  try{const m=await (await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())})).json();
+  try{const m=await apiJson("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())});
     if(!m.ok)throw new Error(m.error||"save failed");
     SET("mailPass").value=""; SET("mailState").textContent=m.passSet?`(set ····${m.passLast4||""})`:"(not set)";
     SET("mailStatus").textContent="Saved on the server.";
@@ -3663,7 +3676,7 @@ async function mailRun(apply){
   try{
     await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
     SET("mailPass").value="";
-    const j=await (await fetch("/api/mail/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})})).json();
+    const j=await apiJson("/api/mail/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})});
     if(j.report){SET("mailReport").textContent=j.report;SET("mailReport").style.display="block";}
     if(!j.ok)throw new Error(j.error||"run failed");
     SET("mailStatus").textContent=apply?"Ran on the server.":"Dry run complete — nothing changed.";
@@ -3675,7 +3688,7 @@ async function mailConnTest(){
   try{
     await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
     SET("mailPass").value="";
-    const j=await (await fetch("/api/mail/test",{method:"POST",headers:{"Content-Type":"application/json"}})).json();
+    const j=await apiJson("/api/mail/test",{method:"POST",headers:{"Content-Type":"application/json"}});
     if(!j.ok){ if(j.report){SET("mailReport").textContent=j.report;SET("mailReport").style.display="block";} throw new Error(j.error||"connection failed"); }
     // Success: clean one-liner only — no raw stdout / SUMMARY_JSON dump.
     SET("mailReport").style.display="none";
@@ -3703,7 +3716,7 @@ async function emailScoutRun(apply){
   try{
     await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
     SET("mailPass").value="";
-    const j=await (await fetch("/api/mail/scout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})})).json();
+    const j=await apiJson("/api/mail/scout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})});
     if(j.report){SET("emailScoutReport").textContent=j.report;SET("emailScoutReport").style.display="block";}
     if(!j.ok)throw new Error(j.error||"run failed");
     const c=(j.summary&&j.summary.counts)||{};

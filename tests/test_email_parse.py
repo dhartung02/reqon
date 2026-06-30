@@ -77,6 +77,53 @@ class Glassdoor(unittest.TestCase):
         self.assertIn("241K", c["salary"])
 
 
+class ParseRobustness(unittest.TestCase):
+    """Regressions for the live "garbage company" bugs (CSS leak, blob-in-anchor, digest links)."""
+
+    def test_style_block_css_does_not_leak_as_company(self):
+        html = (
+            '<style> .card { display:inline-block !important; } } </style>'
+            '<a href="https://www.linkedin.com/comm/jobs/view/501">Principal Product Manager, Platform</a>'
+            ' Acme Corp · Remote'
+        )
+        cards = se.parse_cards("linkedin", html)
+        self.assertEqual(len(cards), 1)
+        self.assertNotIn("display", cards[0]["company"])
+        self.assertNotIn("{", cards[0]["company"])
+        self.assertEqual(cards[0]["company"], "Acme Corp")
+
+    def test_glassdoor_blob_in_anchor_text(self):
+        # The shape that broke in production: the whole listing lives in the link text.
+        html = (
+            '<style>.x{display:inline-block !important;}}</style>'
+            '<a href="https://www.glassdoor.com/partner/jobListing.htm?id=9">'
+            'Waymo 4.0 ★ Senior Product Manager, DevAI &amp; Agentic Workflows '
+            'Mountain View, CA $241K - $297K ( Employer est. )</a>'
+        )
+        cards = se.parse_cards("glassdoor", html)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["company"], "Waymo")
+        self.assertTrue(cards[0]["title"].startswith("Senior Product Manager"))
+        self.assertNotIn("inline-block", cards[0]["company"])
+
+    def test_jobs_similar_to_digest_is_skipped(self):
+        html = (
+            '<a href="https://www.linkedin.com/comm/jobs/view/777">'
+            'Jobs similar to Senior Product Manager - Platform at honeycomb.io</a>'
+        )
+        self.assertEqual(se.parse_cards("linkedin", html), [])
+
+    def test_dangling_tag_fragment_not_used_as_company(self):
+        html = (
+            'lots of text <td style="-webkit-text-siz'
+            '<a href="https://www.linkedin.com/comm/jobs/view/888">Group Product Manager</a> Globex · Remote'
+        )
+        cards = se.parse_cards("linkedin", html)
+        self.assertEqual(len(cards), 1)
+        self.assertNotIn("<", cards[0]["company"])
+        self.assertNotIn("style", cards[0]["company"].lower())
+
+
 class Hygiene(unittest.TestCase):
     def test_dedupes_repeated_linkedin_link(self):
         html = (

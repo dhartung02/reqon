@@ -3663,6 +3663,7 @@ function settingsPayload() {
     salaryFloor: st.minSalary != null && !isNaN(+st.minSalary) ? +st.minSalary : 0,
     salaryTarget: st.salaryTarget != null && !isNaN(+st.salaryTarget) ? +st.salaryTarget : 0,
     remoteOnly: boards.remoteOnly !== false,
+    theme: (boards.theme === 'light' || boards.theme === 'dark') ? boards.theme : 'dark',
     minDelaySeconds: boards.minDelaySeconds != null ? boards.minDelaySeconds : 0.4,
     analyticsWindowDays: boards.analyticsWindowDays != null ? boards.analyticsWindowDays : 0,
     minTierToMerge: ['A', 'B', 'C'].includes(String(boards.minTierToMerge || '').toUpperCase()) ? String(boards.minTierToMerge).toUpperCase() : 'B',
@@ -3818,6 +3819,7 @@ app.put('/api/settings', (req, res) => {
       touchedBoards = true;
     }
     if (typeof b.remoteOnly === 'boolean') { boards.remoteOnly = b.remoteOnly; touchedBoards = true; }
+    if (b.theme === 'light' || b.theme === 'dark') { boards.theme = b.theme; touchedBoards = true; }
     if (typeof b.minTierToMerge === 'string' && ['A', 'B', 'C'].includes(b.minTierToMerge.toUpperCase())) { boards.minTierToMerge = b.minTierToMerge.toUpperCase(); touchedBoards = true; }
     if (b.tierThresholds && typeof b.tierThresholds === 'object') {
       const cur = tierThresholds(boards);
@@ -3998,16 +4000,25 @@ app.post('/api/sources/add', (req, res) => {
   const ats = String(b.ats || '').toLowerCase().trim();
   const slug = String(b.slug || '').trim();
   const name = (String(b.name || '').trim()) || slug;
+  // Optional vertical/industry tag (crowdsourced board directory, phase 1 — see BOARD-DIRECTORY.md).
+  const industry = String(b.industry || '').trim().slice(0, 40);
   const valid = new Set(SOURCE_CATALOG.map(s => s.name));
   if (!valid.has(ats)) return res.status(400).json({ ok: false, error: 'Unknown/unsupported ATS: ' + ats });
   if (!slug) return res.status(400).json({ ok: false, error: 'Missing slug.' });
   const boards = readJsonSafe(P.boards, {});
   boards.companies = boards.companies || [];
   const dup = boards.companies.find(c => String(c.ats).toLowerCase() === ats && String(c.slug).toLowerCase() === slug.toLowerCase());
-  if (dup) return res.json({ ok: true, added: 0, duplicate: true, name: dup.name, total: boards.companies.length });
-  boards.companies.push({ name, ats, slug });
+  if (dup) {
+    // Backfill an industry tag on an already-tracked company, but never overwrite an existing one.
+    let tagged = false;
+    if (industry && !String(dup.industry || '').trim()) { dup.industry = industry; writeJsonPretty(P.boards, boards); tagged = true; }
+    return res.json({ ok: true, added: 0, duplicate: true, name: dup.name, industry: dup.industry || '', tagged, total: boards.companies.length });
+  }
+  const entry = { name, ats, slug };
+  if (industry) entry.industry = industry;
+  boards.companies.push(entry);
   writeJsonPretty(P.boards, boards);
-  res.json({ ok: true, added: 1, name, ats, slug, total: boards.companies.length });
+  res.json({ ok: true, added: 1, name, ats, slug, industry, total: boards.companies.length });
 });
 
 // Regenerate the scoped ingest token. Full-auth only (the /api gate already blocks the ingest

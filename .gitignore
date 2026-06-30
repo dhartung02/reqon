@@ -22,7 +22,7 @@ data.json
 data.json.tmp
 backups/
 logs/
-# Multi-user (ROADMAP-V3 PR0): credential registry + per-user namespaces — NEVER commit
+# Multi-user (ROADMAP PR0): credential registry + per-user namespaces — NEVER commit
 users.json
 users.json.tmp
 data/users/
@@ -74,6 +74,9 @@ MOBILE-SETUP.md
 
 # runtime push device registry (WP-0)
 agent/push-tokens.json
+
+# waitlist signups (PII: email/name) — runtime store, never commit
+agent/waitlist.json
 
 # APNs key written by the board push-config endpoint
 agent/apns-AuthKey.p8

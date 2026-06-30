@@ -105,7 +105,7 @@ Uses the OpenAI integration already in `server.js` (`openaiChat` → `/v1/chat/c
   clients over the board API. `cd mcp && npm install`, then register the command.
 - **Extension tests** — `extension/tests/lib.test.js` (`node --test extension/tests/*.test.js`).
 
-**Tier 4 (ROADMAP-V3 P1.10–1.14)**
+**Tier 4 (ROADMAP P1.10–1.14)**
 - **Richer clip capture (P1.10)** — `captureMeta()` reads salary/remote/ATS/posting-id/JD-excerpt off
   the page; a confirmation panel shows Captured / Confidence / Detected / Needs review before sending.
 - **Fillability hint (P1.11)** — overlay shows Easy Apply · Likely / Partially fillable · Manual-heavy

@@ -1,34 +1,52 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Reqon Clip — Settings</title>
+<link rel="stylesheet" href="theme.css">
 <style>
-  body{background:#0d1117;color:#e8eef5;font:14px/1.5 -apple-system,system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 20px}
-  h1{font-size:1.2rem}p{color:#aab6c2}
-  .logo{font-weight:700;font-size:.66rem;letter-spacing:.26em;text-transform:uppercase;color:#00df8f;margin-bottom:6px}
-  label{display:block;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;color:#aab6c2;margin:16px 0 5px}
-  input,select{width:100%;box-sizing:border-box;background:#151b23;border:1px solid #333c47;color:#e8eef5;border-radius:9px;padding:10px 12px;font:inherit}
-  input:focus,select:focus{outline:none;border-color:#00df8f}
-  select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b97a4' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-  .toggle{display:flex;align-items:center;gap:9px;margin-top:18px}
-  .toggle input{width:auto}
-  .toggle label{margin:0;text-transform:none;letter-spacing:0;font-size:.9rem;color:#e8eef5}
-  .row{display:flex;gap:10px;margin-top:18px}
-  button{background:#00df8f;color:#08130d;border:0;border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;font:inherit}
-  button.ghost{background:transparent;color:#aab6c2;border:1px solid #333c47}
-  #msg{margin-top:14px;font-size:.85rem;min-height:1.2em}
-  .ok{color:#69c57e}.err{color:#e8755f}
-  #customOriginWrap{margin-top:0}
-  hr{border:0;border-top:1px solid #1e2730;margin:20px 0}
+  body { background: var(--canvas); color: var(--text); font: 14px/1.5 var(--sans);
+         max-width: 520px; margin: 40px auto; padding: 0 20px; -webkit-font-smoothing: antialiased; }
+  .brandline { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+  .brandline svg { width: 20px; height: 20px; }
+  .logo { font: 600 .6rem/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--emerald); }
+  h1 { font: 600 1.5rem var(--serif); margin: 0 0 6px; }
+  p { color: var(--text2); }
+  label { display: block; font: 600 .6rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+  select { appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  .toggle { display: flex; align-items: center; gap: 9px; margin-top: 18px; }
+  .toggle input { width: auto; }
+  .toggle label { margin: 0; font: .9rem var(--sans); letter-spacing: 0; text-transform: none; color: var(--text); }
+  .row { display: flex; gap: 10px; margin-top: 20px; }
+  button { background: var(--emerald); color: var(--btnink); border: 0; border-radius: 10px;
+           padding: 11px 18px; font: 700 .9rem var(--sans); cursor: pointer; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line2); font-weight: 600; }
+  button.ghost:hover { border-color: var(--emerald); }
+  #msg { margin-top: 14px; font-size: .85rem; min-height: 1.2em; }
+  #customOriginWrap { margin-top: 0; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
+  .fineprint { font-size: .8rem; margin-top: 6px; color: var(--muted); }
+  .usage { background: var(--elem); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .usage .urow { display: flex; align-items: baseline; justify-content: space-between; margin: 5px 0; font-size: .86rem; color: var(--text2); }
+  .usage .urow .v { font: 700 .9rem var(--mono); color: var(--text); }
+  .usage .budget { height: 7px; border-radius: 6px; background: var(--elem2); overflow: hidden; margin: 10px 0 4px; }
+  .usage .budget span { display: block; height: 100%; background: var(--emerald); }
+  .usage .budget span.warn { background: var(--amber); } .usage .budget span.over { background: var(--coral); }
+  .usage .tok { font-size: .76rem; color: var(--muted); }
+  .usage .tok code { font-family: var(--mono); }
 </style>
-<div class="logo">Reqon</div>
+<div class="brandline">
+  <svg viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="35" stroke="var(--emerald)" stroke-width="10" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="var(--emerald)" stroke-width="10" stroke-linecap="round"></line></svg>
+  <span class="logo">Reqon</span>
+</div>
 <h1>Reqon Clip</h1>
-<p>Clip postings, see your fit / EV overlay on the page, fill applications from your Reqon profile +
+<p>Clip postings, see your fit + EV overlay on the page, fill applications from your Reqon profile +
 saved answers, and mark Applied — writing back to your pipeline. <b>Never submits.</b></p>
 
-<label>Server</label>
+<label>Where's your board</label>
 <select id="serverPreset">
   <option value="cloud">Reqon Cloud (cloud.reqon.app)</option>
-  <option value="personal">Personal server…</option>
+  <option value="personal">My own server…</option>
 </select>
 
 <div id="customOriginWrap" style="display:none">
@@ -37,17 +55,24 @@ saved answers, and mark Applied — writing back to your pipeline. <b>Never subm
 </div>
 
 <label>Username</label>
-<input id="username" type="text" placeholder="your username" autocomplete="username">
+<input id="username" type="text" placeholder="you@example.com" autocomplete="username">
 
 <label>Password</label>
-<input id="password" type="password" placeholder="your password" autocomplete="current-password">
-<p style="font-size:.8rem;margin-top:6px">Signs you in and saves a session token. Your password is not stored.</p>
+<input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+<p class="fineprint">Signs you in and saves a session token. Your password is not stored.</p>
 
 <hr>
 
+<label>Appearance</label>
+<div class="seg" id="themeSeg">
+  <button type="button" data-pref="system">System</button>
+  <button type="button" data-pref="light">Light</button>
+  <button type="button" data-pref="dark">Dark</button>
+</div>
+
 <div class="toggle">
   <input id="overlay" type="checkbox">
-  <label for="overlay">Show the on-page overlay on job postings</label>
+  <label for="overlay">Show the helper on job postings</label>
 </div>
 
 <div class="row">
@@ -55,4 +80,10 @@ saved answers, and mark Applied — writing back to your pipeline. <b>Never subm
   <button id="test" class="ghost">Test connection</button>
 </div>
 <div id="msg"></div>
+
+<hr>
+
+<label>AI usage</label>
+<div id="usage" class="usage"><div class="muted">Loading…</div></div>
+<script src="theme.js"></script>
 <script src="options.js"></script>

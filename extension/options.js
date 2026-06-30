@@ -15,6 +15,46 @@ $('serverPreset').onchange = () => {
   $('customOriginWrap').style.display = personal ? '' : 'none';
 };
 
+// Appearance: System / Light / Dark (persisted in chrome.storage.sync via theme.js).
+if (window.reqonThemeWireSeg) window.reqonThemeWireSeg($('themeSeg'));
+
+// ---- AI usage (full breakdown) — relocated here from the side panel, which now shows just the
+// daily-calls bar. Same data via bg.js → /api/assist/usage. ----
+const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const urow = (l, v) => `<div class="urow"><span>${escHtml(l)}</span><span class="v">${escHtml(v)}</span></div>`;
+async function loadUsage() {
+  const el = $('usage');
+  if (!el) return;
+  const r = await new Promise((res) => chrome.runtime.sendMessage({ type: 'assistUsage' }, res));
+  if (!r || r.ok === false) {
+    el.innerHTML = (r && r.keySet === false)
+      ? '<div class="muted">Add an OpenAI key in the board Settings to enable AI.</div>'
+      : '<div class="muted">Usage unavailable — connect your board first, then reopen this page.</div>';
+    return;
+  }
+  if (!r.keySet) { el.innerHTML = '<div class="muted">No OpenAI key set. Add one in the board Settings to enable AI drafts.</div>'; return; }
+  const t = r.today || {}, w7 = r.last7d || {}, w30 = r.last30d || {};
+  const money = (v) => v == null ? '—' : '$' + v.toFixed(2);
+  let html =
+    urow('Calls today', `${t.calls || 0}${t.cap ? ' / ' + t.cap : ''}`) +
+    urow('Tokens today', (t.tokens || 0).toLocaleString()) +
+    urow('Last 7 days', `${(w7.tokens || 0).toLocaleString()} tok` + (w7.estCost != null ? ` · ${money(w7.estCost)}` : '')) +
+    urow('Last 30 days', `${(w30.tokens || 0).toLocaleString()} tok` + (w30.estCost != null ? ` · ${money(w30.estCost)}` : '')) +
+    urow('Model', escHtml(r.model || '—'));
+  if (r.monthlyBudget != null && r.budgetUsedPct != null) {
+    const pct = r.budgetUsedPct;
+    const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
+    html += `<div class="budget"><span class="${cls}" style="width:${Math.min(100, pct)}%"></span></div>` +
+      `<div class="tok">${money(w30.estCost)} of ${money(r.monthlyBudget)} monthly budget (${pct}%)</div>`;
+  } else if (r.ratePer1M == null) {
+    html += '<div class="tok" style="margin-top:6px">Set <code>OPENAI_PRICE_PER_1M</code> (and optionally <code>ASSIST_MONTHLY_BUDGET</code>) in the board to estimate $ cost.</div>';
+  }
+  html += `<div class="tok" style="margin-top:8px">${escHtml(r.note || '')} <a class="link" id="usageDash" href="#">Open OpenAI usage ↗</a></div>`;
+  el.innerHTML = html;
+  const d = $('usageDash'); if (d) d.onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: r.dashboard || 'https://platform.openai.com/usage' }); };
+}
+loadUsage();
+
 async function ensureHostPermission(origin) {
   try {
     const pattern = origin.replace(/\/$/, '') + '/*';

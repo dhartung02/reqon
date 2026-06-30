@@ -44,5 +44,25 @@
       "css": ["overlay.css"],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["fonts/Fraunces.ttf", "fonts/SplineSans.ttf", "fonts/SplineSansMono.ttf"],
+      "matches": [
+        "https://job-boards.greenhouse.io/*",
+        "https://boards.greenhouse.io/*",
+        "https://jobs.ashbyhq.com/*",
+        "https://jobs.lever.co/*",
+        "https://www.linkedin.com/*",
+        "https://simplify.jobs/*",
+        "https://apply.workable.com/*",
+        "https://*.workable.com/*",
+        "https://jobs.smartrecruiters.com/*",
+        "https://*.recruitee.com/*",
+        "https://*.teamtailor.com/*",
+        "https://*.jobs.personio.de/*",
+        "https://*.jobs.personio.com/*"
+      ]
+    }
   ]
 }

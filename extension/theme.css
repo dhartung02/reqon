@@ -1,0 +1,98 @@
+/* Reqon Clip — shared "Emerald Command" tokens, fonts, and base components.
+   Linked by popup.html, sidepanel.html, and options.html so the extension matches the
+   web board (public/index.html) and the app (app/src/theme.ts). The in-page overlay is
+   self-contained — see overlay.css. Theme is set via data-theme on <html> by theme.js. */
+
+@font-face { font-family:"Fraunces"; src:url("fonts/Fraunces.ttf") format("truetype"); font-weight:400 900; font-display:swap; }
+@font-face { font-family:"Spline Sans"; src:url("fonts/SplineSans.ttf") format("truetype"); font-weight:300 700; font-display:swap; }
+@font-face { font-family:"Spline Sans Mono"; src:url("fonts/SplineSansMono.ttf") format("truetype"); font-weight:400 700; font-display:swap; }
+
+:root, [data-theme="dark"] {
+  --canvas:#0B0C0E; --elem:#16181C; --elem2:#1B1F25; --line:#232A31; --line2:#2E3741;
+  --text:#E2E8F0; --text2:#94A3B8; --muted:#64748B;
+  --emerald:#00E5A3; --amber:#FFB800; --teal:#2DD4BF; --coral:#F87171; --info:#79A6E0;
+  --btnink:#06211a; --ringbg:rgba(255,255,255,.04);
+  --serif:'Fraunces',Georgia,serif;
+  --sans:'Spline Sans',-apple-system,system-ui,sans-serif;
+  --mono:'Spline Sans Mono',ui-monospace,Menlo,monospace;
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --canvas:#F4F6F9; --elem:#FFFFFF; --elem2:#EEF2F7; --line:#E3E8EF; --line2:#D3DBE5;
+  --text:#0B1220; --text2:#475569; --muted:#7C8A9C;
+  --emerald:#00936B; --amber:#B45309; --teal:#0D9488; --coral:#DC2626; --info:#3B6FB0;
+  --btnink:#FFFFFF; --ringbg:rgba(2,12,27,.04);
+  color-scheme: light;
+}
+
+/* tier → color + word (Strong / Possible / Long shot) */
+[data-tier="a"],[data-tier="A"]{--tier:var(--emerald)}
+[data-tier="b"],[data-tier="B"]{--tier:var(--info)}
+[data-tier="c"],[data-tier="C"]{--tier:var(--muted)}
+[data-tier=""]{--tier:var(--muted)}
+
+/* status roles */
+[data-st="saved"]{--st:var(--text2)}
+[data-st="ready"]{--st:var(--emerald)}
+[data-st="applied"]{--st:var(--teal)}
+[data-st="interviewing"]{--st:var(--info)}
+[data-st="rejected"]{--st:var(--coral)}
+
+* { box-sizing: border-box; }
+
+/* ---- shared components ---- */
+.card { background: var(--elem); border: 1px solid var(--line); border-radius: 13px; padding: 13px; }
+.muted { color: var(--muted); }
+
+.role { font-family: var(--serif); font-weight: 600; font-size: 1.02rem; line-height: 1.15; color: var(--text); }
+.company { color: var(--text2); font-size: .8rem; margin-top: 1px; }
+
+.metrics { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
+.chip { font: 600 .64rem/1 var(--mono); color: var(--text2); background: var(--elem2);
+        border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+.chip b { color: var(--text); font-weight: 700; }
+.chip.ev b, .chip b.ev { color: var(--emerald); }
+
+.status { font: 600 .8rem var(--sans); margin-top: 2px; color: var(--st, var(--text2)); }
+.s-open { color: var(--emerald); } .s-applied { color: var(--teal); }
+.s-rejected { color: var(--coral); } .s-none { color: var(--text2); }
+
+.btn { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; border: 0;
+       border-radius: 10px; padding: 11px; font: 700 .88rem var(--sans); cursor: pointer; }
+.btn-primary { background: var(--emerald); color: var(--btnink); font-weight: 700; }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--line2); font-weight: 600; }
+.btn-ghost:hover { border-color: var(--emerald); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+a.link { color: var(--emerald); font-size: .78rem; text-decoration: none; display: inline-block; }
+
+.ok { color: var(--emerald); } .err { color: var(--coral); }
+
+/* form fields */
+label.eyebrow, .eyebrow { display: block; font: 600 .6rem/1 var(--mono); letter-spacing: .06em;
+        text-transform: uppercase; color: var(--muted); }
+input[type=text], input[type=password], input[type=url], select, textarea, .tk-in {
+  width: 100%; box-sizing: border-box; background: var(--elem2); border: 1px solid var(--line);
+  color: var(--text); border-radius: 9px; padding: 9px 11px; font: .84rem var(--sans); }
+input:focus, select:focus, textarea:focus, .tk-in:focus { outline: none; border-color: var(--emerald); }
+
+/* ---- the signature score circle ---- */
+.scorewrap { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 46px; }
+.scorecirc { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+             background: var(--ringbg); border: 2px solid var(--tier); }
+.scorecirc span { font: 600 1rem var(--serif); color: var(--tier); }
+.scorelbl { font: 600 .5rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--tier); }
+
+/* small tier dot for opportunity lists */
+.tdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--tier); }
+
+/* ---- appearance switch (System / Light / Dark) ---- */
+.themebtn { display: inline-grid; place-items: center; background: transparent; border: 1px solid var(--line2);
+            color: var(--text2); cursor: pointer; line-height: 0; padding: 6px; border-radius: 8px; }
+.themebtn svg { width: 16px; height: 16px; display: block; }
+.themebtn:hover { border-color: var(--emerald); color: var(--text); }
+.seg { display: inline-flex; align-self: flex-start; gap: 0; border: 1px solid var(--line2); border-radius: 9px; overflow: hidden; padding: 0; background: var(--elem2); }
+.seg button { background: transparent; border: 0; color: var(--text2); cursor: pointer;
+              font: 600 .78rem var(--sans); padding: 7px 12px; }
+.seg button:hover { color: var(--text); }
+.seg button.on { background: var(--emerald); color: var(--btnink); }

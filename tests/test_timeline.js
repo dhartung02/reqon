@@ -1,4 +1,4 @@
-// Unit tests for the per-role timeline (lib/timeline.js, ROADMAP-V3 P2.5). Pure + deterministic.
+// Unit tests for the per-role timeline (lib/timeline.js, ROADMAP P2.5). Pure + deterministic.
 // Run: node tests/test_timeline.js
 const assert = require('node:assert');
 const { buildTimeline, captureLabel } = require('../lib/timeline');

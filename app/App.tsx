@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Pressable, AppState, ActivityIndicator, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { rolesInLane, EMPTY_FILTER, type Lane, type SortKey, type Status, type RoleFilter } from './src/model';
+import { rolesInLane, LANES, EMPTY_FILTER, type Lane, type StatusLane, type SortKey, type Status, type RoleFilter } from './src/model';
 import { todayActionCount } from './src/today';
 import { fonts, useThemedStyles, useScheme, ThemeProvider, type Palette } from './src/theme';
 import { EntitlementsProvider } from './src/entitlements';
 import { useRoles } from './src/store/useRoles';
 import { ReqonGlyph } from './src/components/ReqonGlyph';
-import { SettingsIcon } from './src/components/SettingsIcon';
 import { TabBar } from './src/components/TabBar';
+import { BottomTabBar, type Section } from './src/components/BottomTabBar';
 import { NavRail } from './src/components/NavRail';
 import { ControlBar } from './src/components/ControlBar';
 import { useLayout } from './src/useLayout';
@@ -52,6 +52,9 @@ const VIEW_TITLE: Record<Lane, string> = {
   analytics: 'Analytics',
 };
 
+// The status lanes shown as the secondary pill row inside the Board section (phone bottom-tab nav).
+const STATUS_LANES = LANES.filter((l) => l.key !== 'today' && l.key !== 'analytics');
+
 function AppInner() {
   const { c, styles } = useThemedStyles(makeStyles);
   const { scheme } = useScheme();
@@ -63,6 +66,7 @@ function AppInner() {
   });
   const { roles, loading, setStatus, setStatusMany, update, remove, add, refresh } = useRoles();
   const [lane, setLane] = useState<Lane>('today');
+  const [boardLane, setBoardLane] = useState<StatusLane>('open'); // remembers the last status lane for the Board tab
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -136,6 +140,11 @@ function AppInner() {
     });
     return () => sub.remove();
   }, [autoSync]);
+
+  // Remember the active status lane so the Board bottom-tab returns to where you left off.
+  useEffect(() => {
+    if (lane !== 'today' && lane !== 'analytics') setBoardLane(lane as StatusLane);
+  }, [lane]);
 
   // Refresh the notification-bell unread badge when a server is configured + after each sync (P1.8).
   useEffect(() => {
@@ -338,6 +347,14 @@ function AppInner() {
   }
 
   const isPipeline = lane !== 'today' && lane !== 'analytics';
+  // Phone bottom-tab section derived from the active lane; Settings is a modal, not a lane.
+  const section: Section = lane === 'today' ? 'today' : lane === 'analytics' ? 'insights' : 'board';
+  const onSection = (s: Section) => {
+    if (s === 'settings') { setShowSettings(true); return; }
+    if (s === 'today') setLane('today');
+    else if (s === 'insights') setLane('analytics');
+    else setLane(boardLane);
+  };
   // The lane body (ternary preserves the StatusLane narrowing for PipelineScreen). Shared by both
   // layouts; on wide the pipeline list sits in the master column with the detail pane beside it.
   const laneBody =
@@ -413,35 +430,31 @@ function AppInner() {
         </View>
       ) : (
         <View style={styles.shell}>
-          <View style={styles.brandbar}>
-            <View style={styles.brandLeft}>
-              <ReqonGlyph size={26} />
-              <View>
-                <Text style={styles.brand}>REQON</Text>
-                <Text style={styles.title}>{VIEW_TITLE[lane]}</Text>
-              </View>
-            </View>
-            <View style={styles.brandRight}>
-              <Pressable style={styles.iconBtn} onPress={() => setShowNotifs(true)} hitSlop={22} accessibilityLabel="Notifications">
-                <Text style={styles.bell}>🔔</Text>
-                {unread > 0 ? (
-                  <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>
-                ) : null}
-              </Pressable>
-              <Pressable style={styles.iconBtn} onPress={() => setShowSettings(true)} hitSlop={22} accessibilityLabel="Settings & sync">
-                <SettingsIcon size={18} color={c.textBase} />
-              </Pressable>
-              <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add role">
-                <Text style={styles.addBtnText}>+</Text>
-              </Pressable>
-            </View>
+          <View style={styles.topActions}>
+            <Pressable style={styles.iconBtn} onPress={() => setShowNotifs(true)} hitSlop={22} accessibilityLabel="Notifications">
+              <Text style={styles.bell}>🔔</Text>
+              {unread > 0 ? (
+                <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>
+              ) : null}
+            </Pressable>
+            <Pressable style={styles.addBtn} onPress={() => setShowAdd(true)} hitSlop={14} accessibilityLabel="Add a job">
+              <Text style={styles.addBtnText}>+</Text>
+            </Pressable>
           </View>
 
-          <TabBar active={lane} counts={counts} onChange={setLane} />
-
-          {isPipeline ? controlBar : null}
+          {section === 'board' ? (
+            <>
+              <Text style={styles.screenTitle}>Your jobs</Text>
+              <TabBar lanes={STATUS_LANES} active={lane} counts={counts} onChange={(l) => { setBoardLane(l as StatusLane); setLane(l); }} />
+              {controlBar}
+            </>
+          ) : section === 'insights' ? (
+            <Text style={styles.screenTitle}>Insights</Text>
+          ) : null}
 
           <View style={styles.body}>{laneBody}</View>
+
+          <BottomTabBar active={showSettings ? 'settings' : section} onChange={onSection} />
         </View>
       )}
       <AddRoleModal visible={showAdd} onClose={() => setShowAdd(false)} onAdd={add} />
@@ -536,6 +549,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   loadSpin: { marginTop: 16 },
   shell: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
+  topActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 8 },
+  screenTitle: { fontFamily: fonts.serif, fontSize: 26, fontWeight: '600', color: c.textHigh, letterSpacing: -0.3, marginBottom: 10 },
   brandbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },

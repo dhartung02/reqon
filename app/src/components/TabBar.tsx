@@ -8,10 +8,12 @@ export function TabBar({
   active,
   counts,
   onChange,
+  lanes = LANES,
 }: {
   active: Lane;
   counts: Record<Lane, number>;
   onChange: (l: Lane) => void;
+  lanes?: { key: Lane; label: string }[];
 }) {
   const { c, styles } = useThemedStyles(makeStyles);
   return (
@@ -21,7 +23,7 @@ export function TabBar({
       style={styles.bar}
       contentContainerStyle={styles.row}
     >
-      {LANES.map(({ key, label }) => {
+      {lanes.map(({ key, label }) => {
         const on = key === active;
         return (
           <Pressable

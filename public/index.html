@@ -3650,6 +3650,21 @@ async function apiJson(path, opts){
     throw new Error(`unexpected non-JSON response (HTTP ${r.status})${txt?': '+txt.slice(0,120):''}`);
   }
 }
+// Kick a long mail/scout run as a background job and poll it to completion, so a slow run never
+// holds the HTTP request open past a hosted proxy's timeout (Render etc.). Tolerates transient poll
+// hiccups; onTick(job, secs) fires each poll for a live status line.
+async function pollJob(jobId, onTick){
+  const t0=Date.now(); let errs=0;
+  for(;;){
+    await new Promise(r=>setTimeout(r,2000));
+    let job;
+    try{ const j=await apiJson("/api/jobs/"+encodeURIComponent(jobId),{cache:"no-store"}); job=j.job; errs=0; }
+    catch(e){ if(++errs>=5) throw new Error("lost contact with the server during the run ("+e.message+")"); continue; }
+    if(!job){ if(++errs>=5) throw new Error("the run job is no longer on the server."); continue; }
+    if(onTick) onTick(job, Math.round((Date.now()-t0)/1000));
+    if(job.status==="succeeded"||job.status==="failed"||job.status==="cancelled") return job;
+  }
+}
 async function loadMailConfig(){
   try{const m=await apiJson("/api/mail/config",{cache:"no-store"});
     if(!m||!m.ok)return;
@@ -3672,11 +3687,20 @@ async function mailSave(){
   }catch(e){SET("mailStatus").textContent="Failed: "+e.message;}
 }
 async function mailRun(apply){
-  SET("mailStatus").textContent=apply?"Running…":"Dry run…"; SET("mailReport").style.display="none";
+  SET("mailStatus").textContent=apply?"Starting run…":"Starting dry run…"; SET("mailReport").style.display="none";
   try{
     await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
     SET("mailPass").value="";
-    const j=await apiJson("/api/mail/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})});
+    const start=await apiJson("/api/mail/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply,async:true})});
+    if(!start.ok)throw new Error(start.error||"could not start the run");
+    let j=start;   // pre-async server answers synchronously with the full result; new server returns a jobId to poll
+    if(start.jobId){
+      const verb=apply?"Running":"Dry run";
+      SET("mailStatus").textContent=verb+"… (large mailboxes can take a minute)";
+      const job=await pollJob(start.jobId,(jb,secs)=>{ SET("mailStatus").textContent=verb+"… "+secs+"s"; });
+      j=job.result||{};
+      if(job.status!=="succeeded")throw new Error(job.error||j.error||"run failed");
+    }
     if(j.report){SET("mailReport").textContent=j.report;SET("mailReport").style.display="block";}
     if(!j.ok)throw new Error(j.error||"run failed");
     SET("mailStatus").textContent=apply?"Ran on the server.":"Dry run complete — nothing changed.";
@@ -3712,11 +3736,20 @@ SET("emailScoutEnable").onchange=async(e)=>{
 SET("emailScoutGotoGmail")&&(SET("emailScoutGotoGmail").onclick=(e)=>{e.preventDefault();openSettingsTo("digest");});
 SET("emailScoutGotoSources")&&(SET("emailScoutGotoSources").onclick=(e)=>{e.preventDefault();openSettingsTo("sources");});
 async function emailScoutRun(apply){
-  SET("emailScoutStatus").textContent=apply?"Running…":"Dry run…"; SET("emailScoutReport").style.display="none";
+  SET("emailScoutStatus").textContent=apply?"Starting…":"Starting dry run…"; SET("emailScoutReport").style.display="none";
   try{
     await fetch("/api/mail/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mailBody())}); // persist edits first
     SET("mailPass").value="";
-    const j=await apiJson("/api/mail/scout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply})});
+    const start=await apiJson("/api/mail/scout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply,async:true})});
+    if(!start.ok)throw new Error(start.error||"could not start the run");
+    let j=start;   // pre-async server answers synchronously; new server returns a jobId to poll
+    if(start.jobId){
+      const verb=apply?"Scanning your inbox":"Dry run";
+      SET("emailScoutStatus").textContent=verb+"…";
+      const job=await pollJob(start.jobId,(jb,secs)=>{ SET("emailScoutStatus").textContent=verb+"… "+secs+"s"; });
+      j=job.result||{};
+      if(job.status!=="succeeded")throw new Error(job.error||j.error||"run failed");
+    }
     if(j.report){SET("emailScoutReport").textContent=j.report;SET("emailScoutReport").style.display="block";}
     if(!j.ok)throw new Error(j.error||"run failed");
     const c=(j.summary&&j.summary.counts)||{};

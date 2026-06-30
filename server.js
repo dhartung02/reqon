@@ -375,7 +375,7 @@ const app = express();
 //   api       (api.reqon.app)       — backend + /health only; root returns JSON; no board UI.
 //   cloud     (cloud.reqon.app)     — serves the board UI and reverse-proxies API paths to
 //                                    REQON_API_BASE_URL.
-//   marketing (reqon.app)           — public placeholder; no API, no data, no auth.
+//   marketing (reqon.app)           — public site; the ONLY write surface is the beta waitlist.
 //   all       (local default)       — monolith (UI + API in one process); unchanged dev behavior.
 const REQON_ROLE = (process.env.REQON_ROLE || 'all').toLowerCase();
 const SERVE_API = REQON_ROLE === 'all' || REQON_ROLE === 'api';
@@ -388,12 +388,51 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, service: SERVE_API ? 'reqon-api' : 'reqon-cloud', role: REQON_ROLE });
 });
 
+// Public beta-waitlist capture (private preview). Append-only to agent/waitlist.json, deduped by
+// email. This is the single write surface allowed in the otherwise-locked-down marketing role —
+// collecting beta signups is the whole point of the preview site. Unauthenticated by design; the
+// marketing form posts same-origin. Kept deliberately minimal: no reads, no list, no PII beyond
+// what the visitor types into the form.
+const WAITLIST_FILE = path.join(DATA_DIR, 'agent', 'waitlist.json');
+function handleWaitlist(req, res) {
+  try {
+    const b = req.body || {};
+    const email = String(b.email || '').trim().toLowerCase();
+    if (!email || email.length > 200 || !/.+@.+\..+/.test(email)) {
+      return res.status(400).json({ ok: false, error: 'valid email required' });
+    }
+    const clip = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    let list = [];
+    try { const j = JSON.parse(fs.readFileSync(WAITLIST_FILE, 'utf8')); if (Array.isArray(j)) list = j; } catch (e) {}
+    if (!list.some((e) => e && String(e.email || '').toLowerCase() === email)) {
+      list.push({
+        email,
+        name: clip(b.name, 120),
+        role: clip(b.role, 120),
+        intent: b.intent === 'updates' ? 'updates' : 'beta',
+        pain: clip(b.pain, 500),
+        status: 'waiting',
+        at: new Date().toISOString(),
+      });
+      fs.mkdirSync(path.dirname(WAITLIST_FILE), { recursive: true });
+      const tmp = WAITLIST_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(list, null, 2));
+      fs.renameSync(tmp, WAITLIST_FILE);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: 'could not save' });
+  }
+}
+
 // Marketing role: serves marketing/index.html at / with self-hosted fonts + images.
-// express.static handles all assets; the catch-all keeps the API surface unexposed.
+// express.static handles all assets; the catch-all keeps the rest of the API surface unexposed.
 if (SERVE_MARKETING) {
   app.use(express.static(path.join(__dirname, 'marketing')));
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'marketing', 'index.html')));
-  // Block every other path — no API, auth, or write surface is reachable in this role.
+  // The one permitted write — beta-waitlist signups (own body parser; runs before the catch-all).
+  app.post('/api/waitlist', express.json({ limit: '16kb' }), handleWaitlist);
+  // Block every other path — no other API, auth, or write surface is reachable in this role.
   app.use((req, res) => res.status(404).type('text').send('Not found'));
 }
 
@@ -417,6 +456,9 @@ if (REQON_ROLE === 'cloud') {
 
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false }));
+// Beta-waitlist capture for the api/all roles too (the marketing role wires its own copy above,
+// before its catch-all). Public + unauthenticated by design; registered before the auth gate.
+if (SERVE_API) app.post('/api/waitlist', handleWaitlist);
 // ROADMAP PR0 slice 3: bind every request to its tenant namespace. Multi-user OFF -> owner
 // (legacy paths; a no-op). resolveUserId/sessionUser below are function declarations (hoisted), so
 // this closure resolves them at request time. AsyncLocalStorage propagates through async handlers.

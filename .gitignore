@@ -90,3 +90,5 @@ agent/jobs.json
 
 # server-acquired company logo cache (shared, regenerable)
 agent/logos/
+agent/waitlist.json
+agent/waitlist.json.tmp

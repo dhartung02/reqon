@@ -9,7 +9,7 @@
 <meta property="og:description" content="Discover roles, rank them by fit, track every follow-up, and move every opportunity from saved to offer. Your job search, organized.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://reqon.app">
-<meta name="theme-color" content="#0B0C0E">
+<meta name="theme-color" content="#FBFBF9">
 <link rel="icon" href="images/glyph.svg" type="image/svg+xml">
 <style>
 @font-face{font-family:"Fraunces";src:url("fonts/Fraunces.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
@@ -17,15 +17,14 @@
 @font-face{font-family:"Spline Sans Mono";src:url("fonts/SplineSansMono.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{margin:0;background:#0B0C0E}
+body{margin:0;background:#FBFBF9}
 img{display:block;max-width:100%}
-::selection{background:rgba(0,229,163,.25);color:#fff}
+::selection{background:rgba(0,229,163,.25);color:#06211a}
 @keyframes ping{0%{transform:scale(1);opacity:.55}80%,100%{transform:scale(2.6);opacity:0}}
 sc-if{display:contents}
 a{text-decoration:none;color:inherit}
-/* Mobile nav: the design's header has a fixed height with a wrapping flex row,
-   which overflows on narrow screens. Let it grow and drop the links to their
-   own full-width row under the logo + actions. */
+/* Mobile nav: the design's header is a fixed-height wrapping flex row that overflows on
+   narrow screens. Let it grow and drop the links to their own full-width row. */
 @media (max-width:720px){
   header>div{height:auto!important;padding-top:13px!important;padding-bottom:13px!important;row-gap:12px}
   header>div>nav{order:3;width:100%;gap:12px 20px!important}
@@ -33,25 +32,25 @@ a{text-decoration:none;color:inherit}
 </style>
 </head>
 <body>
-<div id="dc-root" style="--canvas:#0B0C0E;--elem:#16181C;--elem2:#1B1F25;--line:#232A31;--emerald:#00E5A3;--amber:#FFB800;--teal:#2DD4BF;--coral:#F87171;--muted:#64748B;--text:#E2E8F0;--text2:#94A3B8;--serif:'Fraunces',Georgia,serif;--sans:'Spline Sans',-apple-system,system-ui,sans-serif;--mono:'Spline Sans Mono',ui-monospace,Menlo,monospace;background:var(--canvas);color:var(--text);font-family:var(--sans);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:clip">
+<div id="dc-root" style="--wrap:min(1360px,92vw);--canvas:#FBFBF9;--elem:#FFFFFF;--elem2:#F4F5F3;--line:#DADDD7;--headerbg:rgba(251,251,249,.82);--chrome:#F1F2EF;--emerald:#00E5A3;--amber:#FFB800;--teal:#2DD4BF;--coral:#F87171;--muted:#6B7480;--text:#15181B;--text2:#43505C;--shadow:0 22px 55px -26px rgba(20,30,28,.30);--serif:'Fraunces',Georgia,serif;--sans:'Spline Sans',-apple-system,system-ui,sans-serif;--mono:'Spline Sans Mono',ui-monospace,Menlo,monospace;background:var(--canvas);color:var(--text);font-family:var(--sans);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden">
 
 <!-- ============ NAV ============ -->
-<header style="position:sticky;top:0;z-index:50;background:rgba(11,12,14,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:18px;height:68px;flex-wrap:wrap">
-    <a href="#/home" data-route="home" onclick="{{ go }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+<header style="position:sticky;top:0;z-index:50;background:var(--headerbg);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:18px;height:68px;flex-wrap:wrap">
+    <a href="#/home" data-route="home" data-act="go" style="display:flex;align-items:center;gap:10px;cursor:pointer">
       <svg viewBox="0 0 100 100" fill="none" style="width:26px;height:26px;flex:none"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="10" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="10" stroke-linecap="round"></line></svg>
       <span style="font-family:var(--mono);font-weight:600;letter-spacing:.22em;font-size:.82rem;text-transform:uppercase;color:var(--emerald)">Reqon</span>
     </a>
     <nav style="display:flex;align-items:center;gap:30px;flex-wrap:wrap">
-      <a href="#/home" data-route="home" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Home<sc-if value="{{ isHome }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
-      <a href="#/how" data-route="how" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">How it works<sc-if value="{{ isHow }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
-      <a href="#/apps" data-route="apps" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Apps<sc-if value="{{ isApps }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
-      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Pricing<sc-if value="{{ isPricing }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
-      <a href="#/about" data-route="about" onclick="{{ go }}" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">About<sc-if value="{{ isAbout }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/home" data-route="home" data-act="go" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Home<sc-if value="{{ isHome }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/how" data-route="how" data-act="go" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">How it works<sc-if value="{{ isHow }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/apps" data-route="apps" data-act="go" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Apps<sc-if value="{{ isApps }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/pricing" data-route="pricing" data-act="go" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">Pricing<sc-if value="{{ isPricing }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
+      <a href="#/about" data-route="about" data-act="go" style="position:relative;font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);cursor:pointer" style-hover="color:var(--text)">About<sc-if value="{{ isAbout }}"><span style="position:absolute;left:0;right:0;bottom:-7px;height:2px;background:var(--emerald);border-radius:2px"></span></sc-if></a>
     </nav>
     <div style="display:flex;align-items:center;gap:12px">
       <a href="https://cloud.reqon.app" style="font-weight:600;font-size:.9rem;color:var(--text);padding:9px 6px;cursor:pointer" style-hover="color:var(--emerald)">Sign in</a>
-      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.88rem;background:var(--emerald);color:#06211a;cursor:pointer;white-space:nowrap" style-hover="background:#26efb3">Get started</a>
+      <a href="#/pricing" data-route="pricing" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.88rem;background:var(--emerald);color:#06211a;cursor:pointer;white-space:nowrap" style-hover="background:#26efb3">Get started</a>
     </div>
   </div>
 </header>
@@ -60,33 +59,27 @@ a{text-decoration:none;color:inherit}
 <sc-if value="{{ isHome }}">
 <section style="position:relative;padding:64px 0 0;text-align:center;overflow:hidden">
   <div style="position:absolute;inset:-20% 0 auto;height:560px;background:radial-gradient(60% 70% at 50% 0%,rgba(0,229,163,.13),transparent 70%);pointer-events:none"></div>
-  <div style="position:relative;max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="position:relative;max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:7px 15px"><span style="position:relative;width:7px;height:7px;flex:none"><span style="position:absolute;inset:0;border-radius:50%;background:var(--emerald)"></span><span style="position:absolute;inset:0;border-radius:50%;background:var(--emerald);animation:ping 2.4s ease-out infinite"></span></span>Now in private preview</span>
     <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.5rem,6.4vw,4.4rem);margin:24px auto 0;max-width:17ch">Stop letting <span style="color:var(--emerald)">good roles</span> slip away.</h1>
     <p style="font-size:clamp(1.05rem,2.1vw,1.32rem);color:var(--text2);max-width:60ch;margin:22px auto 0">Reqon finds jobs that actually fit you, ranks them so you know what to do first, and keeps every one moving — from the day you save it to the day you land an offer.</p>
     <div style="margin-top:32px;display:flex;gap:13px;justify-content:center;flex-wrap:wrap">
-      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Start your free trial →</a>
-      <a href="#/how" data-route="how" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">See how it works</a>
+      <a href="#/pricing" data-route="pricing" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Start your free trial →</a>
+      <a href="#/how" data-route="how" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">See how it works</a>
     </div>
     <div style="margin-top:18px;font-family:var(--mono);font-size:.76rem;letter-spacing:.04em;color:var(--muted)">No auto-apply · you review every action · your data stays yours</div>
     <div style="margin-top:10px;font-family:var(--serif);font-style:italic;font-size:.98rem;color:var(--text2);opacity:.8">Your job search, run like an operation.</div>
   </div>
 
   <!-- product window -->
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="position:relative;margin-top:46px">
-      <div style="position:relative;z-index:3;max-width:920px;margin:0 auto -26px;display:flex;flex-wrap:wrap;justify-content:center;background:var(--elem);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px -30px rgba(0,0,0,.8)">
-        <div style="flex:1 1 130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Jobs tracked</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1">159</div></div>
-        <div style="flex:1 1 130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Strong matches</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1;color:var(--emerald)">50</div></div>
-        <div style="flex:1 1 130px;padding:14px 18px;border-right:1px solid var(--line);text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Ready to apply</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1;color:var(--teal)">27</div></div>
-        <div style="flex:1 1 130px;padding:14px 18px;text-align:left"><div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Time to follow up</div><div style="font-family:var(--serif);font-size:1.5rem;font-weight:600;margin-top:3px;line-height:1;color:var(--amber)">52</div></div>
-      </div>
-      <div style="position:relative;max-width:1040px;margin:0 auto;border:1px solid var(--line);border-radius:16px 16px 0 0;overflow:hidden;background:var(--elem);box-shadow:0 50px 110px -50px rgba(0,229,163,.28)">
-        <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);background:#101216">
+      <div style="position:relative;max-width:1040px;margin:0 auto;border:1px solid var(--line);border-radius:16px 16px 0 0;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--chrome)">
           <span style="display:flex;gap:7px"><i style="width:11px;height:11px;border-radius:50%;display:block;background:#F87171"></i><i style="width:11px;height:11px;border-radius:50%;display:block;background:#FFB800"></i><i style="width:11px;height:11px;border-radius:50%;display:block;background:#00E5A3"></i></span>
           <span style="flex:1;text-align:center;font-family:var(--mono);font-size:.74rem;color:var(--muted);letter-spacing:.03em">cloud.reqon.app — your job board</span>
         </div>
-        <img src="images/dashboard-overview.png" alt="The Reqon job board: roles ranked by fit and tracked through follow-ups, interviews, and offers." style="width:100%;display:block">
+        <img src="images/board.png" alt="The Reqon job board: roles ranked best-first by match strength and tracked through follow-ups, interviews, and offers." style="width:100%;display:block">
       </div>
       <div style="position:absolute;left:0;right:0;bottom:0;height:160px;background:linear-gradient(to bottom,transparent,var(--canvas));pointer-events:none"></div>
     </div>
@@ -95,7 +88,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- source strip -->
 <div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--elem)">
-  <div style="max-width:1140px;margin:0 auto;padding:22px 28px;display:flex;align-items:center;gap:18px 26px;flex-wrap:wrap;justify-content:center">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:22px 28px;display:flex;align-items:center;gap:18px 26px;flex-wrap:wrap;justify-content:center">
     <span style="font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Jobs come straight from</span>
     <span style="font-family:var(--mono);font-size:.84rem;color:var(--text2)">Greenhouse</span>
     <span style="font-family:var(--mono);font-size:.84rem;color:var(--text2)">Ashby</span>
@@ -107,25 +100,25 @@ a{text-decoration:none;color:inherit}
 
 <!-- problem -->
 <section style="padding:84px 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">The problem</span>
     <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.02em;font-size:clamp(1.8rem,4.4vw,3rem);max-width:20ch;margin-top:12px">A real job search ends up scattered across a dozen places.</h2>
     <p style="color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:62ch">Spreadsheets, browser tabs, email threads, saved postings, recruiter messages, sticky notes. The hard part isn't finding more jobs — it's keeping the right ones moving before they go stale.</p>
     <div style="display:flex;flex-wrap:wrap;gap:9px;margin-top:30px">
       <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px">Spreadsheets</span>
       <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px">Browser tabs</span>
-      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.8">Email threads</span>
-      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.7">Saved postings</span>
-      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.55">Recruiter DMs</span>
-      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.4">Sticky notes</span>
-      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.3">Calendar reminders</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.9">Email threads</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.82">Saved postings</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.74">Recruiter DMs</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.66">Sticky notes</span>
+      <span style="font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--elem);border:1px solid var(--line);border-radius:8px;padding:8px 13px;opacity:.58">Calendar reminders</span>
     </div>
   </div>
 </section>
 
 <!-- 3 step overview -->
 <section style="padding:0 0 84px">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">How it works</span>
     <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.7rem,3.6vw,2.6rem);margin-top:12px">Find. Focus. Follow through.</h2>
     <p style="color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:58ch">One simple loop instead of a dozen open tabs — built to protect your attention, not pad your activity.</p>
@@ -146,7 +139,7 @@ a{text-decoration:none;color:inherit}
         <p style="color:var(--text2);margin-top:8px;font-size:.96rem">Each job moves through one clear track from saved to offer, with reminders so a promising lead never quietly goes cold.</p>
       </div>
     </div>
-    <div style="margin-top:26px"><a href="#/how" data-route="how" onclick="{{ go }}" style="font-family:var(--mono);font-size:.82rem;letter-spacing:.04em;color:var(--emerald);cursor:pointer" style-hover="text-decoration:underline">See how it works in detail →</a></div>
+    <div style="margin-top:26px"><a href="#/how" data-route="how" data-act="go" style="font-family:var(--mono);font-size:.82rem;letter-spacing:.04em;color:var(--emerald);cursor:pointer" style-hover="text-decoration:underline">See how it works in detail →</a></div>
   </div>
 </section>
 </sc-if>
@@ -154,7 +147,7 @@ a{text-decoration:none;color:inherit}
 <!-- ================= HOW IT WORKS ================= -->
 <sc-if value="{{ isHow }}">
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">How it works</span>
     <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:18ch">One simple loop instead of a dozen open tabs.</h1>
     <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:60ch">Reqon turns a messy search into three repeatable steps you can run in a few minutes a day.</p>
@@ -163,7 +156,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- 3 steps detailed -->
 <section style="padding:46px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem)">
       <div style="padding:30px 28px;border-right:1px solid var(--line)">
         <div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:.8rem;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none">1</span><span style="flex:1;height:1px;background:linear-gradient(to right,rgba(0,229,163,.4),transparent)"></span></div>
@@ -186,7 +179,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- deep dive 1: daily loop (text left, image right) -->
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
       <div style="flex:1 1 320px">
         <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Your daily loop</span>
@@ -198,16 +191,16 @@ a{text-decoration:none;color:inherit}
           <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Live count at every stage, from saved to offer</li>
         </ul>
       </div>
-      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 80px -40px rgba(0,229,163,.22)"><img src="images/dashboard-overview.png" alt="Reqon's daily board showing jobs grouped by what needs attention today." loading="lazy" style="width:100%;display:block"></div>
+      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/today.png" alt="Reqon's daily board showing jobs grouped by what needs attention today." loading="lazy" style="width:100%;display:block"></div>
     </div>
   </div>
 </section>
 
 <!-- deep dive 2: ranking (image left, text right) -->
 <section style="padding:64px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
-      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 70px -40px rgba(0,0,0,.75)"><img src="images/analytics.png" alt="Reqon's insights: response rate, conversion funnel, and which job sources actually reply." loading="lazy" style="width:100%;display:block"></div>
+      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/insights.png" alt="Reqon's insights: response rate, which job sources actually reply, and follow-ups going stale." loading="lazy" style="width:100%;display:block"></div>
       <div style="flex:1 1 320px">
         <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">Ranking &amp; insights</span>
         <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.6vw,2rem);margin-top:12px">Know which jobs are worth your time.</h2>
@@ -224,7 +217,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- what's inside grid -->
 <section style="padding:84px 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">What's inside</span>
     <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.7rem,3.6vw,2.6rem);margin-top:12px">Everything in one place, not ten.</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:40px">
@@ -266,7 +259,7 @@ a{text-decoration:none;color:inherit}
 <!-- ================= APPS ================= -->
 <sc-if value="{{ isApps }}">
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Apps</span>
     <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:16ch">Reqon, wherever your search is.</h1>
     <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:60ch">The same search on your desktop, in your browser, and in your pocket — always in sync.</p>
@@ -275,22 +268,22 @@ a{text-decoration:none;color:inherit}
 
 <!-- Cloud (text left, image right) -->
 <section style="padding:52px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
       <div style="flex:1 1 320px">
         <span style="display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:6px;padding:3px 9px">Reqon Cloud · web</span>
         <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.8vw,2.1rem);margin-top:14px">Your home base in the browser.</h2>
         <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">The full picture: every job ranked and tracked, today's actions sorted, and your progress at a glance. This is where you run the search.</p>
-        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap"><a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Launch Reqon Cloud →</a><a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b">See plans →</a></div>
+        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap"><a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Launch Reqon Cloud →</a><a href="#/pricing" data-route="pricing" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b">See plans →</a></div>
       </div>
-      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:0 30px 80px -40px rgba(0,229,163,.22)"><img src="images/dashboard-overview.png" alt="Reqon Cloud, the web app, showing the job board." loading="lazy" style="width:100%;display:block"></div>
+      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/board.png" alt="Reqon Cloud, the web app, showing the job board." loading="lazy" style="width:100%;display:block"></div>
     </div>
   </div>
 </section>
 
 <!-- Extension + Mobile side by side -->
 <section style="padding:64px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
       <!-- extension -->
       <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:30px;display:flex;flex-direction:column">
@@ -302,7 +295,7 @@ a{text-decoration:none;color:inherit}
           <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>See how well it fits before you apply</li>
           <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Fills facts only — never auto-submits</li>
         </ul>
-        <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:center"><div style="width:230px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--canvas);box-shadow:0 30px 60px -36px rgba(0,0,0,.8)"><img src="images/chrome-extension.png" alt="The Reqon browser extension clipping a job into the board." loading="lazy" style="width:100%;display:block"></div></div>
+        <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:center"><div style="width:300px;max-width:100%;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--canvas);box-shadow:var(--shadow)"><img src="images/extension.png" alt="The Reqon browser extension clipping a job into your board — it never submits anything for you." loading="lazy" style="width:100%;display:block"></div></div>
       </div>
       <!-- mobile -->
       <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:30px;display:flex;flex-direction:column">
@@ -314,14 +307,14 @@ a{text-decoration:none;color:inherit}
           <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Get pinged when a recruiter replies</li>
           <li style="display:flex;gap:10px;align-items:flex-start;color:var(--text2);font-size:.92rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Always in sync with your board</li>
         </ul>
-        <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:center"><div style="width:200px;border:1px solid var(--line);border-radius:26px;padding:8px;background:var(--canvas);box-shadow:0 30px 60px -36px rgba(0,0,0,.8)"><img src="images/mobile-companion.png" alt="The Reqon mobile companion showing today's actions." loading="lazy" style="width:100%;display:block;border-radius:18px"></div></div>
+        <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:center"><div style="width:220px;max-width:100%;border:1px solid var(--line);border-radius:26px;padding:8px;background:var(--canvas);box-shadow:var(--shadow)"><img src="images/mobile.png" alt="The Reqon mobile companion showing today's actions: strong matches, ready to apply, and follow-ups due." loading="lazy" style="width:100%;display:block;border-radius:18px"></div></div>
       </div>
     </div>
   </div>
 </section>
 
 <section style="padding:40px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <p style="font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;color:var(--muted)">Cloud is live in private preview. The extension and mobile companion are rolling out to preview users.</p>
   </div>
 </section>
@@ -331,16 +324,16 @@ a{text-decoration:none;color:inherit}
 <sc-if value="{{ isPricing }}">
 <section style="padding:72px 0 0;text-align:center;position:relative;overflow:hidden">
   <div style="position:absolute;inset:-30% 0 auto;height:480px;background:radial-gradient(55% 70% at 50% 0%,rgba(0,229,163,.10),transparent 70%);pointer-events:none"></div>
-  <div style="position:relative;max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="position:relative;max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Plans</span>
     <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:16ch;margin-left:auto;margin-right:auto">Two ways to run your search.</h1>
     <p style="color:var(--text2);margin:16px auto 0;font-size:1.1rem;max-width:60ch">Start with everything you need to run a focused search. Add an AI corner man when you want the extra edge. Both work across web, browser, and mobile — switch or cancel anytime.</p>
     <div style="display:flex;justify-content:center;margin-top:30px">
       <div style="display:inline-flex;align-items:center;gap:4px;background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:4px">
-        <sc-if value="{{ billingMonthly }}"><button onclick="{{ setMonthly }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.85rem;padding:9px 18px;border-radius:999px;background:var(--emerald);color:#06211a">Monthly</button></sc-if>
-        <sc-if value="{{ billingAnnual }}"><button onclick="{{ setMonthly }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.85rem;padding:9px 18px;border-radius:999px;background:transparent;color:var(--text2)">Monthly</button></sc-if>
-        <sc-if value="{{ billingAnnual }}"><button onclick="{{ setAnnual }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.85rem;padding:9px 18px;border-radius:999px;background:var(--emerald);color:#06211a">Annual <span style="opacity:.7">· 2 months free</span></button></sc-if>
-        <sc-if value="{{ billingMonthly }}"><button onclick="{{ setAnnual }}" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.85rem;padding:9px 18px;border-radius:999px;background:transparent;color:var(--text2)">Annual <span style="opacity:.7">· 2 months free</span></button></sc-if>
+        <sc-if value="{{ billingMonthly }}"><button data-act="setMonthly" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.85rem;padding:9px 18px;border-radius:999px;background:var(--emerald);color:#06211a">Monthly</button></sc-if>
+        <sc-if value="{{ billingAnnual }}"><button data-act="setMonthly" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.85rem;padding:9px 18px;border-radius:999px;background:transparent;color:var(--text2)">Monthly</button></sc-if>
+        <sc-if value="{{ billingAnnual }}"><button data-act="setAnnual" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.85rem;padding:9px 18px;border-radius:999px;background:var(--emerald);color:#06211a">Annual <span style="opacity:.7">· 2 months free</span></button></sc-if>
+        <sc-if value="{{ billingMonthly }}"><button data-act="setAnnual" style="border:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.85rem;padding:9px 18px;border-radius:999px;background:transparent;color:var(--text2)">Annual <span style="opacity:.7">· 2 months free</span></button></sc-if>
       </div>
     </div>
   </div>
@@ -361,7 +354,7 @@ a{text-decoration:none;color:inherit}
         </div>
         <sc-if value="{{ billingMonthly }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">billed monthly</div></sc-if>
         <sc-if value="{{ billingAnnual }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">$180 billed yearly</div></sc-if>
-        <a href="https://cloud.reqon.app/early-access" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer;margin-top:22px" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">Request early access</a>
+        <a href="#/join" data-route="join" data-act="go" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer;margin-top:22px" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">Request early access</a>
         <div style="height:1px;background:var(--line);margin:24px 0"></div>
         <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">What's included</div>
         <ul style="list-style:none;display:flex;flex-direction:column;gap:11px">
@@ -386,7 +379,7 @@ a{text-decoration:none;color:inherit}
         </div>
         <sc-if value="{{ billingMonthly }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">billed monthly</div></sc-if>
         <sc-if value="{{ billingAnnual }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">$360 billed yearly</div></sc-if>
-        <a href="https://cloud.reqon.app/early-access" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer;margin-top:22px" style-hover="background:#26efb3;transform:translateY(-1px)">Request early access</a>
+        <a href="#/join" data-route="join" data-act="go" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer;margin-top:22px" style-hover="background:#26efb3;transform:translateY(-1px)">Request early access</a>
         <div style="height:1px;background:var(--line);margin:24px 0"></div>
         <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Everything in Reqon Cloud, plus</div>
         <ul style="list-style:none;display:flex;flex-direction:column;gap:11px">
@@ -420,10 +413,98 @@ a{text-decoration:none;color:inherit}
 </section>
 </sc-if>
 
+<!-- ================= JOIN / BETA ================= -->
+<sc-if value="{{ isJoin }}">
+<section style="padding:72px 0 96px;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:-30% 0 auto;height:480px;background:radial-gradient(55% 70% at 50% 0%,rgba(0,229,163,.10),transparent 70%);pointer-events:none"></div>
+  <div style="position:relative;max-width:var(--wrap);margin:0 auto;padding:0 28px">
+    <div style="display:flex;flex-wrap:wrap;gap:48px 64px;align-items:flex-start">
+
+      <!-- left: pitch -->
+      <div style="flex:1 1 360px">
+        <span style="display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);background:var(--elem);border:1px solid var(--line);border-radius:999px;padding:7px 15px"><span style="width:7px;height:7px;border-radius:50%;background:var(--emerald);display:block"></span>Private preview</span>
+        <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:18px;max-width:15ch">Get early access to Reqon.</h1>
+        <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:52ch">Reqon is in private preview. Request a beta invite, or just get an email when we open up — no spam, no commitment, unsubscribe anytime.</p>
+        <ul style="list-style:none;margin-top:26px;display:flex;flex-direction:column;gap:14px">
+          <li style="display:flex;gap:12px;align-items:flex-start"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg><div><div style="font-weight:600">Be first in line</div><div style="color:var(--text2);font-size:.94rem">Beta invites go out in small batches. Early testers help shape what ships.</div></div></li>
+          <li style="display:flex;gap:12px;align-items:flex-start"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg><div><div style="font-weight:600">Your data stays yours</div><div style="color:var(--text2);font-size:.94rem">We'll only use your email to contact you about Reqon. Nothing else.</div></div></li>
+          <li style="display:flex;gap:12px;align-items:flex-start"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg><div><div style="font-weight:600">No commitment</div><div style="color:var(--text2);font-size:.94rem">Updates only until you're ready. Leave whenever you like.</div></div></li>
+        </ul>
+      </div>
+
+      <!-- right: form card -->
+      <div style="flex:1 1 380px;max-width:480px;width:100%">
+        <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:clamp(24px,4vw,36px);box-shadow:var(--shadow)">
+
+          <sc-if value="{{ submitted }}">
+            <div style="text-align:center;padding:18px 4px">
+              <div style="width:54px;height:54px;border-radius:50%;display:grid;place-items:center;margin:0 auto;background:rgba(0,229,163,.14)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></div>
+              <h2 style="font-family:var(--serif);font-weight:600;font-size:1.5rem;margin-top:18px">You're on the list.</h2>
+              <p style="color:var(--text2);margin-top:10px;font-size:.98rem;max-width:34ch;margin-left:auto;margin-right:auto">Thanks — we'll be in touch at the email you gave us. Keep an eye on your inbox.</p>
+              <button data-act="resetForm" style="margin-top:22px;border:1px solid var(--line);background:transparent;color:var(--text);font-family:var(--sans);font-weight:600;font-size:.9rem;border-radius:10px;padding:10px 18px;cursor:pointer" style-hover="border-color:#9aa6b2">Add another</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ intentBeta }}">
+          <form data-act="submitForm" style="display:flex;flex-direction:column;gap:18px">
+            <div>
+              <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px">I want to</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button type="button" data-act="pickBeta" style="cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.9rem;padding:12px 10px;border-radius:11px;border:1.5px solid var(--emerald);background:rgba(0,229,163,.10);color:var(--text);text-align:left">Request a beta invite<div style="font-weight:500;font-size:.78rem;color:var(--text2);margin-top:3px">Try Reqon early</div></button>
+                <button type="button" data-act="pickUpdates" style="cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.9rem;padding:12px 10px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--text2);text-align:left">Just get updates<div style="font-weight:500;font-size:.78rem;color:var(--muted);margin-top:3px">Email me at launch</div></button>
+              </div>
+            </div>
+            <div>
+              <label style="display:block;font-size:.85rem;font-weight:600;margin-bottom:7px">Email <span style="color:var(--coral)">*</span></label>
+              <input type="email" required="" data-field="email" placeholder="you@email.com" style="width:100%;font-family:var(--sans);font-size:.98rem;color:var(--text);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:12px 14px;outline:none" style-focus="border-color:var(--emerald)">
+              <sc-if value="{{ emailError }}"><div style="color:var(--coral);font-size:.8rem;margin-top:6px">Please enter a valid email.</div></sc-if>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap">
+              <div style="flex:1 1 140px">
+                <label style="display:block;font-size:.85rem;font-weight:600;margin-bottom:7px">Name <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+                <input type="text" data-field="name" placeholder="First name" style="width:100%;font-family:var(--sans);font-size:.98rem;color:var(--text);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:12px 14px;outline:none" style-focus="border-color:var(--emerald)">
+              </div>
+              <div style="flex:1 1 140px">
+                <label style="display:block;font-size:.85rem;font-weight:600;margin-bottom:7px">Your role <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+                <input type="text" data-field="role" placeholder="e.g. Product Manager" style="width:100%;font-family:var(--sans);font-size:.98rem;color:var(--text);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:12px 14px;outline:none" style-focus="border-color:var(--emerald)">
+              </div>
+            </div>
+            <button type="submit" style="margin-top:4px;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.98rem;padding:14px;border-radius:11px;border:none;background:var(--emerald);color:#06211a" style-hover="background:#26efb3">Request beta access →</button>
+            <p style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:.72rem;margin:0">We'll only email you about Reqon. Unsubscribe anytime.</p>
+          </form>
+          </sc-if>
+
+          <sc-if value="{{ intentUpdates }}">
+          <form data-act="submitForm" style="display:flex;flex-direction:column;gap:18px">
+            <div>
+              <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px">I want to</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button type="button" data-act="pickBeta" style="cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.9rem;padding:12px 10px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--text2);text-align:left">Request a beta invite<div style="font-weight:500;font-size:.78rem;color:var(--muted);margin-top:3px">Try Reqon early</div></button>
+                <button type="button" data-act="pickUpdates" style="cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.9rem;padding:12px 10px;border-radius:11px;border:1.5px solid var(--emerald);background:rgba(0,229,163,.10);color:var(--text);text-align:left">Just get updates<div style="font-weight:500;font-size:.78rem;color:var(--text2);margin-top:3px">Email me at launch</div></button>
+              </div>
+            </div>
+            <div>
+              <label style="display:block;font-size:.85rem;font-weight:600;margin-bottom:7px">Email <span style="color:var(--coral)">*</span></label>
+              <input type="email" required="" data-field="email" placeholder="you@email.com" style="width:100%;font-family:var(--sans);font-size:.98rem;color:var(--text);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:12px 14px;outline:none" style-focus="border-color:var(--emerald)">
+              <sc-if value="{{ emailError }}"><div style="color:var(--coral);font-size:.8rem;margin-top:6px">Please enter a valid email.</div></sc-if>
+            </div>
+            <button type="submit" style="margin-top:4px;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:.98rem;padding:14px;border-radius:11px;border:none;background:var(--emerald);color:#06211a" style-hover="background:#26efb3">Keep me posted →</button>
+            <p style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:.72rem;margin:0">We'll only email you about Reqon. Unsubscribe anytime.</p>
+          </form>
+          </sc-if>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+</sc-if>
+
 <!-- ================= ABOUT ================= -->
 <sc-if value="{{ isAbout }}">
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">Our philosophy</span>
     <h1 style="font-family:var(--serif);font-weight:600;line-height:1.06;letter-spacing:-.02em;font-size:clamp(2.1rem,5vw,3.4rem);margin-top:12px;max-width:16ch">AI helps. You stay in charge.</h1>
     <p style="color:var(--text2);margin-top:16px;font-size:1.1rem;max-width:62ch">Reqon is built to organize and speed up a search you run — not to blast out applications on your behalf. Scoring, drafts, and prep are always reviewable and editable. The goal is quality over quantity, and every decision stays yours.</p>
@@ -432,7 +513,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- yes/no -->
 <section style="padding:40px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
       <div style="display:flex;gap:13px;align-items:flex-start;background:var(--elem);border:1px solid var(--line);border-radius:12px;padding:18px 19px"><span style="flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px;background:rgba(45,212,191,.14);color:var(--teal)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></span><div><div style="font-weight:600;font-size:.98rem">Reqon helps</div><div style="color:var(--text2);font-size:.9rem;margin-top:2px">Ranks jobs, drafts notes, preps interview answers — all editable before you ever use them.</div></div></div>
       <div style="display:flex;gap:13px;align-items:flex-start;background:var(--elem);border:1px solid var(--line);border-radius:12px;padding:18px 19px"><span style="flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;margin-top:1px;background:rgba(45,212,191,.14);color:var(--teal)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></span><div><div style="font-weight:600;font-size:.98rem">You decide</div><div style="color:var(--text2);font-size:.9rem;margin-top:2px">You choose what to apply to, what to send, and when. Nothing leaves your hands without your review.</div></div></div>
@@ -444,7 +525,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- who it's for -->
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Who it's for</span>
     <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.6rem,3.4vw,2.4rem);margin-top:12px;max-width:20ch">Built for people running a deliberate search.</h2>
     <p style="color:var(--text2);margin-top:14px;font-size:1.05rem;max-width:58ch">If you want structure, focus, and follow-through instead of a chaotic spreadsheet, Reqon is for you.</p>
@@ -460,7 +541,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- why trust it -->
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Why trust it</span>
     <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.018em;font-size:clamp(1.6rem,3.4vw,2.4rem);margin-top:12px">Honest by design.</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:32px">
@@ -482,7 +563,7 @@ a{text-decoration:none;color:inherit}
 
 <!-- story -->
 <section style="padding:72px 0 0">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <div style="background:var(--elem);border:1px solid var(--line);border-radius:18px;padding:clamp(28px,5vw,52px);max-width:760px">
       <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">The story</span>
       <p style="font-family:var(--serif);font-size:clamp(1.3rem,2.6vw,1.7rem);line-height:1.4;margin-top:16px;color:var(--text)">Reqon started as one person's job search that had outgrown a spreadsheet. It's built to solve a real problem the hard way — quietly, honestly, and with the candidate always in control.</p>
@@ -495,27 +576,28 @@ a{text-decoration:none;color:inherit}
 <section style="position:relative;text-align:center;padding:104px 0;overflow:hidden;margin-top:84px">
   <div style="position:absolute;inset:0;background:radial-gradient(55% 80% at 50% 50%,rgba(0,229,163,.12),transparent 70%);pointer-events:none"></div>
   <svg viewBox="0 0 100 100" fill="none" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:440px;height:440px;opacity:.05;pointer-events:none"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="6" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="6" stroke-linecap="round"></line></svg>
-  <div style="position:relative;max-width:1140px;margin:0 auto;padding:0 28px">
+  <div style="position:relative;max-width:var(--wrap);margin:0 auto;padding:0 28px">
     <h2 style="font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.02em;font-size:clamp(2rem,4.6vw,3.2rem);max-width:18ch;margin:0 auto">Bring order to your search.</h2>
     <p style="color:var(--text2);max-width:54ch;margin:18px auto 0;font-size:1.08rem">Set your criteria once, let Reqon surface a ranked shortlist, and work the few jobs that matter — with everything in one place.</p>
-    <div style="margin-top:32px"><a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Get started — free trial →</a></div>
+    <div style="margin-top:32px;display:flex;gap:13px;justify-content:center;flex-wrap:wrap"><a href="#/pricing" data-route="pricing" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Get started — free trial →</a><a href="#/join" data-route="join" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:14px 24px;font-weight:700;font-size:.98rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#9aa6b2">Join the beta</a></div>
     <div style="margin-top:18px;font-family:var(--mono);font-size:.76rem;color:var(--muted)">Private preview · no auto-apply · you stay in control</div>
   </div>
 </section>
 
 <!-- ============ FOOTER (persistent) ============ -->
 <footer style="border-top:1px solid var(--line);padding:34px 0 56px">
-  <div style="max-width:1140px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px">
-    <a href="#/home" data-route="home" onclick="{{ go }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+  <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px">
+    <a href="#/home" data-route="home" data-act="go" style="display:flex;align-items:center;gap:10px;cursor:pointer">
       <svg viewBox="0 0 100 100" fill="none" style="width:26px;height:26px;flex:none"><circle cx="50" cy="50" r="35" stroke="#00E5A3" stroke-width="10" stroke-dasharray="70 15 70 15"></circle><line x1="50" y1="50" x2="75" y2="75" stroke="#00E5A3" stroke-width="10" stroke-linecap="round"></line></svg>
       <span style="font-family:var(--mono);font-weight:600;letter-spacing:.22em;font-size:.82rem;text-transform:uppercase;color:var(--emerald)">Reqon</span>
     </a>
     <div style="display:flex;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;color:var(--muted)">
-      <a href="#/home" data-route="home" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">Home</a>
-      <a href="#/how" data-route="how" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">How it works</a>
-      <a href="#/apps" data-route="apps" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">Apps</a>
-      <a href="#/pricing" data-route="pricing" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">Pricing</a>
-      <a href="#/about" data-route="about" onclick="{{ go }}" style="cursor:pointer" style-hover="color:var(--text)">About</a>
+      <a href="#/home" data-route="home" data-act="go" style="cursor:pointer" style-hover="color:var(--text)">Home</a>
+      <a href="#/how" data-route="how" data-act="go" style="cursor:pointer" style-hover="color:var(--text)">How it works</a>
+      <a href="#/apps" data-route="apps" data-act="go" style="cursor:pointer" style-hover="color:var(--text)">Apps</a>
+      <a href="#/pricing" data-route="pricing" data-act="go" style="cursor:pointer" style-hover="color:var(--text)">Pricing</a>
+      <a href="#/about" data-route="about" data-act="go" style="cursor:pointer" style-hover="color:var(--text)">About</a>
+      <a href="#/join" data-route="join" data-act="go" style="cursor:pointer" style-hover="color:var(--text)">Join the beta</a>
       <a href="https://cloud.reqon.app" style="cursor:pointer" style-hover="color:var(--text)">Launch app</a>
     </div>
     <div style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">© 2026 Reqon · private preview</div>
@@ -523,42 +605,45 @@ a{text-decoration:none;color:inherit}
 </footer>
 
 </div>
+
 <script>
 (function () {
   "use strict";
-  var ROUTES = ["home", "how", "apps", "pricing", "about"];
-  var state = { route: "home", billing: "monthly" };
+  // Static runtime for the marketing page — interprets the design's <sc-if>/{{ }}/data-act
+  // directives without React. The page ships pre-rendered as the light theme.
+  var ROUTES = ["home", "how", "apps", "pricing", "about", "join"];
+  var WAITLIST_ENDPOINT = "/api/waitlist";
+  var state = { route: "home", billing: "monthly", intent: "beta", submitted: false, emailError: false };
 
   function vals() {
     var r = state.route, b = state.billing;
     return {
       isHome: r === "home", isHow: r === "how", isApps: r === "apps",
-      isPricing: r === "pricing", isAbout: r === "about",
-      billingMonthly: b === "monthly", billingAnnual: b === "annual"
+      isPricing: r === "pricing", isAbout: r === "about", isJoin: r === "join",
+      billingMonthly: b === "monthly", billingAnnual: b === "annual",
+      submitted: state.submitted,
+      // forms hide once a signup is in, so only the success panel shows
+      intentBeta: state.intent === "beta" && !state.submitted,
+      intentUpdates: state.intent === "updates" && !state.submitted,
+      emailError: state.emailError
     };
   }
 
-  // Read the boolean token out of value="{{ isHome }}" / value="{{ true }}"
   function condFor(el) {
     var raw = (el.getAttribute("value") || "").replace(/[{}]/g, "").trim();
     if (raw === "true") return true;
     if (raw === "false") return false;
-    var v = vals();
-    return !!v[raw];
+    return !!vals()[raw];
   }
-
   function render() {
     var nodes = document.querySelectorAll("sc-if");
-    for (var i = 0; i < nodes.length; i++) {
-      nodes[i].style.display = condFor(nodes[i]) ? "contents" : "none";
-    }
+    for (var i = 0; i < nodes.length; i++) nodes[i].style.display = condFor(nodes[i]) ? "contents" : "none";
   }
 
   function syncFromHash() {
     var h = (location.hash || "").replace(/^#\/?/, "");
     state.route = ROUTES.indexOf(h) !== -1 ? h : "home";
   }
-
   function navTo(route) {
     if (ROUTES.indexOf(route) === -1) return;
     state.route = route;
@@ -567,43 +652,70 @@ a{text-decoration:none;color:inherit}
     try { window.scrollTo({ top: 0, behavior: "auto" }); } catch (e) { window.scrollTo(0, 0); }
   }
 
-  // Click handlers wired off the placeholder onclick tokens the design ships with.
+  function persist(rec) {
+    // localStorage fallback so a signup is never lost if the network call fails.
+    try {
+      var key = "reqon_signups";
+      var list = JSON.parse(localStorage.getItem(key) || "[]");
+      list.push(rec); localStorage.setItem(key, JSON.stringify(list));
+    } catch (e) {}
+    try {
+      fetch(WAITLIST_ENDPOINT, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec)
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function submit(form) {
+    var get = function (f) { var el = form.querySelector('[data-field="' + f + '"]'); return el ? el.value.trim() : ""; };
+    var email = get("email");
+    if (!email || !/.+@.+\..+/.test(email)) { state.emailError = true; render(); return; }
+    persist({ email: email, name: get("name"), role: get("role"), intent: state.intent, at: new Date().toISOString() });
+    state.submitted = true; state.emailError = false; render();
+  }
+  function resetForm() {
+    state.submitted = false; state.intent = "beta"; state.emailError = false;
+    document.querySelectorAll('#dc-root [data-field]').forEach(function (el) { el.value = ""; });
+    render();
+  }
+
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[onclick]");
+    var t = e.target.closest("[data-act]");
     if (!t) return;
-    var tok = (t.getAttribute("onclick") || "");
-    if (tok.indexOf("go") !== -1) {
-      e.preventDefault();
-      navTo(t.dataset.route);
-    } else if (tok.indexOf("setMonthly") !== -1) {
-      e.preventDefault(); state.billing = "monthly"; render();
-    } else if (tok.indexOf("setAnnual") !== -1) {
-      e.preventDefault(); state.billing = "annual"; render();
-    }
+    var act = t.getAttribute("data-act");
+    if (act === "go") { e.preventDefault(); navTo(t.dataset.route); }
+    else if (act === "setMonthly") { e.preventDefault(); state.billing = "monthly"; render(); }
+    else if (act === "setAnnual") { e.preventDefault(); state.billing = "annual"; render(); }
+    else if (act === "pickBeta") { e.preventDefault(); state.intent = "beta"; state.emailError = false; render(); }
+    else if (act === "pickUpdates") { e.preventDefault(); state.intent = "updates"; state.emailError = false; render(); }
+    else if (act === "resetForm") { e.preventDefault(); resetForm(); }
+  });
+  document.addEventListener("submit", function (e) {
+    var f = e.target.closest('form[data-act="submitForm"]');
+    if (!f) return;
+    e.preventDefault(); submit(f);
   });
 
-  // style-hover -> apply on hover, revert on leave (preserves original inline values)
+  // style-hover / style-focus -> apply on hover|focus, revert on leave|blur
   function parseDecls(s) {
     var out = [];
-    (s || "").split(";").forEach(function (d) {
-      var i = d.indexOf(":"); if (i === -1) return;
-      var prop = d.slice(0, i).trim(), val = d.slice(i + 1).trim();
-      if (prop) out.push([prop, val]);
-    });
+    (s || "").split(";").forEach(function (d) { var i = d.indexOf(":"); if (i === -1) return; var p = d.slice(0, i).trim(), v = d.slice(i + 1).trim(); if (p) out.push([p, v]); });
     return out;
   }
-  document.querySelectorAll("[style-hover]").forEach(function (el) {
-    var decls = parseDecls(el.getAttribute("style-hover"));
-    el.addEventListener("mouseenter", function () {
-      el._prev = decls.map(function (d) { return [d[0], el.style.getPropertyValue(d[0])]; });
-      decls.forEach(function (d) { el.style.setProperty(d[0], d[1]); });
-    });
-    el.addEventListener("mouseleave", function () {
-      (el._prev || []).forEach(function (d) {
-        if (d[1]) el.style.setProperty(d[0], d[1]); else el.style.removeProperty(d[0]);
+  function bindStyleState(attr, onEv, offEv) {
+    document.querySelectorAll("[" + attr + "]").forEach(function (el) {
+      var decls = parseDecls(el.getAttribute(attr));
+      el.addEventListener(onEv, function () {
+        el["_prev_" + attr] = decls.map(function (d) { return [d[0], el.style.getPropertyValue(d[0])]; });
+        decls.forEach(function (d) { el.style.setProperty(d[0], d[1]); });
+      });
+      el.addEventListener(offEv, function () {
+        (el["_prev_" + attr] || []).forEach(function (d) { if (d[1]) el.style.setProperty(d[0], d[1]); else el.style.removeProperty(d[0]); });
       });
     });
-  });
+  }
+  bindStyleState("style-hover", "mouseenter", "mouseleave");
+  bindStyleState("style-focus", "focusin", "focusout");
 
   window.addEventListener("hashchange", function () { syncFromHash(); render(); });
   syncFromHash();

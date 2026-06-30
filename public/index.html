@@ -756,6 +756,9 @@
   .salslider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.3);margin-top:-7px;cursor:pointer}
   .salslider input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line-2)}
   .salslider input[type=range]::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);cursor:pointer}
+  .salslider.saloff{opacity:.4;pointer-events:none}
+  .salignore{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.8rem;color:var(--text-2);text-transform:none;letter-spacing:0;cursor:pointer}
+  .salignore input{width:auto}
   .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gold)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
@@ -1290,11 +1293,12 @@
               <label>Range you’ll consider <span class="setmuted" id="salReadout"></span></label>
               <div class="salslider">
                 <div class="sal-fill" id="salFill"></div>
-                <input id="setSalaryFloor" type="range" min="0" max="500000" step="5000" value="0" aria-label="Minimum acceptable salary">
-                <input id="setSalaryTarget" type="range" min="0" max="500000" step="5000" value="0" aria-label="Target salary">
+                <input id="setSalaryFloor" type="range" min="20000" max="1000000" step="10000" value="20000" aria-label="Minimum acceptable salary">
+                <input id="setSalaryTarget" type="range" min="20000" max="1000000" step="10000" value="20000" aria-label="Target salary">
               </div>
+              <label class="salignore"><input id="setSalaryIgnore" type="checkbox"> Don’t filter by salary</label>
             </div>
-            <p class="hint" style="margin:8px 0 0">Scores salary fit against the <b>top</b> of each posting's range. At/above target = small fit bonus; at/above the minimum = neutral; below = a fit penalty that scales (well-below roles can drop out). Roles with no posted comp are never penalized. Drag both to $0 to ignore salary. <a href="/guide#scores" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">How fit works ↗</a></p>
+            <p class="hint" style="margin:8px 0 0">Scores salary fit against the <b>top</b> of each posting's range. At/above target = small fit bonus; at/above the minimum = neutral; below = a fit penalty that scales (well-below roles can drop out). Roles with no posted comp are never penalized. Tick <b>Don’t filter by salary</b> to ignore pay entirely. <a href="/guide#scores" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">How fit works ↗</a></p>
           </div>
           <div class="sgrp">
             <div class="sgrp-h">Titles &amp; keywords</div>
@@ -3118,8 +3122,10 @@ function fillSettings(j){
   if(sa)sa.onchange=()=>{SET("setSources").querySelectorAll("input[data-src]").forEach(c=>{c.checked=sa.checked;});updateSourceCount();};
   updateSourceCount();
   SET("setMinFit").value=j.minFit;
-  SET("setSalaryFloor").value=j.salaryFloor?j.salaryFloor:"";
-  SET("setSalaryTarget").value=j.salaryTarget?j.salaryTarget:"";
+  {const sf=+j.salaryFloor||0, st=+j.salaryTarget||0, ignored=(sf<=0&&st<=0);
+   SET("setSalaryIgnore").checked=ignored;
+   SET("setSalaryFloor").value=ignored?20000:sf;   // range input auto-clamps into [20000, 1000000]
+   SET("setSalaryTarget").value=ignored?20000:st;}
   SET("setMinTier").value=["A","B","C"].includes(j.minTierToMerge)?j.minTierToMerge:"B";
   SET("setRemoteOnly").checked=!!j.remoteOnly;
   SET("setTitles").value=(j.titles||[]).join("\n");
@@ -3265,20 +3271,24 @@ async function loadDeploy(){
 loadDeploy();
 
 // ---- desired-salary dual slider + auto-grow textareas ----
-function salFmt(n){ n=+n||0; if(n<=0)return '$0'; if(n>=500000)return '$500K+'; return '$'+Math.round(n/1000)+'K'; }
+function salFmt(n){ n=+n||0; if(n<=0)return '$0'; if(n>=1000000)return '$1M'; return '$'+Math.round(n/1000)+'K'; }
 function salUpdate(){
   const lo=SET('setSalaryFloor'), hi=SET('setSalaryTarget'); if(!lo||!hi)return;
+  const ign=SET('setSalaryIgnore'), ignored=!!(ign&&ign.checked);
   let a=+lo.value||0, b=+hi.value||0;
   if(a>b){ b=a; hi.value=String(a); }   // floor can't exceed target
-  const max=+lo.max||500000;
-  const fill=SET('salFill'); if(fill){ fill.style.left=(a/max*100)+'%'; fill.style.width=(Math.max(0,b-a)/max*100)+'%'; }
-  const ro=SET('salReadout'); if(ro) ro.textContent=(a<=0&&b<=0)?'off — salary ignored':(salFmt(a)+' — '+salFmt(b));
+  const min=+lo.min||0, max=+lo.max||1000000, span=Math.max(1,max-min);
+  const fill=SET('salFill'); if(fill){ fill.style.left=((a-min)/span*100)+'%'; fill.style.width=(Math.max(0,b-a)/span*100)+'%'; }
+  lo.disabled=hi.disabled=ignored;
+  const sl=lo.closest('.salslider'); if(sl) sl.classList.toggle('saloff', ignored);
+  const ro=SET('salReadout'); if(ro) ro.textContent=ignored?'off — salary ignored':(salFmt(a)+' — '+salFmt(b));
 }
 function autogrow(el){ if(!el)return; el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
 function refreshSettingsUi(){ salUpdate(); document.querySelectorAll('.field textarea.ag').forEach(autogrow); }
 (function salWire(){
-  const lo=SET('setSalaryFloor'), hi=SET('setSalaryTarget');
+  const lo=SET('setSalaryFloor'), hi=SET('setSalaryTarget'), ign=SET('setSalaryIgnore');
   if(lo&&hi)[lo,hi].forEach(r=>r.addEventListener('input',salUpdate));
+  if(ign) ign.addEventListener('change',salUpdate);
   document.querySelectorAll('.field textarea.ag').forEach(t=>t.addEventListener('input',()=>autogrow(t)));
 })();
 function openSettings(){
@@ -3397,8 +3407,8 @@ async function saveSettings(){
     disabledSources:[...SET("setSources").querySelectorAll("input[data-src]")].filter(c=>!c.checked).map(c=>c.dataset.src),
     remoteOnly:SET("setRemoteOnly").checked,
     minFit:parseFloat(SET("setMinFit").value)||0,
-    salaryFloor:parseInt(SET("setSalaryFloor").value,10)||0,
-    salaryTarget:parseInt(SET("setSalaryTarget").value,10)||0,
+    salaryFloor:(SET("setSalaryIgnore").checked?0:parseInt(SET("setSalaryFloor").value,10)||0),
+    salaryTarget:(SET("setSalaryIgnore").checked?0:parseInt(SET("setSalaryTarget").value,10)||0),
     minTierToMerge:SET("setMinTier").value,
     titles:SET("setTitles").value.split("\n").map(s=>s.trim()).filter(Boolean),
     keywords:SET("setKeywords").value.split("\n").map(s=>s.trim()).filter(Boolean),

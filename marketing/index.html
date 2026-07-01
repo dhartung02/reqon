@@ -180,38 +180,38 @@ a{text-decoration:none;color:inherit}
 <!-- deep dive 1: daily loop (text left, image right) -->
 <section style="padding:72px 0 0">
   <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
-    <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
-      <div style="flex:1 1 320px">
+    <div style="display:flex;flex-wrap:wrap;gap:20px 56px;align-items:flex-end;justify-content:space-between;margin-bottom:34px">
+      <div style="flex:1 1 440px;max-width:640px">
         <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--emerald)">Your daily loop</span>
-        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.6vw,2rem);margin-top:12px">See exactly what needs doing today.</h2>
-        <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">Open Reqon and the work is already sorted: top jobs to apply to, follow-ups gone quiet, interviews to prep, links to double-check. Each one is a click from the detail.</p>
-        <ul style="list-style:none;margin-top:18px;display:flex;flex-direction:column;gap:10px">
-          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Sorted by what's worth your time, not just what's newest</li>
-          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Best matches flagged at a glance</li>
-          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Live count at every stage, from saved to offer</li>
-        </ul>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.6rem,3vw,2.2rem);margin-top:12px">See exactly what needs doing today.</h2>
+        <p style="color:var(--text2);margin-top:14px;font-size:1.05rem">Open Reqon and the work is already sorted: top jobs to apply to, follow-ups gone quiet, interviews to prep, links to double-check. Each one is a click from the detail.</p>
       </div>
-      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/today.png" alt="Reqon's daily board showing jobs grouped by what needs attention today." loading="lazy" style="width:100%;display:block"></div>
+      <ul style="list-style:none;flex:1 1 320px;max-width:420px;display:flex;flex-direction:column;gap:11px">
+        <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Sorted by what's worth your time, not just what's newest</li>
+        <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Best matches flagged at a glance</li>
+        <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E5A3" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Live count at every stage, from saved to offer</li>
+      </ul>
     </div>
+    <div style="border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/today.png" alt="Reqon's daily board showing jobs grouped by what needs attention today." loading="lazy" style="width:100%;display:block"></div>
   </div>
 </section>
 
 <!-- deep dive 2: ranking (image left, text right) -->
 <section style="padding:64px 0 0">
   <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
-    <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
-      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/insights.png" alt="Reqon's insights: response rate, which job sources actually reply, and follow-ups going stale." loading="lazy" style="width:100%;display:block"></div>
-      <div style="flex:1 1 320px">
+    <div style="display:flex;flex-wrap:wrap;gap:20px 56px;align-items:flex-end;justify-content:space-between;margin-bottom:34px">
+      <div style="flex:1 1 440px;max-width:640px">
         <span style="font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--teal)">Ranking &amp; insights</span>
-        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.6vw,2rem);margin-top:12px">Know which jobs are worth your time.</h2>
-        <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">Reqon scores how well each job fits you and how likely you are to hear back, then puts the best bets up top. You'll also see which sources actually reply — so you stop pouring effort into the ones that don't.</p>
-        <ul style="list-style:none;margin-top:18px;display:flex;flex-direction:column;gap:10px">
-          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Clear, adjustable ranking — never a black box</li>
-          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>See your response rate and where you're getting stuck</li>
-          <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Honest caveats shown, not hidden</li>
-        </ul>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.6rem,3vw,2.2rem);margin-top:12px">Know which jobs are worth your time.</h2>
+        <p style="color:var(--text2);margin-top:14px;font-size:1.05rem">Reqon scores how well each job fits you and how likely you are to hear back, then puts the best bets up top. You'll also see which sources actually reply — so you stop pouring effort into the ones that don't.</p>
       </div>
+      <ul style="list-style:none;flex:1 1 320px;max-width:420px;display:flex;flex-direction:column;gap:11px">
+        <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Clear, adjustable ranking — never a black box</li>
+        <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>See your response rate and where you're getting stuck</li>
+        <li style="display:flex;gap:11px;align-items:flex-start;color:var(--text2);font-size:.95rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" stroke-width="2" style="flex:none;margin-top:3px"><polyline points="4 12 10 18 20 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>Honest caveats shown, not hidden</li>
+      </ul>
     </div>
+    <div style="border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/insights.png" alt="Reqon's insights: response rate, which job sources actually reply, and follow-ups going stale." loading="lazy" style="width:100%;display:block"></div>
   </div>
 </section>
 
@@ -269,15 +269,15 @@ a{text-decoration:none;color:inherit}
 <!-- Cloud (text left, image right) -->
 <section style="padding:52px 0 0">
   <div style="max-width:var(--wrap);margin:0 auto;padding:0 28px">
-    <div style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:center">
-      <div style="flex:1 1 320px">
+    <div style="display:flex;flex-wrap:wrap;gap:20px 56px;align-items:flex-end;justify-content:space-between;margin-bottom:34px">
+      <div style="flex:1 1 440px;max-width:660px">
         <span style="display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--emerald);border:1px solid rgba(0,229,163,.35);border-radius:6px;padding:3px 9px">Reqon Cloud · web</span>
-        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.5rem,2.8vw,2.1rem);margin-top:14px">Your home base in the browser.</h2>
-        <p style="color:var(--text2);margin-top:14px;font-size:1.02rem">The full picture: every job ranked and tracked, today's actions sorted, and your progress at a glance. This is where you run the search.</p>
-        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap"><a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Launch Reqon Cloud →</a><a href="#/pricing" data-route="pricing" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b">See plans →</a></div>
+        <h2 style="font-family:var(--serif);font-weight:600;line-height:1.1;letter-spacing:-.018em;font-size:clamp(1.6rem,3vw,2.2rem);margin-top:14px">Your home base in the browser.</h2>
+        <p style="color:var(--text2);margin-top:14px;font-size:1.05rem">The full picture: every job ranked and tracked, today's actions sorted, and your progress at a glance. This is where you run the search.</p>
       </div>
-      <div style="flex:1 1 380px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/board.png" alt="Reqon Cloud, the web app, showing the job board." loading="lazy" style="width:100%;display:block"></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer" style-hover="background:#26efb3;transform:translateY(-1px)">Launch Reqon Cloud →</a><a href="#/pricing" data-route="pricing" data-act="go" style="display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:12px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer" style-hover="border-color:#33414b">See plans →</a></div>
     </div>
+    <div style="border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--elem);box-shadow:var(--shadow)"><img src="images/board.png" alt="Reqon Cloud, the web app, showing the job board." loading="lazy" style="width:100%;display:block"></div>
   </div>
 </section>
 
@@ -354,7 +354,7 @@ a{text-decoration:none;color:inherit}
         </div>
         <sc-if value="{{ billingMonthly }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">billed monthly</div></sc-if>
         <sc-if value="{{ billingAnnual }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">$180 billed yearly</div></sc-if>
-        <a href="#/join" data-route="join" data-act="go" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer;margin-top:22px" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">Request early access</a>
+        <a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;border:1px solid var(--line);color:var(--text);background:transparent;cursor:pointer;margin-top:22px" style-hover="border-color:#33414b;background:rgba(255,255,255,.02)">Start 14-day free trial</a>
         <div style="height:1px;background:var(--line);margin:24px 0"></div>
         <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">What's included</div>
         <ul style="list-style:none;display:flex;flex-direction:column;gap:11px">
@@ -379,7 +379,7 @@ a{text-decoration:none;color:inherit}
         </div>
         <sc-if value="{{ billingMonthly }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">billed monthly</div></sc-if>
         <sc-if value="{{ billingAnnual }}"><div style="color:var(--muted);font-family:var(--mono);font-size:.74rem;margin-top:6px">$360 billed yearly</div></sc-if>
-        <a href="#/join" data-route="join" data-act="go" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer;margin-top:22px" style-hover="background:#26efb3;transform:translateY(-1px)">Request early access</a>
+        <a href="https://cloud.reqon.app" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:13px 20px;font-weight:700;font-size:.94rem;background:var(--emerald);color:#06211a;cursor:pointer;margin-top:22px" style-hover="background:#26efb3;transform:translateY(-1px)">Start 14-day free trial</a>
         <div style="height:1px;background:var(--line);margin:24px 0"></div>
         <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Everything in Reqon Cloud, plus</div>
         <ul style="list-style:none;display:flex;flex-direction:column;gap:11px">

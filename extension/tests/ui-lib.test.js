@@ -4,6 +4,8 @@ const {
   popupHeadingForRow,
   isBestBetRow,
   buildAiUsageViewModel,
+  buildBannerModel,
+  summarizeFillAvailability,
 } = require('../ui-lib.js');
 
 test('popupHeadingForRow reflects whether the current page is already tracked', () => {
@@ -36,4 +38,33 @@ test('buildAiUsageViewModel removes warning language for unlimited plans', () =>
   assert.strictEqual(capped.unlimited, false);
   assert.strictEqual(capped.countText, '7 / 25');
   assert.match(capped.helperText, /Each AI draft, score, autofill, or match counts as one request/);
+});
+
+test('buildBannerModel prioritizes tracked role summary for tracked pages', () => {
+  const model = buildBannerModel({
+    row: { company: 'Reddit', role: 'Senior Group Product Manager', status: 'Applied', fit: 6 },
+    pageState: { recognized: true, fillable: true },
+  });
+
+  assert.strictEqual(model.mode, 'tracked');
+  assert.strictEqual(model.primaryCta, 'Continue application');
+  assert.match(model.summaryText, /Tracked/);
+  assert.match(model.summaryText, /Applied/);
+});
+
+test('buildBannerModel uses review CTA for untracked manual pages', () => {
+  const model = buildBannerModel({
+    row: null,
+    pageState: { recognized: true, fillable: false, fit: 7 },
+  });
+
+  assert.strictEqual(model.mode, 'untracked');
+  assert.strictEqual(model.primaryCta, 'Review job');
+});
+
+test('summarizeFillAvailability explains deterministic and AI assisted counts', () => {
+  assert.strictEqual(
+    summarizeFillAvailability({ total: 18, direct: 8, ai: 3, remaining: 7 }),
+    'Filled 11 of 18 fields: 8 direct, 3 AI-assisted, 7 still need review.'
+  );
 });

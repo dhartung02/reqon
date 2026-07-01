@@ -13,10 +13,11 @@
   --bg:#16181C;--fg:#E2E8F0;--fg2:#94A3B8;--mut:#64748B;--ln:#2E3741;--ln2:#232A31;--el2:#1B1F25;
   --em:#00E5A3;--am:#FFB800;--co:#F87171;--info:#79A6E0;--ink:#06211a;--ring:rgba(255,255,255,.04);
   --tier:var(--em);
-  position:fixed;right:14px;bottom:14px;z-index:2147483647;width:262px;
-  background:var(--bg);color:var(--fg);border:1px solid var(--ln);border-radius:13px;
-  box-shadow:0 18px 40px -18px rgba(0,0,0,.6);
-  font:13px/1.4 "Reqon Spline",-apple-system,system-ui,sans-serif;padding:13px}
+  position:fixed;right:18px;top:18px;z-index:2147483647;width:392px;
+  background:color-mix(in srgb, var(--bg) 90%, transparent);color:var(--fg);border:1px solid color-mix(in srgb, var(--ln) 72%, white 8%);
+  border-radius:22px;box-shadow:0 24px 60px -28px rgba(0,0,0,.72),0 8px 28px rgba(6,16,28,.28);
+  backdrop-filter:blur(18px);
+  font:13px/1.4 "Reqon Spline",-apple-system,system-ui,sans-serif;padding:14px}
 /* light tokens — forced light */
 .jpcrm-box.jpcrm-light{
   --bg:#FFFFFF;--fg:#0B1220;--fg2:#475569;--mut:#7C8A9C;--ln:#D3DBE5;--ln2:#E3E8EF;--el2:#EEF2F7;
@@ -46,6 +47,15 @@
 .jpcrm-x:hover{color:var(--fg)}
 .jpcrm-body{margin-top:11px}
 .jpcrm-body>*{margin-top:11px}.jpcrm-body>*:first-child{margin-top:0}
+.jpcrm-banner-shell{display:flex;flex-direction:column;gap:12px}
+.jpcrm-banner-main{display:flex;flex-direction:column;gap:10px}
+.jpcrm-banner-summary{font-family:"Reqon Fraunces",Georgia,serif;font-size:1rem;line-height:1.2;color:var(--fg)}
+.jpcrm-banner-message{font-size:.77rem;color:var(--fg2)}
+.jpcrm-banner-actions{display:flex;gap:8px}
+.jpcrm-banner-actions .jpcrm-btn{flex:1}
+.jpcrm-banner-meta{display:flex;flex-wrap:wrap;gap:7px}
+.jpcrm-banner-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:var(--ring);border:1px solid var(--ln);font-size:.68rem;color:var(--fg2)}
+.jpcrm-box[data-mode="tracked"] .jpcrm-banner-summary{color:var(--em)}
 
 /* the signature score circle (replaces the old .jpcrm-tier badge) */
 .jpcrm-score{display:flex;align-items:center;gap:11px}
@@ -71,6 +81,7 @@
 .jpcrm-btn:disabled{opacity:.6;cursor:default}
 .jpcrm-primary{background:var(--em);color:var(--ink);border-color:var(--em);font-weight:700}
 .jpcrm-primary:hover{border-color:var(--em)}
+.jpcrm-btn-ghost{background:transparent;border-color:var(--ln);color:var(--fg)}
 .jpcrm-foot{font-size:.68rem;color:var(--mut);text-align:center}
 .jpcrm-toast{background:var(--ring);border:1px solid var(--em);color:var(--em);border-radius:8px;padding:7px 10px;font-size:.78rem}
 .jpcrm-toast.jpcrm-warn{border-color:var(--co);color:var(--co)}

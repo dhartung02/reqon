@@ -41,5 +41,39 @@
     };
   }
 
-  return { popupHeadingForRow, isBestBetRow, buildAiUsageViewModel };
+  function summarizeFillAvailability({ total = 0, direct = 0, ai = 0, remaining = 0 }) {
+    const filled = Math.max(0, direct + ai);
+    return `Filled ${filled} of ${total} fields: ${direct} direct, ${ai} AI-assisted, ${remaining} still need review.`;
+  }
+
+  function buildBannerModel({ row, pageState }) {
+    const state = pageState || {};
+    const tracked = !!row;
+    const fillable = !!state.fillable;
+    const recognized = !!state.recognized;
+    const fitValue = tracked ? row.fit : state.fit;
+    const fit = fitValue == null || fitValue === '' ? '—' : String(fitValue);
+    const status = tracked ? (row.status || 'Not Applied') : (recognized ? 'Open role' : 'Page not recognized');
+    let primaryCta = 'Review job';
+    if (tracked) primaryCta = fillable ? 'Continue application' : 'Review status';
+    else if (recognized && fillable) primaryCta = 'Start guided fill';
+    const fillLabel = fillable ? 'Fill available' : (recognized ? 'Review needed' : 'Job page not detected');
+    return {
+      mode: tracked ? 'tracked' : 'untracked',
+      primaryCta,
+      secondaryCta: tracked ? 'Open board' : 'Track role',
+      summaryText: `${tracked ? 'Tracked' : 'Untracked'} • ${status} • Fit ${fit}/10 • ${fillLabel}`,
+      fitText: `Fit ${fit}/10`,
+      statusText: status,
+      fillText: fillLabel,
+    };
+  }
+
+  return {
+    popupHeadingForRow,
+    isBestBetRow,
+    buildAiUsageViewModel,
+    summarizeFillAvailability,
+    buildBannerModel,
+  };
 }));

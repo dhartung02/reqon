@@ -3297,12 +3297,16 @@ app.post('/api/mail/run', requireFeature('gmail_ingest'), (req, res) => {
   let child, out = '', err = '', done = false, killedByTimeout = false;
   const t0 = Date.now(), TAG = '[gmail-ingest]';
   const uid = store.currentUser();   // capture tenant for the async exit handler (per-user notifications)
+  const wantAsync = (req.body || {}).async === true;   // async: return a jobId now; client polls /api/jobs/:id (so a slow run never holds the request open past a hosted proxy's timeout)
   const job = jobs.create('gmail_ingest', { label: 'Gmail ingest' + (apply ? ' (apply)' : ' (dry-run)') });
-  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); res.status(status).json(payload); };
+  // Bounded result stored on the job so a polling client gets the summary + a trimmed report.
+  const jobResult = (p) => ({ ok: !!(p && p.ok), applied: !!(p && p.applied), summary: (p && p.summary) || null, report: String((p && p.report) || '').slice(-4000) });
+  const finish = (status, payload) => { if (done) return; done = true; mailChild = null; payload && payload.ok ? jobs.finish(job.id, jobResult(payload)) : jobs.fail(job.id, (payload && payload.error) || 'failed'); if (!wantAsync) res.status(status).json(payload); };
   try { child = spawn(resolvePython(), argv, { cwd: ROOT, env: tenantEnv() }); }
-  catch (e) { console.error(TAG, 'spawn threw:', e.message || e); return finish(500, { ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
+  catch (e) { console.error(TAG, 'spawn threw:', e.message || e); jobs.fail(job.id, 'spawn failed: ' + (e.message || e)); return res.status(500).json({ ok: false, error: 'Could not start mail ingest: ' + (e.message || e) }); }
   mailChild = child;
   console.log(TAG, (apply ? 'apply' : 'dry-run'), 'started pid=' + child.pid);
+  if (wantAsync) res.status(202).json({ ok: true, async: true, jobId: job.id, type: 'gmail_ingest' });
   jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
   const killer = setTimeout(() => { killedByTimeout = true; console.error(TAG, 'hard timeout (120s) reached — killing pid=' + child.pid); try { child.kill('SIGKILL'); } catch (e) {} }, 120000);
   child.stdout && child.stdout.on('data', d => { const s = String(d); out += s; if (out.length > 20000) out = out.slice(-20000); process.stdout.write(TAG + ' ' + s); });
@@ -3346,7 +3350,7 @@ let emailScoutChild = null;
 // "Run now" endpoint below AND by triggerScout() so a manual board "Run Scout" also consults the
 // inbox when the Sources → Email recommendations toggle is on. cb(status, payload) reports the
 // outcome; pass a no-op cb for fire-and-forget. Returns false if it couldn't start (cb still fires).
-function startEmailScout(apply, uid, cb) {
+function startEmailScout(apply, uid, cb, onStart) {
   if (emailScoutChild) { cb(409, { ok: false, error: 'An email scout run is already in progress.' }); return false; }
   if (!cfg('GMAIL_USER') || !cfg('GMAIL_APP_PASSWORD')) { cb(400, { ok: false, error: 'Gmail isn’t configured yet.' }); return false; }
   // -u: run Python unbuffered so progress lines reach our logs *before* any kill (block-buffered
@@ -3362,7 +3366,8 @@ function startEmailScout(apply, uid, cb) {
   let child, out = '', err = '', done = false, killedByTimeout = false;
   const t0 = Date.now(), TAG = '[email-scout]';
   const job = jobs.create('gmail_scout', { label: 'Email scout' + (apply ? ' (apply)' : ' (dry-run)') });
-  const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, payload.summary || null) : jobs.fail(job.id, (payload && payload.error) || 'failed'); cb(status, payload); };
+  const jobResult = (p) => ({ ok: !!(p && p.ok), applied: !!(p && p.applied), summary: (p && p.summary) || null, report: String((p && p.report) || '').slice(-4000) });
+  const finish = (status, payload) => { if (done) return; done = true; emailScoutChild = null; payload && payload.ok ? jobs.finish(job.id, jobResult(payload)) : jobs.fail(job.id, (payload && payload.error) || 'failed'); cb(status, payload); };
   // Faster speculative board probes (resolution) + a resolution wall-time budget so a big batch can't
   // run past the hard kill below. Both overridable via env.
   const childEnv = { ...tenantEnv(),
@@ -3372,6 +3377,7 @@ function startEmailScout(apply, uid, cb) {
   catch (e) { console.error(TAG, 'spawn threw:', e.message || e); finish(500, { ok: false, error: 'Could not start email scout: ' + (e.message || e) }); return false; }
   emailScoutChild = child;
   console.log(TAG, (apply ? 'apply' : 'dry-run'), 'started pid=' + child.pid);
+  if (onStart) onStart(job.id);
   jobs.onCancel(job.id, () => { try { child.kill('SIGKILL'); } catch (e) {} });
   const killer = setTimeout(() => { killedByTimeout = true; console.error(TAG, 'hard timeout (180s) reached — killing pid=' + child.pid); try { child.kill('SIGKILL'); } catch (e) {} }, 180000);
   child.stdout && child.stdout.on('data', d => { const s = String(d); out += s; if (out.length > 20000) out = out.slice(-20000); process.stdout.write(TAG + ' ' + s); });
@@ -3404,8 +3410,16 @@ function startEmailScout(apply, uid, cb) {
 }
 app.post('/api/mail/scout', requireFeature('gmail_ingest'), (req, res) => {
   const apply = (req.body || {}).apply === true;       // default: dry-run (writes nothing)
+  const wantAsync = (req.body || {}).async === true;   // async: return a jobId now; client polls /api/jobs/:id
   const uid = store.currentUser();
-  startEmailScout(apply, uid, (status, payload) => res.status(status).json(payload));
+  if (wantAsync) {
+    let started = false;
+    startEmailScout(apply, uid,
+      (status, payload) => { if (!started) res.status(status).json(payload); },        // couldn't start (409/400/spawn) → respond now
+      (jobId) => { started = true; res.status(202).json({ ok: true, async: true, jobId, type: 'gmail_scout' }); });
+  } else {
+    startEmailScout(apply, uid, (status, payload) => res.status(status).json(payload));
+  }
 });
 
 // Start a scout in the CURRENT tenant context (used by /api/scout/run and the admin force-scout op).

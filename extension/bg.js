@@ -110,12 +110,22 @@ async function computePageContext(tab) {
   };
 }
 
-async function broadcastPageContext(tab) {
+async function broadcastPageContext(tab, options) {
   const next = await computePageContext(tab);
-  if (!shouldBroadcastPageContext(lastPageContext, next)) return next;
+  if (!shouldBroadcastPageContext(lastPageContext, next, options)) return next;
   lastPageContext = next;
   try { await chrome.runtime.sendMessage({ type: 'pageContextChanged', context: next }); } catch (e) {}
   return next;
+}
+
+async function refreshActiveExperienceContext(options) {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return null;
+    return await broadcastPageContext(tab, options);
+  } catch (e) {
+    return null;
+  }
 }
 
 async function requestUpdateCheck() {
@@ -209,6 +219,7 @@ async function clip(url, title, extra) {
   }
   notify(out.msg);
   badgeActiveTab();
+  if (out.ok) await refreshActiveExperienceContext({ force: true });
   return out;
 }
 
@@ -229,6 +240,7 @@ async function markApplied(row) {
   }
   notify(out.msg);
   badgeActiveTab();
+  if (out.ok) await refreshActiveExperienceContext({ force: true });
   return out;
 }
 
@@ -261,6 +273,7 @@ async function setStatus(row, status) {
   try {
     await api('/api/reqs/' + encodeURIComponent(reqKey(row)), { method: 'PATCH', body: JSON.stringify({ fields, note: 'status set via chrome-ext' }) });
     rowCache.at = 0; badgeActiveTab();
+    await refreshActiveExperienceContext({ force: true });
     return { ok: true, status };
   } catch (e) { return { ok: false, error: e.message }; }
 }
@@ -296,7 +309,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } else if (msg.type === 'patchFields') {
         try {
           await api('/api/reqs/' + encodeURIComponent(reqKey(msg.row)), { method: 'PATCH', body: JSON.stringify({ fields: msg.fields || {}, note: 'edited via chrome-ext' }) });
-          rowCache.at = 0; sendResponse({ ok: true });
+          rowCache.at = 0;
+          await refreshActiveExperienceContext({ force: true });
+          sendResponse({ ok: true });
         } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'assistUsage') {
         try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }

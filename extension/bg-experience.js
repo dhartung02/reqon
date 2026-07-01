@@ -9,7 +9,8 @@ function buildExperienceCache({ ttlMs = 60_000, now = () => Date.now() } = {}) {
   };
 }
 
-function shouldBroadcastPageContext(prev, next) {
+function shouldBroadcastPageContext(prev, next, { force = false } = {}) {
+  if (force) return true;
   if (!prev || !next) return true;
   return prev.mode !== next.mode || prev.pageKey !== next.pageKey;
 }

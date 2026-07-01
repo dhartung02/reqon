@@ -142,6 +142,7 @@ $('save').onclick = async () => {
       $('msg').textContent = j.error || 'Login failed.'; $('msg').className = 'err'; return;
     }
     await chrome.storage.sync.set({ origin, token: j.token || '', ...prefsPatch({ overlayEnabled: $('overlay').checked }) });
+    await loadExperienceMeta();
     $('msg').textContent = j.displayName ? `Connected as ${j.displayName}.` : 'Connected.';
     $('msg').className = 'ok';
     $('password').value = '';
@@ -153,7 +154,8 @@ $('save').onclick = async () => {
 $('test').onclick = () => {
   $('msg').textContent = 'Testing…'; $('msg').className = '';
   testDraftConnection()
-    .then((r) => {
+    .then(async (r) => {
+      await loadExperienceMeta();
       $('msg').textContent = r.msg;
       $('msg').className = 'ok';
     })

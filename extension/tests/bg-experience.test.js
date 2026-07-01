@@ -23,6 +23,16 @@ test('buildExperienceCache reuses fresh config payloads for 60 seconds', () => {
   assert.equal(cache.isFresh(), false);
 });
 
+test('buildExperienceCache clear removes stale payload state', () => {
+  const cache = buildExperienceCache({ ttlMs: 60_000, now: () => 1_720_000_000_000 });
+  cache.set({ version: '2026-07-01' });
+
+  cache.clear();
+
+  assert.equal(cache.get(), null);
+  assert.equal(cache.isFresh(), false);
+});
+
 test('normalizeUpdateCheckResult surfaces human-safe update states', () => {
   assert.deepStrictEqual(normalizeUpdateCheckResult('update_available'), {
     ok: true,
@@ -49,4 +59,5 @@ test('shouldBroadcastPageContext only emits when the active job context meaningf
   assert.equal(shouldBroadcastPageContext(next, next), false);
   assert.equal(shouldBroadcastPageContext(next, { mode: 'job', pageKey: 'reddit|senior-group-product-manager' }), false);
   assert.equal(shouldBroadcastPageContext(next, { mode: 'tracked-job', pageKey: 'reddit|senior-group-product-manager' }), true);
+  assert.equal(shouldBroadcastPageContext(next, next, { force: true }), true);
 });

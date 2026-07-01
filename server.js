@@ -21,6 +21,7 @@ const ExcelJS = require('exceljs');
 const QRCode = require('qrcode');
 const docx = require('docx');
 const store = require('./lib/store');   // tenant-scoped paths (ROADMAP PR0): owner==legacy paths
+const { effectiveAssistDailyCap } = require('./lib/assist-usage');
 const users = require('./lib/users');   // user registry + auth (multi-user mode)
 const MULTIUSER = () => store.multiUserEnabled();   // read live (env MULTIUSER=true)
 
@@ -1682,6 +1683,7 @@ app.get('/api/profile/resume/file', (req, res) => {
 const assistEnabled = () => cfg('ASSIST_ENABLED') !== 'false';
 const assistModel = () => cfg('ASSIST_MODEL') || cfg('OPENAI_MODEL') || 'gpt-5.4-mini';
 const assistDailyCalls = () => Math.max(0, parseInt(cfg('ASSIST_DAILY_CALLS') || '25', 10) || 0);
+const assistDailyCallsFor = (req) => effectiveAssistDailyCap(planFor(req), assistDailyCalls());
 const assistMaxTokens = () => Math.max(64, Math.min(4000, parseInt(cfg('ASSIST_MAX_TOKENS') || '700', 10) || 700));
 function assistUsage() {
   const today = new Date().toISOString().slice(0, 10);
@@ -1826,7 +1828,7 @@ app.post('/api/assist', requireFeature('ai_draft'), async (req, res) => {
   const role = (row && row.role) || b.role || '';
   if (kind !== 'answer' && !company && !role) return res.status(404).json({ ok: false, error: 'Req not found and no company/role provided.' });
   if (kind === 'answer' && !String(b.question || '').trim()) return res.status(400).json({ ok: false, error: 'A question is required to write an answer.' });
-  const cap = assistDailyCalls();
+  const cap = assistDailyCallsFor(req);
   const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}). Raise it in Settings or wait.` });
 
@@ -1871,7 +1873,7 @@ app.post('/api/assist', requireFeature('ai_draft'), async (req, res) => {
 app.post('/api/profile/draft-summary', requireFeature('profile_summary'), async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
-  const cap = assistDailyCalls();
+  const cap = assistDailyCallsFor(req);
   const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
   const p = readProfile();
@@ -1907,7 +1909,7 @@ function profileGrounding(p) {
 app.post('/api/profile/narratives/suggest', async (req, res) => {
   if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings → Advanced.' });
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
-  const cap = assistDailyCalls(); const u = assistUsage();
+  const cap = assistDailyCallsFor(req); const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
   const p = readProfile();
   const { a, work, edu, kw } = profileGrounding(p);
@@ -1936,7 +1938,7 @@ app.post('/api/profile/narratives/polish', async (req, res) => {
   if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
   const b = req.body || {};
   if (!String(b.rough || '').trim()) return res.status(400).json({ ok: false, error: 'Write a few rough lines first, then polish.' });
-  const cap = assistDailyCalls(); const u = assistUsage();
+  const cap = assistDailyCallsFor(req); const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
   const tool = { type: 'function', name: 'polish_narrative',
     description: 'Tighten the candidate rough notes into ONE clean reusable narrative.',
@@ -1964,7 +1966,7 @@ app.post('/api/transcribe', async (req, res) => {
   const b = req.body || {};
   const data = String(b.audioBase64 || '');
   if (!data) return res.status(400).json({ ok: false, error: 'No audio provided.' });
-  const cap = assistDailyCalls(); const u = assistUsage();
+  const cap = assistDailyCallsFor(req); const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u.calls}/${cap}).` });
   let buf; try { buf = Buffer.from(data, 'base64'); } catch (e) { return res.status(400).json({ ok: false, error: 'Bad audio encoding.' }); }
   // Whisper accepts up to 25MB; the JSON body parser caps us at 8mb (~6MB decoded) first. Keep clips short.
@@ -2000,6 +2002,8 @@ app.post('/api/assist/score', requireFeature('ai_score'), async (req, res) => {
   const company = (row && row.company) || b.company || '';
   const role = (row && row.role) || b.role || '';
   if (!company && !role) return res.status(404).json({ ok: false, error: 'Req not found and no company/role provided.' });
+  const cap = assistDailyCallsFor(req); const u0 = assistUsage();
+  if (cap && u0.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u0.calls}/${cap}). Raise it in Settings or wait.` });
   const p = readProfile();
   const a = p.applicant || {};
   const narr = (p.narratives || []).map((n) => `- ${n.title}: ${n.body}`).join('\n');
@@ -2034,7 +2038,7 @@ app.post('/api/assist/keywords', requireFeature('keyword_ai'), async (req, res) 
   const row = rows.find((r) => reqKey(r) === String(b.key || '').toLowerCase().trim());
   const jd = String(b.jd || (row && row.notes) || '').slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10));
   if (!jd.trim()) return res.status(400).json({ ok: false, error: 'No job description text to analyze.' });
-  const cap = assistDailyCalls(); const u = assistUsage();
+  const cap = assistDailyCallsFor(req); const u = assistUsage();
   if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily AI cap reached (${u.calls}/${cap}). Raise it in Settings or wait.` });
   const p = readProfile();
   const skills = (p.keywords || []).map((k) => k && k.kw).filter(Boolean).join(', ');
@@ -2068,6 +2072,8 @@ app.post('/api/assist/map-fields', requireFeature('ai_mapfields'), async (req, r
   const b = req.body || {};
   const fields = Array.isArray(b.fields) ? b.fields.slice(0, 60) : [];
   if (!fields.length) return res.json({ ok: true, fields: [], tokens: 0 });
+  const cap = assistDailyCallsFor(req); const u0 = assistUsage();
+  if (cap && u0.calls >= cap) return res.status(429).json({ ok: false, error: `Daily assistant cap reached (${u0.calls}/${cap}). Raise it in Settings or wait.` });
   const p = readProfile();
   const a = p.applicant || {};
   const facts = {
@@ -2121,7 +2127,8 @@ const estCost = (tokens, rate) => rate == null ? null : Math.round((tokens / 1e6
 
 app.get('/api/assist/usage', (req, res) => {
   const u = assistUsage();
-  const cap = assistDailyCalls();
+  const plan = planFor(req);
+  const cap = assistDailyCallsFor(req);
   const w7 = assistWindowStats(7);
   const w30 = assistWindowStats(30);
   const rate = assistRatePer1M();
@@ -2129,6 +2136,7 @@ app.get('/api/assist/usage', (req, res) => {
   const cost30 = estCost(w30.tokens, rate);
   res.json({
     ok: true,
+    plan, tierLabel: ent.tierLabel(plan.tier),
     enabled: assistEnabled(), keySet: !!aiKey(), model: assistModel(),
     today: { calls: u.calls, tokens: u.tokens, cap },
     last7d: { calls: w7.calls, tokens: w7.tokens, estCost: estCost(w7.tokens, rate) },

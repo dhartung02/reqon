@@ -2,7 +2,20 @@
 // Mirrors the semantics the server + board rely on (postingId / reqKey / matchRow / answer match).
 const test = require('node:test');
 const assert = require('node:assert');
-const { postingId, reqKey, sameReq, matchRow, bestAnswerMatch, detectATS, detectRemote, extractSalary, fillabilityHint, captureConfidence } = require('../lib.js');
+const {
+  postingId,
+  reqKey,
+  sameReq,
+  matchRow,
+  bestAnswerMatch,
+  detectATS,
+  detectRemote,
+  extractSalary,
+  fillabilityHint,
+  captureConfidence,
+  shouldSkipAiField,
+  isRetryableActionError,
+} = require('../lib.js');
 
 test('postingId extracts ids across ATS url shapes', () => {
   assert.strictEqual(postingId('https://boards.greenhouse.io/acme/jobs/4567890?gh_jid=4567890'), '4567890');
@@ -86,4 +99,21 @@ test('captureConfidence bands + flags gaps', () => {
   const lo = captureConfidence({ company: 'Unknown', role: 'Untitled lead' });
   assert.strictEqual(lo.level, 'Low');
   assert.ok(lo.needsReview.some(r => /role/.test(r)));
+});
+
+test('shouldSkipAiField only blocks unsafe input types', () => {
+  assert.strictEqual(shouldSkipAiField('Create a password', 'password'), true);
+  assert.strictEqual(shouldSkipAiField('Upload your resume', 'file'), true);
+  assert.strictEqual(shouldSkipAiField('Do you now or will you in the future require sponsorship?', 'text'), false);
+  assert.strictEqual(shouldSkipAiField('I agree to the privacy policy and consent to processing', 'text'), false);
+  assert.strictEqual(shouldSkipAiField('LinkedIn profile URL', 'url'), false);
+  assert.strictEqual(shouldSkipAiField('Why are you interested in this role?', 'textarea'), false);
+});
+
+test('isRetryableActionError only retries transient failures', () => {
+  assert.strictEqual(isRetryableActionError(new Error('Network error reaching CRM (fetch failed)')), true);
+  assert.strictEqual(isRetryableActionError(new Error('HTTP 500')), true);
+  assert.strictEqual(isRetryableActionError(Object.assign(new Error('Requires the AI package'), { upgrade: { error: 'upgrade_required' } })), false);
+  assert.strictEqual(isRetryableActionError(new Error('HTTP 401')), false);
+  assert.strictEqual(isRetryableActionError(new Error('HTTP 422')), false);
 });

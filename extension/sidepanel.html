@@ -59,7 +59,8 @@
   .cov-bar > span.mid { background: var(--amber); } .cov-bar > span.low { background: var(--coral); }
   .kw { display: inline-block; font-size: .7rem; padding: 3px 9px; border-radius: 20px; margin: 4px 4px 0 0;
         border: 1px solid var(--line2); color: var(--text2); }
-  .kw.miss { border-color: var(--coral); color: var(--coral); background: var(--ringbg); }
+  .kw.hit { border-color: color-mix(in srgb, var(--emerald) 38%, var(--line2)); color: var(--text); }
+  .kw.hit::before { content: "✓"; color: var(--emerald); font-weight: 700; margin-right: 5px; }
   .covai { margin-top: 12px; }
   .covai-head { border-top: 1px dashed var(--line); padding-top: 11px; }
 
@@ -131,5 +132,6 @@
   <a id="board" class="link" href="#" style="margin-top:14px">Open board ↗</a>
 </div>
 <script src="lib.js"></script>
+<script src="ui-lib.js"></script>
 <script src="theme.js"></script>
 <script src="sidepanel.js"></script>

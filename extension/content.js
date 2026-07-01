@@ -307,10 +307,12 @@
     let idx = 0;
     document.querySelectorAll('input, textarea').forEach((e) => {
       const t = (e.type || '').toLowerCase();
+      const sig = fieldSig(e);
+      if (typeof shouldSkipAiField === 'function' && shouldSkipAiField(sig, t)) return;
       if (SKIP_TYPES.indexOf(t) >= 0) return;
       if (e.value && e.value.trim()) return;             // already filled (incl. deterministic pass)
       e.setAttribute('data-reqon-i', String(idx));
-      candidates.push({ i: idx, sig: fieldSig(e), type: t });
+      candidates.push({ i: idx, sig, type: t });
       idx++;
     });
     if (!candidates.length) return { ok: false, ai: 0, msg: 'Nothing left for AI to fill.' };

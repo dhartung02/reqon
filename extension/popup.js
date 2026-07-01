@@ -5,6 +5,15 @@ const $ = (id) => document.getElementById(id);
 const DEFAULTS = { origin: 'https://cloud.reqon.app', token: '', notifyEnabled: true, overlayEnabled: true };
 const CLOUD_ORIGIN = 'https://cloud.reqon.app';
 const send = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res));
+const resolveOrigin = (typeof resolveBoardOrigin === 'function')
+  ? resolveBoardOrigin
+  : ({ preset, draftOrigin }) => (preset === 'cloud' ? CLOUD_ORIGIN : String(draftOrigin || '').trim().replace(/\/$/, '') || CLOUD_ORIGIN);
+const prefsPatch = (typeof buildLocalPrefsPatch === 'function')
+  ? buildLocalPrefsPatch
+  : ({ overlayEnabled, notifyEnabled }) => ({ overlayEnabled, notifyEnabled });
+const popupHeading = (typeof reqonUiLib !== 'undefined' && reqonUiLib.popupHeadingForRow)
+  ? reqonUiLib.popupHeadingForRow
+  : (row) => (row ? 'Tracked on your board' : 'Clip this job');
 
 let activeTab = null;
 let currentRow = null;
@@ -38,8 +47,32 @@ function setMsg(text, kind) {
 async function getConfig() {
   return new Promise((r) => chrome.storage.sync.get(DEFAULTS, r));
 }
+async function saveLocalPrefs() {
+  await chrome.storage.sync.set(prefsPatch({
+    overlayEnabled: $('overlay').checked,
+    notifyEnabled: $('notify').checked,
+  }));
+}
+async function testDraftConnection() {
+  const cfg = await getConfig();
+  const origin = resolveOrigin({
+    preset: $('serverPreset').value,
+    draftOrigin: $('origin').value,
+    savedOrigin: cfg.origin,
+    cloudOrigin: CLOUD_ORIGIN,
+  });
+  const pattern = origin + '/*';
+  if (!(await chrome.permissions.contains({ origins: [pattern] }))) {
+    await chrome.permissions.request({ origins: [pattern] });
+  }
+  const r = await fetch(origin + '/api/health');
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return { ok: true, msg: 'Connected — ' + j.count + ' rows on the board.' };
+}
 
 function renderUntracked() {
+  const h = document.querySelector('.head h1'); if (h) h.textContent = popupHeading(null);
   $('card').setAttribute('data-tier', '');
   $('card').setAttribute('data-st', 'ready');
   $('card').innerHTML =
@@ -52,6 +85,7 @@ function renderUntracked() {
 }
 
 function renderTracked(row) {
+  const h = document.querySelector('.head h1'); if (h) h.textContent = popupHeading(row);
   const salaryChip = row.salary ? `<span class="chip">${esc(row.salary)}</span>` : '';
   const chips = salaryChip +
     `<span class="chip">prob <b>${esc(row.prob ?? '—')}</b></span>` +
@@ -161,6 +195,8 @@ async function loadSettings() {
 $('serverPreset').onchange = () => {
   $('customOriginWrap').style.display = $('serverPreset').value === 'personal' ? '' : 'none';
 };
+$('overlay').onchange = () => { saveLocalPrefs().catch(() => {}); };
+$('notify').onchange = () => { saveLocalPrefs().catch(() => {}); };
 // The gear swaps the clip card for the settings view (and back), matching the redesign.
 function setSettingsView(show) {
   $('settings').classList.toggle('open', show);
@@ -182,8 +218,13 @@ $('panel').onclick = async () => {
   }
 };
 $('save').onclick = async () => {
-  const preset = $('serverPreset').value;
-  const origin = (preset === 'cloud' ? CLOUD_ORIGIN : ($('origin').value.trim() || CLOUD_ORIGIN)).replace(/\/$/, '');
+  const cfg = await getConfig();
+  const origin = resolveOrigin({
+    preset: $('serverPreset').value,
+    draftOrigin: $('origin').value,
+    savedOrigin: cfg.origin,
+    cloudOrigin: CLOUD_ORIGIN,
+  });
   const username = $('username').value.trim();
   const password = $('password').value;
   setMsg('Connecting…');
@@ -201,7 +242,7 @@ $('save').onclick = async () => {
     });
     const j = await r.json();
     if (!r.ok || !j.ok) { setMsg(j.error || 'Login failed.', 'err'); return; }
-    await chrome.storage.sync.set({ origin, token: j.token || '', notifyEnabled: $('notify').checked, overlayEnabled: $('overlay').checked });
+    await chrome.storage.sync.set({ origin, token: j.token || '', ...prefsPatch({ notifyEnabled: $('notify').checked, overlayEnabled: $('overlay').checked }) });
     $('password').value = '';
     setMsg(j.displayName ? `Connected as ${j.displayName}.` : 'Connected.', 'ok');
     await refresh();
@@ -211,8 +252,12 @@ $('save').onclick = async () => {
 };
 $('test').onclick = async () => {
   setMsg('Testing…');
-  const r = await send({ type: 'testConnection' });
-  setMsg((r && r.msg) || 'No response.', r && r.ok ? 'ok' : 'err');
+  try {
+    const r = await testDraftConnection();
+    setMsg(r.msg, 'ok');
+  } catch (e) {
+    setMsg(e && e.message ? e.message : 'No response.', 'err');
+  }
 };
 
 (async () => { await loadSettings(); await refresh(); })();

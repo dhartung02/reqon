@@ -1,6 +1,17 @@
 const $ = id => document.getElementById(id);
 const CLOUD_ORIGIN = 'https://cloud.reqon.app';
 const DEFAULTS = { origin: CLOUD_ORIGIN, token: '', overlayEnabled: true };
+const resolveOrigin = (typeof resolveBoardOrigin === 'function')
+  ? resolveBoardOrigin
+  : ({ preset, draftOrigin }) => (preset === 'cloud' ? CLOUD_ORIGIN : String(draftOrigin || '').trim().replace(/\/$/, '') || CLOUD_ORIGIN);
+const prefsPatch = (typeof buildLocalPrefsPatch === 'function')
+  ? buildLocalPrefsPatch
+  : ({ overlayEnabled, notifyEnabled }) => {
+      const patch = {};
+      if (typeof overlayEnabled === 'boolean') patch.overlayEnabled = overlayEnabled;
+      if (typeof notifyEnabled === 'boolean') patch.notifyEnabled = notifyEnabled;
+      return patch;
+    };
 
 chrome.storage.sync.get(DEFAULTS, c => {
   const isCloud = !c.origin || c.origin === CLOUD_ORIGIN;
@@ -14,6 +25,7 @@ $('serverPreset').onchange = () => {
   const personal = $('serverPreset').value === 'personal';
   $('customOriginWrap').style.display = personal ? '' : 'none';
 };
+$('overlay').onchange = () => { chrome.storage.sync.set(prefsPatch({ overlayEnabled: $('overlay').checked })); };
 
 // Appearance: System / Light / Dark (persisted in chrome.storage.sync via theme.js).
 if (window.reqonThemeWireSeg) window.reqonThemeWireSeg($('themeSeg'));
@@ -62,10 +74,32 @@ async function ensureHostPermission(origin) {
     if (!has) await chrome.permissions.request({ origins: [pattern] });
   } catch (e) {}
 }
+async function getConfig() {
+  return new Promise((r) => chrome.storage.sync.get(DEFAULTS, r));
+}
+async function testDraftConnection() {
+  const cfg = await getConfig();
+  const origin = resolveOrigin({
+    preset: $('serverPreset').value,
+    draftOrigin: $('origin').value,
+    savedOrigin: cfg.origin,
+    cloudOrigin: CLOUD_ORIGIN,
+  });
+  await ensureHostPermission(origin);
+  const r = await fetch(origin + '/api/health');
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return { ok: true, msg: 'Connected — ' + j.count + ' rows on the board.' };
+}
 
 $('save').onclick = async () => {
-  const preset = $('serverPreset').value;
-  const origin = (preset === 'cloud' ? CLOUD_ORIGIN : ($('origin').value.trim() || CLOUD_ORIGIN)).replace(/\/$/, '');
+  const cfg = await getConfig();
+  const origin = resolveOrigin({
+    preset: $('serverPreset').value,
+    draftOrigin: $('origin').value,
+    savedOrigin: cfg.origin,
+    cloudOrigin: CLOUD_ORIGIN,
+  });
   const username = $('username').value.trim();
   const password = $('password').value;
 
@@ -82,7 +116,7 @@ $('save').onclick = async () => {
     if (!r.ok || !j.ok) {
       $('msg').textContent = j.error || 'Login failed.'; $('msg').className = 'err'; return;
     }
-    await chrome.storage.sync.set({ origin, token: j.token || '', overlayEnabled: $('overlay').checked });
+    await chrome.storage.sync.set({ origin, token: j.token || '', ...prefsPatch({ overlayEnabled: $('overlay').checked }) });
     $('msg').textContent = j.displayName ? `Connected as ${j.displayName}.` : 'Connected.';
     $('msg').className = 'ok';
     $('password').value = '';
@@ -93,8 +127,13 @@ $('save').onclick = async () => {
 
 $('test').onclick = () => {
   $('msg').textContent = 'Testing…'; $('msg').className = '';
-  chrome.runtime.sendMessage({ type: 'testConnection' }, r => {
-    $('msg').textContent = (r && r.msg) || 'No response.';
-    $('msg').className = (r && r.ok) ? 'ok' : 'err';
-  });
+  testDraftConnection()
+    .then((r) => {
+      $('msg').textContent = r.msg;
+      $('msg').className = 'ok';
+    })
+    .catch((e) => {
+      $('msg').textContent = e && e.message ? e.message : 'No response.';
+      $('msg').className = 'err';
+    });
 };

@@ -1,8 +1,10 @@
 /**
  * On-page overlay (FR-EXT-3/4) + apply-assist fill. Shows a compact badge (fit/prob/EV/tier +
  * status if tracked, Clip if not) and a "Fill" button that fills factual fields from your Reqon
- * profile and inserts matching saved answers — on the real ATS page, in your real browser.
- * GUARDRAILS: factual fields + saved answers only; NEVER passwords / EEO / consent; NEVER submits.
+ * profile, inserts matching saved answers, and attaches the résumé you uploaded in Settings to
+ * résumé upload fields — on the real ATS page, in your real browser.
+ * GUARDRAILS: factual fields + saved answers + résumé attach only; NEVER passwords / EEO / consent;
+ * NEVER submits (the résumé is attached for you to review, never sent).
  */
 (function () {
   if (window.__jpcrmOverlay) return;
@@ -186,11 +188,65 @@
         if (a) { setVal(e, a.a); answered++; }
       }
     });
+    const rez = await attachResume();   // inject the stored résumé into any résumé upload field
     return {
-      ok: factual + answered > 0,
-      factual, answered,
-      msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '') + ' — review, never auto-submitted.',
+      ok: factual + answered + (rez.attached || 0) > 0,
+      factual, answered, resume: rez.attached || 0, resumeMissing: !!rez.noResume,
+      msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '')
+        + (rez.attached ? ` + résumé attached` : '') + ' — review, never auto-submitted.',
     };
+  }
+
+  // ── Résumé upload injection (like Simplify) ──────────────────────────────────────────────────
+  // Browsers block setting a file input's value via JS; the one supported path is building a File
+  // and assigning it through a DataTransfer. We fetch the résumé the user already uploaded in
+  // Settings (served base64 by the server) and inject it into detected résumé upload fields. Works
+  // on standard <input type=file> (Greenhouse/Lever/Ashby/Glassdoor Easy Apply); custom drag-drop
+  // widgets and account-gated portals (Workday/iCIMS) can't be populated this way. NEVER submits.
+  let _resumeCache = null;   // { name, mime, bytes } cached per page session
+  async function fetchResume() {
+    if (_resumeCache !== null) return _resumeCache || null;
+    let r; try { r = await send({ type: 'resumeFile' }); } catch (e) { r = null; }
+    if (!r || !r.ok || !r.exists || !r.dataBase64) { _resumeCache = false; return null; }
+    try {
+      const bin = atob(r.dataBase64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      _resumeCache = { name: r.name || 'resume', mime: r.mime || 'application/octet-stream', bytes };
+      return _resumeCache;
+    } catch (e) { _resumeCache = false; return null; }
+  }
+  function resumeInputs() {
+    const out = [];
+    document.querySelectorAll('input[type="file"]').forEach((e) => {
+      const sig = fieldSig(e);
+      const accept = (e.getAttribute('accept') || '').toLowerCase();
+      if (/cover|portfolio|photo|image|headshot|transcript|logo|avatar/i.test(sig)) return;   // not the résumé slot
+      const resumeSig = /resume|résumé|\bcv\b|curriculum/i.test(sig);
+      const docAccept = /pdf|word|document|msword|officedocument|\.docx?/.test(accept) && !accept.includes('image');
+      if (resumeSig || docAccept) out.push(e);
+    });
+    return out;
+  }
+  async function attachResume() {
+    let inputs;
+    try { inputs = resumeInputs().filter((e) => !(e.files && e.files.length)); } catch (e) { return { attached: 0 }; }
+    if (!inputs.length) return { attached: 0 };
+    const rz = await fetchResume();
+    if (!rz) return { attached: 0, noResume: true };
+    let attached = 0;
+    for (const e of inputs) {
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(new File([rz.bytes], rz.name, { type: rz.mime }));
+        e.files = dt.files;
+        e.dispatchEvent(new Event('input', { bubbles: true }));
+        e.dispatchEvent(new Event('change', { bubbles: true }));
+        e.style.outline = '2px solid #00E5A3'; e.style.outlineOffset = '1px'; highlighted.push(e);
+        attached++;
+      } catch (err) { /* this input blocks programmatic files (custom widget) — leave it for the human */ }
+    }
+    return { attached };
   }
   const fillBtn = () => { const b = el('button', 'jpcrm-btn jpcrm-primary', '⚡ Fill form'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '⚡ Fill form'; renderFillSummary(res); }; return b; };
   // The consistent autofill pair (mirrors the side panel): deterministic "Fill form" first, then an
@@ -223,9 +279,13 @@
     if (res.answered) line('✓ Inserted ' + res.answered + ' saved answer' + (res.answered === 1 ? '' : 's'), 'jpcrm-ok');
     if (res.ai) line('✓ ' + res.ai + ' field' + (res.ai === 1 ? '' : 's') + ' via AI map', 'jpcrm-ok');
     if (res.aiError) line('AI fill unavailable: ' + res.aiError, 'jpcrm-warn-line');
+    if (res.resume) line('✓ Attached your résumé to ' + res.resume + ' upload field' + (res.resume === 1 ? '' : 's') + ' — confirm it before submitting', 'jpcrm-ok');
+    else if (res.resumeMissing) line('Résumé upload found — add a résumé in Settings to auto-attach it', 'jpcrm-warn-line');
     const skips = [];
     if (sk.eeoConsent) skips.push(sk.eeoConsent + ' EEO/consent');
-    if (sk.file) skips.push(sk.file + ' file upload' + (sk.file === 1 ? '' : 's') + ' (résumé — attach it yourself)');
+    // File uploads still left for the human — minus the résumé slot(s) we just attached.
+    const filesLeft = Math.max(0, (sk.file || 0) - (res.resume || 0));
+    if (filesLeft) skips.push(filesLeft + ' other file upload' + (filesLeft === 1 ? '' : 's'));
     if (sk.password) skips.push(sk.password + ' login');
     if (skips.length) line('Skipped (left for you): ' + skips.join(', '));
     line('Review every field — nothing is submitted.', 'jpcrm-dim');

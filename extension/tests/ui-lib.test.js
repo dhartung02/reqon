@@ -52,6 +52,16 @@ test('buildBannerModel prioritizes tracked role summary for tracked pages', () =
   assert.match(model.summaryText, /Applied/);
 });
 
+test('buildBannerModel switches tracked manual pages to review status CTA', () => {
+  const model = buildBannerModel({
+    row: { company: 'Reddit', role: 'Senior Group Product Manager', status: 'Applied', fit: 6 },
+    pageState: { recognized: true, fillable: false },
+  });
+
+  assert.strictEqual(model.mode, 'tracked');
+  assert.strictEqual(model.primaryCta, 'Review status');
+});
+
 test('buildBannerModel uses review CTA for untracked manual pages', () => {
   const model = buildBannerModel({
     row: null,

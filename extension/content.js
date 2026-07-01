@@ -26,11 +26,27 @@
     const resume = Number(res && res.resume) || 0;
     const ai = Number(res && res.ai) || 0;
     const direct = Number(res && res.direct) || (factual + answered + resume);
-    const total = Number(res && res.total) || (direct + ai + (Number(res && res.remaining) || 0));
-    const remaining = res && res.remaining != null
-      ? Number(res.remaining) || 0
-      : Math.max(0, total - direct - ai);
-    return reqonUiLib.summarizeFillAvailability({ total, direct, ai, remaining }).replace(` of ${total}`, '');
+    const hasRemaining = res && res.remaining != null;
+    const hasTotal = res && res.total != null;
+    if (hasRemaining && hasTotal) {
+      const total = Number(res.total) || 0;
+      const remaining = Number(res.remaining) || 0;
+      return reqonUiLib.summarizeFillAvailability({ total, direct, ai, remaining }).replace(` of ${total}`, '');
+    }
+    if (hasRemaining) {
+      const remaining = Number(res.remaining) || 0;
+      return `Filled ${direct + ai} fields: ${direct} direct, ${ai} AI-assisted, ${remaining} still need review.`;
+    }
+    return `Filled ${direct + ai} fields so far: ${direct} direct, ${ai} AI-assisted.`;
+  }
+
+  function resolveBannerActionKind({ mode, primaryCta, fillable }) {
+    if (mode === 'tracked') {
+      if (primaryCta === 'Continue application' && fillable) return 'fill';
+      return 'board';
+    }
+    if (fillable && primaryCta === 'Start guided fill') return 'fill';
+    return 'clip';
   }
 
   function deriveBannerState({ row, job, fill, fit }) {
@@ -51,6 +67,7 @@
     module.exports = {
       deriveBannerState,
       summarizeBannerFillResult,
+      resolveBannerActionKind,
       isBannerFillable,
       isRecognizedJobPage,
     };
@@ -590,7 +607,11 @@
     box.querySelector('.jpcrm-banner-message').textContent = row.company ? `${row.company} is already tracked on your board.` : 'Tracked role found on your board.';
     renderBannerActions({
       primaryLabel: banner.model.primaryCta,
-      primaryKind: fill.level !== 'External redirect' ? 'fill' : 'board',
+      primaryKind: resolveBannerActionKind({
+        mode: banner.model.mode,
+        primaryCta: banner.model.primaryCta,
+        fillable: banner.fillable,
+      }),
       secondaryLabel: banner.model.secondaryCta,
       secondaryKind: 'board',
       row,
@@ -636,7 +657,11 @@
       : 'Review this page, then save it to your board if it is worth tracking.';
     renderBannerActions({
       primaryLabel: banner.model.primaryCta,
-      primaryKind: banner.fillable ? 'fill' : 'clip',
+      primaryKind: resolveBannerActionKind({
+        mode: banner.model.mode,
+        primaryCta: banner.model.primaryCta,
+        fillable: banner.fillable,
+      }),
       secondaryLabel: banner.model.secondaryCta,
       secondaryKind: 'clip',
       row: null,

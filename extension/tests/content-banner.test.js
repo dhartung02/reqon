@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   deriveBannerState,
   summarizeBannerFillResult,
+  resolveBannerActionKind,
 } = require('../content.js');
 
 test('deriveBannerState keeps tracked rows in tracked mode with continue CTA on fillable pages', () => {
@@ -33,9 +34,33 @@ test('deriveBannerState falls back to untracked review CTA when the page is not 
   assert.equal(state.model.primaryCta, 'Review job');
 });
 
+test('deriveBannerState uses review status CTA for tracked manual-heavy pages', () => {
+  const state = deriveBannerState({
+    row: { company: 'Reddit', role: 'Senior Group Product Manager', status: 'Applied', fit: 6 },
+    job: { role: 'Senior Group Product Manager' },
+    fill: { level: 'Manual-heavy' },
+  });
+
+  assert.equal(state.fillable, false);
+  assert.equal(state.model.mode, 'tracked');
+  assert.equal(state.model.primaryCta, 'Review status');
+});
+
+test('resolveBannerActionKind does not map review status CTAs to autofill', () => {
+  assert.equal(resolveBannerActionKind({ mode: 'tracked', primaryCta: 'Continue application', fillable: true }), 'fill');
+  assert.equal(resolveBannerActionKind({ mode: 'tracked', primaryCta: 'Review status', fillable: false }), 'board');
+});
+
 test('summarizeBannerFillResult combines direct, AI, and remaining counts for the banner message', () => {
   assert.equal(
     summarizeBannerFillResult({ factual: 5, answered: 2, resume: 1, ai: 3, remaining: 4 }),
     'Filled 11 fields: 8 direct, 3 AI-assisted, 4 still need review.'
+  );
+});
+
+test('summarizeBannerFillResult avoids inventing a remaining count when totals are unknown', () => {
+  assert.equal(
+    summarizeBannerFillResult({ factual: 5, answered: 2, resume: 1, ai: 3 }),
+    'Filled 11 fields so far: 8 direct, 3 AI-assisted.'
   );
 });

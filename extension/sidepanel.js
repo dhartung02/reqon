@@ -219,7 +219,11 @@ async function doFill(kind, btn) {
 async function doClip() {
   if (!activeTab) return;
   const b = $('clip'); if (b) { b.disabled = true; b.textContent = 'Clipping…'; }
-  const r = await send({ type: 'clip', url: activeTab.url, title: activeTab.title || '' });
+  // Ask the page for the extracted job (JSON-LD / detail pane) so the clip captures the real role +
+  // company, not the tab title — same source the on-page overlay uses.
+  let meta;
+  try { if (activeTab.id != null) { const c = await chrome.tabs.sendMessage(activeTab.id, { type: 'captureMeta' }); if (c && c.ok) meta = c.meta; } } catch (e) { /* not a job page */ }
+  const r = await send({ type: 'clip', url: activeTab.url, title: activeTab.title || '', meta });
   setMsg(r.msg, r.ok ? 'ok' : 'err');
   setTimeout(refresh, r.ok ? 2000 : 0);
 }
@@ -495,6 +499,7 @@ async function refresh() {
   try { const e = await send({ type: 'entitlements' }); ENT = (e && e.ok) ? e : null; } catch (_) { ENT = null; }
   applyDraftGate();
   await renderPage();
+  lastPageUrl = activeTab && activeTab.url;   // record the loaded page so only real navigations clear drafts
   await Promise.all([renderCoverage(), renderPipeline(), loadUsage()]);
 }
 
@@ -503,8 +508,25 @@ async function refresh() {
 // / post-edit. Without this the panel kept rendering the previously-detected page and showed a
 // stale "Not on your board" after you opened a different posting (e.g. a Best-bets link) — the only
 // way to refresh was reopening the panel. Debounced so a navigation's burst of events runs once.
+// AI output is built for one specific job — clear it when the active tab moves to a different
+// listing so a draft/score from the previous job never lingers on the new one. (renderPage rebuilds
+// #page, clearing #scoreOut; the draft answer + pasted question live in the static #ai section.)
+let lastPageUrl = null;
+function clearJobDrafts() {
+  const out = $('aiOut'); if (out) out.innerHTML = '';
+  const q = $('aiQ'); if (q) q.value = '';
+  const so = $('scoreOut'); if (so) so.innerHTML = '';
+}
 let pageNavTimer = null;
-function refreshPageSoon() { clearTimeout(pageNavTimer); pageNavTimer = setTimeout(async () => { await renderPage(); renderCoverage(); }, 150); }
+function refreshPageSoon() {
+  clearTimeout(pageNavTimer);
+  pageNavTimer = setTimeout(async () => {
+    await renderPage();
+    const url = activeTab && activeTab.url;
+    if (url && url !== lastPageUrl) { clearJobDrafts(); lastPageUrl = url; }   // new listing → reset AI work
+    renderCoverage();
+  }, 150);
+}
 chrome.tabs.onActivated.addListener(refreshPageSoon);
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (tab && tab.active && (info.url || info.status === 'complete')) refreshPageSoon(); });
 try { chrome.windows.onFocusChanged.addListener((wid) => { if (wid !== chrome.windows.WINDOW_ID_NONE) refreshPageSoon(); }); } catch (_) {}

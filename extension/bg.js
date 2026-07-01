@@ -116,6 +116,9 @@ async function runAction(a) {
     if (m.jdExcerpt) noteParts.push('JD: ' + m.jdExcerpt);
     const body = {
       url: a.url, link: a.url, title: a.title, source: 'chrome-ext',
+      // Explicit company/role extracted from the page (captureJob) — the server honors these and
+      // only parses the tab title when absent, so aggregator/SPA clips arrive as the real job.
+      company: m.company || undefined, role: m.role || undefined, location: m.location || undefined,
       salary: m.salary || '', remote: m.remote || '', sourceType: m.source || '',
       notes: noteParts.join('\n') || undefined,
     };

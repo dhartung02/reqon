@@ -87,6 +87,7 @@
     hookFocus();   // once the panel/overlay is in use, track the last-focused field for Insert
     if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords(msg.company) }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
+    if (msg.type === 'captureMeta') { try { const c = captureMeta(); sendResponse({ ok: true, meta: c.meta, job: c.job }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'smartFill') { smartFill().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'aiFillRest') { aiFillRest().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
@@ -307,26 +308,77 @@
     });
     return { inputs, textareas, hasFile, hasPassword, fillableNow };
   }
-  // Pull company/role/remote/salary/JD-excerpt/ATS off the page. company/role stay best-effort
-  // (the server's parseTitle is authoritative); we send what we see so the lead arrives richer.
+  // Extract the SPECIFIC job on the page — structured (JSON-LD JobPosting) first, then the visible
+  // detail-pane heading. Aggregator / SPA pages (Glassdoor & LinkedIn "For You", Indeed) keep a
+  // generic tab title ("Recommended Jobs For You") while the real job lives in a detail pane, so
+  // clipping off document.title captured garbage. Returns {company, role, location} best-effort.
+  function captureJob() {
+    const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 160);
+    // 1) JSON-LD JobPosting — the most reliable, site-agnostic source (Glassdoor / LinkedIn / Indeed /
+    //    Greenhouse / Lever commonly embed it). Handles a single object, an array, or an @graph.
+    try {
+      const flat = [];
+      document.querySelectorAll('script[type="application/ld+json"]').forEach((n) => {
+        let data; try { data = JSON.parse(n.textContent || 'null'); } catch (e) { return; }
+        const push = (d) => { if (d && typeof d === 'object') flat.push(d); };
+        if (Array.isArray(data)) data.forEach(push);
+        else if (data && Array.isArray(data['@graph'])) data['@graph'].forEach(push);
+        else push(data);
+      });
+      const typeOf = (d) => [].concat(d['@type'] || []).map((x) => String(x).toLowerCase());
+      const jp = flat.find((d) => typeOf(d).includes('jobposting'));
+      if (jp) {
+        const org = jp.hiringOrganization;
+        const company = clean(typeof org === 'string' ? org : (org && org.name));
+        const role = clean(jp.title);
+        const loc0 = Array.isArray(jp.jobLocation) ? jp.jobLocation[0] : jp.jobLocation;
+        const addr = loc0 && loc0.address;
+        const location = clean(addr && [addr.addressLocality, addr.addressRegion].filter(Boolean).join(', '));
+        if (role || company) return { company, role, location, from: 'jsonld' };
+      }
+    } catch (e) { /* defensive */ }
+    // 2) Visible detail-pane heading (SPA aggregators). Job-specific selectors first so a generic
+    //    page heading ("Recommended Jobs For You") is never mistaken for a role.
+    try {
+      const pick = (sels) => { for (const s of sels) { const el = document.querySelector(s); const v = clean(el && el.textContent); if (v) return v; } return ''; };
+      const role = pick(['[data-test="job-title"]', '[data-test="jobTitle"]',
+        '.job-details-jobs-unified-top-card__job-title', 'h1[class*="jobTitle" i]',
+        '[class*="JobDetails_jobTitle" i]', '[id^="job-details"] h1']);
+      if (role) {
+        const company = pick(['[data-test="employer-name"]', '[data-test="employerName"]',
+          '.job-details-jobs-unified-top-card__company-name', '[class*="EmployerProfile_employerName" i]',
+          '[class*="companyName" i]']);
+        return { company, role, location: '', from: 'dom' };
+      }
+    } catch (e) { /* defensive */ }
+    return { company: '', role: '', location: '', from: '' };
+  }
+
+  // Pull company/role/remote/salary/JD-excerpt/ATS off the page. company/role are extracted from the
+  // page (captureJob) and sent explicitly; the server honors them and only parses the tab title when
+  // they're absent, so aggregator/SPA clips arrive as the real job, not the page name.
   function captureMeta() {
     const text = jdText();
     const { source, applyMode } = detectATS(location.href);
+    const job = captureJob();
     const title = document.title || '';
     const meta = {
       source, applyMode,
+      company: job.company || undefined,
+      role: job.role || undefined,
+      location: job.location || undefined,
       remote: detectRemote(text),
       salary: extractSalary(text),
       jdExcerpt: text.slice(0, 600),
       postingId: postingId(location.href),
-      seniority: /\b(principal|director|staff|head of|vp|vice president|lead|group)\b/i.test(title + ' ' + text.slice(0, 400)) ? 'senior' : '',
+      seniority: /\b(principal|director|staff|head of|vp|vice president|lead|group)\b/i.test((job.role || title) + ' ' + text.slice(0, 400)) ? 'senior' : '',
     };
     const fill = fillabilityHint(applyMode, formStats());
-    // The server's parseTitle resolves the employer; if the title is company-structured
-    // (" at X", "X hiring", "Role | X") we count company as a positive signal for confidence.
-    const hasCompanySignal = /\s(?:at|@|—|–|\||·|-)\s|hiring/i.test(title) || !!document.querySelector('meta[property="og:site_name"]');
-    const conf = captureConfidence(Object.assign({ company: hasCompanySignal ? title : '', role: title }, meta));
-    return { meta, fill, conf };
+    // Prefer the extracted job for confidence; fall back to the title heuristic when nothing parsed.
+    const hasCompanySignal = !!job.company || /\s(?:at|@|—|–|\||·|-)\s|hiring/i.test(title) || !!document.querySelector('meta[property="og:site_name"]');
+    const conf = captureConfidence(Object.assign(
+      { company: job.company || (hasCompanySignal ? title : ''), role: job.role || title }, meta));
+    return { meta, fill, conf, job };
   }
 
   let box;
@@ -461,12 +513,14 @@
   // Clip confirmation panel (P1.10 + P1.12): shows what was captured, confidence, and optional
   // note/tag/priority before the row is created. Nothing is sent until the user confirms.
   function openClipPanel() {
-    const { meta, conf } = captureMeta();
+    const { meta, conf, job } = captureMeta();
     const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
     const panel = el('div', 'jpcrm-clip');
     const confCls = { High: 'jpcrm-c-hi', Medium: 'jpcrm-c-mid', Low: 'jpcrm-c-lo' }[conf.level] || 'jpcrm-c-mid';
+    // Show the extracted job (role — company), not the tab title, so the confirm reflects what saves.
+    const heading = [job.role, job.company].filter(Boolean).join(' — ') || esc(document.title);
     panel.innerHTML =
-      '<div class="jpcrm-clip-h">' + esc(document.title).slice(0, 80) + '</div>' +
+      '<div class="jpcrm-clip-h">' + esc(heading).slice(0, 90) + '</div>' +
       '<div class="jpcrm-clip-conf ' + confCls + '">Confidence: ' + conf.level + '</div>' +
       (conf.detected.length ? '<div class="jpcrm-clip-meta">Detected: ' + conf.detected.map(esc).join(', ') + '</div>' : '') +
       (conf.needsReview.length ? '<div class="jpcrm-clip-meta jpcrm-clip-warn">Needs review: ' + conf.needsReview.map(esc).join(', ') + '</div>' : '');

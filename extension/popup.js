@@ -129,7 +129,11 @@ async function doClip() {
   if (!activeTab) return;
   $('clip').disabled = true;
   setMsg('Clipping…');
-  const r = await send({ type: 'clip', url: activeTab.url, title: activeTab.title || '' });
+  // Pull the extracted job (JSON-LD / detail pane) from the page so the clip captures the real
+  // role + company instead of the tab title — same source the overlay and side panel use.
+  let meta;
+  try { if (activeTab.id != null) { const c = await chrome.tabs.sendMessage(activeTab.id, { type: 'captureMeta' }); if (c && c.ok) meta = c.meta; } } catch (e) { /* not a job page */ }
+  const r = await send({ type: 'clip', url: activeTab.url, title: activeTab.title || '', meta });
   setMsg(r.msg, r.ok ? 'ok' : 'err');
   await refresh();
 }

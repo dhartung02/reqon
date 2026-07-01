@@ -79,10 +79,10 @@ function ensureExperienceMetaNode() {
   return el;
 }
 
-async function loadExperienceMeta() {
+async function loadExperienceMeta(force) {
   const meta = ensureExperienceMetaNode();
   if (!meta) return;
-  const r = await new Promise((res) => chrome.runtime.sendMessage({ type: 'experienceConfig' }, res));
+  const r = await new Promise((res) => chrome.runtime.sendMessage({ type: 'experienceConfig', force: !!force }, res));
   if (!r || r.ok === false) {
     meta.textContent = 'Experience config unavailable until the extension can reach your board.';
     return;
@@ -142,7 +142,7 @@ $('save').onclick = async () => {
       $('msg').textContent = j.error || 'Login failed.'; $('msg').className = 'err'; return;
     }
     await chrome.storage.sync.set({ origin, token: j.token || '', ...prefsPatch({ overlayEnabled: $('overlay').checked }) });
-    await loadExperienceMeta();
+    await loadExperienceMeta(true);
     $('msg').textContent = j.displayName ? `Connected as ${j.displayName}.` : 'Connected.';
     $('msg').className = 'ok';
     $('password').value = '';
@@ -155,7 +155,7 @@ $('test').onclick = () => {
   $('msg').textContent = 'Testing…'; $('msg').className = '';
   testDraftConnection()
     .then(async (r) => {
-      await loadExperienceMeta();
+      await loadExperienceMeta(true);
       $('msg').textContent = r.msg;
       $('msg').className = 'ok';
     })

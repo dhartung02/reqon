@@ -113,3 +113,16 @@ test('buildTodayBuckets orders ready-to-apply roles ahead of lower-priority entr
     ['Coast']
   );
 });
+
+test('buildTodayBuckets excludes closed roles from needsFollowUp even with lingering dates', () => {
+  const rows = [
+    { company: 'OpenCo', role: 'Principal PM', status: 'Applied', followup: '2026-07-02', tier: 'A', conf: 'verified' },
+    { company: 'ClosedCo', role: 'Director', status: 'Rejected', followup: '2026-07-01', tier: 'A', conf: 'verified' },
+  ];
+
+  const buckets = buildTodayBuckets(rows);
+  assert.deepStrictEqual(
+    buckets.needsFollowUp.map((row) => row.company),
+    ['OpenCo']
+  );
+});

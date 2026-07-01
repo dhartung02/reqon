@@ -102,11 +102,17 @@
     return /^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(String(status || ''));
   }
 
+  function isClosedStatus(status) {
+    return /^(Rejected|Archived)$/.test(String(status || ''));
+  }
+
   function buildTodayBuckets(rows) {
     const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
     const readyToApply = list.filter(isBestBetRow).sort(compareReadyRows);
     const inProgress = list.filter((row) => isInProgressStatus(row && row.status)).sort(compareByDate('followup'));
-    const needsFollowUp = list.filter((row) => !!(row && row.followup)).sort(compareByDate('followup'));
+    const needsFollowUp = list
+      .filter((row) => row && row.followup && !isClosedStatus(row.status))
+      .sort(compareByDate('followup'));
 
     return {
       defaultSection: { id: 'ready-to-apply', title: 'Ready to apply' },

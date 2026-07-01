@@ -67,6 +67,31 @@ async function loadUsage() {
 }
 loadUsage();
 
+function ensureExperienceMetaNode() {
+  let el = $('experienceMeta');
+  if (el) return el;
+  const usage = $('usage');
+  if (!usage || !usage.parentNode) return null;
+  el = document.createElement('div');
+  el.id = 'experienceMeta';
+  el.className = 'fineprint';
+  usage.parentNode.insertBefore(el, usage.nextSibling);
+  return el;
+}
+
+async function loadExperienceMeta() {
+  const meta = ensureExperienceMetaNode();
+  if (!meta) return;
+  const r = await new Promise((res) => chrome.runtime.sendMessage({ type: 'experienceConfig' }, res));
+  if (!r || r.ok === false) {
+    meta.textContent = 'Experience config unavailable until the extension can reach your board.';
+    return;
+  }
+  const updateMode = r.updates && r.updates.mode ? r.updates.mode.replace(/_/g, ' ') : 'managed updates';
+  meta.textContent = `Experience config ${r.version} loaded from your Reqon server. Updates use ${updateMode}.`;
+}
+loadExperienceMeta();
+
 async function ensureHostPermission(origin) {
   try {
     const pattern = origin.replace(/\/$/, '') + '/*';

@@ -3,7 +3,7 @@
  * origin only). Holds the API client, a 60s row cache for overlay lookups, and the
  * offline action queue (FR-EXT-5: failed writes persist and flush on an alarm).
  */
-importScripts('lib.js');
+importScripts('lib.js', 'bg-experience.js');
 
 const DEFAULTS = { origin: 'https://cloud.reqon.app', token: '' };
 const getCfg = () => new Promise(r => chrome.storage.sync.get(DEFAULTS, r));
@@ -75,6 +75,63 @@ async function getProfile(force) {
   const j = await api('/api/profile');
   profileCache = { profile: (j && j.profile) || {}, at: Date.now() };
   return profileCache.profile;
+}
+
+const experienceCache = buildExperienceCache();
+let lastPageContext = null;
+
+async function getExperience(force) {
+  if (!force && experienceCache.isFresh()) return experienceCache.get();
+  const payload = await api('/api/extension/experience');
+  experienceCache.set(payload);
+  return payload;
+}
+
+function isRecognizedJobPage(url) {
+  return detectATS(url).applyMode !== 'Unknown';
+}
+
+function pageKeyFor(tab, row) {
+  if (row) return reqKey(row);
+  const url = tab && tab.url ? String(tab.url) : '';
+  return postingId(url) || url.replace(/[?#].*$/, '');
+}
+
+async function computePageContext(tab) {
+  if (!tab || !tab.url || !/^https?:/.test(tab.url)) return { mode: 'today', pageKey: '' };
+  const recognized = isRecognizedJobPage(tab.url);
+  const row = recognized ? matchRow(await getRows(false), tab.url) : null;
+  return {
+    recognized,
+    row,
+    mode: row ? 'tracked-job' : (recognized ? 'job' : 'today'),
+    pageKey: pageKeyFor(tab, row),
+    url: tab.url,
+  };
+}
+
+async function broadcastPageContext(tab) {
+  const next = await computePageContext(tab);
+  if (!shouldBroadcastPageContext(lastPageContext, next)) return next;
+  lastPageContext = next;
+  try { await chrome.runtime.sendMessage({ type: 'pageContextChanged', context: next }); } catch (e) {}
+  return next;
+}
+
+async function requestUpdateCheck() {
+  if (!chrome.runtime || typeof chrome.runtime.requestUpdateCheck !== 'function') {
+    return { ok: false, status: 'unavailable', message: 'Chrome update checks are unavailable in this browser.' };
+  }
+  return new Promise((resolve) => {
+    chrome.runtime.requestUpdateCheck((status, details) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        resolve({ ok: false, status: 'error', message: err.message || 'Chrome could not check for updates.' });
+        return;
+      }
+      resolve(normalizeUpdateCheckResult(status, details));
+    });
+  });
 }
 
 // ---- offline queue (FR-EXT-5) ----
@@ -245,6 +302,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try { sendResponse(await api('/api/assist/usage')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'entitlements') {
         try { sendResponse(await getEntitlements(!!msg.force)); } catch (e) { sendResponse({ ok: false, error: e.message }); }
+      } else if (msg.type === 'experienceConfig') {
+        try { sendResponse(await getExperience(!!msg.force)); } catch (e) { sendResponse({ ok: false, error: e.message }); }
+      } else if (msg.type === 'requestUpdateCheck') {
+        sendResponse(await requestUpdateCheck());
       } else if (msg.type === 'profile') {
         sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
       } else if (msg.type === 'resumeFile') {
@@ -307,11 +368,27 @@ async function refreshBadge(tabId, url) {
   } catch (e) { text = ''; }
   await setBadge(tabId, text, color);
 }
-chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' && tab && tab.url) refreshBadge(tabId, tab.url); });
-chrome.tabs.onActivated.addListener(async ({ tabId }) => { try { const t = await chrome.tabs.get(tabId); refreshBadge(tabId, t.url); } catch (e) {} });
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.status === 'complete' && tab && tab.url) {
+    refreshBadge(tabId, tab.url);
+    broadcastPageContext(tab);
+  }
+});
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const t = await chrome.tabs.get(tabId);
+    refreshBadge(tabId, t.url);
+    broadcastPageContext(t);
+  } catch (e) {}
+});
 // SPA boards (Ashby/LinkedIn) swap postings via pushState with no full load, so onUpdated
 // 'complete' never refires and the badge can show a stale posting's tracked state. Re-check on
 // history-state navigation too, in the top frame only (frameId 0).
 try {
-  chrome.webNavigation.onHistoryStateUpdated.addListener((d) => { if (d.frameId === 0) refreshBadge(d.tabId, d.url); });
+  chrome.webNavigation.onHistoryStateUpdated.addListener((d) => {
+    if (d.frameId === 0) {
+      refreshBadge(d.tabId, d.url);
+      broadcastPageContext({ id: d.tabId, url: d.url });
+    }
+  });
 } catch (e) { /* webNavigation unavailable — badge just won't update on SPA nav */ }

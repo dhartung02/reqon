@@ -6,6 +6,7 @@ const {
   buildAiUsageViewModel,
   buildBannerModel,
   summarizeFillAvailability,
+  buildTodayBuckets,
 } = require('../ui-lib.js');
 
 test('popupHeadingForRow reflects whether the current page is already tracked', () => {
@@ -76,5 +77,39 @@ test('summarizeFillAvailability explains deterministic and AI assisted counts', 
   assert.strictEqual(
     summarizeFillAvailability({ total: 18, direct: 8, ai: 3, remaining: 7 }),
     'Filled 11 of 18 fields: 8 direct, 3 AI-assisted, 7 still need review.'
+  );
+});
+
+test('buildTodayBuckets leads with ready-to-apply roles and keeps follow-up separate', () => {
+  const rows = [
+    { company: 'Reddit', role: 'Senior PM', status: 'Not Applied', tier: 'A', conf: 'verified', reqCheck: 'open' },
+    { company: 'Yahoo', role: 'Director', status: 'Applied', followup: '2026-07-01', tier: 'A', conf: 'verified' },
+  ];
+
+  const buckets = buildTodayBuckets(rows);
+  assert.strictEqual(buckets.defaultSection.id, 'ready-to-apply');
+  assert.strictEqual(buckets.readyToApply.length, 1);
+  assert.strictEqual(buckets.needsFollowUp.length, 1);
+});
+
+test('buildTodayBuckets orders ready-to-apply roles ahead of lower-priority entries', () => {
+  const rows = [
+    { company: 'Bravo', role: 'Principal PM', status: 'Not Applied', tier: 'B', conf: 'verified', reqCheck: 'open', fit: 8, prob: 7 },
+    { company: 'Atlas', role: 'Group PM', status: 'Not Applied', tier: 'A', conf: 'verified', reqCheck: 'open', fit: 9, prob: 8 },
+    { company: 'Coast', role: 'Director', status: 'Applied', followup: '2026-07-01', tier: 'A', conf: 'verified', fit: 7, prob: 6 },
+  ];
+
+  const buckets = buildTodayBuckets(rows);
+  assert.deepStrictEqual(
+    buckets.readyToApply.map((row) => row.company),
+    ['Atlas', 'Bravo']
+  );
+  assert.deepStrictEqual(
+    buckets.inProgress.map((row) => row.company),
+    ['Coast']
+  );
+  assert.deepStrictEqual(
+    buckets.needsFollowUp.map((row) => row.company),
+    ['Coast']
   );
 });

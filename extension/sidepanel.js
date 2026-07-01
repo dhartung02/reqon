@@ -39,6 +39,9 @@ const bestBetRow = (typeof reqonUiLib !== 'undefined' && reqonUiLib.isBestBetRow
 const usageView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildAiUsageViewModel)
   ? reqonUiLib.buildAiUsageViewModel
   : (r) => ({ unlimited: !(r && r.today && r.today.cap), countText: String((r && r.today && r.today.calls) || 0), helperText: '', pct: 0, tone: '' });
+const todayBucketsView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildTodayBuckets)
+  ? reqonUiLib.buildTodayBuckets
+  : (rows) => ({ defaultSection: { id: 'ready-to-apply', title: 'Ready to apply' }, readyToApply: Array.isArray(rows) ? rows.filter(bestBetRow) : [], inProgress: [], needsFollowUp: [] });
 const sidepanelMode = (typeof reqonSidepanelMode !== 'undefined' && reqonSidepanelMode)
   ? reqonSidepanelMode
   : { deriveAssistantMode: () => ({ mode: 'today', row: null }), buildTrackedRoleCards: () => [] };
@@ -148,27 +151,80 @@ function renderJobMode(tab) {
   wireFill();
 }
 
+function todayRoleHtml(row, meta) {
+  const label = meta || `${row.company || 'Unknown company'} · ${ev(row)} EV`;
+  return `<article class="assist-mini"${row.link ? ` data-open-link="${esc(row.link)}"` : ''}>` +
+    `<div class="assist-mini-title">${esc(row.role || 'Untitled role')}</div>` +
+    `<div class="assist-mini-copy">${esc(label)}</div>` +
+    '</article>';
+}
+
+function renderTodayEntryPoint(id, title, rows, emptyText) {
+  const count = rows.length;
+  const next = rows[0];
+  const nextLabel = next
+    ? `${next.company || 'Unknown company'} · ${next.role || 'Untitled role'}`
+    : emptyText;
+  const actionLabel = next && next.link ? 'Open next role' : 'Open board';
+  return `<article class="assist-mini" data-entry-point="${esc(id)}">` +
+    `<div class="assist-mini-title">${esc(title)} · ${count}</div>` +
+    `<div class="assist-mini-copy">${esc(nextLabel)}</div>` +
+    `<button class="btn btn-ghost" style="margin-top:10px" data-entry-action="${esc(id)}"${next && next.link ? ` data-open-link="${esc(next.link)}"` : ''}>${esc(actionLabel)}</button>` +
+    '</article>';
+}
+
+function renderTodayWorkspace(rows) {
+  const buckets = todayBucketsView(rows);
+  const readyList = buckets.readyToApply.slice(0, 3);
+  const readyHtml = readyList.length
+    ? readyList.map((row) => todayRoleHtml(row, `${row.company || 'Unknown company'} · Tier ${tierKey(row.tier)} · EV ${ev(row)}`)).join('')
+    : '<div class="assist-mini"><div class="assist-mini-title">Nothing ready yet</div><div class="assist-mini-copy">Verify more live roles or clip new postings to refill this queue.</div></div>';
+
+  return '<section class="assist-card">' +
+      '<div class="role">Today workspace</div>' +
+      '<div class="company muted">Start with the default queue, then branch into follow-up or in-progress work without mixing those paths together.</div>' +
+      '<div class="sect-title" style="margin-top:12px">Ready to apply</div>' +
+      '<div class="assist-card-grid" data-today-default="' + esc(buckets.defaultSection.id) + '">' + readyHtml + '</div>' +
+      '<div class="sect-title">Other entry points</div>' +
+      '<div class="assist-card-grid">' +
+        renderTodayEntryPoint('in-progress', 'In progress', buckets.inProgress, 'No active applications need attention yet.') +
+        renderTodayEntryPoint('needs-follow-up', 'Needs follow up', buckets.needsFollowUp, 'No follow ups are due right now.') +
+      '</div>' +
+    '</section>';
+}
+
+async function openBoardHome() {
+  const o = await getOrigin();
+  if (o) chrome.tabs.create({ url: o });
+}
+
+function wireTodayWorkspace() {
+  const page = $('page');
+  if (!page) return;
+  page.querySelectorAll('[data-open-link]').forEach((el) => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const url = el.getAttribute('data-open-link');
+      if (url) chrome.tabs.create({ url });
+    };
+  });
+  page.querySelectorAll('[data-entry-action]').forEach((el) => {
+    if (el.hasAttribute('data-open-link')) return;
+    el.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await openBoardHome();
+    };
+  });
+}
+
 function renderTodayMode(rows) {
   const live = (rows || []).filter((r) => r && r.deleted !== true);
-  const open = live.filter((r) => !isApplied(r.status) && !isClosed(r.status));
-  const tracked = live.length;
-  const interviewing = live.filter((r) => /^(Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(r.status || '')).length;
-  const best = open.slice().sort((a, b) => ev(b) - ev(a))[0];
   $('page').removeAttribute('data-tier');
   $('page').removeAttribute('data-st');
-  $('page').innerHTML =
-    '<section class="assist-card">' +
-      '<div class="role">Today workspace</div>' +
-      '<div class="company muted">Open any supported job page and the assistant will switch into live apply mode in place.</div>' +
-      '<div class="assist-summary">' +
-        `<div class="assist-stat"><div class="assist-stat-value">${tracked}</div><div class="assist-stat-label">Tracked</div></div>` +
-        `<div class="assist-stat"><div class="assist-stat-value">${open.length}</div><div class="assist-stat-label">Ready</div></div>` +
-        `<div class="assist-stat"><div class="assist-stat-value">${interviewing}</div><div class="assist-stat-label">Interviewing</div></div>` +
-      '</div>' +
-      (best
-        ? `<div class="assist-mini" style="margin-top:12px"><div class="assist-mini-title">Best bet next</div><div class="assist-mini-copy">${esc(best.company || '')} · ${esc(best.role || '—')} · EV ${esc(ev(best))}</div></div>`
-        : '<div class="assist-mini" style="margin-top:12px"><div class="assist-mini-title">Nothing queued yet</div><div class="assist-mini-copy">Clip a new posting or work the best-bets list below.</div></div>') +
-    '</section>';
+  $('page').innerHTML = renderTodayWorkspace(live);
+  wireTodayWorkspace();
 }
 
 async function renderPage() {

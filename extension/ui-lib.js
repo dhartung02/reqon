@@ -69,11 +69,59 @@
     };
   }
 
+  function ev(row) {
+    return Math.round(((+row.fit || 0) * (+row.prob || 0) / 10) * 10) / 10;
+  }
+
+  function tierRank(tier) {
+    return ({ A: 0, B: 1, C: 2 }[String(tier || 'C').toUpperCase()] ?? 3);
+  }
+
+  function compareReadyRows(a, b) {
+    const tierDelta = tierRank(a && a.tier) - tierRank(b && b.tier);
+    if (tierDelta) return tierDelta;
+    const evDelta = ev(b || {}) - ev(a || {});
+    if (evDelta) return evDelta;
+    const fitDelta = (+b.fit || 0) - (+a.fit || 0);
+    if (fitDelta) return fitDelta;
+    return String((a && a.company) || '').localeCompare(String((b && b.company) || ''));
+  }
+
+  function compareByDate(field) {
+    return (a, b) => {
+      const at = Date.parse(a && a[field]);
+      const bt = Date.parse(b && b[field]);
+      const av = Number.isNaN(at) ? Number.POSITIVE_INFINITY : at;
+      const bv = Number.isNaN(bt) ? Number.POSITIVE_INFINITY : bt;
+      if (av !== bv) return av - bv;
+      return compareReadyRows(a || {}, b || {});
+    };
+  }
+
+  function isInProgressStatus(status) {
+    return /^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(String(status || ''));
+  }
+
+  function buildTodayBuckets(rows) {
+    const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
+    const readyToApply = list.filter(isBestBetRow).sort(compareReadyRows);
+    const inProgress = list.filter((row) => isInProgressStatus(row && row.status)).sort(compareByDate('followup'));
+    const needsFollowUp = list.filter((row) => !!(row && row.followup)).sort(compareByDate('followup'));
+
+    return {
+      defaultSection: { id: 'ready-to-apply', title: 'Ready to apply' },
+      readyToApply,
+      inProgress,
+      needsFollowUp,
+    };
+  }
+
   return {
     popupHeadingForRow,
     isBestBetRow,
     buildAiUsageViewModel,
     summarizeFillAvailability,
     buildBannerModel,
+    buildTodayBuckets,
   };
 }));

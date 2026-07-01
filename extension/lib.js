@@ -153,4 +153,34 @@ function captureConfidence(meta) {
   return { level, detected, needsReview };
 }
 
-if (typeof module !== 'undefined') module.exports = { postingId, reqKey, sameReq, matchRow, bestAnswerMatch, detectATS, detectRemote, extractSalary, fillabilityHint, captureConfidence };
+function shouldSkipAiField(sig, type) {
+  const t = String(type || '').toLowerCase();
+  if (['password', 'file', 'hidden', 'submit', 'button', 'checkbox', 'radio', 'range', 'color'].includes(t)) return true;
+  return false;
+}
+
+function isRetryableActionError(err) {
+  if (!err) return false;
+  if (err.upgrade) return false;
+  const msg = String(err.message || err);
+  if (/Network error/i.test(msg)) return true;
+  const m = msg.match(/HTTP\s+(\d{3})/i);
+  if (!m) return false;
+  const code = +m[1];
+  return code >= 500;
+}
+
+if (typeof module !== 'undefined') module.exports = {
+  postingId,
+  reqKey,
+  sameReq,
+  matchRow,
+  bestAnswerMatch,
+  detectATS,
+  detectRemote,
+  extractSalary,
+  fillabilityHint,
+  captureConfidence,
+  shouldSkipAiField,
+  isRetryableActionError,
+};

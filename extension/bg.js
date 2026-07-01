@@ -143,8 +143,12 @@ async function clip(url, title, extra) {
     out = j.duplicate ? { ok: true, msg: 'Already tracked: ' + j.company + ' — ' + j.role }
                       : { ok: true, msg: 'Added: ' + j.company + ' — ' + j.role + ' (enriching…)' };
   } catch (e) {
-    await enqueue(action);
-    out = { ok: false, msg: 'Server unreachable — clip queued, will retry. (' + e.message + ')' };
+    if (isRetryableActionError(e)) {
+      await enqueue(action);
+      out = { ok: false, msg: 'Server unreachable — clip queued, will retry. (' + e.message + ')' };
+    } else {
+      out = { ok: false, msg: 'Could not clip this job. (' + e.message + ')' };
+    }
   }
   notify(out.msg);
   badgeActiveTab();
@@ -159,8 +163,12 @@ async function markApplied(row) {
     rowCache.at = 0;
     out = { ok: true, msg: 'Marked Applied (today): ' + row.company + ' — ' + row.role };
   } catch (e) {
-    await enqueue(action);
-    out = { ok: false, msg: 'Server unreachable — status update queued. (' + e.message + ')' };
+    if (isRetryableActionError(e)) {
+      await enqueue(action);
+      out = { ok: false, msg: 'Server unreachable — status update queued. (' + e.message + ')' };
+    } else {
+      out = { ok: false, msg: 'Could not update status. (' + e.message + ')' };
+    }
   }
   notify(out.msg);
   badgeActiveTab();
@@ -301,3 +309,9 @@ async function refreshBadge(tabId, url) {
 }
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' && tab && tab.url) refreshBadge(tabId, tab.url); });
 chrome.tabs.onActivated.addListener(async ({ tabId }) => { try { const t = await chrome.tabs.get(tabId); refreshBadge(tabId, t.url); } catch (e) {} });
+// SPA boards (Ashby/LinkedIn) swap postings via pushState with no full load, so onUpdated
+// 'complete' never refires and the badge can show a stale posting's tracked state. Re-check on
+// history-state navigation too, in the top frame only (frameId 0).
+try {
+  chrome.webNavigation.onHistoryStateUpdated.addListener((d) => { if (d.frameId === 0) refreshBadge(d.tabId, d.url); });
+} catch (e) { /* webNavigation unavailable — badge just won't update on SPA nav */ }

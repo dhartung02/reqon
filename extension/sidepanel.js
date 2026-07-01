@@ -33,6 +33,12 @@ let lastRows = [];
 // Fail-open: until entitlements load (or if the server is old), treat features as available.
 const entHas = (f) => !ENT || !ENT.features || ENT.features[f] !== false;
 const entReq = (f) => { const p = ENT && ENT.requires && ENT.requires[f]; return p ? p[0].toUpperCase() + p.slice(1) : 'paid'; };
+const bestBetRow = (typeof reqonUiLib !== 'undefined' && reqonUiLib.isBestBetRow)
+  ? reqonUiLib.isBestBetRow
+  : (r) => r && r.status === 'Not Applied' && r.conf === 'verified' && !['closed', 'lead', 'unknown'].includes(r.reqCheck || '');
+const usageView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildAiUsageViewModel)
+  ? reqonUiLib.buildAiUsageViewModel
+  : (r) => ({ unlimited: !(r && r.today && r.today.cap), countText: String((r && r.today && r.today.calls) || 0), helperText: '', pct: 0, tone: '' });
 
 function setMsg(t, k) { $('msg').textContent = t || ''; $('msg').className = k || ''; }
 const reqKeyOf = (typeof reqKey === 'function') ? reqKey : (x) => ((x.company || '') + '|' + (x.role || '')).toLowerCase().trim();
@@ -51,7 +57,13 @@ async function renderPage() {
     return;
   }
   const r = await send({ type: 'lookup', url: tab.url, force: false });
-  if (!r || r.ok === false) { $('page').innerHTML = '<div class="role">Can’t reach the board</div><div class="company muted">Check settings in the popup.</div>'; return; }
+  if (!r || r.ok === false) {
+    $('page').innerHTML = '<div class="role">Can’t reach the board</div>' +
+      '<div class="company muted">Check your server connection.</div>' +
+      '<button id="openSettings" class="btn btn-ghost" style="margin-top:8px">Open settings</button>';
+    const os = $('openSettings'); if (os) os.onclick = () => { try { chrome.runtime.openOptionsPage(); } catch (_) {} };
+    return;
+  }
   // Consistent with the overlay: deterministic "Fill form" first, then an "AI-fill rest" enhancement.
   const fillBtns =
     '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
@@ -257,11 +269,11 @@ async function renderCoverage() {
     `<span class="cov-pct ${cls}">${pct}%</span></div>` +
     `<div class="cov-bar"><span class="${cls === 'good' ? '' : cls}" style="width:${pct}%"></span></div>` +
     '<div>' +
-    covered.map((t) => `<span class="kw">${esc(t)}</span>`).join('') +
-    missing.map((t) => `<span class="kw miss">${esc(t)} ✕</span>`).join('') +
+    (covered.length
+      ? covered.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('')
+      : '<span class="muted" style="font-size:.72rem">None of the top JD keywords match your résumé keywords yet.</span>') +
     '</div>' +
-    (missing.length ? '<div class="muted" style="margin-top:8px;font-size:.72rem">Red = in the posting, not in your résumé keywords.</div>' : '') +
-    (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:10px">✦ Suggest how to close the gaps</button><div id="tailorOut"></div>' : '') +
+    (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:10px">✦ Suggest how to strengthen your match</button><div id="tailorOut"></div>' : '') +
     '<div id="covAi" class="covai"></div>';
   wireTailor(missing);
   renderKwAiSlot();
@@ -277,7 +289,7 @@ function wireTailor(missing) {
     const payload = { kind: 'tailor', keywords: missing.join(', '), jd: jdText };
     if (currentRow) payload.key = reqKeyOf(currentRow);
     const r = await send({ type: 'assist', payload });
-    tb.disabled = false; tb.textContent = '✦ Suggest how to close the gaps';
+    tb.disabled = false; tb.textContent = '✦ Suggest how to strengthen your match';
     const out = $('tailorOut');
     if (!r || !r.ok) { if (out) out.innerHTML = `<div class="draft" style="border-color:var(--coral);color:var(--coral)">⚠ ${esc((r && r.error) || 'Suggestion failed')}</div>`; return; }
     if (out) { out.innerHTML = '<div class="draft" id="tailorText"></div>'; $('tailorText').textContent = r.draft || ''; }
@@ -323,10 +335,7 @@ function renderKwAi(res) {
   const cls = res.score >= 70 ? 'good' : res.score >= 40 ? 'mid' : 'low';
   slot.innerHTML =
     `<div class="cov-head covai-head"><span class="muted">AI skills match</span><span class="cov-pct ${cls}">${res.score}%</span></div>` +
-    '<div>' +
-    res.matched.map((t) => `<span class="kw">${esc(t)}</span>`).join('') +
-    res.missing.map((t) => `<span class="kw miss">${esc(t)} ✕</span>`).join('') +
-    '</div>' +
+    (res.matched.length ? '<div>' + res.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('') + '</div>' : '') +
     (res.summary ? `<div class="muted" style="margin-top:8px;font-size:.74rem">${esc(res.summary)}</div>` : '');
 }
 
@@ -372,6 +381,7 @@ const kpi = (v, l, cls) => `<div class="kpi"><div class="kpi-v ${cls || ''}">${v
 const OPP_TOP = 6;
 function oppMatches(r) {
   if (isApplied(r.status) || isClosed(r.status)) return false;
+  if (!bestBetRow(r)) return false;
   if (oppFilter.tier !== 'all' && tierKey(r.tier) !== oppFilter.tier) return false;
   if (oppFilter.remote && !/remote|flex/i.test(r.remote || '')) return false;
   return true;
@@ -482,14 +492,11 @@ async function loadUsage() {
     return;
   }
   if (!r.keySet) { el.innerHTML = '<div class="muted">No OpenAI key set. Add one in the board Settings to enable AI drafts.</div>'; return; }
-  const t = r.today || {};
-  const calls = t.calls || 0, cap = t.cap || 0;
-  const pct = cap ? Math.min(100, Math.round((calls / cap) * 100)) : 0;
-  const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
+  const vm = usageView(r);
   el.innerHTML =
-    `<div class="urow"><span class="muted">AI requests today</span><span class="v">${calls}${cap ? ' / ' + cap : ''}</span></div>` +
-    (cap ? `<div class="budget"><span class="${cls}" style="width:${pct}%"></span></div>` : '') +
-    `<div class="tok" style="margin-top:6px">Each AI draft, score, autofill, or match counts as one request.</div>` +
+    `<div class="urow"><span class="muted">AI requests today</span><span class="v">${esc(vm.countText)}</span></div>` +
+    (!vm.unlimited ? `<div class="budget"><span class="${vm.tone}" style="width:${vm.pct}%"></span></div>` : '') +
+    `<div class="tok" style="margin-top:6px">${esc(vm.helperText)}</div>` +
     `<div class="tok" style="margin-top:8px"><a class="link" id="usageDetails" href="#">Detailed usage →</a></div>`;
   const d = $('usageDetails'); if (d) d.onclick = (e) => { e.preventDefault(); try { chrome.runtime.openOptionsPage(); } catch (_) {} };
 }

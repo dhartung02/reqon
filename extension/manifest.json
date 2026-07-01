@@ -20,8 +20,8 @@
   "background": { "service_worker": "bg.js" },
   "options_ui": { "page": "options.html", "open_in_tab": true },
   "side_panel": { "default_path": "sidepanel.html" },
-  "permissions": ["storage", "activeTab", "alarms", "tabs", "notifications", "sidePanel"],
-  "host_permissions": ["http://localhost:8787/*"],
+  "permissions": ["storage", "activeTab", "alarms", "tabs", "notifications", "sidePanel", "webNavigation"],
+  "host_permissions": ["http://localhost:8787/*", "https://cloud.reqon.app/*", "https://reqon.app/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
     {

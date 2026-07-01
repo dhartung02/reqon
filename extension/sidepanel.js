@@ -52,7 +52,10 @@ async function renderPage() {
   }
   const r = await send({ type: 'lookup', url: tab.url, force: false });
   if (!r || r.ok === false) { $('page').innerHTML = '<div class="role">Can’t reach the board</div><div class="company muted">Check settings in the popup.</div>'; return; }
-  const autofillBtn = '<button id="autofill" class="btn btn-ghost">⚡ Autofill (AI-assisted)</button>';
+  // Consistent with the overlay: deterministic "Fill form" first, then an "AI-fill rest" enhancement.
+  const fillBtns =
+    '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
+    '<button id="aiFill" class="btn btn-ghost">✦ AI-fill rest</button>';
   const row = r.row;
   currentRow = row || null;
   if (!row) {
@@ -60,9 +63,9 @@ async function renderPage() {
       '<div class="role">Not on your board</div>' +
       '<div class="company muted">' + esc((tab.title || '').slice(0, 80)) + '</div>' +
       '<button id="clip" class="btn btn-primary">+ Clip to board</button>' +
-      autofillBtn;
+      '<div class="btnrow">' + fillBtns + '</div>';
     $('clip').onclick = doClip;
-    $('autofill').onclick = doAutofill;
+    wireFill();
     return;
   }
   const chips =
@@ -88,14 +91,14 @@ async function renderPage() {
     `<select id="statusSel" class="sel" style="margin-top:8px">` +
       STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
     `</select>` +
+    `<div class="btnrow">` + fillBtns + `</div>` +
     `<div class="btnrow">` +
-      autofillBtn +
       `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✦ Score with AI${lock(canScore)}</button>` +
     `</div>` +
     guideBtn +
     '<div id="scoreOut"></div>' +
     trackingEditorHTML(row);
-  $('autofill').onclick = doAutofill;
+  wireFill();
   $('statusSel').onchange = (e) => doSetStatus(e.target.value);
   $('score').onclick = canScore ? doScore : () => setMsg(`AI scoring needs the ${entReq('ai_score')} package.`, 'err');
   if ($('guideOpen')) $('guideOpen').onclick = () => openGuide(row);
@@ -190,18 +193,27 @@ async function doScore() {
   }
 }
 
-// Fill standard/factual fields on the open posting via its content script. Open-ended questions are
-// left for the human (AI assist is a future phase). Never submits.
-async function doAutofill() {
-  const b = $('autofill');
+// Autofill: deterministic "Fill form" (factual fields + saved answers) and an "AI-fill rest"
+// enhancement (map_fields for what's left), matching the on-page overlay. Open-ended questions are
+// left for the human; never submits. The AI action spends one request (free on the AI tier).
+function wireFill() {
+  const ff = $('fillForm'); if (ff) ff.onclick = () => doFill('autofill', ff);
+  const af = $('aiFill');
+  if (af) {
+    if (!(ENT && ENT.plan && ENT.plan.ai)) af.textContent = '✦ AI-fill rest · 1 request';
+    af.onclick = () => doFill('aiFillRest', af);
+  }
+}
+async function doFill(kind, btn) {
   if (!activeTab || !/^https?:/.test(activeTab.url || '')) { setMsg('Open a job posting to autofill.', 'err'); return; }
-  if (b) { b.disabled = true; b.textContent = 'Filling…'; }
+  const label = btn && btn.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = kind === 'aiFillRest' ? 'AI filling…' : 'Filling…'; }
   let res = null;
-  // smartFill = deterministic factual/answer pass + an AI map_fields pass for what's left (T1.1).
-  try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'smartFill' }); } catch (e) { res = null; }
-  if (b) { b.disabled = false; b.textContent = '⚡ Autofill (AI-assisted)'; }
+  try { res = await chrome.tabs.sendMessage(activeTab.id, { type: kind }); } catch (e) { res = null; }
+  if (btn) { btn.disabled = false; btn.textContent = label; }
   if (!res) setMsg('Autofill works on the open posting on a supported board.', 'err');
-  else setMsg(res.msg || (res.ok ? 'Filled — review before submitting.' : 'Nothing to fill here.') + (res.aiError ? ' (AI pass: ' + res.aiError + ')' : ''), res.ok ? 'ok' : '');
+  else setMsg(res.msg || (res.ok ? 'Filled — review before submitting.' : 'Nothing to fill here.'), res.ok ? 'ok' : '');
+  if (kind === 'aiFillRest') loadUsage();   // an AI request was consumed
 }
 
 async function doClip() {
@@ -514,5 +526,12 @@ $('aiDraft').onclick = () => {
 if (window.reqonThemeWireButton) window.reqonThemeWireButton($('themeBtn'));
 $('refresh').onclick = () => { send({ type: 'reqs', force: true }); refresh(); };
 $('board').onclick = async (e) => { e.preventDefault(); const o = await getOrigin(); if (o) chrome.tabs.create({ url: o }); };
+
+// Only one Reqon surface at a time: flag the panel open so the on-page overlay hides itself, and
+// clear it when the panel closes so the overlay comes back (content.js watches this key).
+try {
+  chrome.storage.local.set({ _reqonPanelOpen: true });
+  window.addEventListener('pagehide', () => { try { chrome.storage.local.set({ _reqonPanelOpen: false }); } catch (_) {} });
+} catch (_) {}
 
 refresh();

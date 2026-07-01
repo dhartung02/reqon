@@ -89,6 +89,7 @@
     if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'smartFill') { smartFill().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
+    if (msg.type === 'aiFillRest') { aiFillRest().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'insertDraft') { try { sendResponse(insertDraft(msg.text)); } catch (e) { sendResponse({ ok: false, msg: String(e) }); } return; }
   });
 
@@ -97,18 +98,34 @@
     const a = (p && p.applicant) || {};
     const name = (a.name || '').trim();
     const parts = name.split(/\s+/).filter(Boolean);
+    // keys are matched as WHOLE WORDS (see matchFactual), so "tel" no longer hits "Tell us…" and a
+    // bare "Name" field is caught without a "Company name" field grabbing the person's name. `neg`
+    // vetoes a match when a disqualifying token is present. Order matters: first/last before full.
     return [
-      { keys: ['given-name', 'first name', 'firstname', 'fname', 'first_name'], val: parts[0] || '' },
-      { keys: ['family-name', 'last name', 'lastname', 'lname', 'last_name', 'surname'], val: parts.length > 1 ? parts.slice(1).join(' ') : '' },
-      { keys: ['full name', 'your name', 'full_name', 'legal name'], val: name },
-      { keys: ['email', 'e-mail'], val: a.email || '', type: 'email' },
-      { keys: ['phone', 'tel', 'mobile', 'telephone'], val: a.phone || '', type: 'tel' },
-      { keys: ['linkedin', 'linked in'], val: a.linkedin || '' },
-      { keys: ['github', 'git hub'], val: a.github || '' },
-      { keys: ['location', 'city', 'where are you', 'current location'], val: a.location || '' },
+      { keys: ['first name', 'given name', 'firstname', 'fname'], val: parts[0] || '' },
+      { keys: ['last name', 'family name', 'lastname', 'lname', 'surname'], val: parts.length > 1 ? parts.slice(1).join(' ') : '' },
+      { keys: ['full name', 'your name', 'legal name', 'name'], neg: /company|organi[sz]ation|business|employer|file|user|nick|middle|maiden|pronoun|preferred/, val: name },
+      { keys: ['email'], type: 'email', val: a.email || '' },
+      { keys: ['phone', 'mobile', 'telephone', 'tel'], type: 'tel', val: a.phone || '' },
+      { keys: ['linkedin'], val: a.linkedin || '' },
+      { keys: ['github'], val: a.github || '' },
       { keys: ['website', 'portfolio', 'personal site', 'personal website'], val: a.website || '' },
+      { keys: ['location', 'city', 'current location', 'where are you based'], neg: /relocat|preferred|company|country|nationality|citizen|passport/, val: a.location || '' },
     ];
   };
+  // Whole-word key matching: ALL of a key's words must appear as word-bounded tokens in the field's
+  // signature. Stops substring false-positives (the "tel" in "Tell us…", "name" in "username", etc).
+  const hasWord = (s, w) => new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(s);
+  const keyHit = (s, key) => key.split(/[\s_-]+/).every((w) => w && hasWord(s, w));
+  function matchFactual(sig, type, fields) {
+    for (const f of fields) {
+      if (!f.val) continue;
+      if (f.type && type === f.type) return f;          // input type is the strongest signal
+      if (f.neg && f.neg.test(sig)) continue;           // a disqualifying token vetoes this field
+      if (f.keys.some((k) => keyHit(sig, k))) return f;
+    }
+    return null;
+  }
   const fieldSig = (e) => {
     const p = [e.name, e.id, e.placeholder, e.getAttribute('aria-label'), e.getAttribute('autocomplete')];
     try { if (e.labels && e.labels[0]) p.push(e.labels[0].textContent); } catch (x) {}
@@ -155,11 +172,14 @@
       if (SKIP_TYPES.indexOf(t) >= 0) return;
       if (e.value && e.value.trim()) return;
       const s = fieldSig(e);
-      for (const f of fields) {
-        if (!f.val) continue;
-        if ((f.type && t === f.type) || f.keys.some(k => s.indexOf(k) >= 0)) { setVal(e, f.val); factual++; return; }
+      const isTextarea = e.tagName === 'TEXTAREA';
+      // Factual identity fields are short inputs, never a free-text box — so a phone can't land in a
+      // "Tell us about your experience" textarea just because its label contains "tel".
+      if (!isTextarea) {
+        const f = matchFactual(s, t, fields);
+        if (f) { setVal(e, f.val); factual++; return; }
       }
-      const isQuestion = e.tagName === 'TEXTAREA' || /\?|why|describe|tell us|cover|experience|interest|motivat/i.test(s);
+      const isQuestion = isTextarea || /\?|why|describe|tell us|cover letter|motivat|interest/i.test(s);
       if (isQuestion && answers.length) {
         const a = bestAnswerMatch(s, answers); // from lib.js
         if (a) { setVal(e, a.a); answered++; }
@@ -171,7 +191,24 @@
       msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '') + ' — review, never auto-submitted.',
     };
   }
-  const fillBtn = () => { const b = el('button', 'jpcrm-btn', '⚡ Fill form'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '⚡ Fill form'; renderFillSummary(res); }; return b; };
+  const fillBtn = () => { const b = el('button', 'jpcrm-btn jpcrm-primary', '⚡ Fill form'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '⚡ Fill form'; renderFillSummary(res); }; return b; };
+  // The consistent autofill pair (mirrors the side panel): deterministic "Fill form" first, then an
+  // "AI-fill rest" enhancement that spends one AI request (free on the AI tier — label reflects it).
+  function fillRow() {
+    const row = el('div', 'jpcrm-clip-acts');
+    const fb = fillBtn();
+    const ab = el('button', 'jpcrm-btn', '✦ AI-fill rest');
+    send({ type: 'entitlements' }).then((e) => { if (!(e && e.ok && e.plan && e.plan.ai)) ab.textContent = '✦ AI-fill rest · 1 request'; }).catch(() => {});
+    ab.onclick = async () => {
+      ab.disabled = true; ab.textContent = 'AI filling…';
+      const res = await aiFillRest();
+      ab.disabled = false; ab.textContent = '✦ AI-fill rest';
+      send({ type: 'entitlements' }).then((e) => { if (!(e && e.ok && e.plan && e.plan.ai)) ab.textContent = '✦ AI-fill rest · 1 request'; }).catch(() => {});
+      toast(res.msg || (res.ok ? 'AI filled fields — review.' : 'Nothing to add.'), res.ok);
+    };
+    row.appendChild(fb); row.appendChild(ab);
+    return row;
+  }
 
   // Autofill summary (P1.13): after a fill, show exactly what changed + what was intentionally left,
   // a review reminder, and a Clear-highlights action. Replaces the old one-line toast.
@@ -187,7 +224,7 @@
     if (res.aiError) line('AI fill unavailable: ' + res.aiError, 'jpcrm-warn-line');
     const skips = [];
     if (sk.eeoConsent) skips.push(sk.eeoConsent + ' EEO/consent');
-    if (sk.file) skips.push(sk.file + ' file upload');
+    if (sk.file) skips.push(sk.file + ' file upload' + (sk.file === 1 ? '' : 's') + ' (résumé — attach it yourself)');
     if (sk.password) skips.push(sk.password + ' login');
     if (skips.length) line('Skipped (left for you): ' + skips.join(', '));
     line('Review every field — nothing is submitted.', 'jpcrm-dim');
@@ -199,31 +236,39 @@
     box.appendChild(wrap);
   }
 
-  // ---- AI smart-fill (T1.1): deterministic pass, then ask the server's map_fields tool to fill
-  // remaining empty fields it's confident about. Server grounds in factual profile only; we apply
-  // only confidence >= 0.6. NEVER passwords/EEO/consent (those are skipped here too); NEVER submits.
-  async function smartFill() {
-    const base = await fillForm();
+  // ---- AI enhancement (T1.1): ask the server's map_fields tool to fill the fields still empty after
+  // the deterministic pass, applying only confidence >= 0.6. This is the "AI-fill the rest" action —
+  // offered as an enhancement on BOTH the overlay and the side panel, consistent with the keyword
+  // match: it spends one AI request (server-gated), free on the AI tier. NEVER passwords/EEO/consent
+  // (skipped here too); NEVER submits.
+  async function aiFillRest() {
     const candidates = [];
     let idx = 0;
     document.querySelectorAll('input, textarea').forEach((e) => {
       const t = (e.type || '').toLowerCase();
       if (SKIP_TYPES.indexOf(t) >= 0) return;
       if (e.value && e.value.trim()) return;             // already filled (incl. deterministic pass)
-      if (t === 'email' || t === 'tel') { /* still allow */ }
       e.setAttribute('data-reqon-i', String(idx));
       candidates.push({ i: idx, sig: fieldSig(e), type: t });
       idx++;
     });
-    if (!candidates.length) return base;
+    if (!candidates.length) return { ok: false, ai: 0, msg: 'Nothing left for AI to fill.' };
     const r = await send({ type: 'mapFields', payload: { fields: candidates } });
-    if (!r || !r.ok) return Object.assign(base, { aiError: (r && r.error) || 'AI fill unavailable' });
+    if (!r || !r.ok) return { ok: false, ai: 0, aiError: (r && r.error) || 'AI fill unavailable', msg: (r && r.error) || 'AI fill unavailable' };
     let ai = 0;
     (r.fields || []).forEach((m) => {
       if (!m || (typeof m.confidence === 'number' && m.confidence < 0.6)) return;
       const e = document.querySelector('[data-reqon-i="' + m.i + '"]');
       if (e && !(e.value && e.value.trim()) && m.value) { setVal(e, String(m.value)); ai++; }
     });
+    return { ok: ai > 0, ai, msg: ai ? `AI filled ${ai} more field${ai === 1 ? '' : 's'} — review, never submitted.` : 'AI had nothing confident to add.' };
+  }
+  // Deterministic pass + AI enhancement in one call (kept for callers that want both at once).
+  async function smartFill() {
+    const base = await fillForm();
+    const rest = await aiFillRest();
+    if (rest.aiError) return Object.assign(base, { aiError: rest.aiError });
+    const ai = rest.ai || 0;
     return Object.assign(base, { ai, ok: (base.factual + base.answered + ai) > 0,
       msg: `Filled ${base.factual} standard` + (base.answered ? ` + ${base.answered} answer` : '') + (ai ? ` + ${ai} AI` : '') + ' field(s) — review, never auto-submitted.' });
   }
@@ -295,10 +340,45 @@
   }
   function mount() {
     box = el('div', 'jpcrm-box jpcrm-system');
-    box.innerHTML = '<div class="jpcrm-row"><span class="jpcrm-logo">Reqon</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide on this page">×</button></div><div class="jpcrm-body"></div>';
+    box.innerHTML = '<div class="jpcrm-row jpcrm-drag"><span class="jpcrm-logo">Reqon</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide on this page">×</button></div><div class="jpcrm-body"></div>';
     document.documentElement.appendChild(box);
     box.querySelector('.jpcrm-x').onclick = () => { box.remove(); box = null; };
     chrome.storage.sync.get({ theme: 'system' }, (c) => applyOverlayTheme(c && c.theme));
+    restoreBoxPos();
+    makeDraggable(box, box.querySelector('.jpcrm-drag'));
+  }
+  // Drag the overlay by its header and remember where it lands (per the user's request to move it off
+  // the bottom-right). Positions in storage.local so it persists across pages; clamped to the viewport.
+  function restoreBoxPos() {
+    chrome.storage.local.get({ _reqonBoxPos: null }, (c) => {
+      const p = c && c._reqonBoxPos;
+      if (p && box && typeof p.left === 'number' && typeof p.top === 'number') {
+        box.style.left = p.left + 'px'; box.style.top = p.top + 'px'; box.style.right = 'auto'; box.style.bottom = 'auto';
+      }
+    });
+  }
+  function makeDraggable(elm, handle) {
+    if (!handle) return;
+    handle.style.cursor = 'move';
+    let sx = 0, sy = 0, ox = 0, oy = 0, dragging = false;
+    handle.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;   // let the × / pin buttons click through
+      dragging = true;
+      const r = elm.getBoundingClientRect();
+      ox = r.left; oy = r.top; sx = e.clientX; sy = e.clientY;
+      elm.style.left = ox + 'px'; elm.style.top = oy + 'px'; elm.style.right = 'auto'; elm.style.bottom = 'auto';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const nx = Math.max(4, Math.min(window.innerWidth - elm.offsetWidth - 4, ox + (e.clientX - sx)));
+      const ny = Math.max(4, Math.min(window.innerHeight - elm.offsetHeight - 4, oy + (e.clientY - sy)));
+      elm.style.left = nx + 'px'; elm.style.top = ny + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return; dragging = false;
+      chrome.storage.local.set({ _reqonBoxPos: { left: parseInt(elm.style.left, 10) || 0, top: parseInt(elm.style.top, 10) || 0 } });
+    });
   }
 
   // Tier → word (the signature change: Strong / Possible / Long shot replaces TIER A/B/C).
@@ -352,7 +432,7 @@
     }
     const { fill } = captureMeta();
     body.appendChild(fillabilityRow(fill));
-    if (fill.level !== 'External redirect') { body.appendChild(fillBtn()); body.appendChild(el('div', 'jpcrm-foot', 'Skips passwords & EEO · never submits')); }
+    if (fill.level !== 'External redirect') { body.appendChild(fillRow()); body.appendChild(el("div", "jpcrm-foot", "Skips passwords & EEO · never submits")); }
   }
 
   function renderUntracked() {
@@ -364,7 +444,7 @@
     const b = el('button', 'jpcrm-btn jpcrm-primary', '＋ Clip to my board');
     b.onclick = () => openClipPanel();
     body.appendChild(b);
-    if (fill.level !== 'External redirect') { body.appendChild(fillBtn()); body.appendChild(el('div', 'jpcrm-foot', 'Skips passwords & EEO · never submits')); }
+    if (fill.level !== 'External redirect') { body.appendChild(fillRow()); body.appendChild(el("div", "jpcrm-foot", "Skips passwords & EEO · never submits")); }
   }
 
   // Fillability hint line (P1.11): "Likely fillable · 5 fields" + a tooltip of the reasons.
@@ -426,14 +506,24 @@
   }
 
   // The overlay is opt-out: respect the user's setting (default on) and react if they toggle it live.
+  // It also yields to the side panel — only one Reqon surface shows at a time. The side panel sets
+  // `_reqonPanelOpen` while it's open (see sidepanel.js); we hide the overlay then and restore it on close.
   function start() { if (box) return; mount(); refresh(false); }
-  chrome.storage.sync.get({ overlayEnabled: true }, (cfg) => { if (cfg.overlayEnabled !== false) start(); });
+  function hide() { if (box) { box.remove(); box = null; } }
+  function maybeStart() {
+    chrome.storage.sync.get({ overlayEnabled: true }, (cfg) => {
+      if (cfg.overlayEnabled === false) return;
+      chrome.storage.local.get({ _reqonPanelOpen: false }, (l) => { if (!(l && l._reqonPanelOpen)) start(); });
+    });
+  }
+  maybeStart();
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area !== 'sync') return;
-    if (ch.theme && box) applyOverlayTheme(ch.theme.newValue);
-    if (!ch.overlayEnabled) return;
-    if (ch.overlayEnabled.newValue === false) { if (box) { box.remove(); box = null; } }
-    else start();
+    if (area === 'sync') {
+      if (ch.theme && box) applyOverlayTheme(ch.theme.newValue);
+      if (ch.overlayEnabled) { ch.overlayEnabled.newValue === false ? hide() : maybeStart(); }
+    } else if (area === 'local' && ch._reqonPanelOpen) {
+      ch._reqonPanelOpen.newValue ? hide() : maybeStart();   // side panel opened → hide overlay; closed → restore
+    }
   });
   // SPA boards (Ashby/LinkedIn) swap postings without a full load — re-check on URL change
   let last = location.href;

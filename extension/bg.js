@@ -267,25 +267,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---- passive badge: flag whether the page you're on is already tracked ----
 // ✓ green = tracked, not yet applied · ● periwinkle = applied/in-process · × grey = closed · blank = untracked.
 // (Clicking the icon opens the popup — see manifest default_popup — which handles clip / mark-applied.)
+// Set a per-tab badge, swallowing the "No tab with id" rejection that fires when the tab has
+// already closed by the time we get here (chrome.action.* return promises in MV3, so an un-awaited
+// call surfaces as an "Uncaught (in promise)" service-worker error — hence the awaited try/catch).
+async function setBadge(tabId, text, color) {
+  try {
+    await chrome.action.setBadgeText({ tabId, text });
+    if (text && color) await chrome.action.setBadgeBackgroundColor({ tabId, color });
+  } catch (e) { /* tab gone — nothing to badge */ }
+}
 async function refreshBadge(tabId, url) {
-  if (!tabId || !url || !/^https?:/.test(url)) { try { chrome.action.setBadgeText({ tabId, text: '' }); } catch (e) {} return; }
+  if (!tabId || !url || !/^https?:/.test(url)) { await setBadge(tabId, ''); return; }
+  let text = '', color = '#00E5A3';
   try {
     const rows = await getRows();
     const row = matchRow(rows, url);
     // Badge colors use the shared "Emerald Command" status roles (dark-scheme values — the badge
     // always sits on the browser chrome): emerald = ready, teal = applied/in-process, muted = closed.
-    let text = '', color = '#00E5A3';
     if (row) {
       const s = row.status || '';
       if (/^(Rejected|Archived)$/.test(s)) { text = '×'; color = '#64748B'; }
       else if (/^(Applied|Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(s)) { text = '●'; color = '#2DD4BF'; }
       else { text = '✓'; color = '#00E5A3'; }
     }
-    chrome.action.setBadgeText({ tabId, text });
-    if (text) chrome.action.setBadgeBackgroundColor({ tabId, color });
-  } catch (e) {
-    try { chrome.action.setBadgeText({ tabId, text: '' }); } catch (_) {}
-  }
+  } catch (e) { text = ''; }
+  await setBadge(tabId, text, color);
 }
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (info.status === 'complete' && tab && tab.url) refreshBadge(tabId, tab.url); });
 chrome.tabs.onActivated.addListener(async ({ tabId }) => { try { const t = await chrome.tabs.get(tabId); refreshBadge(tabId, t.url); } catch (e) {} });

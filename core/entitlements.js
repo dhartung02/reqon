@@ -70,7 +70,10 @@ const FEATURES = {
   // ── AI package ─────────────────────────────────────────────────────────────
   ai_draft: 'ai', // cover / screening / thank-you drafts
   ai_score: 'ai', // fit/prob auto-score via function calling
-  ai_mapfields: 'ai', // application autofill field mapping
+  // AI autofill "fill the rest" — the enhancement over deterministic Fill form. Tagged `cloud` (like
+  // keyword_ai) so Cloud users can spend one AI request on it and AI users get it free; still counts
+  // against the daily AI-request cap.
+  ai_mapfields: 'cloud', // application autofill field mapping
   guide_generate: 'ai', // interview prep guide generation
   guide_research: 'ai', // opt-in web_search company research pass
   followup_reco: 'ai', // stage-aware follow-up recommendation

@@ -1995,6 +1995,43 @@ app.post('/api/assist/score', requireFeature('ai_score'), async (req, res) => {
   } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
 });
 
+// AI keyword / skills match (the paid enhancement over the extension's free deterministic keyword
+// coverage). Compares the JD to the candidate's actual résumé skills and returns matched / missing
+// SKILLS, a 0-100 match score, and an honest one-line summary — grounded ONLY in the candidate's
+// profile (never credits a skill they haven't shown; never lists EEO/benefits/boilerplate as a gap).
+app.post('/api/assist/keywords', requireFeature('keyword_ai'), async (req, res) => {
+  if (!aiKey()) return res.status(400).json({ ok: false, error: 'No OpenAI key set — add one in Settings.' });
+  if (!assistEnabled()) return res.status(403).json({ ok: false, error: 'AI assistant is disabled in Settings.' });
+  const b = req.body || {};
+  const rows = readStore();
+  const row = rows.find((r) => reqKey(r) === String(b.key || '').toLowerCase().trim());
+  const jd = String(b.jd || (row && row.notes) || '').slice(0, parseInt(cfg('OPENAI_JD_CHARS') || '3500', 10));
+  if (!jd.trim()) return res.status(400).json({ ok: false, error: 'No job description text to analyze.' });
+  const cap = assistDailyCalls(); const u = assistUsage();
+  if (cap && u.calls >= cap) return res.status(429).json({ ok: false, error: `Daily AI cap reached (${u.calls}/${cap}). Raise it in Settings or wait.` });
+  const p = readProfile();
+  const skills = (p.keywords || []).map((k) => k && k.kw).filter(Boolean).join(', ');
+  const sectors = (p.sectors || []).join(', ');
+  const summary = String(p.summary || '').slice(0, 1200);
+  const tool = { type: 'function', name: 'match_keywords',
+    description: "Compare a job description to the candidate's actual résumé skills. Use ONLY skills the candidate has; never invent.",
+    parameters: { type: 'object', additionalProperties: false, properties: {
+      score: { type: 'integer', description: "0-100: how well the candidate's résumé skills cover what this role actually requires" },
+      matched: { type: 'array', items: { type: 'string' }, description: 'real skills/tools/domains the role wants AND the candidate demonstrably has (from their profile)' },
+      missing: { type: 'array', items: { type: 'string' }, description: "real skills/tools/domains the role requires that the candidate's profile does NOT show — meaningful gaps only; never EEO/benefits/boilerplate terms" },
+      summary: { type: 'string', description: 'one honest sentence on the fit and the biggest gap' },
+    }, required: ['score', 'matched', 'missing', 'summary'] } };
+  const system = "You compare a job description to a candidate's résumé and report a TRUE skills match — real competencies, tools, domains, and seniority signals, not generic words or EEO/benefits boilerplate. Ground matched skills ONLY in the candidate profile provided; never credit a skill they have not shown. List only meaningful gaps in \"missing\". Be honest and concise.";
+  const user = `Candidate skills/keywords: ${skills || '(none listed)'}\nDomains: ${sectors || '(none)'}\nProfile summary: ${summary || '(none)'}\n\nJob description:\n${jd}`;
+  try {
+    const { args, tokens } = await callTool({ system, user, tool, maxTokens: 500 });
+    const usg = assistUsage(); usg.calls += 1; usg.tokens += tokens || 0; writeJsonPretty(P.assistUsage, usg);
+    logAssist({ ts: new Date().toISOString(), key: row ? reqKey(row) : '', kind: 'keywords', model: assistModel(), tokens });
+    const clean = (a) => (Array.isArray(a) ? a.map((s) => String(s || '').trim()).filter(Boolean).slice(0, 20) : []);
+    res.json({ ok: true, score: Math.max(0, Math.min(100, Math.round(args.score || 0))), matched: clean(args.matched), missing: clean(args.missing), summary: String(args.summary || ''), tokens });
+  } catch (e) { res.status(502).json({ ok: false, error: e.message }); }
+});
+
 // Structured field mapping via function calling (T1.1). Given scanned form fields ({i, sig, type}),
 // returns {i, value, confidence} grounded ONLY in the candidate's factual profile — for the
 // extension's AI smart-fill of fields the deterministic matcher missed. Never invents values.

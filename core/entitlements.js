@@ -61,11 +61,19 @@ const FEATURES = {
   gmail_ingest: 'cloud',
   scout: 'cloud', // server-side scout runs
   backups: 'cloud',
+  // The résumé/JD keyword match is free + deterministic everywhere; this AI skills analysis is the
+  // paid enhancement. Tagged `cloud` (not `ai`) so Cloud users can spend one AI request on it on
+  // demand, while AI users — who hold every cloud feature too — get it automatically. Still counts
+  // against the daily AI-request cap like any other model call.
+  keyword_ai: 'cloud',
 
   // ── AI package ─────────────────────────────────────────────────────────────
   ai_draft: 'ai', // cover / screening / thank-you drafts
   ai_score: 'ai', // fit/prob auto-score via function calling
-  ai_mapfields: 'ai', // application autofill field mapping
+  // AI autofill "fill the rest" — the enhancement over deterministic Fill form. Tagged `cloud` (like
+  // keyword_ai) so Cloud users can spend one AI request on it and AI users get it free; still counts
+  // against the daily AI-request cap.
+  ai_mapfields: 'cloud', // application autofill field mapping
   guide_generate: 'ai', // interview prep guide generation
   guide_research: 'ai', // opt-in web_search company research pass
   followup_reco: 'ai', // stage-aware follow-up recommendation
@@ -80,6 +88,7 @@ const FEATURE_LABELS = {
   gmail_ingest: 'Gmail ingest',
   scout: 'Auto-scout',
   backups: 'Cloud backups',
+  keyword_ai: 'AI keyword match',
   ai_draft: 'AI drafts',
   ai_score: 'AI auto-score',
   ai_mapfields: 'AI autofill',

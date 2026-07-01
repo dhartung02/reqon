@@ -1643,9 +1643,36 @@ app.post('/api/profile/resume', async (req, res) => {
       regen.keywordOverrides = preserved.keywordOverrides;
       regen.keywords = applyKeywordOverrides(regen.parsedKeywords, preserved.keywordOverrides);
     }
+    // Persist the ORIGINAL résumé bytes (not just the parsed text) so the extension can inject the
+    // real file into application upload fields. Stored next to the profile (under agent/, gitignored)
+    // and overwritten each upload. Non-fatal: parsing already succeeded if this fails.
+    try {
+      const dir = path.dirname(P.profile);
+      for (const old of fs.readdirSync(dir)) { if (/^resume-file\./i.test(old)) { try { fs.unlinkSync(path.join(dir, old)); } catch (e) {} } }
+      const ext = path.extname(fn).toLowerCase();
+      const RESUME_MIME = { '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.txt': 'text/plain', '.md': 'text/markdown' };
+      fs.writeFileSync(path.join(dir, 'resume-file' + ext), buf);
+      regen.resumeFile = { name: fn, ext, mime: RESUME_MIME[ext] || 'application/octet-stream', savedAt: nowIso() };
+    } catch (e) { /* keep going — the parsed profile is the primary result */ }
     try { writeJsonPretty(P.profile, regen); } catch (e) { return finish(500, { ok: false, error: e.message }); }
     finish(200, { ok: true, profile: regen, parsedBy, aiError });
   });
+});
+
+// Serve the stored résumé file (base64 JSON) so the extension can inject it into an application's
+// upload field. Auth-gated like the rest of /api/profile — it returns the user's own résumé, never
+// submits anything. `exists:false` when no résumé is on file.
+app.get('/api/profile/resume/file', (req, res) => {
+  try {
+    const rf = (readProfile() || {}).resumeFile;
+    if (!rf || !rf.ext) return res.json({ ok: true, exists: false });
+    const p = path.join(path.dirname(P.profile), 'resume-file' + rf.ext);
+    if (!fs.existsSync(p)) return res.json({ ok: true, exists: false });
+    const data = fs.readFileSync(p);
+    if (data.length > 8 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'résumé file too large' });
+    res.json({ ok: true, exists: true, name: rf.name || ('resume' + rf.ext),
+      mime: rf.mime || 'application/octet-stream', dataBase64: data.toString('base64') });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // ---------- AI application assistant (Phase 6) ----------

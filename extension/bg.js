@@ -239,6 +239,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try { sendResponse(await getEntitlements(!!msg.force)); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'profile') {
         sendResponse({ ok: true, profile: await getProfile(!!msg.force) });
+      } else if (msg.type === 'resumeFile') {
+        // The stored résumé (base64) so the content script can inject it into an upload field.
+        try { sendResponse(await api('/api/profile/resume/file')); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'queueStatus') {
         const { queue = [], queueLastRetry = 0, queueLastError = '' } = await chrome.storage.local.get(['queue', 'queueLastRetry', 'queueLastError']);
         sendResponse({ ok: true, count: queue.length, items: queue.map((a, i) => ({ i, label: queueLabel(a), kind: a.kind, ts: a.ts })), lastRetry: queueLastRetry, lastError: queueLastError });

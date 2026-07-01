@@ -319,6 +319,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try { sendResponse(await getEntitlements(!!msg.force)); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'experienceConfig') {
         try { sendResponse(await getExperience(!!msg.force)); } catch (e) { sendResponse({ ok: false, error: e.message }); }
+      } else if (msg.type === 'pageContext') {
+        try { sendResponse(await refreshActiveExperienceContext({ force: !!msg.force })); } catch (e) { sendResponse({ ok: false, error: e.message }); }
       } else if (msg.type === 'requestUpdateCheck') {
         sendResponse(await requestUpdateCheck());
       } else if (msg.type === 'profile') {

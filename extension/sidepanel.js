@@ -39,6 +39,9 @@ const bestBetRow = (typeof reqonUiLib !== 'undefined' && reqonUiLib.isBestBetRow
 const usageView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildAiUsageViewModel)
   ? reqonUiLib.buildAiUsageViewModel
   : (r) => ({ unlimited: !(r && r.today && r.today.cap), countText: String((r && r.today && r.today.calls) || 0), helperText: '', pct: 0, tone: '' });
+const sidepanelMode = (typeof reqonSidepanelMode !== 'undefined' && reqonSidepanelMode)
+  ? reqonSidepanelMode
+  : { deriveAssistantMode: () => ({ mode: 'today', row: null }), buildTrackedRoleCards: () => [] };
 
 function setMsg(t, k) { $('msg').textContent = t || ''; $('msg').className = k || ''; }
 const reqKeyOf = (typeof reqKey === 'function') ? reqKey : (x) => ((x.company || '') + '|' + (x.role || '')).toLowerCase().trim();
@@ -48,38 +51,44 @@ async function getOrigin() {
   return (origin || '').replace(/\/$/, '');
 }
 
-// ---- this page ----
-async function renderPage() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  activeTab = tab || null;
-  if (!tab || !tab.url || !/^https?:/.test(tab.url)) {
-    $('page').innerHTML = '<div class="muted">Open a job posting to clip or score it.</div>';
-    return;
-  }
-  const r = await send({ type: 'lookup', url: tab.url, force: false });
-  if (!r || r.ok === false) {
-    $('page').innerHTML = '<div class="role">Can’t reach the board</div>' +
-      '<div class="company muted">Check your server connection.</div>' +
-      '<button id="openSettings" class="btn btn-ghost" style="margin-top:8px">Open settings</button>';
-    const os = $('openSettings'); if (os) os.onclick = () => { try { chrome.runtime.openOptionsPage(); } catch (_) {} };
-    return;
-  }
-  // Consistent with the overlay: deterministic "Fill form" first, then an "AI-fill rest" enhancement.
-  const fillBtns =
-    '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
+let pageContext = null;
+
+function pageActionsHTML() {
+  return '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
     '<button id="aiFill" class="btn btn-ghost">✦ AI-fill rest</button>';
-  const row = r.row;
-  currentRow = row || null;
-  if (!row) {
-    $('page').innerHTML =
-      '<div class="role">Not on your board</div>' +
-      '<div class="company muted">' + esc((tab.title || '').slice(0, 80)) + '</div>' +
-      '<button id="clip" class="btn btn-primary">+ Clip to board</button>' +
-      '<div class="btnrow">' + fillBtns + '</div>';
-    $('clip').onclick = doClip;
-    wireFill();
-    return;
+}
+
+function renderTrackedCard(card) {
+  return `<article class="assist-mini" data-card="${esc(card.id)}">` +
+    `<div class="assist-mini-title">${esc(card.title)}</div>` +
+    `<div class="assist-mini-copy">${esc(card.detail || '')}</div>` +
+    '</article>';
+}
+
+function updateAssistantChrome(mode, tab, row) {
+  const root = $('assistantRoot');
+  if (root) root.setAttribute('data-mode', mode.mode);
+  const pageTitle = $('pageTitle');
+  const header = $('assistantHeader');
+  const title = mode.mode === 'today'
+    ? 'Today'
+    : (row ? (row.role || 'Tracked role') : (tab && tab.title ? String(tab.title).slice(0, 80) : 'Job page'));
+  const subtitle = mode.mode === 'today'
+    ? 'Keep the pipeline moving, then jump into any live posting without reopening the panel.'
+    : row
+      ? `${row.company || 'Tracked role'} · ${row.status || 'Not Applied'}`
+      : 'Recognized application page. Clip it, score it, or continue filling in place.';
+  if (pageTitle) pageTitle.textContent = mode.mode === 'today' ? 'Today' : 'This page';
+  if (header) {
+    header.innerHTML =
+      '<div class="assist-kicker">Reqon Assistant</div>' +
+      `<div class="assist-title">${esc(title)}</div>` +
+      `<div class="assist-subtitle">${esc(subtitle)}</div>`;
   }
+}
+
+function renderTrackedJobMode(row) {
+  const cards = sidepanelMode.buildTrackedRoleCards(row);
   const chips =
     `<span class="chip">fit <b>${esc(row.fit ?? '—')}</b></span>` +
     `<span class="chip">prob <b>${esc(row.prob ?? '—')}</b></span>` +
@@ -96,26 +105,112 @@ async function renderPage() {
   $('page').setAttribute('data-tier', tierKey(row.tier).toLowerCase());
   $('page').setAttribute('data-st', statusKey(row.status));
   $('page').innerHTML =
-    `<div class="page-top">${scoreCircle(row)}<div style="flex:1;min-width:0">` +
-      `<div class="role">${esc(row.role || '—')}</div>` +
-      `<div class="company">${esc(row.company || '')}</div></div></div>` +
-    `<div class="metrics">${chips}</div>` +
-    `<select id="statusSel" class="sel" style="margin-top:8px">` +
-      STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
-    `</select>` +
-    `<div class="btnrow">` + fillBtns + `</div>` +
-    `<div class="btnrow">` +
-      `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✦ Score with AI${lock(canScore)}</button>` +
-    `</div>` +
-    guideBtn +
-    '<div id="scoreOut"></div>' +
-    trackingEditorHTML(row);
+    `<section class="assist-card">` +
+      `<div class="page-top">${scoreCircle(row)}<div style="flex:1;min-width:0">` +
+        `<div class="role">${esc(row.role || '—')}</div>` +
+        `<div class="company">${esc(row.company || '')}</div></div></div>` +
+      `<div class="metrics">${chips}</div>` +
+      `<div class="assist-card-grid">${cards.map(renderTrackedCard).join('')}</div>` +
+      `<select id="statusSel" class="sel" style="margin-top:12px">` +
+        STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
+      `</select>` +
+      `<div class="assist-actions">${pageActionsHTML()}</div>` +
+      `<div class="btnrow" style="margin-top:8px">` +
+        `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✦ Score with AI${lock(canScore)}</button>` +
+      `</div>` +
+      guideBtn +
+      '<div id="scoreOut"></div>' +
+      trackingEditorHTML(row) +
+    '</section>';
   wireFill();
   $('statusSel').onchange = (e) => doSetStatus(e.target.value);
   $('score').onclick = canScore ? doScore : () => setMsg(`AI scoring needs the ${entReq('ai_score')} package.`, 'err');
   if ($('guideOpen')) $('guideOpen').onclick = () => openGuide(row);
   if ($('guideGen')) $('guideGen').onclick = canGuide ? (e) => doGuide(row, e && e.target) : () => setMsg(`Interview guides need the ${entReq('guide_generate')} package.`, 'err');
   wireTrackingEditor(row);
+}
+
+function renderJobMode(tab) {
+  $('page').removeAttribute('data-tier');
+  $('page').removeAttribute('data-st');
+  $('page').innerHTML =
+    '<section class="assist-card">' +
+      '<div class="role">Recognized job page</div>' +
+      '<div class="company muted">' + esc((tab && tab.title ? tab.title : '').slice(0, 80)) + '</div>' +
+      '<div class="assist-card-grid">' +
+        '<article class="assist-mini"><div class="assist-mini-title">Track this role</div><div class="assist-mini-copy">Clip it to the board without leaving the page.</div></article>' +
+        '<article class="assist-mini"><div class="assist-mini-title">Start with factual fill</div><div class="assist-mini-copy">Use your saved profile answers before you draft anything custom.</div></article>' +
+      '</div>' +
+      '<button id="clip" class="btn btn-primary" style="margin-top:12px">+ Clip to board</button>' +
+      '<div class="assist-actions">' + pageActionsHTML() + '</div>' +
+    '</section>';
+  $('clip').onclick = doClip;
+  wireFill();
+}
+
+function renderTodayMode(rows) {
+  const live = (rows || []).filter((r) => r && r.deleted !== true);
+  const open = live.filter((r) => !isApplied(r.status) && !isClosed(r.status));
+  const tracked = live.length;
+  const interviewing = live.filter((r) => /^(Recruiter Screen|Hiring Manager|Panel|Offer)$/.test(r.status || '')).length;
+  const best = open.slice().sort((a, b) => ev(b) - ev(a))[0];
+  $('page').removeAttribute('data-tier');
+  $('page').removeAttribute('data-st');
+  $('page').innerHTML =
+    '<section class="assist-card">' +
+      '<div class="role">Today workspace</div>' +
+      '<div class="company muted">Open any supported job page and the assistant will switch into live apply mode in place.</div>' +
+      '<div class="assist-summary">' +
+        `<div class="assist-stat"><div class="assist-stat-value">${tracked}</div><div class="assist-stat-label">Tracked</div></div>` +
+        `<div class="assist-stat"><div class="assist-stat-value">${open.length}</div><div class="assist-stat-label">Ready</div></div>` +
+        `<div class="assist-stat"><div class="assist-stat-value">${interviewing}</div><div class="assist-stat-label">Interviewing</div></div>` +
+      '</div>' +
+      (best
+        ? `<div class="assist-mini" style="margin-top:12px"><div class="assist-mini-title">Best bet next</div><div class="assist-mini-copy">${esc(best.company || '')} · ${esc(best.role || '—')} · EV ${esc(ev(best))}</div></div>`
+        : '<div class="assist-mini" style="margin-top:12px"><div class="assist-mini-title">Nothing queued yet</div><div class="assist-mini-copy">Clip a new posting or work the best-bets list below.</div></div>') +
+    '</section>';
+}
+
+async function renderPage() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  activeTab = tab || null;
+  if (!tab || !tab.url || !/^https?:/.test(tab.url)) {
+    updateAssistantChrome({ mode: 'today' }, tab, null);
+    currentRow = null;
+    $('page').innerHTML = '<div class="muted">Open a job posting to clip or score it.</div>';
+    return;
+  }
+  const [ctxResponse, lookupResponse] = await Promise.all([
+    send({ type: 'pageContext', force: false }),
+    send({ type: 'lookup', url: tab.url, force: false }),
+  ]);
+  if (!lookupResponse || lookupResponse.ok === false) {
+    $('page').innerHTML = '<div class="role">Can’t reach the board</div>' +
+      '<div class="company muted">Check your server connection.</div>' +
+      '<button id="openSettings" class="btn btn-ghost" style="margin-top:8px">Open settings</button>';
+    const os = $('openSettings'); if (os) os.onclick = () => { try { chrome.runtime.openOptionsPage(); } catch (_) {} };
+    return;
+  }
+  pageContext = (ctxResponse && ctxResponse.ok !== false) ? ctxResponse : pageContext;
+  const mode = sidepanelMode.deriveAssistantMode({
+    activeTab: tab,
+    pageContext: pageContext && pageContext.url === tab.url
+      ? Object.assign({}, pageContext, { row: lookupResponse.row || pageContext.row || null })
+      : { recognized: typeof detectATS === 'function' ? detectATS(tab.url).applyMode !== 'Unknown' : false, row: lookupResponse.row || null, url: tab.url },
+  });
+  currentRow = mode.row || lookupResponse.row || null;
+  updateAssistantChrome(mode, tab, currentRow);
+  if (mode.mode === 'tracked-job' && currentRow) {
+    renderTrackedJobMode(currentRow);
+    return;
+  }
+  if (mode.mode === 'job') {
+    currentRow = null;
+    renderJobMode(tab);
+    return;
+  }
+  const rowsResponse = await send({ type: 'reqs', force: false });
+  renderTodayMode(rowsResponse && rowsResponse.ok !== false && Array.isArray(rowsResponse.rows) ? rowsResponse.rows : lastRows);
 }
 
 // Compact tracking-field editor — parity with the web board's expanded-card tracking strip. Edits
@@ -531,12 +626,18 @@ function refreshPageSoon() {
     await renderPage();
     const url = activeTab && activeTab.url;
     if (url && url !== lastPageUrl) { clearJobDrafts(); lastPageUrl = url; }   // new listing → reset AI work
-    renderCoverage();
+    await Promise.all([renderCoverage(), renderPipeline()]);
   }, 150);
 }
 chrome.tabs.onActivated.addListener(refreshPageSoon);
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (tab && tab.active && (info.url || info.status === 'complete')) refreshPageSoon(); });
 try { chrome.windows.onFocusChanged.addListener((wid) => { if (wid !== chrome.windows.WINDOW_ID_NONE) refreshPageSoon(); }); } catch (_) {}
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg && msg.type === 'pageContextChanged') {
+    pageContext = msg.context || null;
+    refreshPageSoon();
+  }
+});
 
 // Gate the open-ended AI draft button on the AI package (it calls /api/assist).
 function applyDraftGate() {

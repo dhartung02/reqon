@@ -185,6 +185,10 @@ strict ordering requirement relative to each other.
 Once all four steps are done: a push to `main` after tests pass will show the `notify-deploy` job
 waiting in the Actions tab for your approval click, rather than deploying immediately.
 
+To approve: open the run in the Actions tab, click **Review deployments**, select `production`, and
+click **Approve and deploy**. If it's never approved, the job just sits waiting — no failure, no
+silent deploy — and GitHub automatically expires the pending request after 30 days.
+
 ---
 
 ## Troubleshooting

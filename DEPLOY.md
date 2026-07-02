@@ -145,6 +145,52 @@ curl -I https://reqon.app/api/reqs  # → 404 (no API surface exposed)
 
 ---
 
+## CI/CD (GitHub Actions)
+
+`.github/workflows/ci.yml` runs `npm test` + `npm run lint` (+ a best-effort `app/` Jest pass) on
+every push and PR to `main`. On `main`, once tests pass, a second job (`notify-deploy`) POSTs to
+three Render **Deploy Hook** URLs so a deploy only happens after CI is green — instead of Render's
+own push-triggered auto-deploy, which fires regardless of test results. The deploy job is gated
+behind a GitHub **Environment** approval step (see below), so even a green `main` push waits for a
+manual click before anything actually deploys.
+
+**One-time setup — four parts, do them in this order:**
+
+1. **Create the GitHub "production" Environment with a required reviewer.** Repo → Settings →
+   Environments → New environment → name it exactly `production` → under "Deployment protection
+   rules", enable **Required reviewers** and add yourself. This is what makes the `notify-deploy`
+   job in `ci.yml` (which declares `environment: production`) pause and wait for a manual approval
+   click in the Actions tab before it runs, instead of firing automatically. Without this step, the
+   `environment: production` line in the workflow has no environment to bind to and GitHub will
+   still run the job — the protection only exists once this environment is configured with a
+   reviewer.
+
+2. **Get each service's Deploy Hook URL** — Render dashboard → service (`reqon-api`,
+   `reqon-cloud`, `reqon-marketing`) → Settings → Deploy Hook → copy the URL.
+
+3. **Add them as GitHub repo secrets** (repo → Settings → Secrets and variables → Actions →
+   New repository secret): `RENDER_DEPLOY_HOOK_API`, `RENDER_DEPLOY_HOOK_CLOUD`,
+   `RENDER_DEPLOY_HOOK_MARKETING` — one URL per secret, matching the service.
+
+4. **Turn off each service's "Auto-Deploy" toggle** — Render dashboard → service → Settings →
+   Auto-Deploy → Off. This is what makes CI (with its manual-approval gate) the actual deploy
+   path; skip this step and Render will keep deploying every push to `main` on its own, in
+   parallel with the CI-gated deploy — you'd end up with two independent deploy triggers racing
+   each other on every push.
+
+Do step 1 (the Environment + required reviewer) before adding the secrets in step 3 — that way the
+approval gate is already active by the time there's anything for it to gate. Steps 2-4 have no
+strict ordering requirement relative to each other.
+
+Once all four steps are done: a push to `main` after tests pass will show the `notify-deploy` job
+waiting in the Actions tab for your approval click, rather than deploying immediately.
+
+To approve: open the run in the Actions tab, click **Review deployments**, select `production`, and
+click **Approve and deploy**. If it's never approved, the job just sits waiting — no failure, no
+silent deploy — and GitHub automatically expires the pending request after 30 days.
+
+---
+
 ## Troubleshooting
 
 **Cloud proxy can't reach the API** (board shows network errors; `cloud /api/...` returns `502/504`)

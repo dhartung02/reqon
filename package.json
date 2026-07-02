@@ -9,7 +9,9 @@
     "start": "node server.js",
     "start:api": "REQON_ROLE=api node server.js",
     "start:cloud": "REQON_ROLE=cloud node server.js",
-    "start:marketing": "REQON_ROLE=marketing node server.js"
+    "start:marketing": "REQON_ROLE=marketing node server.js",
+    "test": "node tests/run-all.js",
+    "lint": "node scripts/check-syntax.js"
   },
   "engines": {
     "node": ">=18"

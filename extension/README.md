@@ -38,7 +38,7 @@ Open from the popup → **📊 Open analytics sidebar**:
 - **Pipeline analytics** — tier mix, status buckets, applied-this-week, avg EV, top opportunities.
 - **This page** — tracked record or Clip, status dropdown, **✨ Score with AI** (apply to board),
   **⚡ AI-assisted autofill**, and the interview guide for interview-stage roles.
-- **Keyword coverage** — résumé↔JD keyword match, with **Suggest how to close the gaps** (tailoring).
+- **Keyword coverage** — résumé↔JD keyword match, leading with the keywords you cover, plus **Suggest how to strengthen your match** (tailoring).
 - **AI assist** — draft a cover note / screening / reusable answer; **Insert into page** or **Copy**.
 - **AI usage** — calls vs cap, tokens (today / 7d / 30d), $ estimate + budget bar (if a rate is set).
 

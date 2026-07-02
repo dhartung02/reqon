@@ -46,6 +46,28 @@
     return `Filled ${filled} of ${total} fields: ${direct} direct, ${ai} AI-assisted, ${remaining} still need review.`;
   }
 
+  function buildKeywordInsightModel({ matched = [], missing = [] } = {}) {
+    return {
+      matched: Array.from(new Set((matched || []).filter(Boolean))),
+      missing: Array.from(new Set((missing || []).filter(Boolean))),
+      hasGaps: Array.isArray(missing) && missing.filter(Boolean).length > 0,
+    };
+  }
+
+  function explainFitGap({ fit, keywordCoverage, reasons = [] } = {}) {
+    const parts = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
+    const because = parts.length
+      ? parts.join(', ')
+      : 'Reqon also weighs domain alignment, seniority, and remote fit alongside the keywords on the page';
+    return `Fit ${fit}/10 with ${keywordCoverage}% keyword coverage because ${because}.`;
+  }
+
+  function buildUpdateCheckViewModel(result) {
+    if (result && result.status === 'update_available') return { tone: 'ok', label: 'Update ready when Chrome goes idle' };
+    if (result && result.status === 'throttled') return { tone: 'warn', label: 'Update check throttled' };
+    return { tone: 'neutral', label: 'Reqon is up to date' };
+  }
+
   function buildBannerModel({ row, pageState }) {
     const state = pageState || {};
     const tracked = !!row;
@@ -127,6 +149,9 @@
     isBestBetRow,
     buildAiUsageViewModel,
     summarizeFillAvailability,
+    buildKeywordInsightModel,
+    buildUpdateCheckViewModel,
+    explainFitGap,
     buildBannerModel,
     buildTodayBuckets,
   };

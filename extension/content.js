@@ -7,9 +7,13 @@
  * NEVER submits (the résumé is attached for you to review, never sent).
  */
 (function () {
+  const reqonLib = (typeof module !== 'undefined' && module.exports)
+    ? require('./lib.js')
+    : globalThis;
   const reqonUiLib = (typeof module !== 'undefined' && module.exports)
     ? require('./ui-lib.js')
     : globalThis.reqonUiLib;
+  const groupQuestionFields = reqonLib.groupQuestionFields;
   const FILLABLE_LEVELS = new Set(['Easy Apply', 'Likely fillable', 'Partially fillable']);
 
   function isRecognizedJobPage(job) {
@@ -63,8 +67,27 @@
     return { recognized, fillable, model };
   }
 
+  function buildQuestionGroupsSnapshot(fields) {
+    const grouped = groupQuestionFields(fields || []);
+    const snapshot = { total: 0, remaining: 0, groups: {} };
+    Object.entries(grouped).forEach(([id, group]) => {
+      const items = Array.isArray(group && group.items) ? group.items : [];
+      const remaining = items.filter((item) => item && item.filled === false).length;
+      snapshot.groups[id] = {
+        id,
+        count: items.length,
+        remaining,
+        items,
+      };
+      snapshot.total += items.length;
+      snapshot.remaining += remaining;
+    });
+    return snapshot;
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+      buildQuestionGroupsSnapshot,
       deriveBannerState,
       summarizeBannerFillResult,
       resolveBannerActionKind,
@@ -157,6 +180,8 @@
     if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords(msg.company) }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'captureMeta') { try { const c = captureMeta(); sendResponse({ ok: true, meta: c.meta, job: c.job }); } catch (e) { sendResponse({ ok: false }); } return; }
+    if (msg.type === 'questionGroups') { try { sendResponse({ ok: true, snapshot: questionGroupsSnapshot() }); } catch (e) { sendResponse({ ok: false, msg: String(e) }); } return; }
+    if (msg.type === 'jumpToQuestion') { try { sendResponse(jumpToQuestion(msg.id)); } catch (e) { sendResponse({ ok: false, msg: String(e) }); } return; }
     if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'smartFill') { smartFill().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'aiFillRest') { aiFillRest().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
@@ -201,6 +226,71 @@
     try { if (e.labels && e.labels[0]) p.push(e.labels[0].textContent); } catch (x) {}
     return p.filter(Boolean).join(' ').toLowerCase();
   };
+  const visibleField = (e) => !!(e && !e.disabled && e.getClientRects && e.getClientRects().length);
+  function fieldLabel(e) {
+    const picks = [];
+    try {
+      if (e.labels && e.labels.length) picks.push(...Array.from(e.labels).map((label) => label.textContent));
+    } catch (x) {}
+    picks.push(
+      e.getAttribute('aria-label'),
+      e.getAttribute('placeholder'),
+      e.name,
+      e.id
+    );
+    const text = picks.find((value) => value && String(value).trim());
+    return String(text || 'Untitled field').replace(/\s+/g, ' ').trim().slice(0, 140);
+  }
+  function questionFieldKind(e) {
+    if (!e) return 'input';
+    if (e.tagName === 'TEXTAREA') return 'textarea';
+    if (e.tagName === 'SELECT') return 'select-one';
+    return (e.type || 'input').toLowerCase();
+  }
+  function fieldValuePresent(e) {
+    if (!e) return false;
+    if (e.tagName === 'SELECT') return !!String(e.value || '').trim();
+    return !!String(e.value || '').trim();
+  }
+  function questionFieldElements() {
+    const out = [];
+    document.querySelectorAll('input, textarea, select').forEach((e) => {
+      const t = questionFieldKind(e);
+      if (SKIP_TYPES.indexOf(t) >= 0 || ['checkbox', 'radio'].includes(t)) return;
+      if (!visibleField(e)) return;
+      const label = fieldLabel(e);
+      if (!label || label === 'Untitled field') return;
+      out.push(e);
+    });
+    return out;
+  }
+  function questionGroupsSnapshot() {
+    const fields = questionFieldElements().map((e, index) => {
+      const id = e.getAttribute('data-reqon-qid') || ('q-' + index);
+      e.setAttribute('data-reqon-qid', id);
+      return {
+        id,
+        label: fieldLabel(e),
+        kind: questionFieldKind(e),
+        filled: fieldValuePresent(e),
+        required: !!(e.required || e.getAttribute('aria-required') === 'true'),
+      };
+    });
+    return buildQuestionGroupsSnapshot(fields);
+  }
+  function jumpToQuestion(id) {
+    if (!id) return { ok: false, msg: 'No question selected.' };
+    const e = document.querySelector('[data-reqon-qid="' + CSS.escape(String(id)) + '"]');
+    if (!e) return { ok: false, msg: 'That field is no longer on the page.' };
+    clearHighlights();
+    e.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    try { e.focus({ preventScroll: true }); } catch (err) { try { e.focus(); } catch (x) {} }
+    e.style.outline = '2px solid #00E5A3';
+    e.style.outlineOffset = '2px';
+    highlighted.push(e);
+    lastField = e;
+    return { ok: true, msg: 'Jumped to field.' };
+  }
   let highlighted = [];   // fields we filled this session — tracked so "Clear highlights" can reset them
   const setVal = (e, v) => {
     const proto = e.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
@@ -236,6 +326,7 @@
     const p = r.profile || {};
     const fields = factualFields(p);
     const answers = p.answers || [];
+    const before = questionGroupsSnapshot();
     let factual = 0, answered = 0;
     document.querySelectorAll('input, textarea').forEach((e) => {
       const t = (e.type || '').toLowerCase();
@@ -259,6 +350,8 @@
     return {
       ok: factual + answered + (rez.attached || 0) > 0,
       factual, answered, resume: rez.attached || 0, resumeMissing: !!rez.noResume,
+      total: before.total,
+      remaining: questionGroupsSnapshot().remaining,
       msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '')
         + (rez.attached ? ` + résumé attached` : '') + ' — review, never auto-submitted.',
     };
@@ -373,6 +466,7 @@
   // match: it spends one AI request (server-gated), free on the AI tier. NEVER passwords/EEO/consent
   // (skipped here too); NEVER submits.
   async function aiFillRest() {
+    const before = questionGroupsSnapshot();
     const candidates = [];
     let idx = 0;
     document.querySelectorAll('input, textarea').forEach((e) => {
@@ -385,16 +479,22 @@
       candidates.push({ i: idx, sig, type: t });
       idx++;
     });
-    if (!candidates.length) return { ok: false, ai: 0, msg: 'Nothing left for AI to fill.' };
+    if (!candidates.length) return { ok: false, ai: 0, total: before.total, remaining: before.remaining, msg: 'Nothing left for AI to fill.' };
     const r = await send({ type: 'mapFields', payload: { fields: candidates } });
-    if (!r || !r.ok) return { ok: false, ai: 0, aiError: (r && r.error) || 'AI fill unavailable', msg: (r && r.error) || 'AI fill unavailable' };
+    if (!r || !r.ok) return { ok: false, ai: 0, total: before.total, remaining: before.remaining, aiError: (r && r.error) || 'AI fill unavailable', msg: (r && r.error) || 'AI fill unavailable' };
     let ai = 0;
     (r.fields || []).forEach((m) => {
       if (!m || (typeof m.confidence === 'number' && m.confidence < 0.6)) return;
       const e = document.querySelector('[data-reqon-i="' + m.i + '"]');
       if (e && !(e.value && e.value.trim()) && m.value) { setVal(e, String(m.value)); ai++; }
     });
-    return { ok: ai > 0, ai, msg: ai ? `AI filled ${ai} more field${ai === 1 ? '' : 's'} — review, never submitted.` : 'AI had nothing confident to add.' };
+    return {
+      ok: ai > 0,
+      ai,
+      total: before.total,
+      remaining: questionGroupsSnapshot().remaining,
+      msg: ai ? `AI filled ${ai} more field${ai === 1 ? '' : 's'} — review, never submitted.` : 'AI had nothing confident to add.',
+    };
   }
   // Deterministic pass + AI enhancement in one call (kept for callers that want both at once).
   async function smartFill() {

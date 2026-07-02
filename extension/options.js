@@ -12,6 +12,13 @@ const prefsPatch = (typeof buildLocalPrefsPatch === 'function')
       if (typeof notifyEnabled === 'boolean') patch.notifyEnabled = notifyEnabled;
       return patch;
     };
+const updateCheckView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildUpdateCheckViewModel)
+  ? reqonUiLib.buildUpdateCheckViewModel
+  : (result) => {
+      if (result && result.status === 'update_available') return { tone: 'ok', label: 'Update ready when Chrome goes idle' };
+      if (result && result.status === 'throttled') return { tone: 'warn', label: 'Update check throttled' };
+      return { tone: 'neutral', label: 'Reqon is up to date' };
+    };
 
 chrome.storage.sync.get(DEFAULTS, c => {
   const isCloud = !c.origin || c.origin === CLOUD_ORIGIN;
@@ -91,6 +98,19 @@ async function loadExperienceMeta(force) {
   meta.textContent = `Experience config ${r.version} loaded from your Reqon server. Updates use ${updateMode}.`;
 }
 loadExperienceMeta();
+
+const updateBtn = $('checkUpdateBtn');
+if (updateBtn) {
+  updateBtn.onclick = async () => {
+    $('updateStatus').textContent = 'Checking…';
+    updateBtn.disabled = true;
+    const result = await new Promise((res) => chrome.runtime.sendMessage({ type: 'requestUpdateCheck' }, res));
+    const vm = updateCheckView(result);
+    $('updateStatus').textContent = vm.label;
+    $('updateStatus').dataset.tone = vm.tone;
+    updateBtn.disabled = false;
+  };
+}
 
 async function ensureHostPermission(origin) {
   try {

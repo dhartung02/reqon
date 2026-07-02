@@ -14,6 +14,13 @@ const prefsPatch = (typeof buildLocalPrefsPatch === 'function')
 const popupHeading = (typeof reqonUiLib !== 'undefined' && reqonUiLib.popupHeadingForRow)
   ? reqonUiLib.popupHeadingForRow
   : (row) => (row ? 'Tracked on your board' : 'Clip this job');
+const updateCheckView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildUpdateCheckViewModel)
+  ? reqonUiLib.buildUpdateCheckViewModel
+  : (result) => {
+      if (result && result.status === 'update_available') return { tone: 'ok', label: 'Update ready when Chrome goes idle' };
+      if (result && result.status === 'throttled') return { tone: 'warn', label: 'Update check throttled' };
+      return { tone: 'neutral', label: 'Reqon is up to date' };
+    };
 
 let activeTab = null;
 let currentRow = null;
@@ -217,6 +224,18 @@ $('panel').onclick = async () => {
     setMsg('Sidebar needs Chrome 116+. (' + (e && e.message ? e.message : e) + ')', 'err');
   }
 };
+const updateBtn = $('checkUpdateBtn');
+if (updateBtn) {
+  updateBtn.onclick = async () => {
+    updateBtn.disabled = true;
+    $('updateStatus').textContent = 'Checking…';
+    const result = await send({ type: 'requestUpdateCheck' });
+    const vm = updateCheckView(result);
+    $('updateStatus').textContent = vm.label;
+    $('updateStatus').dataset.tone = vm.tone;
+    updateBtn.disabled = false;
+  };
+}
 $('save').onclick = async () => {
   const cfg = await getConfig();
   const origin = resolveOrigin({

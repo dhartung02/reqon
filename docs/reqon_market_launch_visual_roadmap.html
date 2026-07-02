@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Reqon Market Launch Visual Roadmap</title>
+<style>
+  body { margin:0; background:#f7f9fb; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color:#15202b; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 20px 64px; }
+  .hero { background: linear-gradient(135deg,#e6fbff,#f8f5ff); border:1px solid #d7f4f8; border-radius:28px; padding:34px; }
+  h1 { font-size:44px; line-height:1.05; margin:0 0 12px; }
+  .sub { font-size:20px; color:#667085; margin:0 0 22px; }
+  .pill { display:inline-block; background:#15202b; color:#fff; border-radius:999px; padding:12px 18px; font-weight:800; }
+  h2 { margin:42px 0 14px; font-size:30px; }
+  .tiers, .waves, .gates { display:grid; gap:16px; }
+  .tiers { grid-template-columns: repeat(4,1fr); }
+  .waves { grid-template-columns: repeat(3,1fr); }
+  .gates { grid-template-columns: repeat(5,1fr); }
+  .card { background:#fff; border:1px solid #e6eef4; border-radius:18px; padding:20px; box-shadow: 0 8px 18px rgba(16,24,40,.06); }
+  .card h3 { margin:0 0 8px; font-size:22px; }
+  .card p { margin:0; color:#667085; line-height:1.35; }
+  .timeline { display:grid; grid-template-columns: repeat(6,1fr); gap:12px; align-items:stretch; }
+  .phase { background:#fff; border:1px solid #e6eef4; border-radius:18px; overflow:hidden; box-shadow: 0 8px 18px rgba(16,24,40,.06); }
+  .phase .bar { color:#fff; font-weight:900; padding:14px 16px; }
+  .phase .body { padding:16px; }
+  .phase h3 { margin:0 0 10px; font-size:19px; }
+  ul { padding-left:20px; margin:0; color:#344054; }
+  li { margin:7px 0; }
+  .snap { margin:22px 0; text-align:center; font-weight:900; color:#fff; background:linear-gradient(90deg,#22a9bd,#7a5af8); padding:16px; border-radius:999px; }
+  .value { background:#fff; border:1px solid #e6eef4; border-radius:18px; padding:20px; box-shadow: 0 8px 18px rgba(16,24,40,.06); }
+  .value-row { display:grid; grid-template-columns: 240px 1fr; gap:18px; padding:13px 0; border-bottom:1px solid #eef2f6; }
+  .value-row:last-child { border-bottom:0; }
+  .value-row b { font-size:18px; }
+  .value-row span { color:#667085; }
+  @media (max-width: 900px) { .tiers,.timeline,.waves,.gates { grid-template-columns:1fr; } .value-row { grid-template-columns:1fr; } }
+</style>
+</head>
+<body><main class="wrap">
+  <section class="hero">
+    <h1>Reqon Market Launch Visual Roadmap</h1>
+    <p class="sub">A higher-level planning view of what must ship before go-live, what can follow, and how features map to customer value.</p>
+    <span class="pill">Simplify helps apply faster. Reqon helps users run the search.</span>
+  </section>
+  <h2>Tier model</h2>
+  <section class="tiers">
+    <div class="card"><h3>Free</h3><p>Local app + scout + core tracking</p></div><div class="card"><h3>Local Pro</h3><p>Everything unlocked, self-hosted</p></div><div class="card"><h3>Cloud</h3><p>Hosted sync across board/app/extension</p></div><div class="card"><h3>AI+</h3><p>Cloud plus fit, autofill, drafts, prep</p></div>
+  </section>
+  <h2>Pre-launch snap line timeline</h2>
+  <section class="timeline">
+    <div class="phase"><div class="bar" style="background:#22a9bd">Phase 0</div><div class="body"><h3>Stabilize & Package</h3><ul><li>Tier model</li><li>Marketing copy</li><li>Trust/privacy</li><li>Free/local path</li></ul></div></div><div class="phase"><div class="bar" style="background:#2e90fa">Phase 1</div><div class="body"><h3>Activation Loop</h3><ul><li>First-run setup</li><li>Candidate profile</li><li>Scout sources</li><li>Apply Next</li></ul></div></div><div class="phase"><div class="bar" style="background:#7a5af8">Phase 2</div><div class="body"><h3>Command Center</h3><ul><li>Today view</li><li>Follow-ups</li><li>Aging apps</li><li>Quick actions</li></ul></div></div><div class="phase"><div class="bar" style="background:#12b76a">Phase 3</div><div class="body"><h3>Signals & Analytics</h3><ul><li>Outcome signals</li><li>Role timeline</li><li>Conversion metrics</li><li>Signal export</li></ul></div></div><div class="phase"><div class="bar" style="background:#f79009">Phase 4</div><div class="body"><h3>Connected Surfaces</h3><ul><li>Cloud sync</li><li>Extension sync</li><li>App sync</li><li>Backup/restore</li></ul></div></div><div class="phase"><div class="bar" style="background:#f04438">Phase 5</div><div class="body"><h3>Launch Readiness</h3><ul><li>QA</li><li>Demo data</li><li>Beta cohort</li><li>Pricing/tier QA</li></ul></div></div>
+  </section>
+  <div class="snap">GO LIVE SNAP LINE — everything above must be credible before broad market launch</div>
+  <h2>Post-launch update waves</h2>
+  <section class="waves">
+    <div class="card"><h3>Wave 1: Launch Accelerators</h3><ul><li>Assets workspace</li><li>Role detail page</li><li>Company intelligence</li><li>Gmail ingest</li><li>Notifications</li></ul></div><div class="card"><h3>Wave 2: Differentiators</h3><ul><li>Referral/contact CRM</li><li>Advanced AI+ workflows</li><li>Source quality benchmarks</li><li>Importers/migration</li></ul></div><div class="card"><h3>Later: Expansion Bets</h3><ul><li>Public benchmark database</li><li>Services marketplace</li><li>Deep job board</li><li>Career coach portal</li></ul></div>
+  </section>
+  <h2>Customer value map</h2>
+  <section class="value">
+    <div class="value-row"><b>Find better jobs</b><span>Scout/source setup, company career pages, prioritized queue</span></div><div class="value-row"><b>Decide faster</b><span>Fit reasoning, Apply Next, role summary, compensation/remote parsing</span></div><div class="value-row"><b>Act consistently</b><span>Today view, follow-ups, extension clipping, reminders</span></div><div class="value-row"><b>Track outcomes</b><span>Signals, role timeline, recruiter/rejection/offers</span></div><div class="value-row"><b>Learn what works</b><span>Analytics, source/company conversion, resume/version insight</span></div>
+  </section>
+  <h2>P0 launch gates</h2>
+  <section class="gates">
+    <div class="card"><h3>Tier Packaging</h3><p>Make Free / Local Pro / Cloud / AI+ obvious.</p></div><div class="card"><h3>Onboarding</h3><p>Empty state → first scout → Apply Next fast.</p></div><div class="card"><h3>Today View</h3><p>Show what to do next, not just what exists.</p></div><div class="card"><h3>Outcome Signals</h3><p>Track rejection, screen, interview, offer, ghosted.</p></div><div class="card"><h3>Analytics v1</h3><p>Reveal what is working by source, company, role.</p></div><div class="card"><h3>Scout UX</h3><p>Reliable company/ATS setup and source clarity.</p></div><div class="card"><h3>Extension v1</h3><p>Clip, status sync, fit, safe assist.</p></div><div class="card"><h3>Cloud Sync</h3><p>Web, extension, app, board stay aligned.</p></div><div class="card"><h3>Trust & Privacy</h3><p>No auto-submit. Human review. Data ownership.</p></div><div class="card"><h3>Marketing Refresh</h3><p>Position as job-search command center.</p></div>
+  </section>
+</main></body></html>

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   deriveBannerState,
+  buildQuestionGroupsSnapshot,
   summarizeBannerFillResult,
   resolveBannerActionKind,
 } = require('../content.js');
@@ -62,5 +63,25 @@ test('summarizeBannerFillResult avoids inventing a remaining count when totals a
   assert.equal(
     summarizeBannerFillResult({ factual: 5, answered: 2, resume: 1, ai: 3 }),
     'Filled 11 fields so far: 8 direct, 3 AI-assisted.'
+  );
+});
+
+test('buildQuestionGroupsSnapshot returns grouped counts and preserves remaining items', () => {
+  const snapshot = buildQuestionGroupsSnapshot([
+    { id: 'q1', label: 'First Name', kind: 'text', filled: true },
+    { id: 'q2', label: 'How did you hear about this job?', kind: 'text', filled: false },
+    { id: 'q3', label: 'Please describe your current company', kind: 'textarea', filled: false },
+    { id: 'q4', label: 'Are you authorized to work in the U.S.?', kind: 'select-one', filled: true },
+  ]);
+
+  assert.equal(snapshot.total, 4);
+  assert.equal(snapshot.remaining, 2);
+  assert.equal(snapshot.groups.common.count, 3);
+  assert.equal(snapshot.groups.common.remaining, 1);
+  assert.equal(snapshot.groups['open-ended'].count, 1);
+  assert.equal(snapshot.groups['open-ended'].remaining, 1);
+  assert.deepEqual(
+    snapshot.groups.common.items.map((item) => item.id),
+    ['q1', 'q2', 'q4']
   );
 });

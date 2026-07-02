@@ -55,10 +55,87 @@ async function getOrigin() {
 }
 
 let pageContext = null;
+const QUESTION_GROUP_META = {
+  common: {
+    title: 'Common questions',
+    copy: 'Profile fields and standard application questions you can review quickly.',
+  },
+  'open-ended': {
+    title: 'Open-ended prompts',
+    copy: 'These usually need tailored language. Jump there, then draft with AI if needed.',
+  },
+  unique: {
+    title: 'Unique questions',
+    copy: 'Role-specific fields that are worth checking before you continue.',
+  },
+};
 
 function pageActionsHTML() {
   return '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
     '<button id="aiFill" class="btn btn-ghost">✦ AI-fill rest</button>';
+}
+
+function questionGroupHtml(id, group) {
+  const meta = QUESTION_GROUP_META[id] || { title: id, copy: '' };
+  const items = (group && Array.isArray(group.items)) ? group.items : [];
+  if (!items.length) return '';
+  return '<article class="assist-mini">' +
+    `<div class="assist-mini-title">${esc(meta.title)} · ${items.length}</div>` +
+    `<div class="assist-mini-copy">${esc(meta.copy)}</div>` +
+    `<div style="display:grid;gap:6px;margin-top:10px">` +
+      items.slice(0, 6).map((item) => (
+        `<button class="copybtn" style="text-align:left;width:100%" data-jump-qid="${esc(item.id)}" data-question-label="${esc(item.label)}" data-question-group="${esc(id)}">` +
+          `${esc(item.label)}` +
+          `${item.filled ? ' · Reviewed' : ''}` +
+        '</button>'
+      )).join('') +
+      (items.length > 6 ? `<div class="muted" style="font-size:.72rem">+ ${items.length - 6} more on the page</div>` : '') +
+    '</div>' +
+  '</article>';
+}
+
+function renderQuestionGuide(snapshot) {
+  const slot = $('questionGuide');
+  if (!slot) return;
+  if (!snapshot || !snapshot.total) {
+    slot.innerHTML = '<div class="assist-mini"><div class="assist-mini-title">Question guide</div><div class="assist-mini-copy">Open a live application form to review the questions Reqon can guide you through.</div></div>';
+    return;
+  }
+  slot.innerHTML =
+    '<div class="assist-mini" style="margin-bottom:8px">' +
+      `<div class="assist-mini-title">${snapshot.remaining} still need review</div>` +
+      `<div class="assist-mini-copy">${snapshot.total - snapshot.remaining} of ${snapshot.total} visible fields already have values on the page.</div>` +
+    '</div>' +
+    Object.keys(QUESTION_GROUP_META).map((id) => questionGroupHtml(id, snapshot.groups && snapshot.groups[id])).join('');
+
+  slot.querySelectorAll('[data-jump-qid]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!activeTab || activeTab.id == null) return;
+      const qid = btn.getAttribute('data-jump-qid');
+      let res = null;
+      try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'jumpToQuestion', id: qid }); } catch (e) { res = null; }
+      if (!res || !res.ok) {
+        setMsg((res && res.msg) || 'Could not jump to that field on the page.', 'err');
+        return;
+      }
+      const group = btn.getAttribute('data-question-group');
+      const label = btn.getAttribute('data-question-label') || '';
+      if ((group === 'open-ended' || group === 'unique') && $('aiQ') && !$('aiQ').value.trim()) $('aiQ').value = label;
+      setMsg(res.msg || 'Jumped to field.', 'ok');
+    };
+  });
+}
+
+async function loadQuestionGuide() {
+  const slot = $('questionGuide');
+  if (!slot) return;
+  if (!activeTab || activeTab.id == null || !/^https?:/.test(activeTab.url || '')) {
+    renderQuestionGuide(null);
+    return;
+  }
+  let res = null;
+  try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'questionGroups' }); } catch (e) { res = null; }
+  renderQuestionGuide(res && res.ok ? res.snapshot : null);
 }
 
 function renderTrackedCard(card) {
@@ -118,6 +195,8 @@ function renderTrackedJobMode(row) {
         STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
       `</select>` +
       `<div class="assist-actions">${pageActionsHTML()}</div>` +
+      '<div class="sect-title" style="margin-top:14px">Guided review</div>' +
+      '<div id="questionGuide" class="assist-card-grid"></div>' +
       `<div class="btnrow" style="margin-top:8px">` +
         `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✦ Score with AI${lock(canScore)}</button>` +
       `</div>` +
@@ -131,6 +210,7 @@ function renderTrackedJobMode(row) {
   if ($('guideOpen')) $('guideOpen').onclick = () => openGuide(row);
   if ($('guideGen')) $('guideGen').onclick = canGuide ? (e) => doGuide(row, e && e.target) : () => setMsg(`Interview guides need the ${entReq('guide_generate')} package.`, 'err');
   wireTrackingEditor(row);
+  loadQuestionGuide();
 }
 
 function renderJobMode(tab) {
@@ -146,9 +226,12 @@ function renderJobMode(tab) {
       '</div>' +
       '<button id="clip" class="btn btn-primary" style="margin-top:12px">+ Clip to board</button>' +
       '<div class="assist-actions">' + pageActionsHTML() + '</div>' +
+      '<div class="sect-title" style="margin-top:14px">Guided review</div>' +
+      '<div id="questionGuide" class="assist-card-grid"></div>' +
     '</section>';
   $('clip').onclick = doClip;
   wireFill();
+  loadQuestionGuide();
 }
 
 function todayRoleHtml(row, meta) {
@@ -377,6 +460,7 @@ async function doFill(kind, btn) {
   if (!res) setMsg('Autofill works on the open posting on a supported board.', 'err');
   else setMsg(res.msg || (res.ok ? 'Filled — review before submitting.' : 'Nothing to fill here.'), res.ok ? 'ok' : '');
   if (kind === 'aiFillRest') loadUsage();   // an AI request was consumed
+  loadQuestionGuide();
 }
 
 async function doClip() {
@@ -415,15 +499,34 @@ async function renderCoverage() {
   const missing = top.filter((t) => !resumeSet.has(t));
   const pct = Math.round((covered.length / top.length) * 100);
   const cls = pct >= 70 ? 'good' : pct >= 40 ? 'mid' : 'low';
+  const insightModel = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildKeywordInsightModel)
+    ? reqonUiLib.buildKeywordInsightModel({ matched: covered, missing })
+    : { matched: covered, missing, hasGaps: missing.length > 0 };
+  const fitReasons = [];
+  if (currentRow && currentRow.fit >= 7) fitReasons.push('strong domain alignment');
+  else if (currentRow && currentRow.fit > 0) fitReasons.push('partial domain alignment');
+  if (currentRow && currentRow.status && currentRow.status !== 'Not Applied') fitReasons.push('you already moved this role into your tracked pipeline');
+  fitReasons.push(missing.length ? 'limited direct keyword overlap' : 'strong direct keyword overlap');
+  const fitExplanation = (typeof reqonUiLib !== 'undefined' && reqonUiLib.explainFitGap)
+    ? reqonUiLib.explainFitGap({
+      fit: currentRow && currentRow.fit != null ? currentRow.fit : '—',
+      keywordCoverage: pct,
+      reasons: fitReasons,
+    })
+    : '';
   $('coverage').innerHTML =
     `<div class="cov-head"><span class="muted">Covers ${covered.length} of ${top.length} JD keywords</span>` +
     `<span class="cov-pct ${cls}">${pct}%</span></div>` +
     `<div class="cov-bar"><span class="${cls === 'good' ? '' : cls}" style="width:${pct}%"></span></div>` +
     '<div>' +
-    (covered.length
-      ? covered.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('')
+    (insightModel.matched.length
+      ? insightModel.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('')
       : '<span class="muted" style="font-size:.72rem">None of the top JD keywords match your résumé keywords yet.</span>') +
     '</div>' +
+    (insightModel.missing.length
+      ? '<div style="margin-top:10px">' + insightModel.missing.map((t) => `<span class="kw">${esc(t)}</span>`).join('') + '</div>'
+      : '') +
+    (fitExplanation ? `<div class="muted" style="margin-top:10px;font-size:.74rem">${esc(fitExplanation)}</div>` : '') +
     (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:10px">✦ Suggest how to strengthen your match</button><div id="tailorOut"></div>' : '') +
     '<div id="covAi" class="covai"></div>';
   wireTailor(missing);
@@ -484,9 +587,13 @@ async function runKeywordAI() {
 function renderKwAi(res) {
   const slot = $('covAi'); if (!slot) return;
   const cls = res.score >= 70 ? 'good' : res.score >= 40 ? 'mid' : 'low';
+  const model = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildKeywordInsightModel)
+    ? reqonUiLib.buildKeywordInsightModel({ matched: res.matched || [], missing: res.missing || [] })
+    : { matched: res.matched || [], missing: res.missing || [] };
   slot.innerHTML =
     `<div class="cov-head covai-head"><span class="muted">AI skills match</span><span class="cov-pct ${cls}">${res.score}%</span></div>` +
-    (res.matched.length ? '<div>' + res.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('') + '</div>' : '') +
+    (model.matched.length ? '<div>' + model.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('') + '</div>' : '') +
+    (model.missing.length ? '<div style="margin-top:8px">' + model.missing.map((t) => `<span class="kw">${esc(t)}</span>`).join('') + '</div>' : '') +
     (res.summary ? `<div class="muted" style="margin-top:8px;font-size:.74rem">${esc(res.summary)}</div>` : '');
 }
 

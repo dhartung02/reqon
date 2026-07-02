@@ -170,6 +170,26 @@ function isRetryableActionError(err) {
   return code >= 500;
 }
 
+function classifyQuestionField(label, kind) {
+  const sig = String(label || '').toLowerCase();
+  if (/why|describe|tell us|explain|what makes|share an example|walk us through|how have you/i.test(sig)) return 'open-ended';
+  if (/first name|last name|preferred name|email|phone|linkedin|resume|résumé|cover letter|sponsorship|work authorization|how did you hear/i.test(sig)) return 'common';
+  return String(kind || '').toLowerCase() === 'textarea' ? 'unique' : 'common';
+}
+
+function groupQuestionFields(fields) {
+  const groups = {
+    common: { id: 'common', items: [] },
+    unique: { id: 'unique', items: [] },
+    'open-ended': { id: 'open-ended', items: [] },
+  };
+  for (const field of (fields || [])) {
+    const bucket = classifyQuestionField(field && field.label, field && field.kind);
+    groups[bucket].items.push(field);
+  }
+  return groups;
+}
+
 if (typeof module !== 'undefined') module.exports = {
   postingId,
   reqKey,
@@ -183,4 +203,6 @@ if (typeof module !== 'undefined') module.exports = {
   captureConfidence,
   shouldSkipAiField,
   isRetryableActionError,
+  classifyQuestionField,
+  groupQuestionFields,
 };

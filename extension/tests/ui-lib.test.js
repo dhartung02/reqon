@@ -5,6 +5,9 @@ const {
   isBestBetRow,
   buildAiUsageViewModel,
   buildBannerModel,
+  buildKeywordInsightModel,
+  buildUpdateCheckViewModel,
+  explainFitGap,
   summarizeFillAvailability,
   buildTodayBuckets,
 } = require('../ui-lib.js');
@@ -125,4 +128,43 @@ test('buildTodayBuckets excludes closed roles from needsFollowUp even with linge
     buckets.needsFollowUp.map((row) => row.company),
     ['OpenCo']
   );
+});
+
+test('buildKeywordInsightModel surfaces both matched and missing terms', () => {
+  const model = buildKeywordInsightModel({
+    matched: ['product', 'leadership'],
+    missing: ['machine learning', 'data science'],
+  });
+
+  assert.deepStrictEqual(model.matched, ['product', 'leadership']);
+  assert.deepStrictEqual(model.missing, ['machine learning', 'data science']);
+  assert.strictEqual(model.hasGaps, true);
+});
+
+test('explainFitGap summarizes non-keyword inputs into plain language', () => {
+  const message = explainFitGap({
+    fit: 6,
+    keywordCoverage: 17,
+    reasons: ['strong domain alignment', 'seniority match', 'limited direct keyword overlap'],
+  });
+
+  assert.match(message, /Fit 6\/10/);
+  assert.match(message, /17% keyword coverage/);
+  assert.match(message, /domain alignment/);
+  assert.match(message, /keyword overlap/);
+});
+
+test('buildUpdateCheckViewModel maps update statuses to calm user copy', () => {
+  assert.deepStrictEqual(buildUpdateCheckViewModel({ status: 'no_update' }), {
+    tone: 'neutral',
+    label: 'Reqon is up to date',
+  });
+  assert.deepStrictEqual(buildUpdateCheckViewModel({ status: 'update_available' }), {
+    tone: 'ok',
+    label: 'Update ready when Chrome goes idle',
+  });
+  assert.deepStrictEqual(buildUpdateCheckViewModel({ status: 'throttled' }), {
+    tone: 'warn',
+    label: 'Update check throttled',
+  });
 });

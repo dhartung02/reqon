@@ -154,7 +154,7 @@ own push-triggered auto-deploy, which fires regardless of test results. The depl
 behind a GitHub **Environment** approval step (see below), so even a green `main` push waits for a
 manual click before anything actually deploys.
 
-**One-time setup — three parts, do them in this order:**
+**One-time setup — four parts, do them in this order:**
 
 1. **Create the GitHub "production" Environment with a required reviewer.** Repo → Settings →
    Environments → New environment → name it exactly `production` → under "Deployment protection

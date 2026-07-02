@@ -1,12 +1,102 @@
 /**
- * On-page overlay (FR-EXT-3/4) + apply-assist fill. Shows a compact badge (fit/prob/EV/tier +
- * status if tracked, Clip if not) and a "Fill" button that fills factual fields from your Reqon
+ * On-page overlay (FR-EXT-3/4) + apply-assist fill. Shows a floating banner for tracked/untracked
+ * job pages and a "Fill" action that fills factual fields from your Reqon
  * profile, inserts matching saved answers, and attaches the résumé you uploaded in Settings to
  * résumé upload fields — on the real ATS page, in your real browser.
  * GUARDRAILS: factual fields + saved answers + résumé attach only; NEVER passwords / EEO / consent;
  * NEVER submits (the résumé is attached for you to review, never sent).
  */
 (function () {
+  const reqonLib = (typeof module !== 'undefined' && module.exports)
+    ? require('./lib.js')
+    : globalThis;
+  const reqonUiLib = (typeof module !== 'undefined' && module.exports)
+    ? require('./ui-lib.js')
+    : globalThis.reqonUiLib;
+  const groupQuestionFields = reqonLib.groupQuestionFields;
+  const FILLABLE_LEVELS = new Set(['Easy Apply', 'Likely fillable', 'Partially fillable']);
+
+  function isRecognizedJobPage(job) {
+    return !!(job && (job.role || job.company));
+  }
+
+  function isBannerFillable(fill) {
+    return !!(fill && FILLABLE_LEVELS.has(fill.level));
+  }
+
+  function summarizeBannerFillResult(res) {
+    const factual = Number(res && res.factual) || 0;
+    const answered = Number(res && res.answered) || 0;
+    const resume = Number(res && res.resume) || 0;
+    const ai = Number(res && res.ai) || 0;
+    const direct = Number(res && res.direct) || (factual + answered + resume);
+    const hasRemaining = res && res.remaining != null;
+    const hasTotal = res && res.total != null;
+    if (hasRemaining && hasTotal) {
+      const total = Number(res.total) || 0;
+      const remaining = Number(res.remaining) || 0;
+      return reqonUiLib.summarizeFillAvailability({ total, direct, ai, remaining }).replace(` of ${total}`, '');
+    }
+    if (hasRemaining) {
+      const remaining = Number(res.remaining) || 0;
+      return `Filled ${direct + ai} fields: ${direct} direct, ${ai} AI-assisted, ${remaining} still need review.`;
+    }
+    return `Filled ${direct + ai} fields so far: ${direct} direct, ${ai} AI-assisted.`;
+  }
+
+  function resolveBannerActionKind({ mode, primaryCta, fillable }) {
+    if (mode === 'tracked') {
+      if (primaryCta === 'Continue application' && fillable) return 'fill';
+      return 'board';
+    }
+    if (fillable && primaryCta === 'Start guided fill') return 'fill';
+    return 'clip';
+  }
+
+  function deriveBannerState({ row, job, fill, fit }) {
+    const recognized = isRecognizedJobPage(job);
+    const fillable = isBannerFillable(fill);
+    const model = reqonUiLib.buildBannerModel({
+      row: row || null,
+      pageState: {
+        recognized,
+        fillable,
+        fit: row && row.fit != null ? row.fit : fit,
+      },
+    });
+    return { recognized, fillable, model };
+  }
+
+  function buildQuestionGroupsSnapshot(fields) {
+    const grouped = groupQuestionFields(fields || []);
+    const snapshot = { total: 0, remaining: 0, groups: {} };
+    Object.entries(grouped).forEach(([id, group]) => {
+      const items = Array.isArray(group && group.items) ? group.items : [];
+      const remaining = items.filter((item) => item && item.filled === false).length;
+      snapshot.groups[id] = {
+        id,
+        count: items.length,
+        remaining,
+        items,
+      };
+      snapshot.total += items.length;
+      snapshot.remaining += remaining;
+    });
+    return snapshot;
+  }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      buildQuestionGroupsSnapshot,
+      deriveBannerState,
+      summarizeBannerFillResult,
+      resolveBannerActionKind,
+      isBannerFillable,
+      isRecognizedJobPage,
+    };
+    return;
+  }
+
   if (window.__jpcrmOverlay) return;
   window.__jpcrmOverlay = true;
 
@@ -90,6 +180,8 @@
     if (msg.type === 'jdKeywords') { try { sendResponse({ ok: true, tokens: jdKeywords(msg.company) }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'jdText') { try { sendResponse({ ok: true, text: jdText() }); } catch (e) { sendResponse({ ok: false }); } return; }
     if (msg.type === 'captureMeta') { try { const c = captureMeta(); sendResponse({ ok: true, meta: c.meta, job: c.job }); } catch (e) { sendResponse({ ok: false }); } return; }
+    if (msg.type === 'questionGroups') { try { sendResponse({ ok: true, snapshot: questionGroupsSnapshot() }); } catch (e) { sendResponse({ ok: false, msg: String(e) }); } return; }
+    if (msg.type === 'jumpToQuestion') { try { sendResponse(jumpToQuestion(msg.id)); } catch (e) { sendResponse({ ok: false, msg: String(e) }); } return; }
     if (msg.type === 'autofill') { fillForm().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'smartFill') { smartFill().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
     if (msg.type === 'aiFillRest') { aiFillRest().then((res) => sendResponse(res)).catch((e) => sendResponse({ ok: false, msg: String(e) })); return true; }
@@ -134,6 +226,71 @@
     try { if (e.labels && e.labels[0]) p.push(e.labels[0].textContent); } catch (x) {}
     return p.filter(Boolean).join(' ').toLowerCase();
   };
+  const visibleField = (e) => !!(e && !e.disabled && e.getClientRects && e.getClientRects().length);
+  function fieldLabel(e) {
+    const picks = [];
+    try {
+      if (e.labels && e.labels.length) picks.push(...Array.from(e.labels).map((label) => label.textContent));
+    } catch (x) {}
+    picks.push(
+      e.getAttribute('aria-label'),
+      e.getAttribute('placeholder'),
+      e.name,
+      e.id
+    );
+    const text = picks.find((value) => value && String(value).trim());
+    return String(text || 'Untitled field').replace(/\s+/g, ' ').trim().slice(0, 140);
+  }
+  function questionFieldKind(e) {
+    if (!e) return 'input';
+    if (e.tagName === 'TEXTAREA') return 'textarea';
+    if (e.tagName === 'SELECT') return 'select-one';
+    return (e.type || 'input').toLowerCase();
+  }
+  function fieldValuePresent(e) {
+    if (!e) return false;
+    if (e.tagName === 'SELECT') return !!String(e.value || '').trim();
+    return !!String(e.value || '').trim();
+  }
+  function questionFieldElements() {
+    const out = [];
+    document.querySelectorAll('input, textarea, select').forEach((e) => {
+      const t = questionFieldKind(e);
+      if (SKIP_TYPES.indexOf(t) >= 0 || ['checkbox', 'radio'].includes(t)) return;
+      if (!visibleField(e)) return;
+      const label = fieldLabel(e);
+      if (!label || label === 'Untitled field') return;
+      out.push(e);
+    });
+    return out;
+  }
+  function questionGroupsSnapshot() {
+    const fields = questionFieldElements().map((e, index) => {
+      const id = e.getAttribute('data-reqon-qid') || ('q-' + index);
+      e.setAttribute('data-reqon-qid', id);
+      return {
+        id,
+        label: fieldLabel(e),
+        kind: questionFieldKind(e),
+        filled: fieldValuePresent(e),
+        required: !!(e.required || e.getAttribute('aria-required') === 'true'),
+      };
+    });
+    return buildQuestionGroupsSnapshot(fields);
+  }
+  function jumpToQuestion(id) {
+    if (!id) return { ok: false, msg: 'No question selected.' };
+    const e = document.querySelector('[data-reqon-qid="' + CSS.escape(String(id)) + '"]');
+    if (!e) return { ok: false, msg: 'That field is no longer on the page.' };
+    clearHighlights();
+    e.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    try { e.focus({ preventScroll: true }); } catch (err) { try { e.focus(); } catch (x) {} }
+    e.style.outline = '2px solid #00E5A3';
+    e.style.outlineOffset = '2px';
+    highlighted.push(e);
+    lastField = e;
+    return { ok: true, msg: 'Jumped to field.' };
+  }
   let highlighted = [];   // fields we filled this session — tracked so "Clear highlights" can reset them
   const setVal = (e, v) => {
     const proto = e.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
@@ -169,6 +326,7 @@
     const p = r.profile || {};
     const fields = factualFields(p);
     const answers = p.answers || [];
+    const before = questionGroupsSnapshot();
     let factual = 0, answered = 0;
     document.querySelectorAll('input, textarea').forEach((e) => {
       const t = (e.type || '').toLowerCase();
@@ -192,6 +350,8 @@
     return {
       ok: factual + answered + (rez.attached || 0) > 0,
       factual, answered, resume: rez.attached || 0, resumeMissing: !!rez.noResume,
+      total: before.total,
+      remaining: questionGroupsSnapshot().remaining,
       msg: `Filled ${factual} field${factual === 1 ? '' : 's'}` + (answered ? ` + ${answered} answer${answered === 1 ? '' : 's'}` : '')
         + (rez.attached ? ` + résumé attached` : '') + ' — review, never auto-submitted.',
     };
@@ -248,7 +408,7 @@
     }
     return { attached };
   }
-  const fillBtn = () => { const b = el('button', 'jpcrm-btn jpcrm-primary', '⚡ Fill form'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = '⚡ Fill form'; renderFillSummary(res); }; return b; };
+  const fillBtn = () => { const b = el('button', 'jpcrm-btn jpcrm-primary', 'Start guided fill'); b.onclick = async () => { b.disabled = true; b.textContent = 'Filling…'; const res = await fillForm(); b.disabled = false; b.textContent = 'Start guided fill'; renderFillSummary(res); }; return b; };
   // The consistent autofill pair (mirrors the side panel): deterministic "Fill form" first, then an
   // "AI-fill rest" enhancement that spends one AI request (free on the AI tier — label reflects it).
   function fillRow() {
@@ -261,6 +421,7 @@
       const res = await aiFillRest();
       ab.disabled = false; ab.textContent = '✦ AI-fill rest';
       send({ type: 'entitlements' }).then((e) => { if (!(e && e.ok && e.plan && e.plan.ai)) ab.textContent = '✦ AI-fill rest · 1 request'; }).catch(() => {});
+      renderFillSummary(res);
       toast(res.msg || (res.ok ? 'AI filled fields — review.' : 'Nothing to add.'), res.ok);
     };
     row.appendChild(fb); row.appendChild(ab);
@@ -272,9 +433,11 @@
   function renderFillSummary(res) {
     if (!box) return;
     const old = box.querySelector('.jpcrm-summary'); if (old) old.remove();
+    const msg = box.querySelector('.jpcrm-banner-message');
     const sk = skipTally();
     const wrap = el('div', 'jpcrm-summary');
     const line = (txt, cls) => { const d = el('div', 'jpcrm-sum-line' + (cls ? ' ' + cls : ''), txt); wrap.appendChild(d); };
+    if (msg) msg.textContent = summarizeBannerFillResult(res);
     line((res.ok ? '✓ ' : '• ') + 'Filled ' + (res.factual || 0) + ' factual field' + ((res.factual === 1) ? '' : 's'), res.ok ? 'jpcrm-ok' : '');
     if (res.answered) line('✓ Inserted ' + res.answered + ' saved answer' + (res.answered === 1 ? '' : 's'), 'jpcrm-ok');
     if (res.ai) line('✓ ' + res.ai + ' field' + (res.ai === 1 ? '' : 's') + ' via AI map', 'jpcrm-ok');
@@ -303,6 +466,7 @@
   // match: it spends one AI request (server-gated), free on the AI tier. NEVER passwords/EEO/consent
   // (skipped here too); NEVER submits.
   async function aiFillRest() {
+    const before = questionGroupsSnapshot();
     const candidates = [];
     let idx = 0;
     document.querySelectorAll('input, textarea').forEach((e) => {
@@ -315,16 +479,22 @@
       candidates.push({ i: idx, sig, type: t });
       idx++;
     });
-    if (!candidates.length) return { ok: false, ai: 0, msg: 'Nothing left for AI to fill.' };
+    if (!candidates.length) return { ok: false, ai: 0, total: before.total, remaining: before.remaining, msg: 'Nothing left for AI to fill.' };
     const r = await send({ type: 'mapFields', payload: { fields: candidates } });
-    if (!r || !r.ok) return { ok: false, ai: 0, aiError: (r && r.error) || 'AI fill unavailable', msg: (r && r.error) || 'AI fill unavailable' };
+    if (!r || !r.ok) return { ok: false, ai: 0, total: before.total, remaining: before.remaining, aiError: (r && r.error) || 'AI fill unavailable', msg: (r && r.error) || 'AI fill unavailable' };
     let ai = 0;
     (r.fields || []).forEach((m) => {
       if (!m || (typeof m.confidence === 'number' && m.confidence < 0.6)) return;
       const e = document.querySelector('[data-reqon-i="' + m.i + '"]');
       if (e && !(e.value && e.value.trim()) && m.value) { setVal(e, String(m.value)); ai++; }
     });
-    return { ok: ai > 0, ai, msg: ai ? `AI filled ${ai} more field${ai === 1 ? '' : 's'} — review, never submitted.` : 'AI had nothing confident to add.' };
+    return {
+      ok: ai > 0,
+      ai,
+      total: before.total,
+      remaining: questionGroupsSnapshot().remaining,
+      msg: ai ? `AI filled ${ai} more field${ai === 1 ? '' : 's'} — review, never submitted.` : 'AI had nothing confident to add.',
+    };
   }
   // Deterministic pass + AI enhancement in one call (kept for callers that want both at once).
   async function smartFill() {
@@ -454,7 +624,18 @@
   }
   function mount() {
     box = el('div', 'jpcrm-box jpcrm-system');
-    box.innerHTML = '<div class="jpcrm-row jpcrm-drag"><span class="jpcrm-logo">Reqon</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide on this page">×</button></div><div class="jpcrm-body"></div>';
+    box.innerHTML = [
+      '<div class="jpcrm-banner-shell">',
+      '<div class="jpcrm-row jpcrm-drag"><span class="jpcrm-logo">Reqon</span><span class="jpcrm-status">checking…</span><button class="jpcrm-x" title="Hide on this page">×</button></div>',
+      '<div class="jpcrm-banner-main">',
+      '<div class="jpcrm-banner-summary">Checking this page…</div>',
+      '<div class="jpcrm-banner-message">Looking up this role on your board.</div>',
+      '<div class="jpcrm-banner-actions"></div>',
+      '<div class="jpcrm-banner-meta"></div>',
+      '</div>',
+      '<div class="jpcrm-body"></div>',
+      '</div>',
+    ].join('');
     document.documentElement.appendChild(box);
     box.querySelector('.jpcrm-x').onclick = () => { box.remove(); box = null; };
     chrome.storage.sync.get({ theme: 'system' }, (c) => applyOverlayTheme(c && c.theme));
@@ -518,7 +699,24 @@
   }
 
   function renderTracked(row) {
+    const { fill, job } = captureMeta();
+    const banner = deriveBannerState({ row, job, fill, fit: row.fit });
+    box.dataset.mode = banner.model.mode;
     box.querySelector('.jpcrm-status').textContent = row.role || row.company || '';
+    box.querySelector('.jpcrm-banner-summary').textContent = banner.model.summaryText;
+    box.querySelector('.jpcrm-banner-message').textContent = row.company ? `${row.company} is already tracked on your board.` : 'Tracked role found on your board.';
+    renderBannerActions({
+      primaryLabel: banner.model.primaryCta,
+      primaryKind: resolveBannerActionKind({
+        mode: banner.model.mode,
+        primaryCta: banner.model.primaryCta,
+        fillable: banner.fillable,
+      }),
+      secondaryLabel: banner.model.secondaryCta,
+      secondaryKind: 'board',
+      row,
+    });
+    renderBannerMeta([banner.model.fitText, banner.model.statusText, fill.level]);
     const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
     setTier(row.tier);
     body.appendChild(scoreBlock(row));
@@ -544,16 +742,33 @@
       };
       body.appendChild(g);
     }
-    const { fill } = captureMeta();
     body.appendChild(fillabilityRow(fill));
     if (fill.level !== 'External redirect') { body.appendChild(fillRow()); body.appendChild(el("div", "jpcrm-foot", "Skips passwords & EEO · never submits")); }
   }
 
   function renderUntracked() {
+    const { fill, job } = captureMeta();
+    const banner = deriveBannerState({ row: null, job, fill });
+    box.dataset.mode = banner.model.mode;
     box.querySelector('.jpcrm-status').textContent = 'Not tracked yet';
+    box.querySelector('.jpcrm-banner-summary').textContent = banner.model.summaryText;
+    box.querySelector('.jpcrm-banner-message').textContent = banner.fillable
+      ? 'This looks fillable. Save it or start guided fill from here.'
+      : 'Review this page, then save it to your board if it is worth tracking.';
+    renderBannerActions({
+      primaryLabel: banner.model.primaryCta,
+      primaryKind: resolveBannerActionKind({
+        mode: banner.model.mode,
+        primaryCta: banner.model.primaryCta,
+        fillable: banner.fillable,
+      }),
+      secondaryLabel: banner.model.secondaryCta,
+      secondaryKind: 'clip',
+      row: null,
+    });
+    renderBannerMeta([banner.model.fitText, banner.model.fillText, fill.level]);
     const body = box.querySelector('.jpcrm-body'); body.innerHTML = '';
     setTier('');
-    const { fill } = captureMeta();
     body.appendChild(fillabilityRow(fill));
     const b = el('button', 'jpcrm-btn jpcrm-primary', '＋ Clip to my board');
     b.onclick = () => openClipPanel();
@@ -608,6 +823,54 @@
   }
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function renderBannerMeta(items) {
+    if (!box) return;
+    const meta = box.querySelector('.jpcrm-banner-meta');
+    if (!meta) return;
+    meta.innerHTML = '';
+    items.filter(Boolean).forEach((item) => meta.appendChild(el('span', 'jpcrm-banner-chip', item)));
+  }
+
+  function openBoard(row) {
+    chrome.storage.sync.get({ origin: 'http://localhost:8787' }, (cfg) => {
+      const base = String((cfg && cfg.origin) || 'http://localhost:8787').replace(/\/$/, '');
+      const url = row && typeof reqKey === 'function'
+        ? `${base}/?q=${encodeURIComponent(reqKey(row))}`
+        : base;
+      window.open(url, '_blank');
+    });
+  }
+
+  function renderBannerActions({ primaryLabel, primaryKind, secondaryLabel, secondaryKind, row }) {
+    if (!box) return;
+    const actions = box.querySelector('.jpcrm-banner-actions');
+    if (!actions) return;
+    actions.innerHTML = '';
+    const primary = el('button', 'jpcrm-btn jpcrm-primary', primaryLabel);
+    primary.onclick = async () => {
+      if (primaryKind === 'fill') {
+        primary.disabled = true;
+        primary.textContent = 'Filling…';
+        const res = await fillForm();
+        primary.disabled = false;
+        primary.textContent = primaryLabel;
+        renderFillSummary(res);
+        return;
+      }
+      if (primaryKind === 'clip') return openClipPanel();
+      if (primaryKind === 'board') return openBoard(row);
+    };
+    actions.appendChild(primary);
+    if (secondaryLabel) {
+      const secondary = el('button', 'jpcrm-btn jpcrm-btn-ghost', secondaryLabel);
+      secondary.onclick = () => {
+        if (secondaryKind === 'clip') return openClipPanel();
+        if (secondaryKind === 'board') return openBoard(row);
+      };
+      actions.appendChild(secondary);
+    }
+  }
 
   function toast(msg, ok) {
     const t = el('div', 'jpcrm-toast' + (ok ? '' : ' jpcrm-warn'), msg);

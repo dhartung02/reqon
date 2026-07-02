@@ -39,6 +39,12 @@ const bestBetRow = (typeof reqonUiLib !== 'undefined' && reqonUiLib.isBestBetRow
 const usageView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildAiUsageViewModel)
   ? reqonUiLib.buildAiUsageViewModel
   : (r) => ({ unlimited: !(r && r.today && r.today.cap), countText: String((r && r.today && r.today.calls) || 0), helperText: '', pct: 0, tone: '' });
+const todayBucketsView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildTodayBuckets)
+  ? reqonUiLib.buildTodayBuckets
+  : (rows) => ({ defaultSection: { id: 'ready-to-apply', title: 'Ready to apply' }, readyToApply: Array.isArray(rows) ? rows.filter(bestBetRow) : [], inProgress: [], needsFollowUp: [] });
+const sidepanelMode = (typeof reqonSidepanelMode !== 'undefined' && reqonSidepanelMode)
+  ? reqonSidepanelMode
+  : { deriveAssistantMode: () => ({ mode: 'today', row: null }), buildTrackedRoleCards: () => [] };
 
 function setMsg(t, k) { $('msg').textContent = t || ''; $('msg').className = k || ''; }
 const reqKeyOf = (typeof reqKey === 'function') ? reqKey : (x) => ((x.company || '') + '|' + (x.role || '')).toLowerCase().trim();
@@ -48,38 +54,121 @@ async function getOrigin() {
   return (origin || '').replace(/\/$/, '');
 }
 
-// ---- this page ----
-async function renderPage() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  activeTab = tab || null;
-  if (!tab || !tab.url || !/^https?:/.test(tab.url)) {
-    $('page').innerHTML = '<div class="muted">Open a job posting to clip or score it.</div>';
-    return;
-  }
-  const r = await send({ type: 'lookup', url: tab.url, force: false });
-  if (!r || r.ok === false) {
-    $('page').innerHTML = '<div class="role">Can’t reach the board</div>' +
-      '<div class="company muted">Check your server connection.</div>' +
-      '<button id="openSettings" class="btn btn-ghost" style="margin-top:8px">Open settings</button>';
-    const os = $('openSettings'); if (os) os.onclick = () => { try { chrome.runtime.openOptionsPage(); } catch (_) {} };
-    return;
-  }
-  // Consistent with the overlay: deterministic "Fill form" first, then an "AI-fill rest" enhancement.
-  const fillBtns =
-    '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
+let pageContext = null;
+const QUESTION_GROUP_META = {
+  common: {
+    title: 'Common questions',
+    copy: 'Profile fields and standard application questions you can review quickly.',
+  },
+  'open-ended': {
+    title: 'Open-ended prompts',
+    copy: 'These usually need tailored language. Jump there, then draft with AI if needed.',
+  },
+  unique: {
+    title: 'Unique questions',
+    copy: 'Role-specific fields that are worth checking before you continue.',
+  },
+};
+
+function pageActionsHTML() {
+  return '<button id="fillForm" class="btn btn-ghost">⚡ Fill form</button>' +
     '<button id="aiFill" class="btn btn-ghost">✦ AI-fill rest</button>';
-  const row = r.row;
-  currentRow = row || null;
-  if (!row) {
-    $('page').innerHTML =
-      '<div class="role">Not on your board</div>' +
-      '<div class="company muted">' + esc((tab.title || '').slice(0, 80)) + '</div>' +
-      '<button id="clip" class="btn btn-primary">+ Clip to board</button>' +
-      '<div class="btnrow">' + fillBtns + '</div>';
-    $('clip').onclick = doClip;
-    wireFill();
+}
+
+function questionGroupHtml(id, group) {
+  const meta = QUESTION_GROUP_META[id] || { title: id, copy: '' };
+  const items = (group && Array.isArray(group.items)) ? group.items : [];
+  if (!items.length) return '';
+  return '<article class="assist-mini">' +
+    `<div class="assist-mini-title">${esc(meta.title)} · ${items.length}</div>` +
+    `<div class="assist-mini-copy">${esc(meta.copy)}</div>` +
+    `<div style="display:grid;gap:6px;margin-top:10px">` +
+      items.slice(0, 6).map((item) => (
+        `<button class="copybtn" style="text-align:left;width:100%" data-jump-qid="${esc(item.id)}" data-question-label="${esc(item.label)}" data-question-group="${esc(id)}">` +
+          `${esc(item.label)}` +
+          `${item.filled ? ' · Reviewed' : ''}` +
+        '</button>'
+      )).join('') +
+      (items.length > 6 ? `<div class="muted" style="font-size:.72rem">+ ${items.length - 6} more on the page</div>` : '') +
+    '</div>' +
+  '</article>';
+}
+
+function renderQuestionGuide(snapshot) {
+  const slot = $('questionGuide');
+  if (!slot) return;
+  if (!snapshot || !snapshot.total) {
+    slot.innerHTML = '<div class="assist-mini"><div class="assist-mini-title">Question guide</div><div class="assist-mini-copy">Open a live application form to review the questions Reqon can guide you through.</div></div>';
     return;
   }
+  slot.innerHTML =
+    '<div class="assist-mini" style="margin-bottom:8px">' +
+      `<div class="assist-mini-title">${snapshot.remaining} still need review</div>` +
+      `<div class="assist-mini-copy">${snapshot.total - snapshot.remaining} of ${snapshot.total} visible fields already have values on the page.</div>` +
+    '</div>' +
+    Object.keys(QUESTION_GROUP_META).map((id) => questionGroupHtml(id, snapshot.groups && snapshot.groups[id])).join('');
+
+  slot.querySelectorAll('[data-jump-qid]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!activeTab || activeTab.id == null) return;
+      const qid = btn.getAttribute('data-jump-qid');
+      let res = null;
+      try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'jumpToQuestion', id: qid }); } catch (e) { res = null; }
+      if (!res || !res.ok) {
+        setMsg((res && res.msg) || 'Could not jump to that field on the page.', 'err');
+        return;
+      }
+      const group = btn.getAttribute('data-question-group');
+      const label = btn.getAttribute('data-question-label') || '';
+      if ((group === 'open-ended' || group === 'unique') && $('aiQ') && !$('aiQ').value.trim()) $('aiQ').value = label;
+      setMsg(res.msg || 'Jumped to field.', 'ok');
+    };
+  });
+}
+
+async function loadQuestionGuide() {
+  const slot = $('questionGuide');
+  if (!slot) return;
+  if (!activeTab || activeTab.id == null || !/^https?:/.test(activeTab.url || '')) {
+    renderQuestionGuide(null);
+    return;
+  }
+  let res = null;
+  try { res = await chrome.tabs.sendMessage(activeTab.id, { type: 'questionGroups' }); } catch (e) { res = null; }
+  renderQuestionGuide(res && res.ok ? res.snapshot : null);
+}
+
+function renderTrackedCard(card) {
+  return `<article class="assist-mini" data-card="${esc(card.id)}">` +
+    `<div class="assist-mini-title">${esc(card.title)}</div>` +
+    `<div class="assist-mini-copy">${esc(card.detail || '')}</div>` +
+    '</article>';
+}
+
+function updateAssistantChrome(mode, tab, row) {
+  const root = $('assistantRoot');
+  if (root) root.setAttribute('data-mode', mode.mode);
+  const pageTitle = $('pageTitle');
+  const header = $('assistantHeader');
+  const title = mode.mode === 'today'
+    ? 'Today'
+    : (row ? (row.role || 'Tracked role') : (tab && tab.title ? String(tab.title).slice(0, 80) : 'Job page'));
+  const subtitle = mode.mode === 'today'
+    ? 'Keep the pipeline moving, then jump into any live posting without reopening the panel.'
+    : row
+      ? `${row.company || 'Tracked role'} · ${row.status || 'Not Applied'}`
+      : 'Recognized application page. Clip it, score it, or continue filling in place.';
+  if (pageTitle) pageTitle.textContent = mode.mode === 'today' ? 'Today' : 'This page';
+  if (header) {
+    header.innerHTML =
+      '<div class="assist-kicker">Reqon Assistant</div>' +
+      `<div class="assist-title">${esc(title)}</div>` +
+      `<div class="assist-subtitle">${esc(subtitle)}</div>`;
+  }
+}
+
+function renderTrackedJobMode(row) {
+  const cards = sidepanelMode.buildTrackedRoleCards(row);
   const chips =
     `<span class="chip">fit <b>${esc(row.fit ?? '—')}</b></span>` +
     `<span class="chip">prob <b>${esc(row.prob ?? '—')}</b></span>` +
@@ -96,26 +185,171 @@ async function renderPage() {
   $('page').setAttribute('data-tier', tierKey(row.tier).toLowerCase());
   $('page').setAttribute('data-st', statusKey(row.status));
   $('page').innerHTML =
-    `<div class="page-top">${scoreCircle(row)}<div style="flex:1;min-width:0">` +
-      `<div class="role">${esc(row.role || '—')}</div>` +
-      `<div class="company">${esc(row.company || '')}</div></div></div>` +
-    `<div class="metrics">${chips}</div>` +
-    `<select id="statusSel" class="sel" style="margin-top:8px">` +
-      STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
-    `</select>` +
-    `<div class="btnrow">` + fillBtns + `</div>` +
-    `<div class="btnrow">` +
-      `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✦ Score with AI${lock(canScore)}</button>` +
-    `</div>` +
-    guideBtn +
-    '<div id="scoreOut"></div>' +
-    trackingEditorHTML(row);
+    `<section class="assist-card">` +
+      `<div class="page-top">${scoreCircle(row)}<div style="flex:1;min-width:0">` +
+        `<div class="role">${esc(row.role || '—')}</div>` +
+        `<div class="company">${esc(row.company || '')}</div></div></div>` +
+      `<div class="metrics">${chips}</div>` +
+      `<div class="assist-card-grid">${cards.map(renderTrackedCard).join('')}</div>` +
+      `<select id="statusSel" class="sel" style="margin-top:12px">` +
+        STATUSES.map((s) => `<option ${s === (row.status || 'Not Applied') ? 'selected' : ''}>${s}</option>`).join('') +
+      `</select>` +
+      `<div class="assist-actions">${pageActionsHTML()}</div>` +
+      '<div class="sect-title" style="margin-top:14px">Guided review</div>' +
+      '<div id="questionGuide" class="assist-card-grid"></div>' +
+      `<div class="btnrow" style="margin-top:8px">` +
+        `<button id="score" class="btn btn-ghost"${canScore ? '' : ' data-locked="ai_score"'}>✦ Score with AI${lock(canScore)}</button>` +
+      `</div>` +
+      guideBtn +
+      '<div id="scoreOut"></div>' +
+      trackingEditorHTML(row) +
+    '</section>';
   wireFill();
   $('statusSel').onchange = (e) => doSetStatus(e.target.value);
   $('score').onclick = canScore ? doScore : () => setMsg(`AI scoring needs the ${entReq('ai_score')} package.`, 'err');
   if ($('guideOpen')) $('guideOpen').onclick = () => openGuide(row);
   if ($('guideGen')) $('guideGen').onclick = canGuide ? (e) => doGuide(row, e && e.target) : () => setMsg(`Interview guides need the ${entReq('guide_generate')} package.`, 'err');
   wireTrackingEditor(row);
+  loadQuestionGuide();
+}
+
+function renderJobMode(tab) {
+  $('page').removeAttribute('data-tier');
+  $('page').removeAttribute('data-st');
+  $('page').innerHTML =
+    '<section class="assist-card">' +
+      '<div class="role">Recognized job page</div>' +
+      '<div class="company muted">' + esc((tab && tab.title ? tab.title : '').slice(0, 80)) + '</div>' +
+      '<div class="assist-card-grid">' +
+        '<article class="assist-mini"><div class="assist-mini-title">Track this role</div><div class="assist-mini-copy">Clip it to the board without leaving the page.</div></article>' +
+        '<article class="assist-mini"><div class="assist-mini-title">Start with factual fill</div><div class="assist-mini-copy">Use your saved profile answers before you draft anything custom.</div></article>' +
+      '</div>' +
+      '<button id="clip" class="btn btn-primary" style="margin-top:12px">+ Clip to board</button>' +
+      '<div class="assist-actions">' + pageActionsHTML() + '</div>' +
+      '<div class="sect-title" style="margin-top:14px">Guided review</div>' +
+      '<div id="questionGuide" class="assist-card-grid"></div>' +
+    '</section>';
+  $('clip').onclick = doClip;
+  wireFill();
+  loadQuestionGuide();
+}
+
+function todayRoleHtml(row, meta) {
+  const label = meta || `${row.company || 'Unknown company'} · ${ev(row)} EV`;
+  return `<article class="assist-mini"${row.link ? ` data-open-link="${esc(row.link)}"` : ''}>` +
+    `<div class="assist-mini-title">${esc(row.role || 'Untitled role')}</div>` +
+    `<div class="assist-mini-copy">${esc(label)}</div>` +
+    '</article>';
+}
+
+function renderTodayEntryPoint(id, title, rows, emptyText) {
+  const count = rows.length;
+  const next = rows[0];
+  const nextLabel = next
+    ? `${next.company || 'Unknown company'} · ${next.role || 'Untitled role'}`
+    : emptyText;
+  const actionLabel = next && next.link ? 'Open next role' : 'Open board';
+  return `<article class="assist-mini" data-entry-point="${esc(id)}">` +
+    `<div class="assist-mini-title">${esc(title)} · ${count}</div>` +
+    `<div class="assist-mini-copy">${esc(nextLabel)}</div>` +
+    `<button class="btn btn-ghost" style="margin-top:10px" data-entry-action="${esc(id)}"${next && next.link ? ` data-open-link="${esc(next.link)}"` : ''}>${esc(actionLabel)}</button>` +
+    '</article>';
+}
+
+function renderTodayWorkspace(rows) {
+  const buckets = todayBucketsView(rows);
+  const readyList = buckets.readyToApply.slice(0, 3);
+  const readyHtml = readyList.length
+    ? readyList.map((row) => todayRoleHtml(row, `${row.company || 'Unknown company'} · Tier ${tierKey(row.tier)} · EV ${ev(row)}`)).join('')
+    : '<div class="assist-mini"><div class="assist-mini-title">Nothing ready yet</div><div class="assist-mini-copy">Verify more live roles or clip new postings to refill this queue.</div></div>';
+
+  return '<section class="assist-card">' +
+      '<div class="role">Today workspace</div>' +
+      '<div class="company muted">Start with the default queue, then branch into follow-up or in-progress work without mixing those paths together.</div>' +
+      '<div class="sect-title" style="margin-top:12px">Ready to apply</div>' +
+      '<div class="assist-card-grid" data-today-default="' + esc(buckets.defaultSection.id) + '">' + readyHtml + '</div>' +
+      '<div class="sect-title">Other entry points</div>' +
+      '<div class="assist-card-grid">' +
+        renderTodayEntryPoint('in-progress', 'In progress', buckets.inProgress, 'No active applications need attention yet.') +
+        renderTodayEntryPoint('needs-follow-up', 'Needs follow up', buckets.needsFollowUp, 'No follow ups are due right now.') +
+      '</div>' +
+    '</section>';
+}
+
+async function openBoardHome() {
+  const o = await getOrigin();
+  if (o) chrome.tabs.create({ url: o });
+}
+
+function wireTodayWorkspace() {
+  const page = $('page');
+  if (!page) return;
+  page.querySelectorAll('[data-open-link]').forEach((el) => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const url = el.getAttribute('data-open-link');
+      if (url) chrome.tabs.create({ url });
+    };
+  });
+  page.querySelectorAll('[data-entry-action]').forEach((el) => {
+    if (el.hasAttribute('data-open-link')) return;
+    el.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await openBoardHome();
+    };
+  });
+}
+
+function renderTodayMode(rows) {
+  const live = (rows || []).filter((r) => r && r.deleted !== true);
+  $('page').removeAttribute('data-tier');
+  $('page').removeAttribute('data-st');
+  $('page').innerHTML = renderTodayWorkspace(live);
+  wireTodayWorkspace();
+}
+
+async function renderPage() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  activeTab = tab || null;
+  if (!tab || !tab.url || !/^https?:/.test(tab.url)) {
+    updateAssistantChrome({ mode: 'today' }, tab, null);
+    currentRow = null;
+    $('page').innerHTML = '<div class="muted">Open a job posting to clip or score it.</div>';
+    return;
+  }
+  const [ctxResponse, lookupResponse] = await Promise.all([
+    send({ type: 'pageContext', force: false }),
+    send({ type: 'lookup', url: tab.url, force: false }),
+  ]);
+  if (!lookupResponse || lookupResponse.ok === false) {
+    $('page').innerHTML = '<div class="role">Can’t reach the board</div>' +
+      '<div class="company muted">Check your server connection.</div>' +
+      '<button id="openSettings" class="btn btn-ghost" style="margin-top:8px">Open settings</button>';
+    const os = $('openSettings'); if (os) os.onclick = () => { try { chrome.runtime.openOptionsPage(); } catch (_) {} };
+    return;
+  }
+  pageContext = (ctxResponse && ctxResponse.ok !== false) ? ctxResponse : pageContext;
+  const mode = sidepanelMode.deriveAssistantMode({
+    activeTab: tab,
+    pageContext: pageContext && pageContext.url === tab.url
+      ? Object.assign({}, pageContext, { row: lookupResponse.row || pageContext.row || null })
+      : { recognized: typeof detectATS === 'function' ? detectATS(tab.url).applyMode !== 'Unknown' : false, row: lookupResponse.row || null, url: tab.url },
+  });
+  currentRow = mode.row || lookupResponse.row || null;
+  updateAssistantChrome(mode, tab, currentRow);
+  if (mode.mode === 'tracked-job' && currentRow) {
+    renderTrackedJobMode(currentRow);
+    return;
+  }
+  if (mode.mode === 'job') {
+    currentRow = null;
+    renderJobMode(tab);
+    return;
+  }
+  const rowsResponse = await send({ type: 'reqs', force: false });
+  renderTodayMode(rowsResponse && rowsResponse.ok !== false && Array.isArray(rowsResponse.rows) ? rowsResponse.rows : lastRows);
 }
 
 // Compact tracking-field editor — parity with the web board's expanded-card tracking strip. Edits
@@ -226,6 +460,7 @@ async function doFill(kind, btn) {
   if (!res) setMsg('Autofill works on the open posting on a supported board.', 'err');
   else setMsg(res.msg || (res.ok ? 'Filled — review before submitting.' : 'Nothing to fill here.'), res.ok ? 'ok' : '');
   if (kind === 'aiFillRest') loadUsage();   // an AI request was consumed
+  loadQuestionGuide();
 }
 
 async function doClip() {
@@ -264,15 +499,34 @@ async function renderCoverage() {
   const missing = top.filter((t) => !resumeSet.has(t));
   const pct = Math.round((covered.length / top.length) * 100);
   const cls = pct >= 70 ? 'good' : pct >= 40 ? 'mid' : 'low';
+  const insightModel = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildKeywordInsightModel)
+    ? reqonUiLib.buildKeywordInsightModel({ matched: covered, missing })
+    : { matched: covered, missing, hasGaps: missing.length > 0 };
+  const fitReasons = [];
+  if (currentRow && currentRow.fit >= 7) fitReasons.push('strong domain alignment');
+  else if (currentRow && currentRow.fit > 0) fitReasons.push('partial domain alignment');
+  if (currentRow && currentRow.status && currentRow.status !== 'Not Applied') fitReasons.push('you already moved this role into your tracked pipeline');
+  fitReasons.push(missing.length ? 'limited direct keyword overlap' : 'strong direct keyword overlap');
+  const fitExplanation = (typeof reqonUiLib !== 'undefined' && reqonUiLib.explainFitGap)
+    ? reqonUiLib.explainFitGap({
+      fit: currentRow && currentRow.fit != null ? currentRow.fit : '—',
+      keywordCoverage: pct,
+      reasons: fitReasons,
+    })
+    : '';
   $('coverage').innerHTML =
     `<div class="cov-head"><span class="muted">Covers ${covered.length} of ${top.length} JD keywords</span>` +
     `<span class="cov-pct ${cls}">${pct}%</span></div>` +
     `<div class="cov-bar"><span class="${cls === 'good' ? '' : cls}" style="width:${pct}%"></span></div>` +
     '<div>' +
-    (covered.length
-      ? covered.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('')
+    (insightModel.matched.length
+      ? insightModel.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('')
       : '<span class="muted" style="font-size:.72rem">None of the top JD keywords match your résumé keywords yet.</span>') +
     '</div>' +
+    (insightModel.missing.length
+      ? '<div style="margin-top:10px">' + insightModel.missing.map((t) => `<span class="kw">${esc(t)}</span>`).join('') + '</div>'
+      : '') +
+    (fitExplanation ? `<div class="muted" style="margin-top:10px;font-size:.74rem">${esc(fitExplanation)}</div>` : '') +
     (missing.length ? '<button id="tailor" class="btn btn-ghost" style="margin-top:10px">✦ Suggest how to strengthen your match</button><div id="tailorOut"></div>' : '') +
     '<div id="covAi" class="covai"></div>';
   wireTailor(missing);
@@ -333,9 +587,13 @@ async function runKeywordAI() {
 function renderKwAi(res) {
   const slot = $('covAi'); if (!slot) return;
   const cls = res.score >= 70 ? 'good' : res.score >= 40 ? 'mid' : 'low';
+  const model = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildKeywordInsightModel)
+    ? reqonUiLib.buildKeywordInsightModel({ matched: res.matched || [], missing: res.missing || [] })
+    : { matched: res.matched || [], missing: res.missing || [] };
   slot.innerHTML =
     `<div class="cov-head covai-head"><span class="muted">AI skills match</span><span class="cov-pct ${cls}">${res.score}%</span></div>` +
-    (res.matched.length ? '<div>' + res.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('') + '</div>' : '') +
+    (model.matched.length ? '<div>' + model.matched.map((t) => `<span class="kw hit">${esc(t)}</span>`).join('') + '</div>' : '') +
+    (model.missing.length ? '<div style="margin-top:8px">' + model.missing.map((t) => `<span class="kw">${esc(t)}</span>`).join('') + '</div>' : '') +
     (res.summary ? `<div class="muted" style="margin-top:8px;font-size:.74rem">${esc(res.summary)}</div>` : '');
 }
 
@@ -531,12 +789,18 @@ function refreshPageSoon() {
     await renderPage();
     const url = activeTab && activeTab.url;
     if (url && url !== lastPageUrl) { clearJobDrafts(); lastPageUrl = url; }   // new listing → reset AI work
-    renderCoverage();
+    await Promise.all([renderCoverage(), renderPipeline()]);
   }, 150);
 }
 chrome.tabs.onActivated.addListener(refreshPageSoon);
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (tab && tab.active && (info.url || info.status === 'complete')) refreshPageSoon(); });
 try { chrome.windows.onFocusChanged.addListener((wid) => { if (wid !== chrome.windows.WINDOW_ID_NONE) refreshPageSoon(); }); } catch (_) {}
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg && msg.type === 'pageContextChanged') {
+    pageContext = msg.context || null;
+    refreshPageSoon();
+  }
+});
 
 // Gate the open-ended AI draft button on the AI package (it calls /api/assist).
 function applyDraftGate() {

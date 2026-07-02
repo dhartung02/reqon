@@ -34,7 +34,8 @@ Simplify-style "your resume has X of N keywords", board-synced:
 - Content script extracts the job-description text from the page and tokenizes it (reusing the
   `_tokenize` stopword logic in `lib.js`).
 - Ranks the JD's salient terms, intersects them with your **resume keywords** (`profile.keywords`).
-- Shows coverage % + the **missing** keywords (actionable: terms in the JD not in your resume).
+- Shows coverage % + the **matched** keywords (the terms you already cover). Gaps aren't drawn as
+  red chips — they feed the "Suggest how to strengthen your match" tailoring action instead.
 - **Caveat (accuracy):** JD text extraction is per-site and heuristic (Greenhouse/Ashby/Lever/
   LinkedIn differ); coverage is a guide, not a grade. It compares against resume-derived keywords,
   not the full resume text.
@@ -95,7 +96,7 @@ Uses the OpenAI integration already in `server.js` (`openaiChat` → `/v1/chat/c
   guides; `agent/setup-vector-store.py` creates the store from résumé + narratives.
 - **Insert draft into page** — content-script focus tracker + `insertDraft`; panel "Insert into page".
 - **Coverage → tailoring** — `tailor` assist kind turns missing JD keywords into honest résumé
-  suggestions (panel "Suggest how to close the gaps").
+  suggestions (panel "Suggest how to strengthen your match").
 - **Broader boards** — Workable, SmartRecruiters, Recruitee, Teamtailor, Personio added to the
   content-script matches + JD selectors.
 

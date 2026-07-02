@@ -42,6 +42,10 @@
   .qmeta { font-size: .7rem; color: var(--muted); margin-top: 4px; }
   .qrow { display: flex; gap: 8px; margin-top: 10px; }
   .qrow .btn { margin-top: 0; padding: 9px; font-size: .8rem; }
+  .minirow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+  .mini { background: transparent; border: 1px solid var(--line2); border-radius: 8px; color: var(--text2); font: 600 .74rem var(--sans); padding: 7px 10px; cursor: pointer; }
+  .mini:hover { border-color: var(--emerald); color: var(--emerald); }
+  #updateStatus { font-size: .72rem; color: var(--muted); text-align: right; flex: 1; }
 </style>
 <div class="wrap">
   <div class="head">
@@ -57,7 +61,11 @@
   <div id="card" class="card">
     <div class="muted">Loading…</div>
   </div>
-  <button id="panel" class="btn btn-ghost">📊 Open analytics panel</button>
+  <button id="panel" class="btn btn-ghost">Open Today workspace</button>
+  <div class="minirow">
+    <button id="checkUpdateBtn" class="mini" type="button">Check for update</button>
+    <div id="updateStatus">Updates install through Chrome automatically.</div>
+  </div>
   <p class="reassure">Reqon never submits anything for you.</p>
   <div id="msg"></div>
 

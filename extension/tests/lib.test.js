@@ -15,6 +15,8 @@ const {
   captureConfidence,
   shouldSkipAiField,
   isRetryableActionError,
+  classifyQuestionField,
+  groupQuestionFields,
 } = require('../lib.js');
 
 test('postingId extracts ids across ATS url shapes', () => {
@@ -116,4 +118,22 @@ test('isRetryableActionError only retries transient failures', () => {
   assert.strictEqual(isRetryableActionError(Object.assign(new Error('Requires the AI package'), { upgrade: { error: 'upgrade_required' } })), false);
   assert.strictEqual(isRetryableActionError(new Error('HTTP 401')), false);
   assert.strictEqual(isRetryableActionError(new Error('HTTP 422')), false);
+});
+
+test('classifyQuestionField distinguishes common, unique, and open-ended prompts', () => {
+  assert.strictEqual(classifyQuestionField('First Name', 'input'), 'common');
+  assert.strictEqual(classifyQuestionField('Please provide the name of your current company', 'textarea'), 'unique');
+  assert.strictEqual(classifyQuestionField('Why are you interested in this role?', 'textarea'), 'open-ended');
+});
+
+test('groupQuestionFields returns grouped counts and item metadata', () => {
+  const groups = groupQuestionFields([
+    { id: 'f1', label: 'First Name', kind: 'input' },
+    { id: 'f2', label: 'Why are you interested in this role?', kind: 'textarea' },
+  ]);
+  assert.strictEqual(groups.common.items.length, 1);
+  assert.strictEqual(groups['open-ended'].items.length, 1);
+  assert.strictEqual(groups.unique.items.length, 0);
+  assert.strictEqual(groups.common.items[0].id, 'f1');
+  assert.strictEqual(groups['open-ended'].items[0].label, 'Why are you interested in this role?');
 });

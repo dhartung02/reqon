@@ -12,6 +12,13 @@ const prefsPatch = (typeof buildLocalPrefsPatch === 'function')
       if (typeof notifyEnabled === 'boolean') patch.notifyEnabled = notifyEnabled;
       return patch;
     };
+const updateCheckView = (typeof reqonUiLib !== 'undefined' && reqonUiLib.buildUpdateCheckViewModel)
+  ? reqonUiLib.buildUpdateCheckViewModel
+  : (result) => {
+      if (result && result.status === 'update_available') return { tone: 'ok', label: 'Update ready when Chrome goes idle' };
+      if (result && result.status === 'throttled') return { tone: 'warn', label: 'Update check throttled' };
+      return { tone: 'neutral', label: 'Reqon is up to date' };
+    };
 
 chrome.storage.sync.get(DEFAULTS, c => {
   const isCloud = !c.origin || c.origin === CLOUD_ORIGIN;
@@ -67,6 +74,44 @@ async function loadUsage() {
 }
 loadUsage();
 
+function ensureExperienceMetaNode() {
+  let el = $('experienceMeta');
+  if (el) return el;
+  const usage = $('usage');
+  if (!usage || !usage.parentNode) return null;
+  el = document.createElement('div');
+  el.id = 'experienceMeta';
+  el.className = 'fineprint';
+  usage.parentNode.insertBefore(el, usage.nextSibling);
+  return el;
+}
+
+async function loadExperienceMeta(force) {
+  const meta = ensureExperienceMetaNode();
+  if (!meta) return;
+  const r = await new Promise((res) => chrome.runtime.sendMessage({ type: 'experienceConfig', force: !!force }, res));
+  if (!r || r.ok === false) {
+    meta.textContent = 'Experience config unavailable until the extension can reach your board.';
+    return;
+  }
+  const updateMode = r.updates && r.updates.mode ? r.updates.mode.replace(/_/g, ' ') : 'managed updates';
+  meta.textContent = `Experience config ${r.version} loaded from your Reqon server. Updates use ${updateMode}.`;
+}
+loadExperienceMeta();
+
+const updateBtn = $('checkUpdateBtn');
+if (updateBtn) {
+  updateBtn.onclick = async () => {
+    $('updateStatus').textContent = 'Checking…';
+    updateBtn.disabled = true;
+    const result = await new Promise((res) => chrome.runtime.sendMessage({ type: 'requestUpdateCheck' }, res));
+    const vm = updateCheckView(result);
+    $('updateStatus').textContent = vm.label;
+    $('updateStatus').dataset.tone = vm.tone;
+    updateBtn.disabled = false;
+  };
+}
+
 async function ensureHostPermission(origin) {
   try {
     const pattern = origin.replace(/\/$/, '') + '/*';
@@ -117,6 +162,7 @@ $('save').onclick = async () => {
       $('msg').textContent = j.error || 'Login failed.'; $('msg').className = 'err'; return;
     }
     await chrome.storage.sync.set({ origin, token: j.token || '', ...prefsPatch({ overlayEnabled: $('overlay').checked }) });
+    await loadExperienceMeta(true);
     $('msg').textContent = j.displayName ? `Connected as ${j.displayName}.` : 'Connected.';
     $('msg').className = 'ok';
     $('password').value = '';
@@ -128,7 +174,8 @@ $('save').onclick = async () => {
 $('test').onclick = () => {
   $('msg').textContent = 'Testing…'; $('msg').className = '';
   testDraftConnection()
-    .then((r) => {
+    .then(async (r) => {
+      await loadExperienceMeta(true);
       $('msg').textContent = r.msg;
       $('msg').className = 'ok';
     })

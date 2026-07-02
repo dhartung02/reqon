@@ -11,6 +11,23 @@
   .iconbtn { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: .95rem; padding: 2px 5px; border-radius: 6px; }
   .iconbtn:hover { color: var(--text); }
   .wrap { padding: 16px; }
+  .assist-frame { display: flex; flex-direction: column; gap: 16px; }
+  .assist-frame[data-mode="today"] #coverageSection { display: none; }
+  .assist-header { padding: 14px 16px 0; }
+  .assist-kicker { font: 600 .6rem/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--emerald); }
+  .assist-title { margin-top: 6px; font: 600 1.3rem/1.1 var(--serif); color: var(--text); }
+  .assist-subtitle { margin-top: 6px; color: var(--muted); font-size: .8rem; }
+  .assist-card { background: linear-gradient(180deg, color-mix(in srgb, var(--elem) 92%, transparent), var(--elem2)); border: 1px solid var(--line); border-radius: 14px; padding: 12px; box-shadow: 0 14px 30px rgba(5, 10, 17, 0.18); }
+  .assist-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .assist-stat { border: 1px solid var(--line); border-radius: 10px; padding: 9px; background: rgba(255,255,255,0.02); }
+  .assist-stat-value { font: 600 1.15rem/1 var(--serif); color: var(--text); }
+  .assist-stat-label { margin-top: 4px; font: 600 .6rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .assist-card-grid { display: grid; gap: 8px; margin-top: 12px; }
+  .assist-mini { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: rgba(255,255,255,0.02); }
+  .assist-mini-title { font-weight: 600; font-size: .82rem; color: var(--text); }
+  .assist-mini-copy { margin-top: 4px; color: var(--muted); font-size: .74rem; }
+  .assist-actions { display: flex; gap: 7px; margin-top: 12px; }
+  .assist-actions .btn { flex: 1; }
   .sect-title { font: 600 .6rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
   .sect-title:first-of-type { margin-top: 0; }
 
@@ -96,42 +113,61 @@
   <button id="themeBtn" class="themebtn" type="button" title="Appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"></circle><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"></path></svg></button>
   <button id="refresh" class="iconbtn" title="Refresh">⟳</button>
 </div>
-<div class="wrap">
-  <div class="sect-title">This page</div>
-  <div id="page" class="card"><div class="muted">Loading…</div></div>
+<div id="assistantRoot" class="wrap assist-frame" data-mode="today">
+  <section id="assistantHeader" class="assist-header">
+    <div class="assist-kicker">Reqon Assistant</div>
+    <div class="assist-title">Today</div>
+    <div class="assist-subtitle">Loading your workspace…</div>
+  </section>
 
-  <div class="sect-title">Résumé match</div>
-  <div id="coverage" class="card"><div class="muted">Open a job posting to see your résumé match.</div></div>
+  <section id="pageSection">
+    <div id="pageTitle" class="sect-title">Today</div>
+    <div id="page" class="card"><div class="muted">Loading…</div></div>
+  </section>
 
-  <div class="sect-title">Draft an answer</div>
-  <div id="ai" class="card">
-    <select id="aiKind">
-      <option value="answer">Reusable answer</option>
-      <option value="screening">Screening question</option>
-      <option value="cover">Cover note</option>
-    </select>
-    <textarea id="aiQ" placeholder="Paste the application question…" style="margin-top:8px;min-height:54px;resize:vertical"></textarea>
-    <button id="aiDraft" class="btn btn-primary">✦ Draft with AI</button>
-    <div id="aiOut"></div>
-  </div>
+  <section id="coverageSection">
+    <div class="sect-title">Resume match</div>
+    <div id="coverage" class="card"><div class="muted">Open a job posting to see your resume match.</div></div>
+  </section>
 
-  <div class="sect-title">Your pipeline</div>
-  <div id="kpis" class="kpis"></div>
-  <div class="card" style="margin-top:8px">
-    <div id="tierbar"></div>
-  </div>
+  <section id="aiSection">
+    <div class="sect-title">Draft an answer</div>
+    <div id="ai" class="card">
+      <select id="aiKind">
+        <option value="answer">Reusable answer</option>
+        <option value="screening">Screening question</option>
+        <option value="cover">Cover note</option>
+      </select>
+      <textarea id="aiQ" placeholder="Paste the application question…" style="margin-top:8px;min-height:54px;resize:vertical"></textarea>
+      <button id="aiDraft" class="btn btn-primary">✦ Draft with AI</button>
+      <div id="aiOut"></div>
+    </div>
+  </section>
 
-  <div class="sect-title">Best bets to apply</div>
-  <div id="oppsFilters" class="oppfilters"></div>
-  <div id="opps" class="card"><div class="muted">Loading…</div></div>
+  <section id="pipelineSection">
+    <div class="sect-title">Your pipeline</div>
+    <div id="kpis" class="kpis"></div>
+    <div class="card" style="margin-top:8px">
+      <div id="tierbar"></div>
+    </div>
+  </section>
 
-  <div class="sect-title">AI usage</div>
-  <div id="usage" class="card"><div class="muted">Loading…</div></div>
+  <section id="oppsSection">
+    <div class="sect-title">Best bets to apply</div>
+    <div id="oppsFilters" class="oppfilters"></div>
+    <div id="opps" class="card"><div class="muted">Loading…</div></div>
+  </section>
+
+  <section id="usageSection">
+    <div class="sect-title">AI usage</div>
+    <div id="usage" class="card"><div class="muted">Loading…</div></div>
+  </section>
 
   <div id="msg"></div>
-  <a id="board" class="link" href="#" style="margin-top:14px">Open board ↗</a>
+  <a id="board" class="link" href="#" style="margin-top:-2px">Open board ↗</a>
 </div>
 <script src="lib.js"></script>
 <script src="ui-lib.js"></script>
 <script src="theme.js"></script>
+<script src="sidepanel-mode.js"></script>
 <script src="sidepanel.js"></script>

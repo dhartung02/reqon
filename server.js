@@ -749,6 +749,30 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, count: readStore().length, port: PORT, dataFile: P.data });
 });
 
+app.get('/api/extension/experience', (req, res) => {
+  res.json({
+    ok: true,
+    version: '2026-07-01',
+    banner: {
+      compactFields: ['tracked', 'status', 'fit', 'fillAvailability'],
+      trackedPrimary: 'continue_or_review',
+      untrackedPrimary: 'start_guided_fill',
+    },
+    today: {
+      defaultQueue: 'ready_to_apply',
+      showSections: ['ready_to_apply', 'in_progress', 'needs_follow_up', 'best_bets', 'pipeline_snapshot'],
+    },
+    jobSections: {
+      tracked: ['tracked_summary', 'continue_application', 'review_update', 'keywords', 'autofill', 'captured_details', 'open_board'],
+      untracked: ['role_summary', 'track_role', 'fit_keywords', 'fill_availability', 'captured_details', 'open_board'],
+    },
+    updates: {
+      mode: 'chrome_web_store',
+      canRequestCheck: true,
+    },
+  });
+});
+
 // ---------- multi-user: identity, accounts, onboarding (ROADMAP PR0 slices 3-4) ----------
 function reqUser(req) { return MULTIUSER() ? sessionUser(req) : null; }
 function requireAdmin(req, res, next) {

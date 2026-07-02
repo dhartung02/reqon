@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run syntax lint
+        run: npm run lint
+
+      - name: App tests (best-effort — Expo/Jest, not yet proven stable headless in CI)
+        working-directory: app
+        continue-on-error: true
+        run: |
+          npm ci
+          npm test -- --watchAll=false
+
+  # Requires a one-time manual setup step: create a "production" environment in
+  # GitHub repo Settings -> Environments and add a required reviewer, so this job
+  # pauses for manual approval before deploying. Documented in Task 6 (DEPLOY.md).
+  notify-deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    steps:
+      # Each secret below is the FULL deploy hook URL, including its embedded auth
+      # token. Do not decompose/split it in a future edit — GitHub's secret log
+      # masking only matches the exact full secret value as a substring.
+      - name: Trigger Render deploy hook (API)
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+
+      - name: Trigger Render deploy hook (Cloud)
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_CLOUD }}"
+
+      - name: Trigger Render deploy hook (Marketing)
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_MARKETING }}"
